@@ -1,0 +1,9 @@
+[
+    { "id": "internet", "name": "Internet" },
+    { "id": "tv", "name": "TV" },
+    { "id": "phone", "name": "Téléphone" },
+    { "id": "billing", "name": "Facturation" },
+    { "id": "delivery", "name": "Livraison / Swap" },
+    { "id": "appointment", "name": "Rendez-vous" },
+    { "id": "general", "name": "Général" }
+]

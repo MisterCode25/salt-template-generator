@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Créer un modèle</title>
+    <link rel="stylesheet" href="../css/main.css">
+    <link rel="stylesheet" href="../css/layout.css">
+    <link rel="stylesheet" href="../css/components.css">
+</head>
+
+<body>
+
+    <header class="app-header">
+        <h1>Nouveau modèle</h1>
+        <nav class="top-menu">
+            <a href="index.html">Retour</a>
+        </nav>
+    </header>
+
+    <main class="form-container">
+
+        <section class="model-basic-info">
+            <h2>Informations générales</h2>
+
+            <div class="form-field">
+                <label>Titre du modèle</label>
+                <input type="text" id="model-title">
+            </div>
+
+            <div class="form-field">
+                <label>Type</label>
+                <select id="model-type">
+                    <option value="email">Email</option>
+                    <option value="sms">SMS</option>
+                </select>
+            </div>
+
+            <div class="form-field">
+                <label>Catégorie</label>
+                <select id="model-category"></select>
+            </div>
+
+            <div class="form-field">
+                <label>Ordre d'affichage</label>
+                <input type="number" id="model-order" value="1">
+            </div>
+        </section>
+
+        <section class="model-texts">
+            <h2>Contenu des langues</h2>
+
+            <div class="lang-block">
+                <h3>Français</h3>
+                <textarea id="text-fr"></textarea>
+            </div>
+
+            <div class="lang-block">
+                <h3>Anglais</h3>
+                <textarea id="text-en"></textarea>
+            </div>
+
+            <div class="lang-block">
+                <h3>Allemand</h3>
+                <textarea id="text-de"></textarea>
+            </div>
+
+            <div class="lang-block">
+                <h3>Italien</h3>
+                <textarea id="text-it"></textarea>
+            </div>
+        </section>
+
+        <button id="save-template" class="primary-btn">Enregistrer</button>
+
+    </main>
+
+<script type="module" src="../js/templateManager.js"></script>
+</body>
+</html>

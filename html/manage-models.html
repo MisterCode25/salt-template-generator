@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Templates</title>
+    <link rel="stylesheet" href="../css/main.css">
+    <link rel="stylesheet" href="../css/theme.css">
+    <link rel="stylesheet" href="../css/layout.css">
+    <link rel="stylesheet" href="../css/components.css">
+</head>
+
+
+<body>
+    <header class="app-header">
+        <nav class="top-menu">
+            <a href="index.html">← Back</a>
+        </nav>
+    </header>
+
+    <div class="page-container">
+
+        <div class="manage-card">
+        <h1>Manage Templates</h1>
+
+        <!-- Segmented Control -->
+        <div class="segmented-control-managed-models">
+            <div class="segment-group">
+                <button class="segment active" data-type="email">Email</button>
+                <button class="segment" data-type="sms">SMS</button>
+                <button class="segment" data-type="other">Other</button>
+            </div>
+        </div>
+
+        <!-- Zone des modèles (email ou sms selon le segment) -->
+        <div id="models-list" class="models-list"></div>
+
+        <!-- Bouton Ajouter -->
+        <div class="add-btn-container">
+            <button id="addModelBtn" class="primary-btn">+ Add Template</button>
+        </div>
+        </div> <!-- end manage-card -->
+
+    </div>
+
+    <script type="module" src="../js/manageModels.js"></script>
+</body>
+</html>
