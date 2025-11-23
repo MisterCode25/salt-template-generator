@@ -125,3 +125,17 @@
     background: rgba(50,60,85,0.5);
     filter: brightness(1.15);
 }
+
+/* --- RESPONSIVE: STACK ZONES ON SMALL SCREENS --- */
+@media (max-width: 900px) {
+    .zones-grid {
+        grid-template-columns: 1fr !important; /* 1 column instead of 4 */
+        gap: 25px;
+        padding-top: 90px; /* keep margin below segmented control */
+    }
+
+    .zone-box {
+        width: 100% !important;
+        min-height: auto;
+    }
+}
