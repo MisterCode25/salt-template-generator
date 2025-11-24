@@ -6,8 +6,12 @@
 
 /* Copie une chaîne dans le presse‑papiers (HTML + texte brut) */
 export async function copyToClipboard(htmlContent) {
-    const plainText = htmlContent.replace(/<[^>]+>/g, "");
-
+   const plainText = htmlContent
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<\/p>/gi, "\n\n")
+        .replace(/<[^>]+>/g, "")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
     try {
         await navigator.clipboard.write([
             new ClipboardItem({
