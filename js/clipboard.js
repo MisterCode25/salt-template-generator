@@ -1,10 +1,4 @@
-
-
-/* CLIPBOARD.JS
-   Gestion du copier-coller du texte généré
-*/
-
-/* Copie une chaîne dans le presse‑papiers (HTML + texte brut) */
+/* Copie une chaîne dans le presse‑papiers (texte brut uniquement) */
 export async function copyToClipboard(htmlContent) {
    const plainText = htmlContent
         .replace(/<br\s*\/?>/gi, "\n")
@@ -12,43 +6,31 @@ export async function copyToClipboard(htmlContent) {
         .replace(/<[^>]+>/g, "")
         .replace(/\n{3,}/g, "\n\n")
         .trim();
-    try {
-        await navigator.clipboard.write([
-            new ClipboardItem({
-                "text/html": new Blob([htmlContent], { type: "text/html" }),
-                "text/plain": new Blob([plainText], { type: "text/plain" })
-            })
-        ]);
-        console.log("Rich HTML copied.");
-        showToast("Content copied!");
-        return;
-    } catch (err) {
-        console.error("Rich copy failed, fallback:", err);
-    }
 
-    /* Fallback for old browsers */
-    try {
-        await navigator.clipboard.writeText(htmlContent);
-        showToast("Content copied!");
-    } catch (err2) {
-        console.error("Fallback failed:", err2);
+   try {
+       await navigator.clipboard.writeText(plainText);
+       showToast("Content copied!");
+       return;
+   } catch (err) {
+       console.error("Copy failed:", err);
+   }
 
-        const temp = document.createElement("textarea");
-        temp.value = plainText;
-        temp.style.position = "fixed";
-        temp.style.opacity = "0";
-        document.body.appendChild(temp);
-        temp.select();
+   /* Fallback for old browsers */
+   const temp = document.createElement("textarea");
+   temp.value = plainText;
+   temp.style.position = "fixed";
+   temp.style.opacity = "0";
+   document.body.appendChild(temp);
+   temp.select();
 
-        try {
-            document.execCommand("copy");
-            showToast("Content copied!");
-        } catch (err3) {
-            showToast("Unable to copy.");
-        }
+   try {
+       document.execCommand("copy");
+       showToast("Content copied!");
+   } catch (err3) {
+       showToast("Unable to copy.");
+   }
 
-        document.body.removeChild(temp);
-    }
+   document.body.removeChild(temp);
 }
 
 /* ---- TOAST VISUEL ---- */

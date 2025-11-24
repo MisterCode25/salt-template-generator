@@ -107,19 +107,19 @@ function openModelEditor(model = null) {
             <div class="popup-lang-grid">
                 <div class="popup-lang-item">
                     <label>FR</label>
-                    <div id="mFr" class="rich-editor" contenteditable="true" style="height:160px; overflow-y:auto; background-color:#111827; border:1px solid #1f2937; border-radius:8px; padding:8px;">${isEdit ? model.text_fr : ""}</div>
+                    <textarea id="mFr" class="plain-editor" style="height:160px; width:100%; background-color:#111827; color:white; border:1px solid #1f2937; border-radius:8px; padding:8px;">${isEdit ? model.text_fr : ""}</textarea>
                 </div>
                 <div class="popup-lang-item">
                     <label>EN</label>
-                    <div id="mEn" class="rich-editor" contenteditable="true" style="height:160px; overflow-y:auto; background-color:#111827; border:1px solid #1f2937; border-radius:8px; padding:8px;">${isEdit ? model.text_en : ""}</div>
+                    <textarea id="mEn" class="plain-editor" style="height:160px; width:100%; background-color:#111827; color:white; border:1px solid #1f2937; border-radius:8px; padding:8px;">${isEdit ? model.text_en : ""}</textarea>
                 </div>
                 <div class="popup-lang-item">
                     <label>DE</label>
-                    <div id="mDe" class="rich-editor" contenteditable="true" style="height:160px; overflow-y:auto; background-color:#111827; border:1px solid #1f2937; border-radius:8px; padding:8px;">${isEdit ? model.text_de : ""}</div>
+                    <textarea id="mDe" class="plain-editor" style="height:160px; width:100%; background-color:#111827; color:white; border:1px solid #1f2937; border-radius:8px; padding:8px;">${isEdit ? model.text_de : ""}</textarea>
                 </div>
                 <div class="popup-lang-item">
                     <label>IT</label>
-                    <div id="mIt" class="rich-editor" contenteditable="true" style="height:160px; overflow-y:auto; background-color:#111827; border:1px solid #1f2937; border-radius:8px; padding:8px;">${isEdit ? model.text_it : ""}</div>
+                    <textarea id="mIt" class="plain-editor" style="height:160px; width:100%; background-color:#111827; color:white; border:1px solid #1f2937; border-radius:8px; padding:8px;">${isEdit ? model.text_it : ""}</textarea>
                 </div>
             </div>
 
@@ -137,10 +137,10 @@ function openModelEditor(model = null) {
     document.getElementById("saveModel").addEventListener("click", async () => {
         const title = document.getElementById("mTitle").value.trim();
         const type = document.getElementById("mType").value;
-        const text_fr = document.getElementById("mFr").innerHTML.trim();
-        const text_en = document.getElementById("mEn").innerHTML.trim();
-        const text_de = document.getElementById("mDe").innerHTML.trim();
-        const text_it = document.getElementById("mIt").innerHTML.trim();
+        const text_fr = document.getElementById("mFr").value.trim();
+        const text_en = document.getElementById("mEn").value.trim();
+        const text_de = document.getElementById("mDe").value.trim();
+        const text_it = document.getElementById("mIt").value.trim();
 
         if (title === "") {
             alert("Title is required.");
