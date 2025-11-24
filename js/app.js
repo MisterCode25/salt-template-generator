@@ -76,4 +76,23 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
         });
     }
+
+    /* Reset Data Fields button */
+    const resetFieldsBtn = document.getElementById("resetFieldsBtn");
+    if (resetFieldsBtn) {
+        resetFieldsBtn.addEventListener("click", () => {
+            const container = document.getElementById("dynamic-inputs");
+            if (!container) return;
+
+            const fields = container.querySelectorAll("input, textarea, select");
+
+            fields.forEach(field => {
+                if (field.type === "checkbox" || field.type === "radio") {
+                    field.checked = false;
+                } else {
+                    field.value = "";
+                }
+            });
+        });
+    }
 });
