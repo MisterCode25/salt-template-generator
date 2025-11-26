@@ -128,10 +128,6 @@ textarea:focus {
     backdrop-filter: blur(18px);
 }
 
-/* Align Data section header with Email / SMS / Other */
-#zone-left h3 {
-    margin-top: -12px;
-}
 
 /* Titre Email / SMS */
 .model-section h3 {
@@ -436,6 +432,32 @@ textarea:focus {
     filter: brightness(1.1);
 }
 
+/*********** RESET BUTTON INSIDE DROPDOWN ***********/
+.dropdown-reset {
+    position: static !important;
+    width: 100%;
+    margin-top: 8px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    color: #e6ecff;
+    background: rgba(25, 32, 48, 0.85);
+    border: 1px solid rgba(80,120,255,0.25);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    text-align: left;
+    transition: 0.25s ease;
+    z-index: 9999999 !important;
+    box-sizing: border-box;
+}
+
+.dropdown-reset:hover {
+    background: rgba(50,60,85,0.7);
+    border-color: rgba(120,160,255,0.5);
+    transform: translateY(-2px);
+}
+
 /*********** RESET FIELDS BUTTON (DATA ZONE) ***********/
 .reset-fields-btn {
     margin-top: 16px;
@@ -446,9 +468,9 @@ textarea:focus {
     font-size: 14px;
     font-weight: 600;
     color: #ffffff;
-    background: linear-gradient(135deg, #ff9100, #ffb347, #ffd27f);
+    background: linear-gradient(135deg, #3b4a5a, #4e5a6b, #657283);
     border: none;
-    box-shadow: 0 4px 14px rgba(255, 165, 0, 0.5);
+    box-shadow: 0 4px 14px rgba(80, 90, 110, 0.35);
     transition: 0.25s ease;
 }
 
@@ -494,6 +516,19 @@ textarea:focus {
     display: inline-block;
 }
 
+/* Force dropdown above all elements */
+.dropdown {
+    z-index: 99999 !important;
+}
+
+.dropdown-menu {
+    z-index: 999999 !important;
+}
+
+.dropdown-reset {
+    z-index: 9999999 !important;
+}
+
 .dropdown-btn {
     padding: 10px 16px;
     background: linear-gradient(135deg, #283e6d, #1c294a);
@@ -523,16 +558,65 @@ textarea:focus {
 
 .dropdown-menu a {
     display: block;
+    width: 100%;
     padding: 10px 14px;
-    color: #cfd8ff;
-    text-decoration: none;
+    border-radius: 8px;
+    cursor: pointer;
     font-size: 14px;
+    font-weight: 600;
+    color: #e6ecff;
+    background: rgba(25, 32, 48, 0.85);
+    border: 1px solid rgba(80,120,255,0.25);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    text-align: left;
+    transition: 0.25s ease;
+    margin-bottom: 6px;
+    box-sizing: border-box;
 }
 
 .dropdown-menu a:hover {
-    background: rgba(255,255,255,0.08);
+    background: rgba(50,60,85,0.7);
+    border-color: rgba(120,160,255,0.5);
+    transform: translateY(-2px);
 }
 
 .dropdown:hover .dropdown-menu {
     display: block;
+}
+/*********** FORCE HEADER ABOVE ALL SECTIONS ***********/
+.app-header {
+    position: relative !important;
+    z-index: 999999999 !important;
+}
+/*********** RESET LOCAL STORAGE BUTTON — RED GLOSSY OVERRIDE ***********/
+#resetLocalStorageBtn {
+    background: linear-gradient(135deg, #ff3b3b, #ff5c5c, #ff8080) !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 12px rgba(255, 80, 80, 0.5) !important;
+    border: none !important;
+}
+
+#resetLocalStorageBtn:hover {
+    transform: translateY(-2px);
+    filter: brightness(1.1);
+}
+
+/*********** CONFIGURATION BADGE (BOTTOM LEFT) ***********/
+.config-badge {
+    position: fixed;
+    bottom: 18px;
+    left: 18px;
+    padding: 14px 22px;
+    background: rgba(18, 22, 33, 0.85);
+    border: 1px solid rgba(80,120,255,0.35);
+    border-radius: 12px;
+    color: #e6ecff;
+    font-size: 20px;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.45);
+    backdrop-filter: blur(12px);
+    z-index: 999999999 !important;
+    pointer-events: none;
+    opacity: 0.95;
 }

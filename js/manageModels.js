@@ -6,7 +6,7 @@ let templates = [];
 
 /* --- INIT --- */
 document.addEventListener("DOMContentLoaded", async () => {
-    templates = await loadTemplates("../data/models.json");
+    templates = await loadTemplates("models");
     setupSegments();
     renderModelsList();
 
@@ -79,7 +79,7 @@ async function deleteModel(id) {
     if (!confirm("Supprimer ce modèle ?")) return;
 
     templates = templates.filter(t => t.id !== id);
-    await saveTemplates("../data/models.json", templates);
+    await saveTemplates("models", templates);
     renderModelsList();
 }
 
@@ -170,7 +170,7 @@ function openModelEditor(model = null) {
             templates.push(newModel);
         }
 
-        await saveTemplates("../data/models.json", templates);
+        await saveTemplates("models", templates);
         popup.remove();
         renderModelsList();
     });

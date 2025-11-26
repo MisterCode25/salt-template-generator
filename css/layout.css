@@ -87,10 +87,6 @@
 
 
 
-.app-header {
-    position: relative;
-}
-
 .segment-group {
     display: flex;
     gap: 0;

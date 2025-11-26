@@ -2,7 +2,7 @@
 import { loadJSON, saveJSON } from "./storage.js";
 
 let tokens = [];
-const TOKEN_PATH = "../data/tokens.json";
+const TOKEN_PATH = "tokens";
 
 /* Charge depuis localStorage ou tokens.json */
 export async function loadTokens() {

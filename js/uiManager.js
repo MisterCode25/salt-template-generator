@@ -6,7 +6,7 @@
 */
 
 import { loadTokens } from "./tokenManager.js";
-import { loadTemplates, loadCategories } from "./templateManager.js";
+import { loadTemplates } from "./templateManager.js";
 
 /* Affiche les inputs dynamiques (un input par token) */
 export async function renderDynamicInputs() {

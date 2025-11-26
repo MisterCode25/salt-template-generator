@@ -16,8 +16,13 @@
             <div class="dropdown">
                 <button class="dropdown-btn">Options ▾</button>
                 <div class="dropdown-menu">
-                    <a href="./html/manage-tokens.html">Manage Tokens</a>
-                    <a href="./html/manage-models.html">Manage Templates</a>
+                    <button onclick="location.href='./html/manage-tokens.html'" class="dropdown-reset">Manage Tokens</button>
+                    <button onclick="location.href='./html/manage-models.html'" class="dropdown-reset">Manage Templates</button>
+                    <button id="importConfigBtn" class="dropdown-reset">Import Configuration</button>
+                    <button id="exportConfigBtn" class="dropdown-reset">Export Configuration</button>
+                    <button id="resetLocalStorageBtn" class="reset-btn dropdown-reset">
+                        Reset Local Storage
+                    </button>
                 </div>
             </div>
         </nav>
@@ -61,8 +66,7 @@
 
 </div>
 
-<button id="resetLocalStorageBtn" class="reset-btn">Reset Local Storage</button>
-
+    <div id="configBadge" class="config-badge"></div>
 </body>
 <script type="module" src="./js/app.js"></script>
 </html>

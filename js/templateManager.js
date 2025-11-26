@@ -6,7 +6,7 @@ import { loadJSON, saveJSON } from "./storage.js";
 
 /* Charge tous les modèles */
 export async function loadTemplates() {
-    const templates = await loadJSON("../data/models.json") || [];
+    const templates = await loadJSON("models") || [];
 
     return {
         email: templates.filter(t => t.type === "email"),
@@ -15,17 +15,11 @@ export async function loadTemplates() {
     };
 }
 
-/* Charge les catégories */
-export async function loadCategories() {
-    return await loadJSON("../data/categories.json") || [];
-}
-
 /* Crée un objet TemplateModel prêt à être sauvegardé */
 export function buildTemplateModel() {
 
     const title = document.getElementById("model-title").value.trim();
     const type = document.getElementById("model-type").value;
-    const category = document.getElementById("model-category").value;
     const order = Number(document.getElementById("model-order").value);
 
     const text_fr = document.getElementById("text-fr").value;
@@ -42,7 +36,6 @@ export function buildTemplateModel() {
         id: crypto.randomUUID(),
         title,
         type,
-        category,
         order,
         text_fr,
         text_en,
@@ -55,31 +48,16 @@ export function buildTemplateModel() {
 export async function saveTemplate(model) {
     if (!model) return;
 
-    const list = await loadJSON("../data/models.json") || [];
+    const list = await loadJSON("models") || [];
     list.push(model);
 
-    await saveJSON("../data/models.json", list);
+    await saveJSON("models", list);
 
     alert("Modèle enregistré (simulation).");
 }
 
 /* Initialisation sur add-template.html */
 export async function initAddTemplatePage() {
-
-    const categorySelect = document.getElementById("model-category");
-    if (!categorySelect) return;
-
-    /* Charger et afficher les catégories disponibles */
-    const categories = await loadCategories();
-    categorySelect.innerHTML = "";
-
-    categories.forEach(cat => {
-        const opt = document.createElement("option");
-        opt.value = cat.id;
-        opt.textContent = cat.name;
-        categorySelect.appendChild(opt);
-    });
-
     /* Bouton de sauvegarde */
     const saveBtn = document.getElementById("save-template");
     if (saveBtn) {
@@ -92,9 +70,4 @@ export async function initAddTemplatePage() {
 
 /* Auto-init : si on est sur add-template.html */
 document.addEventListener("DOMContentLoaded", () => {
-    const path = window.location.pathname;
-
-    if (path.includes("add-template.html")) {
-        initAddTemplatePage();
-    }
 });
