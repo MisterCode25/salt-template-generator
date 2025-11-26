@@ -1,4 +1,3 @@
-
 /* TOKENMANAGER.JS — Version PRO alignée avec manageModels.js */
 import { loadJSON, saveJSON } from "./storage.js";
 
@@ -90,6 +89,9 @@ function openTokenEditor(token = null) {
                 <option value="date" ${isEdit && token.input_type === "date" ? "selected" : ""}>Date</option>
             </select>
 
+            <label>Default value (optional)</label>
+            <input id="tDefault" type="text" value="${isEdit && token.default ? token.default : ""}">
+
             <div class="popup-actions">
                 <button class="secondary-btn" id="cancelPopup">Cancel</button>
                 <button class="primary-btn" id="saveToken">Save</button>
@@ -119,13 +121,17 @@ async function saveToken(popup, token = null) {
         token.token = name;
         token.label = label;
         token.input_type = type;
+        const def = document.getElementById("tDefault").value.trim();
+        token.default = def !== "" ? def : undefined;
     } else {
         /* Création */
+        const def = document.getElementById("tDefault").value.trim();
         tokens.push({
             id: crypto.randomUUID(),
             token: name,
             label: label,
-            input_type: type
+            input_type: type,
+            default: def !== "" ? def : undefined
         });
     }
 

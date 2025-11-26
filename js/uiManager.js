@@ -1,5 +1,3 @@
-
-
 /* UIMANAGER.JS
    Gestion de l'affichage dynamique :
    - Inputs générés depuis les tokens
@@ -23,12 +21,17 @@ export async function renderDynamicInputs() {
         const div = document.createElement("div");
         div.className = "form-field";
 
+        // load saved value if exists
+        const saved = localStorage.getItem("input_" + t.token);
+        const initialValue = saved !== null ? saved : (t.default ? t.default : "");
+
         div.innerHTML = `
             <label>${t.label || ""}</label>
             <input 
                 type="${t.input_type || 'text'}" 
                 data-token="${t.token}" 
                 placeholder="${t.label || ''}"
+                value="${initialValue}"
             >
         `;
 

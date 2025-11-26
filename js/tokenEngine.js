@@ -1,5 +1,3 @@
-
-
 /* TOKENENGINE.JS
    Moteur de remplacement des tokens dans un texte
 */
@@ -27,13 +25,30 @@ export function applyTokens(text, values) {
  * Récupère les valeurs des inputs dynamiques (un input par token)
  * @returns object : { "{ticket_num}": "263XXXXX", "{agent_name}": "Samir", ... }
  */
-export function collectInputValues() {
+export async function collectInputValues() {
     const inputs = document.querySelectorAll("[data-token]");
     const values = {};
 
+    // Load token definitions to check for defaults
+    const tokenDefs = await (await import("./tokenManager.js")).loadTokens();
+
     inputs.forEach(input => {
         const token = input.getAttribute("data-token");
-        values[token] = input.value;
+        const value = input.value.trim();
+
+        // find token definition
+        const def = tokenDefs.find(t => t.token === token);
+
+        // apply default if empty AND default exists
+        if (value === "" && def && def.default !== undefined) {
+            values[token] = def.default;
+            // save value for persistence
+            localStorage.setItem("input_" + token, values[token]);
+        } else {
+            values[token] = value;
+            // save value for persistence
+            localStorage.setItem("input_" + token, values[token]);
+        }
     });
 
     return values;
