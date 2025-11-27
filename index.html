@@ -8,7 +8,12 @@
     <link rel="stylesheet" href="./css/components.css">
 </head>
 
-<body>
+<body class="page-enter">
+<script>
+    requestAnimationFrame(() => {
+        document.body.classList.add('page-enter-active');
+    });
+</script>
 
     <header class="app-header">
         <div class="app-title">Salt Template Generator</div>

@@ -9,10 +9,15 @@
     <script type="module" src="../js/tokenManager.js"></script>
 </head>
 
-<body>
+<body class="page-enter">
+<script>
+    requestAnimationFrame(() => {
+        document.body.classList.add('page-enter-active');
+    });
+</script>
 
     <header class="app-header">
-        <a href="../index.html" class="back-link">← Back</a>
+        <button onclick="location.href='../index.html'" class="back-link">← Back</button>
     </header>
 
     <main>

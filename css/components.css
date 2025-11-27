@@ -160,7 +160,7 @@ textarea:focus {
 
 /* EMAIL — BLUE GLOSSY */
 #email-container .primary-btn {
-    background: linear-gradient(135deg, #1a2f78, #2d4fa8, #4068d1);
+    background: linear-gradient(135deg, #1e3fa8, #345fe3, #4f7fff);
     border: none;
     color: white;
     padding: 12px 18px;
@@ -168,13 +168,13 @@ textarea:focus {
     cursor: pointer;
     font-size: 16px;
     font-weight: 600;
-    box-shadow: 0 3px 10px rgba(60, 90, 255, 0.35);
+    box-shadow: 0 4px 16px rgba(60,90,255,0.55);
     transition: 0.25s ease;
 }
 
 /* SMS — PURPLE GLOSSY */
 #sms-container .primary-btn {
-    background: linear-gradient(135deg, #5520a8, #6f3ed4, #8a5df0);
+    background: linear-gradient(135deg, #6a29d9, #8c4cff, #a974ff);
     border: none;
     color: white;
     padding: 12px 18px;
@@ -182,13 +182,13 @@ textarea:focus {
     cursor: pointer;
     font-size: 16px;
     font-weight: 600;
-    box-shadow: 0 3px 10px rgba(130, 60, 255, 0.35);
+    box-shadow: 0 4px 16px rgba(130,60,255,0.55);
     transition: 0.25s ease;
 }
 
 /* OTHER — GREEN / TURQUOISE GLOSSY */
 #other-container .primary-btn {
-    background: linear-gradient(135deg, #007a60, #009c7a, #25bfa0);
+    background: linear-gradient(135deg, #009e7a, #00c49b, #34e8c5);
     border: none;
     color: #ffffff;
     padding: 12px 18px;
@@ -196,7 +196,7 @@ textarea:focus {
     cursor: pointer;
     font-size: 16px;
     font-weight: 600;
-    box-shadow: 0 3px 10px rgba(0, 220, 180, 0.35);
+    box-shadow: 0 4px 16px rgba(0,220,180,0.55);
     transition: 0.25s ease;
 }
 
@@ -399,15 +399,24 @@ textarea:focus {
 
 /*********** FIX BACK LINK STYLE ***********/
 .back-link {
+    display: inline-block;
+    padding: 10px 18px;
+    background: linear-gradient(135deg, #283e6d, #1f2f52, #16243f);
     color: #ffffff;
-    font-size: 16px;
-    text-decoration: none;
+    border: 1px solid rgba(80,120,255,0.28);
+    border-radius: 10px;
+    font-size: 15px;
     font-weight: 600;
-    margin-left: 10px;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+    transition: 0.25s ease;
+    text-decoration: none;
 }
 
 .back-link:hover {
-    color: #e6e6e6;
+    background: rgba(50,60,85,0.85);
+    border-color: rgba(120,160,255,0.45);
+    transform: translateY(-2px);
 }
 
 /*********** RESET BUTTON (BOTTOM LEFT) ***********/
@@ -623,16 +632,12 @@ textarea:focus {
     opacity: 0.95;
 }
 
-/*********** APPLE-STYLE PAGE TRANSITION ***********/
+/*********** SAFE APPLE-STYLE PAGE FADE ANIMATION ***********/
 .page-enter {
     opacity: 0;
-    transform: scale(0.97);
-    filter: blur(8px);
-    transition: opacity 0.35s ease-out, transform 0.35s ease-out, filter 0.35s ease-out;
+    transition: opacity 0.35s ease-out;
 }
 
-.page-enter-active {
+.page-enter.page-enter-active {
     opacity: 1;
-    transform: scale(1);
-    filter: blur(0);
 }

@@ -11,10 +11,15 @@
 </head>
 
 
-<body>
+<body class="page-enter">
+<script>
+    requestAnimationFrame(() => {
+        document.body.classList.add('page-enter-active');
+    });
+</script>
     <header class="app-header">
         <nav class="top-menu">
-            <a href="../index.html">← Back</a>
+            <button onclick="location.href='../index.html'" class="back-link">← Back</button>
         </nav>
     </header>
 
