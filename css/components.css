@@ -160,7 +160,7 @@ textarea:focus {
 
 /* EMAIL — BLUE GLOSSY */
 #email-container .primary-btn {
-    background: linear-gradient(135deg, #1e3fa8, #345fe3, #4f7fff);
+    background: linear-gradient(135deg, #1a2f78, #2d4fa8, #4068d1);
     border: none;
     color: white;
     padding: 12px 18px;
@@ -168,13 +168,13 @@ textarea:focus {
     cursor: pointer;
     font-size: 16px;
     font-weight: 600;
-    box-shadow: 0 4px 16px rgba(60,90,255,0.55);
+    box-shadow: 0 3px 10px rgba(60, 90, 255, 0.35);
     transition: 0.25s ease;
 }
 
 /* SMS — PURPLE GLOSSY */
 #sms-container .primary-btn {
-    background: linear-gradient(135deg, #6a29d9, #8c4cff, #a974ff);
+    background: linear-gradient(135deg, #5520a8, #6f3ed4, #8a5df0);
     border: none;
     color: white;
     padding: 12px 18px;
@@ -182,13 +182,13 @@ textarea:focus {
     cursor: pointer;
     font-size: 16px;
     font-weight: 600;
-    box-shadow: 0 4px 16px rgba(130,60,255,0.55);
+    box-shadow: 0 3px 10px rgba(130, 60, 255, 0.35);
     transition: 0.25s ease;
 }
 
 /* OTHER — GREEN / TURQUOISE GLOSSY */
 #other-container .primary-btn {
-    background: linear-gradient(135deg, #009e7a, #00c49b, #34e8c5);
+    background: linear-gradient(135deg, #007a60, #009c7a, #25bfa0);
     border: none;
     color: #ffffff;
     padding: 12px 18px;
@@ -196,7 +196,7 @@ textarea:focus {
     cursor: pointer;
     font-size: 16px;
     font-weight: 600;
-    box-shadow: 0 4px 16px rgba(0,220,180,0.55);
+    box-shadow: 0 3px 10px rgba(0, 220, 180, 0.35);
     transition: 0.25s ease;
 }
 
