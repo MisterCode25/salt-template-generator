@@ -139,7 +139,7 @@ textarea:focus {
 /* Grille des boutons Email / SMS */
 #email-container {
     display: flex;
-    flex-direction: column;
+    flex-wrap: wrap;
     gap: 12px;
     margin-top: 20px;
 }
@@ -153,48 +153,50 @@ textarea:focus {
 
 #other-container {
     display: flex;
-    flex-direction: column;
+    flex-wrap: wrap;
     gap: 12px;
     margin-top: 20px;
 }
 
 /* EMAIL — BLUE GLOSSY */
 #email-container .primary-btn {
-    background: linear-gradient(135deg, #1d4fff, #2596ff, #46c0ff);
+    background: linear-gradient(135deg, #1e3fa8, #345fe3, #4f7fff);
     border: none;
     color: white;
     padding: 12px 18px;
     border-radius: 10px;
     cursor: pointer;
-    font-size: 15px;
-    box-shadow: 0 4px 14px rgba(44,120,255,0.55);
+    font-size: 16px;
+    font-weight: 600;
+    box-shadow: 0 4px 16px rgba(60,90,255,0.55);
     transition: 0.25s ease;
 }
 
 /* SMS — PURPLE GLOSSY */
 #sms-container .primary-btn {
-    background: linear-gradient(135deg, #7b3dff, #a55bff, #c17aff);
+    background: linear-gradient(135deg, #6a29d9, #8c4cff, #a974ff);
     border: none;
     color: white;
     padding: 12px 18px;
     border-radius: 10px;
     cursor: pointer;
-    font-size: 15px;
-    box-shadow: 0 4px 14px rgba(150,80,255,0.55);
+    font-size: 16px;
+    font-weight: 600;
+    box-shadow: 0 4px 16px rgba(130,60,255,0.55);
     transition: 0.25s ease;
 }
 
 /* OTHER — GREEN / TURQUOISE GLOSSY */
 #other-container .primary-btn {
-    background: linear-gradient(135deg, #00c9a7, #00e0c3, #3afce2);
+    background: linear-gradient(135deg, #009e7a, #00c49b, #34e8c5);
     border: none;
     color: #ffffff;
     padding: 12px 18px;
     border-radius: 10px;
     cursor: pointer;
-    font-size: 15px;
+    font-size: 16px;
     font-weight: 600;
-    box-shadow: 0 4px 14px rgba(0,255,210,0.45);
+    box-shadow: 0 4px 16px rgba(0,220,180,0.55);
     transition: 0.25s ease;
 }
 
@@ -619,4 +621,18 @@ textarea:focus {
     z-index: 999999999 !important;
     pointer-events: none;
     opacity: 0.95;
+}
+
+/*********** APPLE-STYLE PAGE TRANSITION ***********/
+.page-enter {
+    opacity: 0;
+    transform: scale(0.97);
+    filter: blur(8px);
+    transition: opacity 0.35s ease-out, transform 0.35s ease-out, filter 0.35s ease-out;
+}
+
+.page-enter-active {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0);
 }
