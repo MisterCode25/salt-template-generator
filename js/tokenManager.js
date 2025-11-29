@@ -3,11 +3,53 @@ import { loadJSON, saveJSON } from "./storage.js";
 
 let tokens = [];
 const TOKEN_PATH = "tokens";
+const TOKEN_PATTERN = /\{[^{}]+\}/g;
 
 /* Charge depuis localStorage ou tokens.json */
 export async function loadTokens() {
     tokens = await loadJSON(TOKEN_PATH) || [];
     return tokens;
+}
+
+/* Ajoute automatiquement les tokens découverts dans des modèles */
+export async function ensureTokensFromTexts(texts = []) {
+    const discovered = new Set();
+
+    texts.filter(Boolean).forEach(text => {
+        const matches = text.match(TOKEN_PATTERN);
+        if (!matches) return;
+        matches.forEach(m => {
+            const token = m.trim();
+            if (token.startsWith("{") && token.endsWith("}")) {
+                discovered.add(token);
+            }
+        });
+    });
+
+    if (discovered.size === 0) return;
+
+    await loadTokens();
+
+    let added = false;
+    discovered.forEach(tokenValue => {
+        const alreadyExists = tokens.some(t => t.token === tokenValue);
+        if (alreadyExists) return;
+
+        const clean = tokenValue.slice(1, -1).replace(/[_-]+/g, " ").trim();
+        const label = clean ? clean.charAt(0).toUpperCase() + clean.slice(1) : tokenValue;
+
+        tokens.push({
+            id: crypto.randomUUID(),
+            token: tokenValue,
+            label,
+            input_type: "text"
+        });
+        added = true;
+    });
+
+    if (added) {
+        await saveTokens();
+    }
 }
 
 /* Sauvegarde dans localStorage */

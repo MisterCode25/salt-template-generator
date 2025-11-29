@@ -42,22 +42,28 @@ textarea:focus {
     outline: none;
 }
 
+.input-error {
+    border-color: #e53e3e !important;
+    box-shadow: 0 0 12px rgba(229, 62, 62, 0.4) !important;
+    background: rgba(60, 20, 20, 0.6) !important;
+}
+
 .primary-btn {
-    background: linear-gradient(135deg, #1d4fff, #2b8bff, #4fc3ff);
-    border: none;
+    background: linear-gradient(140deg, #0a1730, #12305a, #1c4375);
+    border: 1px solid rgba(80,130,230,0.32);
     color: #ffffff;
     padding: 12px 22px;
     font-weight: 600;
     border-radius: 10px;
     cursor: pointer;
     transition: 0.3s ease;
-    box-shadow: 0 4px 14px rgba(44,120,255,0.4);
+    box-shadow: 0 6px 20px rgba(18,45,90,0.5), inset 0 1px 0 rgba(255,255,255,0.08);
 }
 
 .primary-btn:hover {
-    transform: translateY(-3px);
-    filter: brightness(1.15);
-    box-shadow: 0 6px 22px rgba(44,120,255,0.55);
+    transform: translateY(-2px);
+    filter: brightness(1.06);
+    box-shadow: 0 8px 24px rgba(35,95,180,0.6), inset 0 1px 0 rgba(255,255,255,0.1);
 }
 
 .model-list button {
@@ -160,62 +166,62 @@ textarea:focus {
 
 /* EMAIL — BLUE GLOSSY */
 #email-container .primary-btn {
-    background: linear-gradient(135deg, #1e3fa8, #345fe3, #4f7fff);
-    border: none;
+    background: linear-gradient(135deg, #10204f, #1d3674, #294d9d);
+    border: 1px solid rgba(60,95,185,0.48);
     color: white;
     padding: 12px 18px;
     border-radius: 10px;
     cursor: pointer;
     font-size: 16px;
     font-weight: 600;
-    box-shadow: 0 4px 16px rgba(60,90,255,0.55);
+    box-shadow: 0 6px 18px rgba(26,55,115,0.55), inset 0 1px 0 rgba(255,255,255,0.08);
     transition: 0.25s ease;
 }
 
 /* SMS — PURPLE GLOSSY */
 #sms-container .primary-btn {
-    background: linear-gradient(135deg, #6a29d9, #8c4cff, #a974ff);
-    border: none;
+    background: linear-gradient(135deg, #3f177f, #5823ad, #763ad8);
+    border: 1px solid rgba(130,90,235,0.42);
     color: white;
     padding: 12px 18px;
     border-radius: 10px;
     cursor: pointer;
     font-size: 16px;
     font-weight: 600;
-    box-shadow: 0 4px 16px rgba(130,60,255,0.55);
+    box-shadow: 0 6px 18px rgba(60,18,120,0.6), inset 0 1px 0 rgba(255,255,255,0.08);
     transition: 0.25s ease;
 }
 
 /* OTHER — GREEN / TURQUOISE GLOSSY */
 #other-container .primary-btn {
-    background: linear-gradient(135deg, #009e7a, #00c49b, #34e8c5);
-    border: none;
+    background: linear-gradient(135deg, #044e3d, #00785f, #009a78);
+    border: 1px solid rgba(0,160,135,0.48);
     color: #ffffff;
     padding: 12px 18px;
     border-radius: 10px;
     cursor: pointer;
     font-size: 16px;
     font-weight: 600;
-    box-shadow: 0 4px 16px rgba(0,220,180,0.55);
+    box-shadow: 0 6px 18px rgba(0,95,80,0.6), inset 0 1px 0 rgba(255,255,255,0.08);
     transition: 0.25s ease;
 }
 
 #email-container .primary-btn:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 6px 20px rgba(44,120,255,0.75);
-    filter: brightness(1.15);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(44,120,255,0.6), inset 0 1px 0 rgba(255,255,255,0.12);
+    filter: brightness(1.07);
 }
 
 #sms-container .primary-btn:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 6px 20px rgba(170,90,255,0.75);
-    filter: brightness(1.15);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(130,80,235,0.62), inset 0 1px 0 rgba(255,255,255,0.12);
+    filter: brightness(1.07);
 }
 
 #other-container .primary-btn:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 6px 20px rgba(0,255,210,0.65);
-    filter: brightness(1.08);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,150,125,0.62), inset 0 1px 0 rgba(255,255,255,0.12);
+    filter: brightness(1.06);
 }
 
 /*********** MANAGE MODELS — CARD LAYOUT ***********/

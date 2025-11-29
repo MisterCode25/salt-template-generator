@@ -23,11 +23,14 @@ export function applyTokens(text, values) {
 
 /**
  * Récupère les valeurs des inputs dynamiques (un input par token)
- * @returns object : { "{ticket_num}": "263XXXXX", "{agent_name}": "Samir", ... }
+ * @param {string[]} requiredTokens - liste des tokens à valider (si null => tous)
+ * @returns object : { values: { "{ticket_num}": "263XXXXX" }, missing: ["{token}"] }
  */
-export async function collectInputValues() {
+export async function collectInputValues(requiredTokens = null) {
     const inputs = document.querySelectorAll("[data-token]");
     const values = {};
+    const missing = [];
+    const requiredSet = requiredTokens ? new Set(requiredTokens) : null;
 
     // Load token definitions to check for defaults
     const tokenDefs = await (await import("./tokenManager.js")).loadTokens();
@@ -35,23 +38,39 @@ export async function collectInputValues() {
     inputs.forEach(input => {
         const token = input.getAttribute("data-token");
         const value = input.value.trim();
+        const isRequired = !requiredSet || requiredSet.has(token);
 
         // find token definition
         const def = tokenDefs.find(t => t.token === token);
 
         // apply default if empty AND default exists
-        if (value === "" && def && def.default !== undefined) {
-            values[token] = def.default;
-            // save value for persistence
-            localStorage.setItem("input_" + token, values[token]);
-        } else {
-            values[token] = value;
-            // save value for persistence
-            localStorage.setItem("input_" + token, values[token]);
+        let finalValue = value;
+        if (finalValue === "" && def && def.default !== undefined) {
+            finalValue = def.default;
         }
+
+        const isEmpty = finalValue === "" || finalValue === undefined || finalValue === null;
+        if (isRequired && isEmpty) {
+            missing.push(token);
+            input.classList.add("input-error");
+            if (!input.dataset.errorListener) {
+                input.addEventListener("input", () => {
+                    if (input.value.trim() !== "") {
+                        input.classList.remove("input-error");
+                    }
+                });
+                input.dataset.errorListener = "true";
+            }
+        } else {
+            input.classList.remove("input-error");
+        }
+
+        values[token] = finalValue;
+        // save value for persistence
+        localStorage.setItem("input_" + token, values[token]);
     });
 
-    return values;
+    return { values, missing };
 }
 
 /**

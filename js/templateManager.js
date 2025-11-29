@@ -3,6 +3,7 @@
 */
 
 import { loadJSON, saveJSON } from "./storage.js";
+import { ensureTokensFromTexts } from "./tokenManager.js";
 
 /* Charge tous les modèles */
 export async function loadTemplates() {
@@ -52,6 +53,12 @@ export async function saveTemplate(model) {
     list.push(model);
 
     await saveJSON("models", list);
+    await ensureTokensFromTexts([
+        model.text_fr,
+        model.text_en,
+        model.text_de,
+        model.text_it
+    ]);
 
     alert("Modèle enregistré (simulation).");
 }

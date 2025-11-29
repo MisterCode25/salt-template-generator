@@ -1,4 +1,5 @@
-import { loadJSON as loadTemplates, saveJSON as saveTemplates } from "./storage.js";
+import { loadJSON, saveJSON } from "./storage.js";
+import { ensureTokensFromTexts } from "./tokenManager.js";
 
 /* --- STATE --- */
 let currentType = "email"; // email or sms
@@ -6,7 +7,7 @@ let templates = [];
 
 /* --- INIT --- */
 document.addEventListener("DOMContentLoaded", async () => {
-    templates = await loadTemplates("models");
+    templates = await loadJSON("models");
     setupSegments();
     renderModelsList();
 
@@ -79,7 +80,7 @@ async function deleteModel(id) {
     if (!confirm("Supprimer ce modèle ?")) return;
 
     templates = templates.filter(t => t.id !== id);
-    await saveTemplates("models", templates);
+    await saveJSON("models", templates);
     renderModelsList();
 }
 
@@ -170,7 +171,8 @@ function openModelEditor(model = null) {
             templates.push(newModel);
         }
 
-        await saveTemplates("models", templates);
+        await saveJSON("models", templates);
+        await ensureTokensFromTexts([text_fr, text_en, text_de, text_it]);
         popup.remove();
         renderModelsList();
     });

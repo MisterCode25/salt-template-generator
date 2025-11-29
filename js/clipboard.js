@@ -27,28 +27,29 @@ export async function copyToClipboard(htmlContent) {
        document.execCommand("copy");
        showToast("Content copied!");
    } catch (err3) {
-       showToast("Unable to copy.");
+       showToast("Unable to copy.", "error");
    }
 
    document.body.removeChild(temp);
 }
 
 /* ---- TOAST VISUEL ---- */
-function showToast(message) {
+export function showToast(message, variant = "info") {
     const toast = document.createElement("div");
     toast.textContent = message;
     toast.style.position = "fixed";
     toast.style.bottom = "30px";
     toast.style.left = "50%";
     toast.style.transform = "translateX(-50%)";
-    toast.style.background = "white";
-    toast.style.color = "black";
+    toast.style.background = variant === "error" ? "#b91c1c" : "white";
+    toast.style.color = variant === "error" ? "#ffecec" : "black";
     toast.style.padding = "12px 18px";
     toast.style.borderRadius = "8px";
     toast.style.fontSize = "14px";
     toast.style.zIndex = "9999";
     toast.style.opacity = "0";
     toast.style.transition = "opacity 0.3s ease";
+    toast.style.boxShadow = "0 8px 20px rgba(0,0,0,0.35)";
 
     document.body.appendChild(toast);
 
@@ -56,5 +57,5 @@ function showToast(message) {
     setTimeout(() => { 
         toast.style.opacity = "0"; 
         setTimeout(() => toast.remove(), 300);
-    }, 1200);
+    }, 1400);
 }

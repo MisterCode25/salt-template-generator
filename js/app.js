@@ -5,7 +5,7 @@
 import { renderTokens } from "./tokenManager.js";
 import { renderDynamicInputs, renderModelsGrid } from "./uiManager.js";
 import { collectInputValues, generateFinalText } from "./tokenEngine.js";
-import { copyToClipboard } from "./clipboard.js";
+import { copyToClipboard, showToast } from "./clipboard.js";
 import { loadTemplates } from "./templateManager.js";
 
 /* Détecte quelle page est ouverte */
@@ -59,7 +59,23 @@ document.addEventListener("DOMContentLoaded", async () => {
             const model = allTemplates.find(t => t.id === modelId);
             if (!model) return;
 
-            const values = await collectInputValues();
+            const baseText = (() => {
+                switch (currentLang) {
+                    case "fr": return model.text_fr || "";
+                    case "en": return model.text_en || "";
+                    case "de": return model.text_de || "";
+                    case "it": return model.text_it || "";
+                    default: return model.text_fr || "";
+                }
+            })();
+
+            const neededTokens = Array.from(new Set(baseText.match(/\{[^{}]+\}/g) || []));
+
+            const { values, missing } = await collectInputValues(neededTokens);
+            if (missing.length > 0) {
+                showToast("Information manquante", "error");
+                return;
+            }
             const generated = generateFinalText(model, currentLang, values);
 
             copyToClipboard(generated);
