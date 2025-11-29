@@ -137,20 +137,8 @@ textarea:focus {
 }
 
 /* Grille des boutons Email / SMS */
-#email-container {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    margin-top: 20px;
-}
-
-#sms-container {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    margin-top: 20px;
-}
-
+#email-container,
+#sms-container,
 #other-container {
     display: flex;
     flex-wrap: wrap;

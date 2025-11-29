@@ -52,46 +52,24 @@ export async function renderModelsGrid() {
     otherZone.innerHTML = "";
 
     const templates = await loadTemplates();
+    const zones = [
+        { container: emailZone, models: templates.email },
+        { container: smsZone, models: templates.sms },
+        { container: otherZone, models: templates.other }
+    ];
 
-    /* EMAIL */
-    templates.email.forEach(model => {
-        const btn = document.createElement("button");
-        btn.className = "primary-btn";
-        btn.textContent = model.title;
-        btn.setAttribute("data-model-id", model.id);
-        btn.addEventListener("click", () => {
-            document.dispatchEvent(
-                new CustomEvent("modelSelected", { detail: model })
-            );
+    zones.forEach(({ container, models }) => {
+        models.forEach(model => {
+            const btn = document.createElement("button");
+            btn.className = "primary-btn";
+            btn.textContent = model.title;
+            btn.setAttribute("data-model-id", model.id);
+            btn.addEventListener("click", () => {
+                document.dispatchEvent(
+                    new CustomEvent("modelSelected", { detail: model })
+                );
+            });
+            container.appendChild(btn);
         });
-        emailZone.appendChild(btn);
-    });
-
-    /* SMS */
-    templates.sms.forEach(model => {
-        const btn = document.createElement("button");
-        btn.className = "primary-btn";
-        btn.textContent = model.title;
-        btn.setAttribute("data-model-id", model.id);
-        btn.addEventListener("click", () => {
-            document.dispatchEvent(
-                new CustomEvent("modelSelected", { detail: model })
-            );
-        });
-        smsZone.appendChild(btn);
-    });
-
-    /* OTHER */
-    templates.other.forEach(model => {
-        const btn = document.createElement("button");
-        btn.className = "primary-btn";
-        btn.textContent = model.title;
-        btn.setAttribute("data-model-id", model.id);
-        btn.addEventListener("click", () => {
-            document.dispatchEvent(
-                new CustomEvent("modelSelected", { detail: model })
-            );
-        });
-        otherZone.appendChild(btn);
     });
 }

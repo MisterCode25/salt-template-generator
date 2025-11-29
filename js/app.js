@@ -2,7 +2,7 @@
    Point d’entrée principal de l’application
 */
 
-import { renderTokens } from "./tokenManager.js";
+import { loadTokens, renderTokens } from "./tokenManager.js";
 import { renderDynamicInputs, renderModelsGrid } from "./uiManager.js";
 import { collectInputValues, generateFinalText } from "./tokenEngine.js";
 import { copyToClipboard } from "./clipboard.js";
@@ -20,7 +20,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     /* Page : index.html */
     if (path.includes("index.html")) {
-        console.log("Page principale chargée.");
         renderDynamicInputs();
         renderModelsGrid();
 
@@ -49,11 +48,11 @@ document.addEventListener("DOMContentLoaded", async () => {
             if (!btn) return;
 
             const modelId = btn.getAttribute("data-model-id");
-            const groups = await loadTemplates();
+            const templateGroups = await loadTemplates();
             const allTemplates = [
-                ...groups.email,
-                ...groups.sms,
-                ...groups.other
+                ...templateGroups.email,
+                ...templateGroups.sms,
+                ...templateGroups.other
             ];
 
             const model = allTemplates.find(t => t.id === modelId);
@@ -168,15 +167,13 @@ document.addEventListener("DOMContentLoaded", async () => {
                 }
             });
             /* Re-apply default values from tokens */
-            import("./tokenManager.js").then(module => {
-                module.loadTokens().then(tokens => {
-                    tokens.forEach(t => {
-                        if (!t.default) return;
-                        const field = container.querySelector(`[data-token="${t.token}"]`);
-                        if (field && field.value.trim() === "") {
-                            field.value = t.default;
-                        }
-                    });
+            loadTokens().then(tokens => {
+                tokens.forEach(t => {
+                    if (!t.default) return;
+                    const field = container.querySelector(`[data-token="${t.token}"]`);
+                    if (field && field.value.trim() === "") {
+                        field.value = t.default;
+                    }
                 });
             });
         });
