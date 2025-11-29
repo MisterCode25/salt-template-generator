@@ -7,9 +7,10 @@
     <link rel="stylesheet" href="../css/main.css">
     <link rel="stylesheet" href="../css/layout.css">
     <link rel="stylesheet" href="../css/components.css">
+    <script type="module" src="../js/theme.js"></script>
 </head>
 
-<body class="page-enter">
+<body class="page-enter add-template-body">
 <script>
     requestAnimationFrame(() => {
         document.body.classList.add('page-enter-active');
@@ -17,66 +18,127 @@
 </script>
 
     <header class="app-header">
-        <h1>Nouveau modèle</h1>
+        <div class="app-title">New template</div>
         <nav class="top-menu">
-            <a href="index.html">Retour</a>
+            <button onclick="location.href='../index.html'" class="back-link">← Back</button>
+            <button id="themeToggle" class="theme-toggle" aria-label="Toggle theme">☀️</button>
         </nav>
     </header>
 
-    <main class="form-container">
+    <main class="add-template-page">
 
-        <section class="model-basic-info">
-            <h2>Informations générales</h2>
-
-            <div class="form-field">
-                <label>Titre du modèle</label>
-                <input type="text" id="model-title">
+        <section class="add-hero">
+            <div>
+                <p class="eyebrow">Create once, reuse everywhere</p>
+                <h1>Create a new template</h1>
+                <p class="hero-text">Define the general info, write your texts for each language, and insert tokens like <code>{customer_name}</code> wherever data should be injected.</p>
+                <div class="hero-chips">
+                    <span class="chip">Email</span>
+                    <span class="chip">SMS</span>
+                    <span class="chip">Other</span>
+                </div>
             </div>
-
-            <div class="form-field">
-                <label>Type</label>
-                <select id="model-type">
-                    <option value="email">Email</option>
-                    <option value="sms">SMS</option>
-                </select>
-            </div>
-
-            <div class="form-field">
-                <label>Catégorie</label>
-                <select id="model-category"></select>
-            </div>
-
-            <div class="form-field">
-                <label>Ordre d'affichage</label>
-                <input type="number" id="model-order" value="1">
+            <div class="hero-note">
+                <h4>How tokens work</h4>
+                <p>Use braces to mark dynamic parts, e.g. <code>{due_date}</code>, <code>{ticket_id}</code>. Missing values will block copy and highlight the fields.</p>
+                <p class="hint">New tokens are auto-added to the Data panel on the home screen.</p>
             </div>
         </section>
 
-        <section class="model-texts">
-            <h2>Contenu des langues</h2>
+        <div class="add-template-grid">
+            <section class="add-card">
+                <div class="card-header">
+                    <div>
+                        <p class="eyebrow">General</p>
+                        <h2>Template details</h2>
+                    </div>
+                </div>
 
-            <div class="lang-block">
-                <h3>Français</h3>
-                <textarea id="text-fr"></textarea>
-            </div>
+                <div class="field-grid">
+                    <div class="form-field">
+                        <label>Title</label>
+                        <input type="text" id="model-title" placeholder="Onboarding email">
+                    </div>
+                    <div class="form-field">
+                        <label>Type</label>
+                        <select id="model-type">
+                            <option value="email">Email</option>
+                            <option value="sms">SMS</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <label>Category</label>
+                        <select id="model-category">
+                            <option value="">(optional)</option>
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <label>Display order</label>
+                        <input type="number" id="model-order" value="1" min="1">
+                    </div>
+                </div>
+            </section>
 
-            <div class="lang-block">
-                <h3>Anglais</h3>
-                <textarea id="text-en"></textarea>
-            </div>
+            <section class="add-card span-2">
+                <div class="card-header">
+                    <div>
+                        <p class="eyebrow">Content</p>
+                        <h2>Language texts</h2>
+                    </div>
+                    <p class="hint">Insert tokens anywhere in the text to be replaced at copy time.</p>
+                </div>
 
-            <div class="lang-block">
-                <h3>Allemand</h3>
-                <textarea id="text-de"></textarea>
-            </div>
+                <div class="lang-grid">
+                    <div class="lang-block">
+                        <div class="lang-header">
+                            <h3>Français</h3>
+                            <span class="lang-badge">FR</span>
+                        </div>
+                        <textarea id="text-fr" placeholder="Bonjour {customer_name}, ..."></textarea>
+                    </div>
 
-            <div class="lang-block">
-                <h3>Italien</h3>
-                <textarea id="text-it"></textarea>
-            </div>
-        </section>
+                    <div class="lang-block">
+                        <div class="lang-header">
+                            <h3>English</h3>
+                            <span class="lang-badge">EN</span>
+                        </div>
+                        <textarea id="text-en" placeholder="Hi {customer_name}, ..."></textarea>
+                    </div>
 
-        <button id="save-template" class="primary-btn">Enregistrer</button>
+                    <div class="lang-block">
+                        <div class="lang-header">
+                            <h3>Deutsch</h3>
+                            <span class="lang-badge">DE</span>
+                        </div>
+                        <textarea id="text-de" placeholder="Hallo {customer_name}, ..."></textarea>
+                    </div>
+
+                    <div class="lang-block">
+                        <div class="lang-header">
+                            <h3>Italiano</h3>
+                            <span class="lang-badge">IT</span>
+                        </div>
+                        <textarea id="text-it" placeholder="Ciao {customer_name}, ..."></textarea>
+                    </div>
+                </div>
+            </section>
+
+            <aside class="add-card tips-card">
+                <p class="eyebrow">Tips</p>
+                <h3>Make it clear</h3>
+                <ul class="tip-list">
+                    <li>Keep titles short and action-oriented.</li>
+                    <li>Use explicit tokens: <code>{customer_name}</code>, <code>{plan_name}</code>, <code>{due_date}</code>.</li>
+                    <li>Add defaults in Manage Tokens to avoid empty fields.</li>
+                    <li>Set display order to surface your most-used templates.</li>
+                </ul>
+            </aside>
+        </div>
+
+        <div class="actions-row">
+            <button id="save-template" class="primary-btn">Save template</button>
+        </div>
 
     </main>
 

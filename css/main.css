@@ -52,6 +52,31 @@ h1, h2, h3 {
     margin: 0;
 }
 
+.light-theme body {
+    background: #f4f6fb;
+    color: #0b1a33;
+}
+
+.light-theme .app-header {
+    background: rgba(255, 255, 255, 0.82);
+    color: #0f1a33;
+    border-bottom: 1px solid rgba(30,60,120,0.2);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+}
+
+.light-theme .app-title {
+    color: #0f1a33;
+}
+
+.light-theme .top-menu a {
+    color: #1e3e7a;
+}
+
+.light-theme .top-menu a:hover {
+    color: #0f1a33;
+    text-shadow: none;
+}
+
 @media (max-width: 768px) {
     .app-header {
         flex-direction: column;

@@ -425,6 +425,22 @@ textarea:focus {
     transform: translateY(-2px);
 }
 
+.theme-toggle {
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(120,160,255,0.35);
+    background: rgba(25, 32, 48, 0.85);
+    color: #e6ecff;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+    transition: 0.2s ease;
+}
+
+.theme-toggle:hover {
+    transform: translateY(-2px);
+    filter: brightness(1.05);
+}
+
 /*********** RESET BUTTON (BOTTOM LEFT) ***********/
 .reset-btn {
     position: fixed;
@@ -600,10 +616,17 @@ textarea:focus {
 .dropdown:hover .dropdown-menu {
     display: block;
 }
-/*********** FORCE HEADER ABOVE ALL SECTIONS ***********/
+/*********** FORCE HEADER ABOVE SECTIONS (but below modals) ***********/
 .app-header {
-    position: relative !important;
-    z-index: 999999999 !important;
+    position: sticky !important;
+    top: 0;
+    z-index: 100 !important;
+}
+
+/* Add-template page: header should not overlap content */
+.add-template-body .app-header {
+    position: static !important;
+    z-index: 0 !important;
 }
 /*********** RESET LOCAL STORAGE BUTTON — RED GLOSSY OVERRIDE ***********/
 #resetLocalStorageBtn {
@@ -669,7 +692,7 @@ textarea:focus {
     align-items: center;
     justify-content: center;
     padding: 20px;
-    z-index: 9999999999;
+    z-index: 2147483647 !important;
 }
 
 .help-modal.open {
@@ -688,7 +711,7 @@ textarea:focus {
     position: relative;
     max-height: 90vh;
     overflow-y: auto;
-    z-index: 99999999999;
+    z-index: 2147483647 !important;
 }
 
 .help-modal__content h2 {
@@ -738,6 +761,218 @@ textarea:focus {
     color: #9cb4ff;
 }
 
+.theme-toggle {
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(120,160,255,0.35);
+    background: rgba(25, 32, 48, 0.85);
+    color: #e6ecff;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+    transition: 0.2s ease;
+}
+
+.theme-toggle:hover {
+    transform: translateY(-2px);
+    filter: brightness(1.05);
+}
+
+/* ---------- LIGHT THEME OVERRIDES ---------- */
+.light-theme input[type="text"],
+.light-theme input[type="number"],
+.light-theme input[type="date"],
+.light-theme select,
+.light-theme textarea {
+    background: #ffffff;
+    border: 1px solid rgba(40,70,130,0.25);
+    color: #0f1a33;
+    box-shadow: none;
+}
+
+.light-theme input[type="text"]:focus,
+.light-theme input[type="number"]:focus,
+.light-theme select:focus,
+.light-theme textarea:focus {
+    background: #f9fbff;
+    border-color: #2f6bff;
+    box-shadow: 0 0 8px rgba(60,120,255,0.25);
+}
+
+.light-theme .primary-btn {
+    background: linear-gradient(135deg, #2f6bff, #5a8dff, #7ab2ff);
+    border: 1px solid rgba(60,110,220,0.4);
+    color: #0c1428;
+    box-shadow: 0 6px 18px rgba(60,110,200,0.25);
+}
+
+.light-theme .primary-btn:hover {
+    box-shadow: 0 8px 22px rgba(60,110,200,0.3), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+
+.light-theme .secondary-btn {
+    background: #f1f5ff;
+    color: #0f1a33;
+    border: 1px solid rgba(40,70,130,0.2);
+}
+
+.light-theme .dropdown-reset,
+.light-theme .dropdown-menu a,
+.light-theme .model-row,
+.light-theme .token-row,
+.light-theme .reset-fields-btn,
+.light-theme .reset-btn,
+.light-theme .model-section,
+.light-theme .manage-card,
+.light-theme .manage-token-card,
+.light-theme .inputs-zone,
+.light-theme .zone-box {
+    background: #ffffff;
+    color: #0f1a33;
+    border: 1px solid rgba(30,60,120,0.18);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+}
+
+.light-theme .segment-group {
+    background: rgba(255,255,255,0.9);
+    border: 1px solid rgba(30,60,120,0.18);
+}
+
+.light-theme .segment {
+    background: rgba(240,245,255,0.9);
+    color: #0f1a33;
+}
+
+.light-theme .segment.active {
+    background: linear-gradient(135deg, #2f6bff, #5a8dff);
+    color: white;
+    box-shadow: 0 4px 12px rgba(60,110,200,0.35);
+}
+
+.light-theme .dropdown-btn {
+    background: linear-gradient(135deg, #4c6faf, #365b95);
+}
+
+.light-theme .dropdown-menu {
+    background: #ffffff;
+    box-shadow: 0 4px 18px rgba(0,0,0,0.1);
+}
+
+.light-theme .config-badge {
+    background: #ffffff;
+    color: #0f1a33;
+    border: 1px solid rgba(30,60,120,0.18);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+}
+
+.light-theme .model-list button {
+    background: #f8faff;
+    color: #0f1a33;
+    border: 1px solid rgba(30,60,120,0.18);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+}
+
+.light-theme .model-list button:hover {
+    background: #eef3ff;
+    border-color: rgba(30,60,120,0.28);
+}
+
+.light-theme .help-btn {
+    background: linear-gradient(135deg, #e6ecff, #cfdcff, #b6cafe);
+    color: #0f1a33;
+    border: 1px solid rgba(80,110,180,0.35);
+}
+
+.light-theme .help-modal {
+    background: rgba(0,0,0,0.35);
+}
+
+.light-theme .help-modal__content {
+    background: #ffffff;
+    color: #0f1a33;
+    border: 1px solid rgba(30,60,120,0.15);
+    box-shadow: 0 18px 30px rgba(0,0,0,0.12);
+}
+
+.light-theme .help-illustration-inline {
+    background: linear-gradient(135deg, #f4f7ff, #eef3ff);
+    color: #0f1a33;
+    border: 1px dashed rgba(40,80,150,0.4);
+}
+
+.light-theme .back-link {
+    background: linear-gradient(135deg, #dfe8ff, #ccd9f5);
+    color: #0f1a33;
+    border: 1px solid rgba(40,80,150,0.3);
+}
+
+.light-theme .theme-toggle {
+    background: #ffffff;
+    color: #0f1a33;
+    border: 1px solid rgba(30,60,120,0.18);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.light-theme .reset-btn {
+    background: linear-gradient(135deg, #ff6b6b, #ff8c8c, #ffabab);
+    box-shadow: 0 4px 12px rgba(255,120,120,0.4);
+    color: #4a0a0a;
+}
+
+.light-theme .reset-btn:hover {
+    box-shadow: 0 6px 18px rgba(255,120,120,0.45);
+}
+
+.light-theme .edit-btn,
+.light-theme .delete-btn {
+    color: #b01818;
+}
+
+.light-theme .edit-btn:hover,
+.light-theme .delete-btn:hover {
+    color: #8c1212;
+}
+
+.light-theme #email-container .primary-btn {
+    background: linear-gradient(135deg, #3f7bff, #5f98ff, #81b2ff);
+    color: #0c1428;
+    border: 1px solid rgba(70,110,200,0.45);
+    box-shadow: 0 6px 18px rgba(70,110,200,0.22);
+}
+
+.light-theme #sms-container .primary-btn {
+    background: linear-gradient(135deg, #7b55ff, #9a75ff, #b692ff);
+    color: #0c1024;
+    border: 1px solid rgba(120,90,200,0.4);
+    box-shadow: 0 6px 18px rgba(120,90,200,0.22);
+}
+
+.light-theme #other-container .primary-btn {
+    background: linear-gradient(135deg, #1aa78a, #2fc7a8, #4be6c5);
+    color: #06221c;
+    border: 1px solid rgba(40,160,140,0.45);
+    box-shadow: 0 6px 18px rgba(40,160,140,0.22);
+}
+
+.light-theme .reset-fields-btn {
+    background: linear-gradient(135deg, #e5ecf7, #d6e2f5);
+    color: #0f1a33;
+    border: 1px solid rgba(40,80,150,0.2);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.light-theme .dropdown-reset,
+.light-theme .dropdown-menu a {
+    background: #f8faff;
+    color: #0f1a33;
+    border: 1px solid rgba(30,60,120,0.18);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.light-theme .dropdown-menu a:hover,
+.light-theme .dropdown-reset:hover {
+    background: #eef3ff;
+    border-color: rgba(30,60,120,0.28);
+}
 /*********** SAFE APPLE-STYLE PAGE FADE ANIMATION ***********/
 .page-enter {
     opacity: 0;
