@@ -799,14 +799,14 @@ textarea:focus {
 }
 
 .light-theme .primary-btn {
-    background: linear-gradient(135deg, #2f6bff, #5a8dff, #7ab2ff);
-    border: 1px solid rgba(60,110,220,0.4);
-    color: #0c1428;
-    box-shadow: 0 6px 18px rgba(60,110,200,0.25);
+    background: linear-gradient(135deg, #2d5fcb, #4c7ade);
+    border: 1px solid rgba(50,90,180,0.35);
+    color: #f5f8ff;
+    box-shadow: 0 6px 14px rgba(0,0,0,0.12);
 }
 
 .light-theme .primary-btn:hover {
-    box-shadow: 0 8px 22px rgba(60,110,200,0.3), inset 0 1px 0 rgba(255,255,255,0.2);
+    box-shadow: 0 8px 18px rgba(0,0,0,0.14), inset 0 1px 0 rgba(255,255,255,0.2);
 }
 
 .light-theme .secondary-btn {
@@ -849,7 +849,8 @@ textarea:focus {
 }
 
 .light-theme .dropdown-btn {
-    background: linear-gradient(135deg, #4c6faf, #365b95);
+    background: linear-gradient(135deg, #5a78b8, #4967a4);
+    color: #f7f9ff;
 }
 
 .light-theme .dropdown-menu {
@@ -865,10 +866,10 @@ textarea:focus {
 }
 
 .light-theme .model-list button {
-    background: #f8faff;
+    background: linear-gradient(135deg, #f7f9ff, #eef3ff);
     color: #0f1a33;
-    border: 1px solid rgba(30,60,120,0.18);
-    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+    border: 1px solid rgba(30,60,120,0.16);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
 }
 
 .light-theme .model-list button:hover {
@@ -877,9 +878,9 @@ textarea:focus {
 }
 
 .light-theme .help-btn {
-    background: linear-gradient(135deg, #e6ecff, #cfdcff, #b6cafe);
+    background: linear-gradient(135deg, #edf2ff, #d9e4ff);
     color: #0f1a33;
-    border: 1px solid rgba(80,110,180,0.35);
+    border: 1px solid rgba(70,100,170,0.3);
 }
 
 .light-theme .help-modal {
@@ -900,9 +901,9 @@ textarea:focus {
 }
 
 .light-theme .back-link {
-    background: linear-gradient(135deg, #dfe8ff, #ccd9f5);
+    background: linear-gradient(135deg, #edf3ff, #d8e2fb);
     color: #0f1a33;
-    border: 1px solid rgba(40,80,150,0.3);
+    border: 1px solid rgba(40,80,150,0.25);
 }
 
 .light-theme .theme-toggle {
@@ -913,8 +914,8 @@ textarea:focus {
 }
 
 .light-theme .reset-btn {
-    background: linear-gradient(135deg, #ff6b6b, #ff8c8c, #ffabab);
-    box-shadow: 0 4px 12px rgba(255,120,120,0.4);
+    background: linear-gradient(135deg, #ff7b73, #ff9b94);
+    box-shadow: 0 4px 12px rgba(255,130,120,0.35);
     color: #4a0a0a;
 }
 
@@ -933,31 +934,31 @@ textarea:focus {
 }
 
 .light-theme #email-container .primary-btn {
-    background: linear-gradient(135deg, #3f7bff, #5f98ff, #81b2ff);
-    color: #0c1428;
-    border: 1px solid rgba(70,110,200,0.45);
-    box-shadow: 0 6px 18px rgba(70,110,200,0.22);
+    background: linear-gradient(135deg, #3c71d6, #5c8ae4);
+    color: #f6f8ff;
+    border: 1px solid rgba(60,100,190,0.35);
+    box-shadow: 0 6px 14px rgba(0,0,0,0.1);
 }
 
 .light-theme #sms-container .primary-btn {
-    background: linear-gradient(135deg, #7b55ff, #9a75ff, #b692ff);
-    color: #0c1024;
-    border: 1px solid rgba(120,90,200,0.4);
-    box-shadow: 0 6px 18px rgba(120,90,200,0.22);
+    background: linear-gradient(135deg, #7a5ed6, #9779e5);
+    color: #f9f7ff;
+    border: 1px solid rgba(110,80,180,0.35);
+    box-shadow: 0 6px 14px rgba(0,0,0,0.1);
 }
 
 .light-theme #other-container .primary-btn {
-    background: linear-gradient(135deg, #1aa78a, #2fc7a8, #4be6c5);
-    color: #06221c;
-    border: 1px solid rgba(40,160,140,0.45);
-    box-shadow: 0 6px 18px rgba(40,160,140,0.22);
+    background: linear-gradient(135deg, #1d9c82, #35b59b);
+    color: #f4fffd;
+    border: 1px solid rgba(40,150,130,0.35);
+    box-shadow: 0 6px 14px rgba(0,0,0,0.1);
 }
 
 .light-theme .reset-fields-btn {
-    background: linear-gradient(135deg, #e5ecf7, #d6e2f5);
+    background: linear-gradient(135deg, #eef2fb, #e1e8f7);
     color: #0f1a33;
-    border: 1px solid rgba(40,80,150,0.2);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    border: 1px solid rgba(40,80,150,0.18);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.07);
 }
 
 .light-theme .dropdown-reset,
