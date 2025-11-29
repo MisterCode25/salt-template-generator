@@ -23,6 +23,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         console.log("Page principale chargée.");
         renderDynamicInputs();
         renderModelsGrid();
+        setupHelpModal();
 
         /* Display active configuration name */
         const badge = document.getElementById("configBadge");
@@ -198,3 +199,29 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
     }
 });
+
+function setupHelpModal() {
+    const btn = document.getElementById("helpBtn");
+    const modal = document.getElementById("helpModal");
+    const closeBtn = document.getElementById("closeHelp");
+
+    if (!btn || !modal || !closeBtn) return;
+
+    const open = () => {
+        modal.classList.add("open");
+        modal.setAttribute("aria-hidden", "false");
+    };
+    const close = () => {
+        modal.classList.remove("open");
+        modal.setAttribute("aria-hidden", "true");
+    };
+
+    btn.addEventListener("click", open);
+    closeBtn.addEventListener("click", close);
+    modal.addEventListener("click", (e) => {
+        if (e.target === modal) close();
+    });
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") close();
+    });
+}

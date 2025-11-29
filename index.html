@@ -73,6 +73,70 @@
 </div>
 
     <div id="configBadge" class="config-badge"></div>
+    <button id="helpBtn" class="help-btn">?</button>
+
+    <div id="helpModal" class="help-modal" aria-hidden="true">
+        <div class="help-modal__content">
+            <button id="closeHelp" class="secondary-btn help-modal__close">Fermer</button>
+            <h2>Salt Templater — Quick guide</h2>
+            <div class="help-modal__section">
+                <h3>What it does</h3>
+                <p>Create emails, SMS, or other messages with reusable templates and fill them with your data instantly.</p>
+                <div class="help-illustration-inline">
+                    <span>./images/overview-main.png</span>
+                    <small>Main dashboard (zones + header)</small>
+                </div>
+            </div>
+            <div class="help-modal__section">
+                <h3>How to use</h3>
+                <ul>
+                    <li>Fill the fields in the “Data” column (one field per token like <code>{customer_name}</code>).</li>
+                    <li>Pick a language (FR / EN / DE / IT).</li>
+                    <li>Click a template button to copy the final text (copy is blocked if required data is missing).</li>
+                </ul>
+                <div class="help-illustration-inline">
+                    <span>./images/data-entry.png</span>
+                    <small>Data column with token fields filled</small>
+                </div>
+            </div>
+            <div class="help-modal__section">
+                <h3>Create or edit a template</h3>
+                <ul>
+                    <li>Options → Manage Templates.</li>
+                    <li>Each template has a title, a type (Email/SMS/Other), and text per language.</li>
+                    <li>Insert tokens where data should appear, e.g. <code>Hi {customer_name}, your invoice is due on {due_date}.</code></li>
+                </ul>
+                <div class="help-illustration-inline">
+                    <span>./images/manage-templates.png</span>
+                    <small>Manage Templates screen</small>
+                </div>
+            </div>
+            <div class="help-modal__section">
+                <h3>Tokens</h3>
+                <ul>
+                    <li>Format: <code>{token_name}</code> (e.g. <code>{ticket_id}</code>, <code>{agent_name}</code>).</li>
+                    <li>New tokens found in templates are added automatically to the Data form.</li>
+                    <li>Manage Tokens lets you set label, field type (text/number/date), and default value.</li>
+                </ul>
+                <div class="help-illustration-inline">
+                    <span>./images/manage-tokens.png</span>
+                    <small>Manage Tokens screen</small>
+                </div>
+            </div>
+            <div class="help-modal__section">
+                <h3>Tips</h3>
+                <ul>
+                    <li>Use clear names and defaults to avoid empty outputs.</li>
+                    <li>Order your templates to surface the most-used ones first.</li>
+                    <li>Test in each language to ensure all tokens are present.</li>
+                </ul>
+                <div class="help-illustration-inline">
+                    <span>./images/template-copy.png</span>
+                    <small>Copy action with filled tokens</small>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 <script type="module" src="./js/app.js"></script>
 </html>
