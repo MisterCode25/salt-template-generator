@@ -67,7 +67,3 @@ export async function initAddTemplatePage() {
         });
     }
 }
-
-/* Auto-init : si on est sur add-template.html */
-document.addEventListener("DOMContentLoaded", () => {
-});
