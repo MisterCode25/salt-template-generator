@@ -669,7 +669,7 @@ textarea:focus {
     align-items: center;
     justify-content: center;
     padding: 20px;
-    z-index: 999998;
+    z-index: 9999999999;
 }
 
 .help-modal.open {
@@ -688,6 +688,7 @@ textarea:focus {
     position: relative;
     max-height: 90vh;
     overflow-y: auto;
+    z-index: 99999999999;
 }
 
 .help-modal__content h2 {
