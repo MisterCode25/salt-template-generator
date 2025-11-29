@@ -11,7 +11,7 @@ body {
 .app-header {
     background: rgba(20, 28, 48, 0.75);
     backdrop-filter: blur(14px);
-    padding: 20px;
+    padding: 12px 18px 18px 18px;
     color: #e8f0ff;
     display: flex;
     justify-content: space-between;
@@ -20,6 +20,7 @@ body {
     flex-wrap: wrap;
     border-bottom: 1px solid rgba(80,120,255,0.25);
     box-shadow: 0 4px 18px rgba(0,0,0,0.45);
+    position: relative;
 }
 
 .top-menu {

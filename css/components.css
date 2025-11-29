@@ -23,13 +23,12 @@ textarea {
     background: rgba(20, 26, 40, 0.85);
     color: #ffffff;
     transition: 0.25s ease;
-    width: 100%;
-    max-width: 520px;
+    max-width: 450px;
     backdrop-filter: blur(10px);
 }
 
 input[type="date"] {
-    max-width: 220px;
+    max-width: 200px;
     color: #ffffff;
 }
 
@@ -108,7 +107,6 @@ textarea:focus {
 
 .segment:hover {
     background: #e2e2e2;
-    color: #0f172a;
 }
 
 .segment.active {
@@ -116,23 +114,6 @@ textarea:focus {
     color: white;
     border-color: transparent;
     box-shadow: 0 4px 14px rgba(44,120,255,0.55);
-}
-
-@media (max-width: 768px) {
-    .segmented-control {
-        width: 100%;
-        justify-content: center;
-    }
-
-    .segment-group {
-        flex-wrap: wrap;
-        justify-content: center;
-    }
-
-    .segment {
-        flex: 1 1 110px;
-        text-align: center;
-    }
 }
 
 /* ----------- EMAIL & SMS SECTIONS LAYOUT ----------- */

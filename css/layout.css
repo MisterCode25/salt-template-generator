@@ -45,7 +45,7 @@
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
     gap: 20px;
-    padding: 70px 20px 20px 20px;
+    padding: 60px 20px 20px 20px;
     width: 100%;
     align-items: start;
     box-sizing: border-box;
@@ -67,14 +67,19 @@
     margin-bottom: 15px;
 }
 
-.segmented-control {
+.app-header .segmented-control {
     position: absolute;
-    bottom: -40px;
     left: 50%;
-    transform: translateX(-50%);
+    bottom: 0px;
+    transform: translate(-50%, 50%);
     z-index: 30;
     display: flex;
     justify-content: center;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: nowrap;
+    margin: 0;
+    margin-bottom: 0;
     width: auto;
 }
 .segmented-control-managed-models {
@@ -127,7 +132,7 @@
     .zones-grid {
         grid-template-columns: 1fr !important; /* 1 column instead of 4 */
         gap: 25px;
-        padding-top: 90px; /* keep margin below segmented control */
+        padding-top: 70px;
     }
 
     .zone-box {
@@ -138,15 +143,16 @@
 
 @media (max-width: 1200px) {
     .zones-grid {
-        padding-top: 40px;
+        padding-top: 70px;
         gap: 18px;
     }
 
-    .segmented-control {
-        position: static;
-        transform: none;
-        width: 100%;
-        justify-content: center;
-        margin-top: 10px;
+    .app-header .segmented-control {
+        flex-wrap: wrap;
+        width: calc(100% - 40px);
+        gap: 10px;
+        row-gap: 8px;
+        left: 50%;
+        transform: translate(-50%, 50%);
     }
 }
