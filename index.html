@@ -23,13 +23,20 @@
             <div class="dropdown">
                 <button class="dropdown-btn">Options ▾</button>
                 <div class="dropdown-menu">
-                    <button onclick="location.href='./html/manage-tokens.html'" class="dropdown-reset">Manage Tokens</button>
-                    <button onclick="location.href='./html/manage-models.html'" class="dropdown-reset">Manage Templates</button>
-                    <button id="importConfigBtn" class="dropdown-reset">Import Configuration</button>
-                    <button id="exportConfigBtn" class="dropdown-reset">Export Configuration</button>
-                    <button id="resetLocalStorageBtn" class="reset-btn dropdown-reset">
-                        Reset Local Storage
-                    </button>
+                    <div class="dropdown-section">
+                        <div class="dropdown-title">Management</div>
+                        <button onclick="location.href='./html/manage-tokens.html'" class="dropdown-reset">Manage tokens</button>
+                        <button onclick="location.href='./html/manage-models.html'" class="dropdown-reset">Manage templates</button>
+                    </div>
+                    <div class="dropdown-section">
+                        <div class="dropdown-title">Configuration</div>
+                        <button id="importConfigBtn" class="dropdown-reset">Import configuration</button>
+                        <button id="exportConfigBtn" class="dropdown-reset">Export configuration</button>
+                        <button id="renameConfigBtn" class="dropdown-reset">Rename configuration</button>
+                        <button id="resetLocalStorageBtn" class="reset-btn dropdown-reset">
+                            Reset saved data
+                        </button>
+                    </div>
                 </div>
             </div>
             <button id="themeToggle" class="theme-toggle" aria-label="Toggle theme">☀️</button>
@@ -85,7 +92,7 @@
                 <h3>What it does</h3>
                 <p>Create emails, SMS, or other messages with reusable templates and fill them with your data instantly.</p>
                 <div class="help-illustration-inline">
-                    <span>./images/overview-main.png</span>
+                    <img src="./images/overview-main.png" alt="Overview of the main dashboard">
                     <small>Main dashboard (zones + header)</small>
                 </div>
             </div>
@@ -97,7 +104,7 @@
                     <li>Click a template button to copy the final text (copy is blocked if required data is missing).</li>
                 </ul>
                 <div class="help-illustration-inline">
-                    <span>./images/data-entry.png</span>
+                    <img src="./images/data-entry.png" alt="Data entry column filled with fields">
                     <small>Data column with token fields filled</small>
                 </div>
             </div>
@@ -109,7 +116,7 @@
                     <li>Insert tokens where data should appear, e.g. <code>Hi {customer_name}, your invoice is due on {due_date}.</code></li>
                 </ul>
                 <div class="help-illustration-inline">
-                    <span>./images/manage-templates.png</span>
+                    <img src="./images/manage-templates.png" alt="Manage Templates screen">
                     <small>Manage Templates screen</small>
                 </div>
             </div>
@@ -121,7 +128,7 @@
                     <li>Manage Tokens lets you set label, field type (text/number/date), and default value.</li>
                 </ul>
                 <div class="help-illustration-inline">
-                    <span>./images/manage-tokens.png</span>
+                    <img src="./images/manage-tokens.png" alt="Manage Tokens screen">
                     <small>Manage Tokens screen</small>
                 </div>
             </div>
@@ -133,7 +140,7 @@
                     <li>Test in each language to ensure all tokens are present.</li>
                 </ul>
                 <div class="help-illustration-inline">
-                    <span>./images/template-copy.png</span>
+                    <img src="./images/template-copy.png" alt="Copy action with filled tokens">
                     <small>Copy action with filled tokens</small>
                 </div>
             </div>

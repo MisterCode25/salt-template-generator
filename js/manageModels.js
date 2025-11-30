@@ -92,35 +92,62 @@ function openModelEditor(model = null) {
     popup.className = "popup";
 
     popup.innerHTML = `
-        <div class="popup-box">
-            <h2>${isEdit ? "Edit Template" : "New Template"}</h2>
-
-            <label>Title</label>
-            <input id="mTitle" type="text" value="${isEdit ? model.title : ""}">
-
-            <label>Type</label>
-            <select id="mType">
-                <option value="email" ${isEdit && model.type === "email" ? "selected" : ""}>Email</option>
-                <option value="sms" ${isEdit && model.type === "sms" ? "selected" : ""}>SMS</option>
-                <option value="other" ${isEdit && model.type === "other" ? "selected" : ""}>Other</option>
-            </select>
-
-            <div class="popup-lang-grid">
-                <div class="popup-lang-item">
-                    <label>FR</label>
-                    <textarea id="mFr" class="plain-editor" style="height:160px; width:100%; background-color:#111827; color:white; border:1px solid #1f2937; border-radius:8px; padding:8px;">${isEdit ? model.text_fr : ""}</textarea>
+        <div class="popup-box popup-box--wide">
+            <div class="popup-header">
+                <div>
+                    <p class="eyebrow">Template</p>
+                    <h2>${isEdit ? "Edit template" : "New template"}</h2>
                 </div>
-                <div class="popup-lang-item">
-                    <label>EN</label>
-                    <textarea id="mEn" class="plain-editor" style="height:160px; width:100%; background-color:#111827; color:white; border:1px solid #1f2937; border-radius:8px; padding:8px;">${isEdit ? model.text_en : ""}</textarea>
+                <div class="pill">${isEdit ? "Existing" : "Draft"}</div>
+            </div>
+
+            <div class="popup-grid">
+                <div class="popup-card">
+                    <div class="field-line">
+                        <label>Title</label>
+                        <input id="mTitle" type="text" value="${isEdit ? model.title : ""}">
+                    </div>
+                    <div class="field-line">
+                        <label>Type</label>
+                        <select id="mType">
+                            <option value="email" ${isEdit && model.type === "email" ? "selected" : ""}>Email</option>
+                            <option value="sms" ${isEdit && model.type === "sms" ? "selected" : ""}>SMS</option>
+                            <option value="other" ${isEdit && model.type === "other" ? "selected" : ""}>Other</option>
+                        </select>
+                    </div>
                 </div>
-                <div class="popup-lang-item">
-                    <label>DE</label>
-                    <textarea id="mDe" class="plain-editor" style="height:160px; width:100%; background-color:#111827; color:white; border:1px solid #1f2937; border-radius:8px; padding:8px;">${isEdit ? model.text_de : ""}</textarea>
-                </div>
-                <div class="popup-lang-item">
-                    <label>IT</label>
-                    <textarea id="mIt" class="plain-editor" style="height:160px; width:100%; background-color:#111827; color:white; border:1px solid #1f2937; border-radius:8px; padding:8px;">${isEdit ? model.text_it : ""}</textarea>
+
+                <div class="popup-card popup-card--langs">
+                    <div class="lang-columns">
+                        <div class="lang-col">
+                            <div class="lang-head">
+                                <span class="lang-dot">FR</span>
+                                <span class="lang-label">French</span>
+                            </div>
+                            <textarea id="mFr" class="plain-editor tall-textarea">${isEdit ? model.text_fr : ""}</textarea>
+                        </div>
+                        <div class="lang-col">
+                            <div class="lang-head">
+                                <span class="lang-dot">EN</span>
+                                <span class="lang-label">English</span>
+                            </div>
+                            <textarea id="mEn" class="plain-editor tall-textarea">${isEdit ? model.text_en : ""}</textarea>
+                        </div>
+                        <div class="lang-col">
+                            <div class="lang-head">
+                                <span class="lang-dot">DE</span>
+                                <span class="lang-label">German</span>
+                            </div>
+                            <textarea id="mDe" class="plain-editor tall-textarea">${isEdit ? model.text_de : ""}</textarea>
+                        </div>
+                        <div class="lang-col">
+                            <div class="lang-head">
+                                <span class="lang-dot">IT</span>
+                                <span class="lang-label">Italian</span>
+                            </div>
+                            <textarea id="mIt" class="plain-editor tall-textarea">${isEdit ? model.text_it : ""}</textarea>
+                        </div>
+                    </div>
                 </div>
             </div>
 

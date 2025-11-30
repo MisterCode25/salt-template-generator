@@ -5,6 +5,19 @@
 import { loadJSON, saveJSON } from "./storage.js";
 import { ensureTokensFromTexts } from "./tokenManager.js";
 
+function setupAutosizeTextareas(root = document) {
+    const autosize = root.querySelectorAll("textarea[data-autosize]");
+    autosize.forEach(el => {
+        const min = parseInt(getComputedStyle(el).minHeight || "0", 10) || 0;
+        const resize = () => {
+            el.style.height = "auto";
+            el.style.height = Math.max(min, el.scrollHeight) + "px";
+        };
+        el.addEventListener("input", resize);
+        resize();
+    });
+}
+
 /* Charge tous les modèles */
 export async function loadTemplates() {
     const templates = await loadJSON("models") || [];
@@ -73,6 +86,8 @@ export async function initAddTemplatePage() {
             await saveTemplate(model);
         });
     }
+
+    setupAutosizeTextareas();
 }
 
 /* Auto-init : si on est sur add-template.html */

@@ -28,7 +28,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         /* Display active configuration name */
         const badge = document.getElementById("configBadge");
         if (badge) {
-            const name = localStorage.getItem("local_configName") || "Aucune configuration";
+            const name = localStorage.getItem("local_configName") || "No configuration";
             badge.textContent = name;
         }
 
@@ -104,7 +104,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const exportBtn = document.getElementById("exportConfigBtn");
     if (exportBtn) {
         exportBtn.addEventListener("click", async () => {
-            let configName = prompt("Nom de la configuration :", localStorage.getItem("local_configName") || "MaConfiguration");
+            let configName = prompt("Configuration name:", localStorage.getItem("local_configName") || "MyConfiguration");
             if (!configName) return;
 
             localStorage.setItem("local_configName", configName);
@@ -123,6 +123,20 @@ document.addEventListener("DOMContentLoaded", async () => {
             a.download = configName + ".templageConfig";
             a.click();
             URL.revokeObjectURL(url);
+        });
+    }
+
+    /* Rename Configuration button */
+    const renameBtn = document.getElementById("renameConfigBtn");
+    if (renameBtn) {
+        renameBtn.addEventListener("click", () => {
+            const current = localStorage.getItem("local_configName") || "MyConfiguration";
+            const next = prompt("Configuration name:", current);
+            if (!next) return;
+            localStorage.setItem("local_configName", next);
+            const badge = document.getElementById("configBadge");
+            if (badge) badge.textContent = next;
+            showToast("Configuration name updated");
         });
     }
 

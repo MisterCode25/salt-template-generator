@@ -60,6 +60,12 @@
     border-radius: 14px;
     padding: 15px 20px;
     min-height: 150px;
+    transition: transform 0.22s ease, box-shadow 0.22s ease;
+}
+
+.zone-box:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px rgba(0,0,0,0.5);
 }
 
 /* Zone 1 improvements */
@@ -132,16 +138,27 @@
     .zones-grid {
         grid-template-columns: 1fr !important; /* 1 column instead of 4 */
         gap: 25px;
-        padding-top: 70px;
+        padding-top: 24px;
     }
 
     .zone-box {
         width: 100% !important;
         min-height: auto;
     }
+
+    /* Place the language switcher in normal flow on compact layouts */
+    .app-header .segmented-control {
+        position: static;
+        transform: none;
+        width: 100%;
+        margin-top: 6px;
+        justify-content: center;
+    }
+
+    /* Reduce the artificial top padding now that the switcher is inline */
 }
 
-@media (max-width: 1200px) {
+@media (min-width: 901px) and (max-width: 1200px) {
     .zones-grid {
         padding-top: 70px;
         gap: 18px;
