@@ -1,5 +1,5 @@
 /* APP.JS
-   Point d’entrée principal de l’application
+   Main entry point
 */
 
 import { renderTokens, loadTokens } from "./tokenManager.js";
@@ -8,7 +8,7 @@ import { collectInputValues, generateFinalText } from "./tokenEngine.js";
 import { copyToClipboard, showToast } from "./clipboard.js";
 import { loadTemplates } from "./templateManager.js";
 
-/* Détecte quelle page est ouverte */
+/* Detect which page is open */
 document.addEventListener("DOMContentLoaded", async () => {
 
     const path = window.location.pathname;
@@ -24,7 +24,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     /* Page : index.html */
     if (isMain) {
-        console.log("Page principale chargée.");
+        console.log("Main page loaded.");
         await renderDynamicInputs();
         await renderModelsGrid();
         await checkEmptyState();
@@ -40,10 +40,10 @@ document.addEventListener("DOMContentLoaded", async () => {
             badge.textContent = name;
         }
 
-        /* Gestion du segmented control – LANGUE uniquement */
+        /* Language segmented control */
         let currentLang = "fr";
 
-        /* Click langue */
+        /* Language click */
         document.querySelectorAll(".segment[data-lang]").forEach(btn => {
             btn.addEventListener("click", () => {
                 document.querySelectorAll(".segment[data-lang]").forEach(b => b.classList.remove("active"));
@@ -52,7 +52,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             });
         });
 
-        /* Gestion du clic sur un modèle (index.html) */
+        /* Handle model click (index.html) */
         document.body.addEventListener("click", async (e) => {
             const btn = e.target.closest("button[data-model-id]");
             if (!btn) return;
@@ -82,7 +82,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
             const { values, missing } = await collectInputValues(neededTokens);
             if (missing.length > 0) {
-                showToast("Information manquante", "error");
+                showToast("Missing information", "error");
                 return;
             }
             const generated = generateFinalText(model, currentLang, values);
@@ -93,8 +93,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     /* Page : add-template.html */
     if (path.includes("add-template.html")) {
-        console.log("Page création modèle chargée.");
-        // On ajoutera la logique templateManager ici
+        console.log("Add-template page loaded.");
     }
 
     /* Reset Local Storage button */
@@ -150,8 +149,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     /* Import Configuration button */
     const importBtn = document.getElementById("importConfigBtn");
-    if (importBtn) {
-        importBtn.addEventListener("click", () => {
+    const emptyImportBtn = document.getElementById("emptyImportBtn");
+    const wireImport = (btn) => {
+        if (!btn) return;
+        btn.addEventListener("click", () => {
             const input = document.createElement("input");
             input.type = "file";
             input.accept = ".templageConfig,.json";
@@ -160,23 +161,27 @@ document.addEventListener("DOMContentLoaded", async () => {
                 const file = input.files[0];
                 if (!file) return;
 
-                const text = await file.text();
-                let config;
                 try {
-                    config = JSON.parse(text);
+                    const text = await file.text();
+                    const config = JSON.parse(text);
+                    await applyImportedConfig(config);
+                    showToast("Configuration imported successfully.");
                 } catch (e) {
+                    console.error("Import failed:", e);
                     showToast("Invalid configuration file.", "error");
                     return;
                 }
-
-                /* Clear and apply imported configuration */
-                await applyImportedConfig(config);
-                showToast("Configuration imported successfully.");
+                finally {
+                    input.value = "";
+                }
             });
 
             input.click();
         });
-    }
+    };
+
+    wireImport(importBtn);
+    wireImport(emptyImportBtn);
 
     /* Reset Data Fields button */
     const resetFieldsBtn = document.getElementById("resetFieldsBtn");
@@ -310,11 +315,11 @@ async function applyImportedConfig(config = {}) {
     localStorage.setItem("local_models", JSON.stringify(safeModels));
     localStorage.setItem("local_configName", configName);
 
-    // Refresh UI without a full reload
+    // Refresh UI and force a reload to ensure consistency
     await renderDynamicInputs();
     await renderModelsGrid();
     await checkEmptyState();
-
     const badge = document.getElementById("configBadge");
     if (badge) badge.textContent = configName;
+    setTimeout(() => location.reload(), 50);
 }

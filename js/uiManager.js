@@ -1,14 +1,14 @@
 /* UIMANAGER.JS
-   Gestion de l'affichage dynamique :
-   - Inputs générés depuis les tokens
-   - Catégories
-   - Boutons des modèles
+   Dynamic display management:
+   - Inputs generated from tokens
+   - Categories
+   - Model buttons
 */
 
 import { loadTokens } from "./tokenManager.js";
 import { loadTemplates } from "./templateManager.js";
 
-/* Affiche les inputs dynamiques (un input par token) */
+/* Render dynamic inputs (one per token) */
 export async function renderDynamicInputs() {
     const container = document.getElementById("dynamic-inputs");
     if (!container) return;
@@ -39,7 +39,7 @@ export async function renderDynamicInputs() {
     });
 }
 
-/* Affiche les catégories et les modèles */
+/* Render categories and models */
 export async function renderModelsGrid() {
     const emailZone = document.getElementById("email-container");
     const smsZone = document.getElementById("sms-container");

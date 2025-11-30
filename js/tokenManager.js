@@ -1,17 +1,17 @@
-/* TOKENMANAGER.JS — Version PRO alignée avec manageModels.js */
+/* TOKENMANAGER.JS — aligned with manageModels.js */
 import { loadJSON, saveJSON } from "./storage.js";
 
 let tokens = [];
 const TOKEN_PATH = "tokens";
 const TOKEN_PATTERN = /\{[^{}]+\}/g;
 
-/* Charge depuis localStorage ou tokens.json */
+/* Load from localStorage */
 export async function loadTokens() {
     tokens = await loadJSON(TOKEN_PATH) || [];
     return tokens;
 }
 
-/* Ajoute automatiquement les tokens découverts dans des modèles */
+/* Auto-add tokens discovered in templates */
 export async function ensureTokensFromTexts(texts = []) {
     const discovered = new Set();
 
@@ -52,12 +52,12 @@ export async function ensureTokensFromTexts(texts = []) {
     }
 }
 
-/* Sauvegarde dans localStorage */
+/* Save into localStorage */
 async function saveTokens() {
     await saveJSON(TOKEN_PATH, tokens);
 }
 
-/* Affiche la liste des tokens */
+/* Render token list */
 export async function renderTokens() {
     const list = document.getElementById("tokens-list");
     if (!list) return;
@@ -98,7 +98,7 @@ export async function renderTokens() {
     });
 }
 
-/* Supprimer un token */
+/* Delete a token */
 async function deleteToken(id) {
     if (!confirm("Delete this token?")) return;
     tokens = tokens.filter(t => t.id !== id);
@@ -106,7 +106,7 @@ async function deleteToken(id) {
     renderTokens();
 }
 
-/* Popup d’édition / création */
+/* Edit/create popup */
 function openTokenEditor(token = null) {
     const isEdit = token !== null;
 
@@ -147,7 +147,7 @@ function openTokenEditor(token = null) {
     document.getElementById("saveToken").onclick = async () => saveToken(popup, token);
 }
 
-/* Sauvegarde token (edit ou create) */
+/* Save token (edit or create) */
 async function saveToken(popup, token = null) {
     const name = document.getElementById("tName").value.trim();
     const label = document.getElementById("tLabel").value.trim();
@@ -182,7 +182,7 @@ async function saveToken(popup, token = null) {
     renderTokens();
 }
 
-/* Initialisation automatique */
+/* Auto init */
 document.addEventListener("DOMContentLoaded", () => {
     const list = document.getElementById("tokens-list");
     if (!list) return;

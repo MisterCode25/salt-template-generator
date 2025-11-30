@@ -1,5 +1,5 @@
 /* TEMPLATEMANAGER.JS
-   Gestion des modèles : chargement, création, préparation
+   Template handling: load, create, prepare
 */
 
 import { loadJSON, saveJSON } from "./storage.js";
@@ -18,7 +18,7 @@ function setupAutosizeTextareas(root = document) {
     });
 }
 
-/* Charge tous les modèles */
+/* Load all templates */
 export async function loadTemplates() {
     const templates = await loadJSON("models") || [];
 
@@ -29,7 +29,7 @@ export async function loadTemplates() {
     };
 }
 
-/* Crée un objet TemplateModel prêt à être sauvegardé */
+/* Build a TemplateModel ready to be saved */
 export function buildTemplateModel() {
 
     const title = document.getElementById("model-title").value.trim();
@@ -58,7 +58,7 @@ export function buildTemplateModel() {
     };
 }
 
-/* Sauvegarde un modèle dans models.json (simulation locale) */
+/* Save a template in localStorage */
 export async function saveTemplate(model) {
     if (!model) return;
 
@@ -76,9 +76,9 @@ export async function saveTemplate(model) {
     alert("Modèle enregistré (simulation).");
 }
 
-/* Initialisation sur add-template.html */
+/* Init on add-template.html */
 export async function initAddTemplatePage() {
-    /* Bouton de sauvegarde */
+    /* Save button */
     const saveBtn = document.getElementById("save-template");
     if (saveBtn) {
         saveBtn.addEventListener("click", async () => {
@@ -90,6 +90,6 @@ export async function initAddTemplatePage() {
     setupAutosizeTextareas();
 }
 
-/* Auto-init : si on est sur add-template.html */
+/* Auto-init: if on add-template.html */
 document.addEventListener("DOMContentLoaded", () => {
 });

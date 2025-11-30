@@ -27,7 +27,7 @@ function renderModelsList() {
         .sort((a, b) => a.order - b.order);
 
     if (list.length === 0) {
-        container.innerHTML = "<p>Aucun modèle pour ce type.</p>";
+        container.innerHTML = "<p>No template for this type.</p>";
         return;
     }
 
@@ -66,7 +66,7 @@ function renderModelsList() {
 
 /* --- DELETE MODEL --- */
 async function deleteModel(id) {
-    if (!confirm("Supprimer ce modèle ?")) return;
+    if (!confirm("Delete this template?")) return;
 
     templates = templates.filter(t => t.id !== id);
     await saveJSON("models", templates);

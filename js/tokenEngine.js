@@ -1,5 +1,5 @@
 /* TOKENENGINE.JS
-   Moteur de remplacement des tokens dans un texte
+   Token replacement engine
 */
 
 /**
@@ -75,7 +75,7 @@ export async function collectInputValues(requiredTokens = null) {
 
 /**
  * Génère le texte final en fonction de la langue choisie
- * @param {object} model - Le modèle sélectionné
+ * @param {object} model - Selected model
  * @param {string} lang - fr / en / de / it
  */
 export function generateFinalText(model, lang, tokenValues) {

@@ -1,7 +1,7 @@
-/* STORAGE.JS — Nouvelle version avec LocalStorage */
+/* STORAGE.JS — LocalStorage-backed storage */
 /* ------------------------------------------------ */
 
-/* Chargement générique : uniquement depuis localStorage */
+/* Generic load: only from localStorage */
 
 export async function loadJSON(path) {
     try {
@@ -20,7 +20,7 @@ export async function loadJSON(path) {
     }
 }
 
-/* Sauvegarde : Écriture dans localStorage uniquement */
+/* Save: write to localStorage only */
 export async function saveJSON(path, data) {
     try {
         const key = "local_" + path;

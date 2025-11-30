@@ -39,7 +39,7 @@
     border-radius: 6px;
 }
 
-/* --- GRID PRINCIPALE EN 4 ZONES (2x2) --- */
+/* --- MAIN GRID WITH 4 ZONES (2x2) --- */
 
 .zones-grid {
     display: grid;

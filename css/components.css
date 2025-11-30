@@ -141,14 +141,14 @@ textarea:focus {
 }
 
 
-/* Titre Email / SMS */
+/* Email / SMS title */
 .model-section h3 {
     margin: 0 0 20px 0;
     font-size: 18px;
     font-weight: 600;
 }
 
-/* Grille des boutons Email / SMS */
+/* Email / SMS button grid */
 #email-container {
     display: flex;
     flex-wrap: wrap;
@@ -711,6 +711,18 @@ textarea:focus {
     gap: 10px;
     flex-wrap: wrap;
     margin-top: 8px;
+}
+
+.help-link-btn {
+    margin-left: auto;
+    border-style: dashed;
+    border-color: rgba(120,160,255,0.45);
+    background: rgba(25, 32, 48, 0.6);
+}
+
+.help-link-btn:hover {
+    border-color: rgba(160,200,255,0.8);
+    background: rgba(35, 42, 60, 0.8);
 }
 
 /* --- RESPONSIVE: STACK MANAGE LINKS --- */
