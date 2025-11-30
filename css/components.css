@@ -678,6 +678,41 @@ textarea:focus {
     filter: brightness(1.08);
 }
 
+.empty-state {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: center;
+}
+
+.empty-card {
+    width: min(960px, 100%);
+    background: rgba(18, 22, 33, 0.92);
+    border: 1px solid rgba(80,120,255,0.3);
+    border-radius: 16px;
+    padding: 22px 20px;
+    box-shadow: 0 10px 26px rgba(0,0,0,0.45);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    text-align: left;
+}
+
+.empty-card h2 {
+    margin: 0;
+}
+
+.empty-text {
+    color: #cbd6ff;
+    margin: 0;
+}
+
+.empty-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+
 /* --- RESPONSIVE: STACK MANAGE LINKS --- */
 @media (max-width: 900px) {
     .top-menu {
@@ -1127,6 +1162,10 @@ textarea:focus {
     color: #0f1a33;
     border: 1px solid rgba(30,60,120,0.15);
     box-shadow: 0 18px 30px rgba(0,0,0,0.12);
+}
+
+[hidden] {
+    display: none !important;
 }
 .light-theme .help-illustration-inline {
     background: linear-gradient(135deg, #f4f7ff, #eef3ff);

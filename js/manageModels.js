@@ -5,17 +5,6 @@ import { ensureTokensFromTexts } from "./tokenManager.js";
 let currentType = "email"; // email or sms
 let templates = [];
 
-/* --- INIT --- */
-document.addEventListener("DOMContentLoaded", async () => {
-    templates = await loadJSON("models");
-    setupSegments();
-    renderModelsList();
-
-    document.getElementById("addModelBtn").addEventListener("click", () => {
-        openModelEditor();
-    });
-});
-
 /* --- SEGMENTED CONTROL --- */
 function setupSegments() {
     document.querySelectorAll(".segment[data-type]").forEach(btn => {
@@ -85,7 +74,7 @@ async function deleteModel(id) {
 }
 
 /* --- EDITOR POPUP --- */
-function openModelEditor(model = null) {
+export function openModelEditor(model = null, opts = {}) {
     const isEdit = model !== null;
 
     const popup = document.createElement("div");
@@ -201,6 +190,27 @@ function openModelEditor(model = null) {
         await saveJSON("models", templates);
         await ensureTokensFromTexts([text_fr, text_en, text_de, text_it]);
         popup.remove();
-        renderModelsList();
+        if (typeof opts.onSave === "function") {
+            opts.onSave();
+        } else {
+            renderModelsList();
+        }
     });
 }
+
+/* --- INIT --- */
+document.addEventListener("DOMContentLoaded", async () => {
+    const listEl = document.getElementById("models-list");
+    if (!listEl) return;
+
+    templates = await loadJSON("models");
+    setupSegments();
+    renderModelsList();
+
+    const addBtn = document.getElementById("addModelBtn");
+    if (addBtn) {
+        addBtn.addEventListener("click", () => {
+            openModelEditor();
+        });
+    }
+});

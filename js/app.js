@@ -2,7 +2,7 @@
    Point d’entrée principal de l’application
 */
 
-import { renderTokens } from "./tokenManager.js";
+import { renderTokens, loadTokens } from "./tokenManager.js";
 import { renderDynamicInputs, renderModelsGrid } from "./uiManager.js";
 import { collectInputValues, generateFinalText } from "./tokenEngine.js";
 import { copyToClipboard, showToast } from "./clipboard.js";
@@ -12,6 +12,10 @@ import { loadTemplates } from "./templateManager.js";
 document.addEventListener("DOMContentLoaded", async () => {
 
     const path = window.location.pathname;
+    const isMain =
+        path.endsWith("/") ||
+        path.endsWith("/index.html") ||
+        path.includes("index.html");
 
     /* Page : manage-tokens */
     if (path.includes("manage-tokens.html")) {
@@ -19,11 +23,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     /* Page : index.html */
-    if (path.includes("index.html")) {
+    if (isMain) {
         console.log("Page principale chargée.");
-        renderDynamicInputs();
-        renderModelsGrid();
+        await renderDynamicInputs();
+        await renderModelsGrid();
+        await checkEmptyState();
+        setTimeout(checkEmptyState, 0); // re-evaluate once DOM paints
+        initEmptyStateWatcher();
         setupHelpModal();
+        setupQuickCreate();
 
         /* Display active configuration name */
         const badge = document.getElementById("configBadge");
@@ -157,25 +165,13 @@ document.addEventListener("DOMContentLoaded", async () => {
                 try {
                     config = JSON.parse(text);
                 } catch (e) {
-                    alert("Invalid configuration file.");
+                    showToast("Invalid configuration file.", "error");
                     return;
                 }
 
                 /* Clear and apply imported configuration */
-                localStorage.clear();
-
-                if (config.tokens) {
-                    localStorage.setItem("local_tokens", JSON.stringify(config.tokens));
-                }
-                if (config.models) {
-                    localStorage.setItem("local_models", JSON.stringify(config.models));
-                }
-                if (config.configName) {
-                    localStorage.setItem("local_configName", config.configName);
-                }
-
-                alert("Configuration imported successfully.");
-                location.reload();
+                await applyImportedConfig(config);
+                showToast("Configuration imported successfully.");
             });
 
             input.click();
@@ -216,10 +212,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 function setupHelpModal() {
     const btn = document.getElementById("helpBtn");
+    const triggers = document.querySelectorAll("[data-open-help]");
     const modal = document.getElementById("helpModal");
     const closeBtn = document.getElementById("closeHelp");
 
-    if (!btn || !modal || !closeBtn) return;
+    if (!modal || !closeBtn || (!btn && triggers.length === 0)) return;
 
     const open = () => {
         modal.classList.add("open");
@@ -230,7 +227,8 @@ function setupHelpModal() {
         modal.setAttribute("aria-hidden", "true");
     };
 
-    btn.addEventListener("click", open);
+    if (btn) btn.addEventListener("click", open);
+    triggers.forEach(t => t.addEventListener("click", open));
     closeBtn.addEventListener("click", close);
     modal.addEventListener("click", (e) => {
         if (e.target === modal) close();
@@ -238,4 +236,85 @@ function setupHelpModal() {
     document.addEventListener("keydown", (e) => {
         if (e.key === "Escape") close();
     });
+}
+
+async function checkEmptyState() {
+    const empty = document.getElementById("emptyState");
+    const grid = document.getElementById("zones-grid");
+    if (!empty || !grid) return;
+
+    const groups = await loadTemplates();
+    const tokens = await loadTokens();
+    const storageTemplateCount = groups.email.length + groups.sms.length + groups.other.length;
+    const storageTokenCount = tokens.length;
+    const hasTemplates = storageTemplateCount > 0;
+    const hasTokens = storageTokenCount > 0;
+    const isEmpty = !hasTemplates && !hasTokens;
+
+    const sections = [
+        document.getElementById("zone-left"),
+        document.getElementById("email-col"),
+        document.getElementById("sms-col"),
+        document.getElementById("other-col")
+    ].filter(Boolean);
+
+    if (isEmpty) {
+        empty.hidden = false;
+        grid.classList.add("zones-grid--empty");
+        sections.forEach(s => s.setAttribute("hidden", "true"));
+    } else {
+        empty.hidden = true;
+        grid.classList.remove("zones-grid--empty");
+        sections.forEach(s => s.removeAttribute("hidden"));
+    }
+}
+
+function setupQuickCreate() {
+    const btn = document.getElementById("quickCreateTemplate");
+    if (!btn) return;
+    btn.addEventListener("click", () => {
+        import("./manageModels.js").then(mod => {
+            if (mod.openModelEditor) {
+                mod.openModelEditor(null, {
+                    onSave: () => location.reload()
+                });
+            }
+        });
+    });
+}
+
+function initEmptyStateWatcher() {
+    const targets = [
+        document.getElementById("email-container"),
+        document.getElementById("sms-container"),
+        document.getElementById("other-container"),
+        document.getElementById("dynamic-inputs")
+    ].filter(Boolean);
+
+    if (targets.length === 0) return;
+
+    const observer = new MutationObserver(() => {
+        checkEmptyState();
+    });
+
+    targets.forEach(t => observer.observe(t, { childList: true, subtree: true }));
+}
+
+async function applyImportedConfig(config = {}) {
+    const safeTokens = Array.isArray(config.tokens) ? config.tokens : [];
+    const safeModels = Array.isArray(config.models) ? config.models : [];
+    const configName = config.configName || "Imported configuration";
+
+    localStorage.clear();
+    localStorage.setItem("local_tokens", JSON.stringify(safeTokens));
+    localStorage.setItem("local_models", JSON.stringify(safeModels));
+    localStorage.setItem("local_configName", configName);
+
+    // Refresh UI without a full reload
+    await renderDynamicInputs();
+    await renderModelsGrid();
+    await checkEmptyState();
+
+    const badge = document.getElementById("configBadge");
+    if (badge) badge.textContent = configName;
 }
