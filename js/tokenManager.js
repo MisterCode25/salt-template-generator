@@ -75,13 +75,13 @@ export async function renderTokens() {
 
         /* Boutons */
         const editBtn = document.createElement("button");
-        editBtn.className = "edit-btn";
-        editBtn.innerHTML = "✏️";
+        editBtn.className = "icon-btn edit-btn";
+        editBtn.innerHTML = `<span class="icon-pencil" aria-hidden="true"></span><span class="sr-only">Edit</span>`;
         editBtn.addEventListener("click", () => openTokenEditor(t));
 
         const deleteBtn = document.createElement("button");
-        deleteBtn.className = "delete-btn";
-        deleteBtn.innerHTML = "🗑️";
+        deleteBtn.className = "icon-btn delete-btn";
+        deleteBtn.innerHTML = `<span class="icon-trash" aria-hidden="true"></span><span class="sr-only">Delete</span>`;
         deleteBtn.addEventListener("click", () => deleteToken(t.id));
 
         /* Groupe boutons */

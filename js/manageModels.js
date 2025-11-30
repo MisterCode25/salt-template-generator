@@ -50,13 +50,13 @@ function renderModelsList() {
         title.textContent = model.title;
 
         const editBtn = document.createElement("button");
-        editBtn.className = "edit-btn";
-        editBtn.textContent = "✏️";
+        editBtn.className = "icon-btn edit-btn";
+        editBtn.innerHTML = `<span class="icon-pencil" aria-hidden="true"></span><span class="sr-only">Edit</span>`;
         editBtn.addEventListener("click", () => openModelEditor(model));
 
         const deleteBtn = document.createElement("button");
-        deleteBtn.className = "delete-btn";
-        deleteBtn.textContent = "🗑️";
+        deleteBtn.className = "icon-btn delete-btn";
+        deleteBtn.innerHTML = `<span class="icon-trash" aria-hidden="true"></span><span class="sr-only">Delete</span>`;
         deleteBtn.addEventListener("click", () => deleteModel(model.id));
 
         row.appendChild(title);
