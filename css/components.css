@@ -60,6 +60,17 @@ textarea:focus {
     box-shadow: 0 6px 20px rgba(18,45,90,0.5), inset 0 1px 0 rgba(255,255,255,0.08);
 }
 
+.primary-btn.has-variants {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.variant-caret {
+    font-size: 14px;
+    opacity: 0.8;
+}
+
 .primary-btn:hover {
     transform: translateY(-2px);
     filter: brightness(1.06);
@@ -284,6 +295,16 @@ textarea:focus {
     box-shadow: 0 10px 20px rgba(0,0,0,0.35);
 }
 
+.variant-pill {
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: rgba(80,120,255,0.16);
+    border: 1px solid rgba(80,120,255,0.28);
+    color: #d8e3ff;
+    font-size: 12px;
+    font-weight: 700;
+}
+
 /*********** EDIT AND DELETE BUTTONS ***********/
 .icon-btn {
     width: 36px;
@@ -500,6 +521,121 @@ textarea:focus {
     background: rgba(50,60,85,0.85);
     filter: brightness(1.1);
     transform: translateY(-1px);
+}
+
+.variant-editor {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.variant-editor-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.variant-tabs {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.variant-tab {
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(80,120,255,0.25);
+    background: rgba(25, 32, 48, 0.85);
+    color: #e6ecff;
+    cursor: pointer;
+    transition: 0.18s ease;
+    font-weight: 600;
+}
+
+.variant-tab:hover {
+    border-color: rgba(120,160,255,0.55);
+    filter: brightness(1.05);
+}
+
+.variant-tab.active {
+    background: linear-gradient(135deg, #1d4fff, #46c0ff);
+    color: #ffffff;
+    border-color: transparent;
+    box-shadow: 0 4px 14px rgba(44,120,255,0.45);
+}
+
+.variant-panels {
+    border: 1px solid rgba(80,120,255,0.18);
+    border-radius: 12px;
+    padding: 12px;
+    background: rgba(18, 22, 33, 0.7);
+}
+
+.variant-panel {
+    display: none;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.variant-panel.active {
+    display: flex;
+}
+
+.variant-panel-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.variant-name-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 240px;
+}
+
+.variant-name-field input {
+    max-width: 280px;
+}
+
+.variant-lang-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 12px;
+}
+
+.variant-lang textarea {
+    width: 100%;
+}
+
+.variant-empty {
+    padding: 12px 10px;
+    background: rgba(25, 32, 48, 0.6);
+    border: 1px dashed rgba(80,120,255,0.35);
+    border-radius: 10px;
+    color: #cbd6ff;
+    text-align: center;
+}
+
+.variant-picker {
+    max-width: 520px;
+}
+
+.variant-choice-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.variant-choice-btn {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
 }
 
 
@@ -1196,6 +1332,35 @@ textarea:focus {
     color: #0f1a33;
     border: 1px solid rgba(30,60,120,0.18);
     box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.light-theme .variant-panels {
+    background: #ffffff;
+    border: 1px solid rgba(30,60,120,0.16);
+}
+
+.light-theme .variant-tab {
+    background: #f4f7ff;
+    color: #0f1a33;
+    border: 1px solid rgba(30,60,120,0.18);
+}
+
+.light-theme .variant-tab.active {
+    background: linear-gradient(135deg, #2f6bff, #5a8dff);
+    color: #ffffff;
+    border-color: transparent;
+}
+
+.light-theme .variant-pill {
+    background: rgba(30,60,120,0.08);
+    color: #0f1a33;
+    border: 1px solid rgba(30,60,120,0.18);
+}
+
+.light-theme .variant-empty {
+    background: #f7f9ff;
+    border-color: rgba(30,60,120,0.2);
+    color: #0f1a33;
 }
 
 .light-theme .reset-btn {

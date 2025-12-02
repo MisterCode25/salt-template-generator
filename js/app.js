@@ -43,6 +43,74 @@ document.addEventListener("DOMContentLoaded", async () => {
         /* Language segmented control */
         let currentLang = "fr";
 
+        const getTextByLang = (item) => {
+            switch (currentLang) {
+                case "fr": return item.text_fr || "";
+                case "en": return item.text_en || "";
+                case "de": return item.text_de || "";
+                case "it": return item.text_it || "";
+                default: return item.text_fr || "";
+            }
+        };
+
+        const copyModelText = async (model) => {
+            const text = getTextByLang(model);
+            const neededTokens = Array.from(new Set(text.match(/\{[^{}]+\}/g) || []));
+
+            const { values, missing } = await collectInputValues(neededTokens);
+            if (missing.length > 0) {
+                showToast("Missing information", "error");
+                return false;
+            }
+
+            const generated = generateFinalText(model, currentLang, values);
+            copyToClipboard(generated);
+            return true;
+        };
+
+        const openVariantPopup = (model) => {
+            const popup = document.createElement("div");
+            popup.className = "popup";
+
+            const box = document.createElement("div");
+            box.className = "popup-box variant-picker";
+            box.innerHTML = `
+                <div class="popup-header">
+                    <div>
+                        <p class="eyebrow">${model.title}</p>
+                        <h2>Choisir une variante</h2>
+                    </div>
+                    <button class="secondary-btn" data-close-variant>Fermer</button>
+                </div>
+                <div class="variant-choice-grid"></div>
+            `;
+
+            const grid = box.querySelector(".variant-choice-grid");
+            if (Array.isArray(model.variants)) {
+                model.variants.forEach(variant => {
+                    const btn = document.createElement("button");
+                    btn.className = "primary-btn variant-choice-btn";
+                    btn.textContent = variant.name || "Variante";
+                    btn.addEventListener("click", async () => {
+                        const copied = await copyModelText(variant);
+                        if (copied) {
+                            popup.remove();
+                        }
+                    });
+                    grid.appendChild(btn);
+                });
+            }
+
+            const closeBtn = box.querySelector("[data-close-variant]");
+            closeBtn.addEventListener("click", () => popup.remove());
+            popup.addEventListener("click", (e) => {
+                if (e.target === popup) popup.remove();
+            });
+
+            popup.appendChild(box);
+            document.body.appendChild(popup);
+        };
+
         /* Language click */
         document.querySelectorAll(".segment[data-lang]").forEach(btn => {
             btn.addEventListener("click", () => {
@@ -68,26 +136,14 @@ document.addEventListener("DOMContentLoaded", async () => {
             const model = allTemplates.find(t => t.id === modelId);
             if (!model) return;
 
-            const baseText = (() => {
-                switch (currentLang) {
-                    case "fr": return model.text_fr || "";
-                    case "en": return model.text_en || "";
-                    case "de": return model.text_de || "";
-                    case "it": return model.text_it || "";
-                    default: return model.text_fr || "";
-                }
-            })();
+            const hasVariants = Array.isArray(model.variants) && model.variants.length > 0;
 
-            const neededTokens = Array.from(new Set(baseText.match(/\{[^{}]+\}/g) || []));
-
-            const { values, missing } = await collectInputValues(neededTokens);
-            if (missing.length > 0) {
-                showToast("Missing information", "error");
+            if (hasVariants) {
+                openVariantPopup(model);
                 return;
             }
-            const generated = generateFinalText(model, currentLang, values);
 
-            copyToClipboard(generated);
+            await copyModelText(model);
         });
     }
 

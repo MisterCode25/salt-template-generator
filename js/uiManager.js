@@ -52,46 +52,38 @@ export async function renderModelsGrid() {
     otherZone.innerHTML = "";
 
     const templates = await loadTemplates();
-
-    /* EMAIL */
-    templates.email.forEach(model => {
+    const createBtn = (model) => {
         const btn = document.createElement("button");
         btn.className = "primary-btn";
-        btn.textContent = model.title;
         btn.setAttribute("data-model-id", model.id);
+
+        if (model.variants && model.variants.length > 0) {
+            btn.classList.add("has-variants");
+            btn.innerHTML = `<span>${model.title}</span><span class="variant-caret">▾</span>`;
+        } else {
+            btn.textContent = model.title;
+        }
+
         btn.addEventListener("click", () => {
             document.dispatchEvent(
                 new CustomEvent("modelSelected", { detail: model })
             );
         });
-        emailZone.appendChild(btn);
+        return btn;
+    };
+
+    /* EMAIL */
+    templates.email.forEach(model => {
+        emailZone.appendChild(createBtn(model));
     });
 
     /* SMS */
     templates.sms.forEach(model => {
-        const btn = document.createElement("button");
-        btn.className = "primary-btn";
-        btn.textContent = model.title;
-        btn.setAttribute("data-model-id", model.id);
-        btn.addEventListener("click", () => {
-            document.dispatchEvent(
-                new CustomEvent("modelSelected", { detail: model })
-            );
-        });
-        smsZone.appendChild(btn);
+        smsZone.appendChild(createBtn(model));
     });
 
     /* OTHER */
     templates.other.forEach(model => {
-        const btn = document.createElement("button");
-        btn.className = "primary-btn";
-        btn.textContent = model.title;
-        btn.setAttribute("data-model-id", model.id);
-        btn.addEventListener("click", () => {
-            document.dispatchEvent(
-                new CustomEvent("modelSelected", { detail: model })
-            );
-        });
-        otherZone.appendChild(btn);
+        otherZone.appendChild(createBtn(model));
     });
 }
