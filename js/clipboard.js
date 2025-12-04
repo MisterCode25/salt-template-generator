@@ -1,5 +1,6 @@
 /* Copie une chaîne dans le presse‑papiers (texte brut uniquement) */
-export async function copyToClipboard(htmlContent) {
+export async function copyToClipboard(htmlContent, toastOptions = {}) {
+   const { message = "Content copied!", variant = "info" } = toastOptions || {};
    const plainText = htmlContent
         .replace(/<br\s*\/?>/gi, "\n")
         .replace(/<\/p>/gi, "\n\n")
@@ -9,7 +10,7 @@ export async function copyToClipboard(htmlContent) {
 
    try {
        await navigator.clipboard.writeText(plainText);
-       showToast("Content copied!");
+       showToast(message, variant);
        return;
    } catch (err) {
        console.error("Copy failed:", err);
@@ -25,7 +26,7 @@ export async function copyToClipboard(htmlContent) {
 
    try {
        document.execCommand("copy");
-       showToast("Content copied!");
+       showToast(message, variant);
    } catch (err3) {
        showToast("Unable to copy.", "error");
    }
@@ -37,12 +38,18 @@ export async function copyToClipboard(htmlContent) {
 export function showToast(message, variant = "info") {
     const toast = document.createElement("div");
     toast.textContent = message;
+    const palette = {
+        error: { bg: "#b91c1c", color: "#ffecec" },
+        warning: { bg: "#d97706", color: "#fff7ed" },
+        info: { bg: "white", color: "black" }
+    };
+    const tone = palette[variant] || palette.info;
     toast.style.position = "fixed";
     toast.style.bottom = "30px";
     toast.style.left = "50%";
     toast.style.transform = "translateX(-50%)";
-    toast.style.background = variant === "error" ? "#b91c1c" : "white";
-    toast.style.color = variant === "error" ? "#ffecec" : "black";
+    toast.style.background = tone.bg;
+    toast.style.color = tone.color;
     toast.style.padding = "12px 18px";
     toast.style.borderRadius = "8px";
     toast.style.fontSize = "14px";

@@ -8,6 +8,10 @@ import { collectInputValues, generateFinalText } from "./tokenEngine.js";
 import { copyToClipboard, showToast } from "./clipboard.js";
 import { loadTemplates } from "./templateManager.js";
 
+/* Track input activity per section */
+const lastSectionClickVersion = {};
+let inputChangeVersion = 0;
+
 /* Detect which page is open */
 document.addEventListener("DOMContentLoaded", async () => {
 
@@ -52,12 +56,24 @@ document.addEventListener("DOMContentLoaded", async () => {
             });
         });
 
+        /* Track edits on token inputs */
+        const handleInputChange = (e) => {
+            const target = e.target.closest("[data-token]");
+            if (!target) return;
+            inputChangeVersion++;
+            target.classList.remove("input-warning");
+        };
+        document.body.addEventListener("input", handleInputChange);
+        document.body.addEventListener("change", handleInputChange);
+
         /* Handle model click (index.html) */
         document.body.addEventListener("click", async (e) => {
             const btn = e.target.closest("button[data-model-id]");
             if (!btn) return;
 
             const modelId = btn.getAttribute("data-model-id");
+            const section = btn.getAttribute("data-section") || "unknown";
+            const tokenDefs = await loadTokens();
             const groups = await loadTemplates();
             const allTemplates = [
                 ...groups.email,
@@ -85,9 +101,28 @@ document.addEventListener("DOMContentLoaded", async () => {
                 showToast("Missing information", "error");
                 return;
             }
+            const nonDefaultTokens = neededTokens.filter(token => {
+                const def = tokenDefs.find(t => t.token === token);
+                if (!def || def.default === undefined) return true;
+                return values[token] !== def.default;
+            });
+
+            const warnSameSection = lastSectionClickVersion[section] !== undefined
+                && lastSectionClickVersion[section] === inputChangeVersion
+                && nonDefaultTokens.length > 0;
+
+            if (warnSameSection) {
+                highlightInputs(nonDefaultTokens);
+            }
+
             const generated = generateFinalText(model, currentLang, values);
 
-            copyToClipboard(generated);
+            copyToClipboard(generated, warnSameSection ? {
+                message: "Copié (aucun champ modifié depuis cette section).",
+                variant: "warning"
+            } : undefined);
+
+            lastSectionClickVersion[section] = inputChangeVersion;
         });
     }
 
@@ -198,7 +233,9 @@ document.addEventListener("DOMContentLoaded", async () => {
                 } else {
                     field.value = "";
                 }
+                field.classList.remove("input-warning");
             });
+            inputChangeVersion++;
             /* Re-apply default values from tokens */
             import("./tokenManager.js").then(module => {
                 module.loadTokens().then(tokens => {
@@ -322,4 +359,14 @@ async function applyImportedConfig(config = {}) {
     const badge = document.getElementById("configBadge");
     if (badge) badge.textContent = configName;
     setTimeout(() => location.reload(), 50);
+}
+
+function highlightInputs(tokens = []) {
+    const uniqueTokens = Array.from(new Set(tokens));
+    uniqueTokens.forEach(token => {
+        const field = document.querySelector(`[data-token="${token}"]`);
+        if (!field) return;
+        field.classList.remove("input-error");
+        field.classList.add("input-warning");
+    });
 }

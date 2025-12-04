@@ -48,6 +48,12 @@ textarea:focus {
     background: rgba(60, 20, 20, 0.6) !important;
 }
 
+.input-warning {
+    border-color: #f59e0b !important;
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.45) !important;
+    background: rgba(70, 50, 10, 0.5) !important;
+}
+
 .primary-btn {
     background: linear-gradient(140deg, #0a1730, #12305a, #1c4375);
     border: 1px solid rgba(80,130,230,0.32);

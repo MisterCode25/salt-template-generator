@@ -59,6 +59,7 @@ export async function renderModelsGrid() {
         btn.className = "primary-btn";
         btn.textContent = model.title;
         btn.setAttribute("data-model-id", model.id);
+        btn.setAttribute("data-section", "email");
         btn.addEventListener("click", () => {
             document.dispatchEvent(
                 new CustomEvent("modelSelected", { detail: model })
@@ -73,6 +74,7 @@ export async function renderModelsGrid() {
         btn.className = "primary-btn";
         btn.textContent = model.title;
         btn.setAttribute("data-model-id", model.id);
+        btn.setAttribute("data-section", "sms");
         btn.addEventListener("click", () => {
             document.dispatchEvent(
                 new CustomEvent("modelSelected", { detail: model })
@@ -87,6 +89,7 @@ export async function renderModelsGrid() {
         btn.className = "primary-btn";
         btn.textContent = model.title;
         btn.setAttribute("data-model-id", model.id);
+        btn.setAttribute("data-section", "other");
         btn.addEventListener("click", () => {
             document.dispatchEvent(
                 new CustomEvent("modelSelected", { detail: model })
