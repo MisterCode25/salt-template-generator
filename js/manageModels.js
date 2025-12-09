@@ -21,6 +21,82 @@ function normalizeModel(model = {}) {
     };
 }
 
+function deriveLangLabel(textarea) {
+    const host = textarea.closest(".lang-col, .variant-lang");
+    const label = host?.querySelector(".lang-label");
+    if (label && label.textContent.trim()) return label.textContent.trim();
+    const dot = host?.querySelector(".lang-dot");
+    if (dot && dot.textContent.trim()) return dot.textContent.trim();
+    if (textarea.dataset.lang) return textarea.dataset.lang.toUpperCase();
+    return "Texte";
+}
+
+function createLangFullscreenController(host) {
+    let activeTarget = null;
+
+    const overlay = document.createElement("div");
+    overlay.className = "lang-fullscreen";
+    overlay.innerHTML = `
+            <div class="lang-fullscreen__card">
+                <div class="lang-fullscreen__head">
+                    <div>
+                        <p class="eyebrow">Edition plein écran</p>
+                        <h3 class="lang-fullscreen__title">Texte</h3>
+                    </div>
+                    <span class="lang-fullscreen__badge">TXT</span>
+                </div>
+                <textarea class="lang-fullscreen__textarea"></textarea>
+                <div class="lang-fullscreen__actions">
+                    <button type="button" class="primary-btn" data-close-fullscreen>Terminer</button>
+                </div>
+            </div>
+        `;
+
+    const titleEl = overlay.querySelector(".lang-fullscreen__title");
+    const badgeEl = overlay.querySelector(".lang-fullscreen__badge");
+    const fullscreenArea = overlay.querySelector(".lang-fullscreen__textarea");
+    const closeBtn = overlay.querySelector("[data-close-fullscreen]");
+
+    const close = () => {
+        if (!activeTarget) return;
+        activeTarget.value = fullscreenArea.value;
+        activeTarget.dispatchEvent(new Event("input", { bubbles: true }));
+        if (overlay.parentNode === host) {
+            host.removeChild(overlay);
+        }
+        host.classList.remove("has-lang-fullscreen");
+        activeTarget.focus();
+        activeTarget = null;
+    };
+
+    closeBtn.addEventListener("click", close);
+    fullscreenArea.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+            e.preventDefault();
+            close();
+        }
+    });
+
+    return function open(target) {
+        activeTarget = target;
+        fullscreenArea.value = target.value;
+        const label = deriveLangLabel(target);
+        titleEl.textContent = label;
+        const badgeText = target.closest(".lang-col, .variant-lang")?.querySelector(".lang-dot")?.textContent?.trim()
+            || target.dataset.lang?.toUpperCase()
+            || label?.slice(0, 2).toUpperCase()
+            || "TXT";
+        badgeEl.textContent = badgeText;
+
+        if (!overlay.isConnected) {
+            host.appendChild(overlay);
+        }
+        host.classList.add("has-lang-fullscreen");
+        fullscreenArea.focus();
+        fullscreenArea.setSelectionRange(fullscreenArea.value.length, fullscreenArea.value.length);
+    };
+}
+
 /* --- SEGMENTED CONTROL --- */
 function setupSegments() {
     document.querySelectorAll(".segment[data-type]").forEach(btn => {
@@ -206,6 +282,26 @@ export function openModelEditor(model = null, opts = {}) {
     const panelContainer = popup.querySelector("#variantPanels");
     const addVariantBtn = popup.querySelector("#addVariantBtn");
 
+    const openFullscreenEditor = createLangFullscreenController(popup);
+    const baseTextAreas = {
+        fr: popup.querySelector("#mFr"),
+        en: popup.querySelector("#mEn"),
+        de: popup.querySelector("#mDe"),
+        it: popup.querySelector("#mIt")
+    };
+
+    const bindFullscreen = (area) => {
+        if (!area || area.dataset.fullscreenBound === "true") return;
+        area.dataset.fullscreenBound = "true";
+        area.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            openFullscreenEditor(area);
+        });
+    };
+
+    Object.values(baseTextAreas).forEach(bindFullscreen);
+
     function setActiveVariant(id) {
         activeVariantId = id;
         popup.querySelectorAll(".variant-tab").forEach(tab => {
@@ -314,6 +410,7 @@ export function openModelEditor(model = null, opts = {}) {
                     const key = "text_" + area.dataset.lang;
                     variant[key] = area.value;
                 });
+                bindFullscreen(area);
             });
 
             panelContainer.appendChild(panel);

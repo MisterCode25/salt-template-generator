@@ -52,10 +52,11 @@ export async function renderModelsGrid() {
     otherZone.innerHTML = "";
 
     const templates = await loadTemplates();
-    const createBtn = (model) => {
+    const createBtn = (model, section) => {
         const btn = document.createElement("button");
         btn.className = "primary-btn";
         btn.setAttribute("data-model-id", model.id);
+        btn.setAttribute("data-section", section);
 
         if (model.variants && model.variants.length > 0) {
             btn.classList.add("has-variants");
@@ -74,16 +75,16 @@ export async function renderModelsGrid() {
 
     /* EMAIL */
     templates.email.forEach(model => {
-        emailZone.appendChild(createBtn(model));
+        emailZone.appendChild(createBtn(model, "email"));
     });
 
     /* SMS */
     templates.sms.forEach(model => {
-        smsZone.appendChild(createBtn(model));
+        smsZone.appendChild(createBtn(model, "sms"));
     });
 
     /* OTHER */
     templates.other.forEach(model => {
-        otherZone.appendChild(createBtn(model));
+        otherZone.appendChild(createBtn(model, "other"));
     });
 }

@@ -8,6 +8,70 @@ import { collectInputValues, generateFinalText } from "./tokenEngine.js";
 import { copyToClipboard, showToast } from "./clipboard.js";
 import { loadTemplates } from "./templateManager.js";
 
+const lastSectionClickVersion = {};
+let inputChangeVersion = 0;
+const CONFIG_SCHEMA_VERSION = 1;
+
+function computeConfigChecksum(serialized) {
+    return Array.from(serialized).reduce((sum, ch) => (sum + ch.charCodeAt(0)) % 1000000007, 0);
+}
+
+function buildConfigPayload(configName, tokens, models) {
+    const meta = {
+        configName,
+        schemaVersion: CONFIG_SCHEMA_VERSION,
+        exportedAt: Date.now(),
+        checksum: 0
+    };
+    const base = { meta, tokens, models };
+    const serialized = JSON.stringify({ ...base, meta: { ...meta, checksum: 0 } });
+    meta.checksum = computeConfigChecksum(serialized);
+    return {
+        meta,
+        tokens,
+        models,
+        configName // backward compatibility
+    };
+}
+
+function validateImportedConfig(raw = {}) {
+    if (typeof raw !== "object" || raw === null) {
+        throw new Error("Invalid file shape");
+    }
+    const tokens = Array.isArray(raw.tokens) ? raw.tokens : [];
+    const models = Array.isArray(raw.models) ? raw.models : [];
+    const meta = raw.meta || {};
+    const configName = meta.configName || raw.configName || "Imported configuration";
+
+    if (meta.schemaVersion && meta.schemaVersion > CONFIG_SCHEMA_VERSION) {
+        throw new Error("Unsupported version");
+    }
+
+    const serialized = JSON.stringify({
+        meta: { ...meta, checksum: 0 },
+        tokens,
+        models
+    });
+    if (meta.checksum !== undefined) {
+        const computed = computeConfigChecksum(serialized);
+        if (computed !== meta.checksum) {
+            throw new Error("Checksum mismatch");
+        }
+    }
+
+    return { tokens, models, configName };
+}
+
+function highlightInputs(tokens = [], className = "input-warning") {
+    if (!Array.isArray(tokens)) return;
+    tokens.forEach(token => {
+        const field = document.querySelector(`[data-token="${token}"]`);
+        if (field) {
+            field.classList.add(className);
+        }
+    });
+}
+
 /* Detect which page is open */
 document.addEventListener("DOMContentLoaded", async () => {
 
@@ -40,6 +104,16 @@ document.addEventListener("DOMContentLoaded", async () => {
             badge.textContent = name;
         }
 
+        const handleInputChange = (e) => {
+            const target = e.target.closest("[data-token]");
+            if (!target) return;
+            inputChangeVersion++;
+            target.classList.remove("input-error");
+            target.classList.remove("input-warning");
+        };
+        document.body.addEventListener("input", handleInputChange);
+        document.body.addEventListener("change", handleInputChange);
+
         /* Language segmented control */
         let currentLang = "fr";
 
@@ -53,7 +127,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
         };
 
-        const copyModelText = async (model) => {
+        const copyModelText = async (model, section = "global") => {
             const text = getTextByLang(model);
             const neededTokens = Array.from(new Set(text.match(/\{[^{}]+\}/g) || []));
 
@@ -63,12 +137,33 @@ document.addEventListener("DOMContentLoaded", async () => {
                 return false;
             }
 
+            const warnSameSection = lastSectionClickVersion[section] !== undefined
+                && lastSectionClickVersion[section] === inputChangeVersion;
+
+            let warnTokens = neededTokens;
+            if (warnSameSection) {
+                try {
+                    const tokenDefs = await loadTokens();
+                    warnTokens = neededTokens.filter(token => {
+                        const def = tokenDefs.find(t => t.token === token);
+                        return !(def && def.default !== undefined);
+                    });
+                } catch (e) {
+                    console.warn("Unable to load tokens for warning filter", e);
+                }
+                highlightInputs(warnTokens, "input-warning");
+            }
+
             const generated = generateFinalText(model, currentLang, values);
-            copyToClipboard(generated);
+            copyToClipboard(generated, warnSameSection ? {
+                message: "Copied (data unchanged in this section).",
+                variant: "warning"
+            } : {});
+            lastSectionClickVersion[section] = inputChangeVersion;
             return true;
         };
 
-        const openVariantPopup = (model) => {
+        const openVariantPopup = (model, section) => {
             const popup = document.createElement("div");
             popup.className = "popup";
 
@@ -92,7 +187,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     btn.className = "primary-btn variant-choice-btn";
                     btn.textContent = variant.name || "Variante";
                     btn.addEventListener("click", async () => {
-                        const copied = await copyModelText(variant);
+                        const copied = await copyModelText(variant, section);
                         if (copied) {
                             popup.remove();
                         }
@@ -126,6 +221,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             if (!btn) return;
 
             const modelId = btn.getAttribute("data-model-id");
+            const section = btn.getAttribute("data-section") || "global";
             const groups = await loadTemplates();
             const allTemplates = [
                 ...groups.email,
@@ -139,11 +235,11 @@ document.addEventListener("DOMContentLoaded", async () => {
             const hasVariants = Array.isArray(model.variants) && model.variants.length > 0;
 
             if (hasVariants) {
-                openVariantPopup(model);
+                openVariantPopup(model, section);
                 return;
             }
 
-            await copyModelText(model);
+            await copyModelText(model, section);
         });
     }
 
@@ -172,12 +268,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
             localStorage.setItem("local_configName", configName);
 
-            const config = {
-                configName: configName,
-                tokens: JSON.parse(localStorage.getItem("local_tokens") || "[]"),
-                models: JSON.parse(localStorage.getItem("local_models") || "[]"),
-                timestamp: Date.now()
-            };
+            const tokens = JSON.parse(localStorage.getItem("local_tokens") || "[]");
+            const models = JSON.parse(localStorage.getItem("local_models") || "[]");
+            const config = buildConfigPayload(configName, tokens, models);
 
             const blob = new Blob([JSON.stringify(config, null, 2)], { type: "application/json" });
             const url = URL.createObjectURL(blob);
@@ -219,7 +312,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
                 try {
                     const text = await file.text();
-                    const config = JSON.parse(text);
+                    const raw = JSON.parse(text);
+                    const config = validateImportedConfig(raw);
                     await applyImportedConfig(config);
                     showToast("Configuration imported successfully.");
                 } catch (e) {
