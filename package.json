@@ -9,9 +9,10 @@
     "test": "node tests/tokenEngine.test.mjs"
   },
   "dependencies": {
+    "caniuse-lite": "^1.0.30001760",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.22.3"
+    "react-router-dom": "^6.30.2"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.2.1",
