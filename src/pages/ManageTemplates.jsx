@@ -1,0 +1,420 @@
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { loadTemplates, saveTemplates } from "../services/templateService.js";
+import { ensureTokensFromTexts } from "../services/tokenService.js";
+import { groupTemplates } from "../services/templateService.js";
+
+const emptyTexts = { fr: "", en: "", de: "", it: "" };
+
+function LanguagePreview({ label, dot, value, onChange, onFullscreen }) {
+    const [height, setHeight] = useState("auto");
+
+    useEffect(() => {
+        const temp = document.createElement("textarea");
+        temp.style.visibility = "hidden";
+        temp.style.position = "fixed";
+        temp.style.height = "auto";
+        temp.value = value || "";
+        document.body.appendChild(temp);
+        temp.style.height = "auto";
+        const h = temp.scrollHeight;
+        document.body.removeChild(temp);
+        setHeight(`${Math.max(160, h)}px`);
+    }, [value]);
+
+    return (
+        <div className="lang-col">
+            <div className="lang-head">
+                <span className="lang-dot">{dot}</span>
+                <span className="lang-label">{label}</span>
+            </div>
+            <textarea
+                className="plain-editor tall-textarea"
+                data-lang={dot.toLowerCase()}
+                placeholder={`Text ${dot}`}
+                value={value}
+                style={{ height }}
+                onChange={e => onChange(e.target.value)}
+                onClick={(e) => {
+                    e.preventDefault();
+                    if (onFullscreen) onFullscreen();
+                }}
+            />
+        </div>
+    );
+}
+
+function TemplateModal({ initial, onClose, onSave }) {
+    const isEdit = Boolean(initial);
+    const [title, setTitle] = useState(initial?.title || "");
+    const [type, setType] = useState(initial?.type || "email");
+    const [main, setMain] = useState({
+        fr: initial?.text_fr || "",
+        en: initial?.text_en || "",
+        de: initial?.text_de || "",
+        it: initial?.text_it || ""
+    });
+    const [variants, setVariants] = useState(() => (initial?.variants || []).map(v => ({
+        id: v.id || crypto.randomUUID(),
+        name: v.name || "",
+        text_fr: v.text_fr || "",
+        text_en: v.text_en || "",
+        text_de: v.text_de || "",
+        text_it: v.text_it || ""
+    })));
+    const [activeTab, setActiveTab] = useState("main");
+    const [fullscreen, setFullscreen] = useState(null);
+
+    const activeVariant = variants.find(v => v.id === activeTab);
+
+    const updateVariantText = (id, key, value) => {
+        setVariants(prev => prev.map(v => v.id === id ? { ...v, [key]: value } : v));
+    };
+
+    const addVariant = () => {
+        const next = {
+            id: crypto.randomUUID(),
+            name: `Variante ${variants.length + 1}`,
+            text_fr: "",
+            text_en: "",
+            text_de: "",
+            text_it: ""
+        };
+        setVariants(v => [...v, next]);
+        setActiveTab(next.id);
+    };
+
+    const removeVariant = (id) => {
+        setVariants(v => v.filter(x => x.id !== id));
+        setActiveTab("main");
+    };
+
+    const onSaveClick = async () => {
+        if (!title.trim()) {
+            alert("Title is required.");
+            return;
+        }
+        const cleanedVariants = variants
+            .map(v => ({
+                ...v,
+                name: v.name ? v.name.trim() : ""
+            }))
+            .filter(v =>
+                v.name !== "" ||
+                v.text_fr ||
+                v.text_en ||
+                v.text_de ||
+                v.text_it
+            );
+
+        const model = {
+            id: initial?.id || crypto.randomUUID(),
+            title: title.trim(),
+            type,
+            order: initial?.order || (Number.isFinite(initial?.order) ? initial.order : 0),
+            text_fr: main.fr,
+            text_en: main.en,
+            text_de: main.de,
+            text_it: main.it,
+            variants: cleanedVariants
+        };
+
+        await ensureTokensFromTexts([
+            model.text_fr,
+            model.text_en,
+            model.text_de,
+            model.text_it,
+            ...cleanedVariants.flatMap(v => [v.text_fr, v.text_en, v.text_de, v.text_it])
+        ]);
+
+        onSave(model);
+    };
+
+    const renderTabs = () => (
+        <div className="variant-tab-bar">
+            <div id="variantTabs" className="variant-tabs">
+                <button
+                    className={`variant-tab ${activeTab === "main" ? "active" : ""}`}
+                    data-tab-id="main"
+                    onClick={() => setActiveTab("main")}
+                >
+                    Texte principal
+                </button>
+                {variants.map((v, idx) => (
+                    <button
+                        key={v.id}
+                        className={`variant-tab ${activeTab === v.id ? "active" : ""}`}
+                        data-tab-id={v.id}
+                        onClick={() => setActiveTab(v.id)}
+                    >
+                        {v.name?.trim() || `Variante ${idx + 1}`}
+                    </button>
+                ))}
+            </div>
+            <button className="icon-btn add-variant-tab" onClick={addVariant} aria-label="Ajouter une variante">
+                +
+            </button>
+        </div>
+    );
+
+    const nameBar = () => (
+        <div className="variant-name-bar">
+            <div className="variant-name-label">Nom de la variante</div>
+            <div className="variant-name-wrapper">
+                {activeTab === "main" ? (
+                    <span id="variantNameStatic" className="variant-name-static">Texte principal</span>
+                ) : (
+                    <input
+                        type="text"
+                        value={activeVariant?.name || ""}
+                        onChange={e => {
+                            const value = e.target.value;
+                            setVariants(prev => prev.map(v => v.id === activeTab ? { ...v, name: value } : v));
+                        }}
+                        placeholder="Nom de variante"
+                    />
+                )}
+            </div>
+            {activeTab !== "main" && (
+                <button
+                    type="button"
+                    className="icon-btn variant-remove-icon"
+                    onClick={() => removeVariant(activeTab)}
+                    aria-label="Supprimer la variante"
+                >
+                    <span className="icon-trash" aria-hidden="true"></span>
+                </button>
+            )}
+        </div>
+    );
+
+    const langPanel = () => {
+        const values = activeTab === "main"
+            ? { ...main }
+            : {
+                fr: activeVariant?.text_fr || "",
+                en: activeVariant?.text_en || "",
+                de: activeVariant?.text_de || "",
+                it: activeVariant?.text_it || ""
+            };
+
+        const setValue = (lang, val) => {
+            if (activeTab === "main") {
+                setMain(prev => ({ ...prev, [lang]: val }));
+            } else if (activeVariant) {
+                const key = `text_${lang}`;
+                updateVariantText(activeVariant.id, key, val);
+            }
+        };
+
+        const openFullscreen = (langKey) => {
+            const items = [
+                { key: "fr", label: "French", dot: "FR" },
+                { key: "en", label: "English", dot: "EN" },
+                { key: "de", label: "German", dot: "DE" },
+                { key: "it", label: "Italian", dot: "IT" }
+            ];
+            const currentIndex = items.findIndex(i => i.key === langKey);
+            setFullscreen({
+                items,
+                index: currentIndex,
+                context: activeTab
+            });
+        };
+
+        return (
+            <div id="variantLangColumns" className="lang-columns lang-columns-panel">
+                <LanguagePreview label="French" dot="FR" value={values.fr} onChange={v => setValue("fr", v)} onFullscreen={() => openFullscreen("fr")} />
+                <LanguagePreview label="English" dot="EN" value={values.en} onChange={v => setValue("en", v)} onFullscreen={() => openFullscreen("en")} />
+                <LanguagePreview label="German" dot="DE" value={values.de} onChange={v => setValue("de", v)} onFullscreen={() => openFullscreen("de")} />
+                <LanguagePreview label="Italian" dot="IT" value={values.it} onChange={v => setValue("it", v)} onFullscreen={() => openFullscreen("it")} />
+            </div>
+        );
+    };
+
+    const fullscreenOverlay = () => {
+        if (!fullscreen) return null;
+        const { items, index, context } = fullscreen;
+        const item = items[index];
+        const isMain = context === "main";
+        const targetVariant = variants.find(v => v.id === context);
+        const currentValue = isMain ? main[item.key] : targetVariant ? targetVariant[`text_${item.key}`] || "" : "";
+
+        const setValue = (val) => {
+            if (isMain) {
+                setMain(prev => ({ ...prev, [item.key]: val }));
+            } else if (targetVariant) {
+                updateVariantText(targetVariant.id, `text_${item.key}`, val);
+            }
+        };
+
+        const go = (delta) => {
+            const len = items.length;
+            const nextIndex = (index + delta + len) % len;
+            setFullscreen({ ...fullscreen, index: nextIndex });
+        };
+
+        return (
+            <div className="lang-fullscreen">
+                <button type="button" className="lang-fullscreen__nav lang-fullscreen__nav--prev" onClick={() => go(-1)} aria-label="Langue précédente">←</button>
+                <div className="lang-fullscreen__card">
+                    <div className="lang-fullscreen__head">
+                        <div>
+                            <p className="eyebrow">Edition plein écran</p>
+                            <h3 className="lang-fullscreen__title">{item.label}</h3>
+                        </div>
+                        <span className="lang-fullscreen__badge">{item.dot}</span>
+                    </div>
+                    <textarea
+                        className="lang-fullscreen__textarea"
+                        value={currentValue}
+                        onChange={e => setValue(e.target.value)}
+                    />
+                    <div className="lang-fullscreen__actions">
+                        <button type="button" className="primary-btn" data-close-fullscreen onClick={() => setFullscreen(null)}>Terminer</button>
+                    </div>
+                </div>
+                <button type="button" className="lang-fullscreen__nav lang-fullscreen__nav--next" onClick={() => go(1)} aria-label="Langue suivante">→</button>
+            </div>
+        );
+    };
+
+    return (
+        <div className="popup">
+            <div className="popup-box popup-box--wide">
+                <div className="popup-header">
+                    <div>
+                        <p className="eyebrow">Template</p>
+                        <h2>{isEdit ? "Edit template" : "New template"}</h2>
+                    </div>
+                    <div className="pill">{isEdit ? "Existing" : "Draft"}</div>
+                </div>
+
+                <div className="popup-grid">
+                    <div className="popup-card">
+                        <div className="field-line">
+                            <label>Title</label>
+                            <input
+                                value={title}
+                                placeholder="Onboarding email"
+                                onChange={e => setTitle(e.target.value)}
+                            />
+                        </div>
+                        <div className="field-line">
+                            <label>Type</label>
+                            <select value={type} onChange={e => setType(e.target.value)}>
+                                <option value="email">Email</option>
+                                <option value="sms">SMS</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+
+            <div className="popup-card popup-card--langs">
+                {renderTabs()}
+                {nameBar()}
+                {langPanel()}
+            </div>
+        </div>
+
+        <div className="popup-actions">
+            <button className="secondary-btn" onClick={onClose}>Cancel</button>
+            <button className="primary-btn" onClick={onSaveClick}>Save</button>
+        </div>
+
+        {fullscreenOverlay()}
+    </div>
+</div>
+    );
+}
+
+export default function ManageTemplates() {
+    const [templates, setTemplates] = useState([]);
+    const [currentType, setCurrentType] = useState("email");
+    const [modalTemplate, setModalTemplate] = useState(null);
+
+    useEffect(() => {
+        loadTemplates().then(setTemplates);
+    }, []);
+
+    const persist = async (next) => {
+        setTemplates(next);
+        await saveTemplates(next);
+    };
+
+    const list = useMemo(() => {
+        const grouped = groupTemplates(templates);
+        if (currentType === "email") return grouped.email;
+        if (currentType === "sms") return grouped.sms;
+        return grouped.other;
+    }, [templates, currentType]);
+
+    const onDelete = async (id) => {
+        if (!confirm("Delete this template?")) return;
+        await persist(templates.filter(t => t.id !== id));
+    };
+
+    const onSaveTemplate = async (model) => {
+        const exists = templates.some(t => t.id === model.id);
+        const next = exists
+            ? templates.map(t => t.id === model.id ? model : t)
+            : [...templates, { ...model, order: templates.length + 1 }];
+        await persist(next);
+        setModalTemplate(null);
+    };
+
+    return (
+        <main className="page-container">
+            <div className="manage-card">
+                <div className="variant-editor-head" style={{ alignItems: "center" }}>
+                    <h1 style={{ margin: 0 }}>Manage Templates</h1>
+                    <Link to="/tokens" className="secondary-btn">Manage Tokens</Link>
+                </div>
+
+                <div className="segmented-control-managed-models">
+                    <div className="segment-group">
+                        <button className={`segment ${currentType === "email" ? "active" : ""}`} onClick={() => setCurrentType("email")}>Email</button>
+                        <button className={`segment ${currentType === "sms" ? "active" : ""}`} onClick={() => setCurrentType("sms")}>SMS</button>
+                        <button className={`segment ${currentType === "other" ? "active" : ""}`} onClick={() => setCurrentType("other")}>Other</button>
+                    </div>
+                </div>
+
+                <div id="models-list" className="models-list">
+                    {list.length === 0 && <p>No template for this type.</p>}
+                    {list.map(model => (
+                        <div key={model.id} className="model-row">
+                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                <span>{model.title}</span>
+                                {model.variants?.length > 0 && (
+                                    <span className="variant-pill">
+                                        {model.variants.length} variante{model.variants.length > 1 ? "s" : ""}
+                                    </span>
+                                )}
+                            </div>
+                            <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
+                                <button className="icon-btn edit-btn" onClick={() => setModalTemplate(model)}>
+                                    <span className="icon-pencil" aria-hidden="true"></span>
+                                </button>
+                                <button className="icon-btn delete-btn" onClick={() => onDelete(model.id)}>
+                                    <span className="icon-trash" aria-hidden="true"></span>
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                <div className="add-btn-container">
+                    <button className="primary-btn" onClick={() => setModalTemplate({})}>+ Add Template</button>
+                </div>
+            </div>
+
+            {modalTemplate !== null && (
+                <TemplateModal
+                    initial={modalTemplate.id ? modalTemplate : null}
+                    onClose={() => setModalTemplate(null)}
+                    onSave={onSaveTemplate}
+                />
+            )}
+        </main>
+    );
+}

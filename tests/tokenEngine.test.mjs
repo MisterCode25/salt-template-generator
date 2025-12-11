@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { applyTokens, generateFinalText } from "../js/tokenEngine.js";
+import { applyTokens, generateFinalText } from "../src/core/tokenEngine.js";
 
 const sampleModel = {
   text_fr: "Bonjour {customer}",

@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Template Generator</title>
+    <link rel="stylesheet" href="./css/main.css">
+    <link rel="stylesheet" href="./css/layout.css">
+    <link rel="stylesheet" href="./css/components.css">
+    <script type="module" src="./js/theme.js"></script>
+</head>
+
+<body class="page-enter">
+<script>
+    requestAnimationFrame(() => {
+        document.body.classList.add('page-enter-active');
+    });
+</script>
+
+    <header class="app-header">
+        <div class="app-title">Salt Templater</div>
+        <nav class="top-menu">
+            <div class="dropdown">
+                <button class="dropdown-btn">Options ▾</button>
+                <div class="dropdown-menu">
+                    <div class="dropdown-section">
+                    <div class="dropdown-title">Management</div>
+                    <button onclick="location.href='./html/manage-models.html'" class="dropdown-reset">Manage templates</button>
+                </div>
+                    <div class="dropdown-section">
+                        <div class="dropdown-title">Configuration</div>
+                        <button id="importConfigBtn" class="dropdown-reset">Import configuration</button>
+                        <button id="exportConfigBtn" class="dropdown-reset">Export configuration</button>
+                        <button id="renameConfigBtn" class="dropdown-reset">Rename configuration</button>
+                        <button id="resetLocalStorageBtn" class="reset-btn dropdown-reset">
+                            Reset saved data
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <button id="themeToggle" class="theme-toggle" aria-label="Toggle theme">☀️</button>
+        </nav>
+
+        <div class="segmented-control">
+            <div class="segment-group">
+                <button class="segment active" data-lang="fr">FR</button>
+                <button class="segment" data-lang="en">EN</button>
+                <button class="segment" data-lang="de">DE</button>
+                <button class="segment" data-lang="it">IT</button>
+            </div>
+        </div>
+    </header>
+
+    <div id="zones-grid" class="zones-grid">
+
+        <section id="emptyState" class="empty-state" hidden>
+            <div class="empty-card">
+                <p class="eyebrow">Get started</p>
+                <h2>No configuration yet</h2>
+                <p class="empty-text">Create your first template to unlock the workspace. You can always import an existing configuration later.</p>
+                <div class="empty-actions">
+                    <button class="primary-btn" id="quickCreateTemplate">Create template</button>
+                    <button class="secondary-btn" id="emptyImportBtn">Import configuration</button>
+                    <button class="secondary-btn help-link-btn" data-open-help>How it works</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- COLUMN 1: Input Fields -->
+        <section id="zone-left" class="zone-box">
+            <h3>Data</h3>
+            <div id="dynamic-inputs" class="inputs-zone"></div>
+            <button id="resetFieldsBtn" class="reset-fields-btn">Reset fields</button>
+        </section>
+
+        <!-- COLUMN 2: Email Templates -->
+        <section id="email-col" class="zone-box">
+            <h3>Email</h3>
+            <div id="email-container"></div>
+        </section>
+
+        <!-- COLUMN 3: SMS Templates -->
+        <section id="sms-col" class="zone-box">
+            <h3>SMS</h3>
+            <div id="sms-container"></div>
+        </section>
+
+        <!-- COLUMN 4: Other Templates -->
+        <section id="other-col" class="zone-box">
+            <h3>Other</h3>
+            <div id="other-container"></div>
+        </section>
+
+</div>
+
+    <div id="configBadge" class="config-badge"></div>
+    <button id="helpBtn" class="help-btn">?</button>
+
+    <div id="helpModal" class="help-modal" aria-hidden="true">
+        <div class="help-modal__content">
+            <button id="closeHelp" class="secondary-btn help-modal__close">Fermer</button>
+            <h2>Salt Templater — Quick guide</h2>
+            <div class="help-modal__section">
+                <h3>What it does</h3>
+                <p>Create emails, SMS, or other messages with reusable templates and fill them with your data instantly.</p>
+                <div class="help-illustration-inline">
+                    <img src="./images/overview-main.png" alt="Overview of the main dashboard">
+                    <small>Main dashboard (zones + header)</small>
+                </div>
+            </div>
+            <div class="help-modal__section">
+                <h3>How to use</h3>
+                <ul>
+                    <li>Fill the fields in the “Data” column (one field per token like <code>{customer_name}</code>).</li>
+                    <li>Pick a language (FR / EN / DE / IT).</li>
+                    <li>Click a template button to copy the final text (copy is blocked if required data is missing).</li>
+                </ul>
+                <div class="help-illustration-inline">
+                    <img src="./images/data-entry.png" alt="Data entry column filled with fields">
+                    <small>Data column with token fields filled</small>
+                </div>
+            </div>
+            <div class="help-modal__section">
+                <h3>Create or edit a template</h3>
+                <ul>
+                    <li>Options → Manage Templates.</li>
+                    <li>Each template has a title, a type (Email/SMS/Other), and text per language.</li>
+                    <li>Insert tokens where data should appear, e.g. <code>Hi {customer_name}, your invoice is due on {due_date}.</code></li>
+                </ul>
+                <div class="help-illustration-inline">
+                    <img src="./images/manage-templates.png" alt="Manage Templates screen">
+                    <small>Manage Templates screen</small>
+                </div>
+            </div>
+            <div class="help-modal__section">
+                <h3>Tokens</h3>
+                <ul>
+                    <li>Format: <code>{token_name}</code> (e.g. <code>{ticket_id}</code>, <code>{agent_name}</code>).</li>
+                    <li>New tokens found in templates are added automatically to the Data form.</li>
+                    <li>Manage Tokens lets you set label, field type (text/number/date), and default value.</li>
+                </ul>
+                <div class="help-illustration-inline">
+                    <img src="./images/manage-tokens.png" alt="Manage Tokens screen">
+                    <small>Manage Tokens screen</small>
+                </div>
+            </div>
+            <div class="help-modal__section">
+                <h3>Tips</h3>
+                <ul>
+                    <li>Use clear names and defaults to avoid empty outputs.</li>
+                    <li>Order your templates to surface the most-used ones first.</li>
+                    <li>Test in each language to ensure all tokens are present.</li>
+                </ul>
+                <div class="help-illustration-inline">
+                    <img src="./images/template-copy.png" alt="Copy action with filled tokens">
+                    <small>Copy action with filled tokens</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+<script type="module" src="./js/app.js"></script>
+</html>
