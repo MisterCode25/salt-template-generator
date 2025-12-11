@@ -241,7 +241,6 @@ export function openModelEditor(model = null, opts = {}) {
             text_it: v.text_it || ""
         }))
         : [];
-    let activeVariantId = variantState[0] ? variantState[0].id : null;
 
     const popup = document.createElement("div");
     popup.className = "popup";
@@ -273,49 +272,21 @@ export function openModelEditor(model = null, opts = {}) {
                 </div>
 
                 <div class="popup-card popup-card--langs">
-                    <div class="lang-columns">
-                        <div class="lang-col">
-                            <div class="lang-head">
-                                <span class="lang-dot">FR</span>
-                                <span class="lang-label">French</span>
-                            </div>
-                            <textarea id="mFr" class="plain-editor tall-textarea">${isEdit ? model.text_fr : ""}</textarea>
-                        </div>
-                        <div class="lang-col">
-                            <div class="lang-head">
-                                <span class="lang-dot">EN</span>
-                                <span class="lang-label">English</span>
-                            </div>
-                            <textarea id="mEn" class="plain-editor tall-textarea">${isEdit ? model.text_en : ""}</textarea>
-                        </div>
-                        <div class="lang-col">
-                            <div class="lang-head">
-                                <span class="lang-dot">DE</span>
-                                <span class="lang-label">German</span>
-                            </div>
-                            <textarea id="mDe" class="plain-editor tall-textarea">${isEdit ? model.text_de : ""}</textarea>
-                        </div>
-                        <div class="lang-col">
-                            <div class="lang-head">
-                                <span class="lang-dot">IT</span>
-                                <span class="lang-label">Italian</span>
-                            </div>
-                            <textarea id="mIt" class="plain-editor tall-textarea">${isEdit ? model.text_it : ""}</textarea>
-                        </div>
+                    <div class="variant-tab-bar">
+                        <div id="variantTabs" class="variant-tabs"></div>
+                        <button class="icon-btn add-variant-tab" id="addVariantTab" aria-label="Ajouter une variante">+</button>
                     </div>
-                </div>
-
-                <div class="popup-card">
-                    <div class="variant-editor-head">
-                        <div>
-                            <p class="eyebrow">Variantes</p>
-                            <h3>Versions alternatives</h3>
-                            <p class="hint">Si vous ajoutez des variantes, un choix sera proposé lors du clic sur le template dans la page principale.</p>
+                    <div class="variant-name-bar">
+                        <div class="variant-name-label">Nom de la variante</div>
+                        <div class="variant-name-wrapper">
+                            <input type="text" id="variantNameInput" placeholder="Nom de variante">
+                            <span id="variantNameStatic" class="variant-name-static">Texte principal</span>
                         </div>
-                        <button class="secondary-btn" id="addVariantBtn">+ Ajouter une variante</button>
+                        <button type="button" class="icon-btn variant-remove-icon" id="removeVariantBtn" aria-label="Supprimer la variante">
+                            <span class="icon-trash" aria-hidden="true"></span>
+                        </button>
                     </div>
-                    <div id="variantTabs" class="variant-tabs"></div>
-                    <div id="variantPanels" class="variant-panels"></div>
+                    <div id="variantLangColumns" class="lang-columns"></div>
                 </div>
             </div>
 
@@ -329,16 +300,15 @@ export function openModelEditor(model = null, opts = {}) {
     document.body.appendChild(popup);
 
     const tabContainer = popup.querySelector("#variantTabs");
-    const panelContainer = popup.querySelector("#variantPanels");
-    const addVariantBtn = popup.querySelector("#addVariantBtn");
+    const addVariantTab = popup.querySelector("#addVariantTab");
+    const variantNameInput = popup.querySelector("#variantNameInput");
+    const variantNameStatic = popup.querySelector("#variantNameStatic");
+    const langColumnsHost = popup.querySelector("#variantLangColumns");
+    const removeVariantBtn = popup.querySelector("#removeVariantBtn");
 
     const openFullscreenEditor = createLangFullscreenController(popup);
-    const baseTextAreas = {
-        fr: popup.querySelector("#mFr"),
-        en: popup.querySelector("#mEn"),
-        de: popup.querySelector("#mDe"),
-        it: popup.querySelector("#mIt")
-    };
+    const panels = {};
+    let activeTabId = "main";
 
     const bindFullscreen = (area) => {
         if (!area || area.dataset.fullscreenBound === "true") return;
@@ -350,143 +320,190 @@ export function openModelEditor(model = null, opts = {}) {
         });
     };
 
+    const variantLabel = (variant, idx) => variant.name?.trim() || `Variante ${idx}`;
+
+    const createLangPanel = (values = {}, { isMain = false, variantRef = null } = {}) => {
+        const panel = document.createElement("div");
+        panel.className = "lang-columns lang-columns-panel";
+        panel.innerHTML = `
+            <div class="lang-col">
+                <div class="lang-head">
+                    <span class="lang-dot">FR</span>
+                    <span class="lang-label">French</span>
+                </div>
+                <textarea ${isMain ? 'id="mFr"' : ""} class="plain-editor tall-textarea" data-lang="fr" placeholder="Texte FR">${values.text_fr || ""}</textarea>
+            </div>
+            <div class="lang-col">
+                <div class="lang-head">
+                    <span class="lang-dot">EN</span>
+                    <span class="lang-label">English</span>
+                </div>
+                <textarea ${isMain ? 'id="mEn"' : ""} class="plain-editor tall-textarea" data-lang="en" placeholder="Text EN">${values.text_en || ""}</textarea>
+            </div>
+            <div class="lang-col">
+                <div class="lang-head">
+                    <span class="lang-dot">DE</span>
+                    <span class="lang-label">German</span>
+                </div>
+                <textarea ${isMain ? 'id="mDe"' : ""} class="plain-editor tall-textarea" data-lang="de" placeholder="Text DE">${values.text_de || ""}</textarea>
+            </div>
+            <div class="lang-col">
+                <div class="lang-head">
+                    <span class="lang-dot">IT</span>
+                    <span class="lang-label">Italian</span>
+                </div>
+                <textarea ${isMain ? 'id="mIt"' : ""} class="plain-editor tall-textarea" data-lang="it" placeholder="Text IT">${values.text_it || ""}</textarea>
+            </div>
+        `;
+
+        panel.querySelectorAll("textarea[data-lang]").forEach(area => {
+            bindFullscreen(area);
+            if (!isMain && variantRef) {
+                area.addEventListener("input", () => {
+                    const key = "text_" + area.dataset.lang;
+                    variantRef[key] = area.value;
+                });
+            }
+        });
+
+        return panel;
+    };
+
+    panels.main = createLangPanel({
+        text_fr: isEdit ? model.text_fr : "",
+        text_en: isEdit ? model.text_en : "",
+        text_de: isEdit ? model.text_de : "",
+        text_it: isEdit ? model.text_it : ""
+    }, { isMain: true });
+
+    variantState.forEach(v => {
+        panels[v.id] = createLangPanel(v, { variantRef: v });
+    });
+
+    const baseTextAreas = {
+        fr: panels.main.querySelector("#mFr"),
+        en: panels.main.querySelector("#mEn"),
+        de: panels.main.querySelector("#mDe"),
+        it: panels.main.querySelector("#mIt")
+    };
+
     Object.values(baseTextAreas).forEach(bindFullscreen);
 
-    function setActiveVariant(id) {
-        activeVariantId = id;
-        popup.querySelectorAll(".variant-tab").forEach(tab => {
-            tab.classList.toggle("active", tab.dataset.variantId === id);
-        });
-        popup.querySelectorAll(".variant-panel").forEach(panel => {
-            panel.classList.toggle("active", panel.dataset.variantId === id);
-        });
-    }
-
-    function removeVariant(id) {
-        variantState = variantState.filter(v => v.id !== id);
-        if (activeVariantId === id) {
-            activeVariantId = variantState[0] ? variantState[0].id : null;
+    const showPanel = (panel) => {
+        langColumnsHost.innerHTML = "";
+        if (panel) {
+            langColumnsHost.appendChild(panel);
         }
-        renderVariantUI();
-    }
+    };
 
-    function addVariant(data = {}) {
-        const variant = {
-            id: data.id || crypto.randomUUID(),
-            name: data.name || `Variante ${variantState.length + 1}`,
-            text_fr: data.text_fr || "",
-            text_en: data.text_en || "",
-            text_de: data.text_de || "",
-            text_it: data.text_it || ""
-        };
-        variantState.push(variant);
-        activeVariantId = variant.id;
-        renderVariantUI();
-    }
+    const setActiveTab = (id) => {
+        const exists = id === "main" || variantState.some(v => v.id === id);
+        activeTabId = exists ? id : "main";
+        tabContainer.querySelectorAll("[data-tab-id]").forEach(btn => {
+            btn.classList.toggle("active", btn.dataset.tabId === activeTabId);
+        });
 
-    function renderVariantUI() {
-        if (!tabContainer || !panelContainer) return;
+        if (activeTabId === "main") {
+            variantNameInput.classList.add("is-hidden");
+            variantNameInput.value = "";
+            if (variantNameStatic) {
+                variantNameStatic.textContent = "Texte principal";
+                variantNameStatic.classList.remove("is-hidden");
+            }
+            if (removeVariantBtn) {
+                removeVariantBtn.classList.add("is-hidden");
+                removeVariantBtn.disabled = true;
+            }
+            showPanel(panels.main);
+        } else {
+            const targetVariant = variantState.find(v => v.id === activeTabId);
+            variantNameInput.classList.remove("is-hidden");
+            variantNameInput.value = targetVariant?.name || "";
+            if (variantNameStatic) {
+                variantNameStatic.classList.add("is-hidden");
+            }
+            if (removeVariantBtn) {
+                removeVariantBtn.classList.remove("is-hidden");
+                removeVariantBtn.disabled = false;
+            }
+            showPanel(panels[activeTabId]);
+        }
+    };
 
+    const renderTabs = () => {
         tabContainer.innerHTML = "";
-        panelContainer.innerHTML = "";
-
-        if (variantState.length === 0) {
-            panelContainer.innerHTML = `<div class="variant-empty">Aucune variante. Ajoutez-en une pour proposer plusieurs déclinaisons.</div>`;
-            return;
-        }
+        const mainTab = document.createElement("button");
+        mainTab.className = "variant-tab";
+        mainTab.dataset.tabId = "main";
+        mainTab.textContent = "Texte principal";
+        mainTab.addEventListener("click", () => setActiveTab("main"));
+        tabContainer.appendChild(mainTab);
 
         variantState.forEach((variant, idx) => {
             const tab = document.createElement("button");
-            tab.className = "variant-tab" + (variant.id === activeVariantId ? " active" : "");
-            tab.dataset.variantId = variant.id;
-            tab.textContent = variant.name || `Variante ${idx + 1}`;
-            tab.addEventListener("click", () => setActiveVariant(variant.id));
+            tab.className = "variant-tab";
+            tab.dataset.tabId = variant.id;
+            tab.textContent = variantLabel(variant, idx + 1);
+            tab.addEventListener("click", () => setActiveTab(variant.id));
             tabContainer.appendChild(tab);
-
-            const panel = document.createElement("div");
-            panel.className = "variant-panel" + (variant.id === activeVariantId ? " active" : "");
-            panel.dataset.variantId = variant.id;
-            panel.innerHTML = `
-                <div class="variant-panel-header">
-                    <div class="variant-name-field">
-                        <label>Nom de la variante</label>
-                        <input type="text" data-variant-name value="${variant.name || ""}" placeholder="Nom de variante">
-                    </div>
-                    <button class="secondary-btn variant-delete-btn" data-remove-variant>Supprimer</button>
-                </div>
-                <div class="variant-lang-grid">
-                    <div class="variant-lang">
-                        <div class="lang-head">
-                            <span class="lang-dot">FR</span>
-                            <span class="lang-label">French</span>
-                        </div>
-                        <textarea class="plain-editor tall-textarea" data-lang="fr" placeholder="Texte FR">${variant.text_fr || ""}</textarea>
-                    </div>
-                    <div class="variant-lang">
-                        <div class="lang-head">
-                            <span class="lang-dot">EN</span>
-                            <span class="lang-label">English</span>
-                        </div>
-                        <textarea class="plain-editor tall-textarea" data-lang="en" placeholder="Text EN">${variant.text_en || ""}</textarea>
-                    </div>
-                    <div class="variant-lang">
-                        <div class="lang-head">
-                            <span class="lang-dot">DE</span>
-                            <span class="lang-label">German</span>
-                        </div>
-                        <textarea class="plain-editor tall-textarea" data-lang="de" placeholder="Text DE">${variant.text_de || ""}</textarea>
-                    </div>
-                    <div class="variant-lang">
-                        <div class="lang-head">
-                            <span class="lang-dot">IT</span>
-                            <span class="lang-label">Italian</span>
-                        </div>
-                        <textarea class="plain-editor tall-textarea" data-lang="it" placeholder="Text IT">${variant.text_it || ""}</textarea>
-                    </div>
-                </div>
-            `;
-
-            const nameInput = panel.querySelector("[data-variant-name]");
-            nameInput.addEventListener("input", (e) => {
-                variant.name = e.target.value;
-                tab.textContent = variant.name || `Variante ${idx + 1}`;
-            });
-
-            const removeBtn = panel.querySelector("[data-remove-variant]");
-            removeBtn.addEventListener("click", () => removeVariant(variant.id));
-
-            panel.querySelectorAll("textarea[data-lang]").forEach(area => {
-                area.addEventListener("input", () => {
-                    const key = "text_" + area.dataset.lang;
-                    variant[key] = area.value;
-                });
-                bindFullscreen(area);
-            });
-
-            panelContainer.appendChild(panel);
         });
 
-        if (!activeVariantId && variantState[0]) {
-            setActiveVariant(variantState[0].id);
-        } else {
-            setActiveVariant(activeVariantId);
+        setActiveTab(activeTabId || "main");
+    };
+
+    renderTabs();
+    showPanel(panels.main);
+    setActiveTab("main");
+
+    variantNameInput.addEventListener("input", () => {
+        if (activeTabId === "main") return;
+        const targetVariant = variantState.find(v => v.id === activeTabId);
+        if (!targetVariant) return;
+        targetVariant.name = variantNameInput.value;
+        const tab = tabContainer.querySelector(`[data-tab-id="${activeTabId}"]`);
+        if (tab) {
+            tab.textContent = variantLabel(targetVariant, variantState.indexOf(targetVariant) + 1);
         }
+    });
+
+    if (addVariantTab) {
+        addVariantTab.addEventListener("click", () => {
+            const variant = {
+                id: crypto.randomUUID(),
+                name: `Variante ${variantState.length + 1}`,
+                text_fr: "",
+                text_en: "",
+                text_de: "",
+                text_it: ""
+            };
+            variantState.push(variant);
+            panels[variant.id] = createLangPanel(variant, { variantRef: variant });
+            activeTabId = variant.id;
+            renderTabs();
+            setActiveTab(variant.id);
+        });
     }
 
-    if (addVariantBtn) {
-        addVariantBtn.addEventListener("click", () => addVariant());
+    if (removeVariantBtn) {
+        removeVariantBtn.addEventListener("click", () => {
+            if (activeTabId === "main") return;
+            variantState = variantState.filter(v => v.id !== activeTabId);
+            delete panels[activeTabId];
+            activeTabId = "main";
+            renderTabs();
+            setActiveTab("main");
+        });
     }
-    renderVariantUI();
 
     document.getElementById("closePopup").addEventListener("click", () => popup.remove());
 
     document.getElementById("saveModel").addEventListener("click", async () => {
         const title = document.getElementById("mTitle").value.trim();
         const type = document.getElementById("mType").value;
-        const text_fr = document.getElementById("mFr").value.trim();
-        const text_en = document.getElementById("mEn").value.trim();
-        const text_de = document.getElementById("mDe").value.trim();
-        const text_it = document.getElementById("mIt").value.trim();
+        const text_fr = baseTextAreas.fr.value.trim();
+        const text_en = baseTextAreas.en.value.trim();
+        const text_de = baseTextAreas.de.value.trim();
+        const text_it = baseTextAreas.it.value.trim();
         const cleanedVariants = variantState
             .map(v => ({
                 ...v,
