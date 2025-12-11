@@ -33,10 +33,13 @@ function deriveLangLabel(textarea) {
 
 function createLangFullscreenController(host) {
     let activeTarget = null;
+    let sequence = [];
+    let sequenceIndex = -1;
 
     const overlay = document.createElement("div");
     overlay.className = "lang-fullscreen";
     overlay.innerHTML = `
+            <button type="button" class="lang-fullscreen__nav lang-fullscreen__nav--prev" data-nav="prev" aria-label="Langue précédente">←</button>
             <div class="lang-fullscreen__card">
                 <div class="lang-fullscreen__head">
                     <div>
@@ -50,23 +53,79 @@ function createLangFullscreenController(host) {
                     <button type="button" class="primary-btn" data-close-fullscreen>Terminer</button>
                 </div>
             </div>
+            <button type="button" class="lang-fullscreen__nav lang-fullscreen__nav--next" data-nav="next" aria-label="Langue suivante">→</button>
         `;
 
     const titleEl = overlay.querySelector(".lang-fullscreen__title");
     const badgeEl = overlay.querySelector(".lang-fullscreen__badge");
     const fullscreenArea = overlay.querySelector(".lang-fullscreen__textarea");
     const closeBtn = overlay.querySelector("[data-close-fullscreen]");
+    const navPrev = overlay.querySelector("[data-nav='prev']");
+    const navNext = overlay.querySelector("[data-nav='next']");
 
-    const close = () => {
+    const persistActiveValue = () => {
         if (!activeTarget) return;
         activeTarget.value = fullscreenArea.value;
         activeTarget.dispatchEvent(new Event("input", { bubbles: true }));
+    };
+
+    const updateNavState = () => {
+        const disabled = sequence.length <= 1 || sequenceIndex === -1;
+        navPrev.disabled = disabled;
+        navNext.disabled = disabled;
+    };
+
+    const buildSequence = (target) => {
+        const container = target.closest(".lang-columns, .variant-lang-grid");
+        const scope = container || host;
+        sequence = Array.from(scope.querySelectorAll("textarea.plain-editor"));
+        sequenceIndex = sequence.indexOf(target);
+        updateNavState();
+    };
+
+    const applyContent = (target, { focus = true } = {}) => {
+        if (!target) return;
+        activeTarget = target;
+        fullscreenArea.value = target.value;
+        const label = deriveLangLabel(target);
+        titleEl.textContent = label;
+        const badgeText = target.closest(".lang-col, .variant-lang")?.querySelector(".lang-dot")?.textContent?.trim()
+            || target.dataset.lang?.toUpperCase()
+            || label?.slice(0, 2).toUpperCase()
+            || "TXT";
+        badgeEl.textContent = badgeText;
+        buildSequence(target);
+
+        if (!overlay.isConnected) {
+            host.appendChild(overlay);
+        }
+        host.classList.add("has-lang-fullscreen");
+        if (focus) {
+            fullscreenArea.focus();
+            fullscreenArea.setSelectionRange(fullscreenArea.value.length, fullscreenArea.value.length);
+        }
+    };
+
+    const navigate = (delta) => {
+        if (sequence.length <= 1 || sequenceIndex === -1) return;
+        persistActiveValue();
+        sequenceIndex = (sequenceIndex + delta + sequence.length) % sequence.length;
+        const nextTarget = sequence[sequenceIndex];
+        applyContent(nextTarget);
+    };
+
+    const close = () => {
+        if (!activeTarget) return;
+        const targetToFocus = activeTarget;
+        persistActiveValue();
         if (overlay.parentNode === host) {
             host.removeChild(overlay);
         }
         host.classList.remove("has-lang-fullscreen");
-        activeTarget.focus();
+        targetToFocus.focus();
         activeTarget = null;
+        sequence = [];
+        sequenceIndex = -1;
     };
 
     closeBtn.addEventListener("click", close);
@@ -77,23 +136,14 @@ function createLangFullscreenController(host) {
         }
     });
 
-    return function open(target) {
-        activeTarget = target;
-        fullscreenArea.value = target.value;
-        const label = deriveLangLabel(target);
-        titleEl.textContent = label;
-        const badgeText = target.closest(".lang-col, .variant-lang")?.querySelector(".lang-dot")?.textContent?.trim()
-            || target.dataset.lang?.toUpperCase()
-            || label?.slice(0, 2).toUpperCase()
-            || "TXT";
-        badgeEl.textContent = badgeText;
+    navPrev.addEventListener("click", () => navigate(-1));
+    navNext.addEventListener("click", () => navigate(1));
 
-        if (!overlay.isConnected) {
-            host.appendChild(overlay);
+    return function open(target) {
+        if (activeTarget && activeTarget !== target) {
+            persistActiveValue();
         }
-        host.classList.add("has-lang-fullscreen");
-        fullscreenArea.focus();
-        fullscreenArea.setSelectionRange(fullscreenArea.value.length, fullscreenArea.value.length);
+        applyContent(target);
     };
 }
 

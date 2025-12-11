@@ -566,6 +566,44 @@ textarea:focus {
     gap: 12px;
 }
 
+.lang-fullscreen__nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.18);
+    background: rgba(18, 24, 40, 0.92);
+    color: #e6ecff;
+    font-size: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 10px 28px rgba(0,0,0,0.45);
+    transition: transform 0.12s ease, background 0.12s ease, opacity 0.12s ease;
+}
+
+.lang-fullscreen__nav:hover {
+    background: rgba(52, 64, 95, 0.96);
+    transform: translateY(-50%) scale(1.04);
+}
+
+.lang-fullscreen__nav:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    transform: translateY(-50%);
+}
+
+.lang-fullscreen__nav--prev {
+    left: 18px;
+}
+
+.lang-fullscreen__nav--next {
+    right: 18px;
+}
+
 .lang-fullscreen__head {
     display: flex;
     align-items: center;
@@ -1529,6 +1567,13 @@ textarea:focus {
     border-color: rgba(40, 75, 180, 0.26);
     color: #0d1630;
     max-width: 90%;
+}
+
+.light-theme .lang-fullscreen__nav {
+    background: #ffffff;
+    color: #0f1a33;
+    border-color: rgba(40, 75, 180, 0.26);
+    box-shadow: 0 8px 18px rgba(0,0,0,0.14);
 }
 
 .light-theme .config-badge {

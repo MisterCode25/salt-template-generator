@@ -6,6 +6,29 @@ body {
     font-family: Arial, sans-serif;
     background: #0b0f19;
     color: #e3ecff;
+    scrollbar-color: #3d4f82 #0f1320;
+    scrollbar-width: thin;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+    width: 11px;
+}
+
+::-webkit-scrollbar-track {
+    background: #0f1320;
+    border-left: 1px solid rgba(80,120,255,0.25);
+}
+
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #30406b, #3f5ca3);
+    border-radius: 999px;
+    border: 2px solid #0f1320;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #3a5084, #5174c8);
 }
 
 .app-header {
@@ -55,6 +78,7 @@ h1, h2, h3 {
 .light-theme body {
     background: #f4f6fb;
     color: #0b1a33;
+    scrollbar-color: #9eb4de #e8ecf7;
 }
 
 .light-theme .app-header {
@@ -75,6 +99,21 @@ h1, h2, h3 {
 .light-theme .top-menu a:hover {
     color: #0f1a33;
     text-shadow: none;
+}
+
+.light-theme ::-webkit-scrollbar-track {
+    background: #e8ecf7;
+    border-left: 1px solid rgba(40,80,150,0.18);
+}
+
+.light-theme ::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #bac7e6, #8aa4db);
+    border: 2px solid #e8ecf7;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.04);
+}
+
+.light-theme ::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #a9bce6, #7997d6);
 }
 
 @media (max-width: 768px) {
