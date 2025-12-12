@@ -4,6 +4,7 @@ import { loadTokens, saveTokens } from "../services/tokenService.js";
 function TokenModal({ initial, onClose, onSave }) {
     const [token, setToken] = useState(initial?.token || "");
     const [label, setLabel] = useState(initial?.label || "");
+    const [key, setKey] = useState(initial?.key || "");
     const [type, setType] = useState(initial?.input_type || "text");
     const [def, setDef] = useState(initial?.default || "");
 
@@ -16,6 +17,7 @@ function TokenModal({ initial, onClose, onSave }) {
             ...initial,
             token,
             label,
+            key: key.trim() || undefined,
             input_type: type,
             default: def !== "" ? def : undefined
         });
@@ -30,6 +32,13 @@ function TokenModal({ initial, onClose, onSave }) {
 
                 <label>Display label</label>
                 <input value={label} onChange={e => setLabel(e.target.value)} />
+
+                <label>Parsing key (optional)</label>
+                <input
+                    value={key}
+                    onChange={e => setKey(e.target.value)}
+                    placeholder="Ex: LastName, Mobile, Request…"
+                />
 
                 <label>Field type</label>
                 <select value={type} onChange={e => setType(e.target.value)}>
@@ -96,6 +105,7 @@ export default function ManageTokens() {
                         <div key={t.id} className="model-row">
                             <div>
                                 <strong>{t.label || t.token}</strong> <span className="hint">{t.token}</span>
+                                {t.key && <div className="hint" style={{ marginTop: 2 }}>Key: {t.key}</div>}
                             </div>
                             <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
                                 <button className="icon-btn edit-btn" onClick={() => setModalToken(t)}>

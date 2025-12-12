@@ -1,63 +1,13 @@
 import { useEffect, useMemo, useState, useRef } from "react";
-import { loadTokens, ensureTokensFromTexts } from "../services/tokenService.js";
+import { createPortal } from "react-dom";
+import { loadTokens, ensureTokensFromTexts, saveTokens } from "../services/tokenService.js";
 import { loadTemplates, groupTemplates, saveTemplates } from "../services/templateService.js";
 import { applyTokens, generateFinalText } from "../core/tokenEngine.js";
 import { copyText, showToast } from "../services/clipboardService.js";
 import { loadJSON, saveJSON } from "../services/storageService.js";
 import { useNavigate } from "react-router-dom";
 import { applyTheme, getInitialTheme, getThemeToggleLabel } from "../utils/theme.js";
-
-const CONFIG_SCHEMA_VERSION = 1;
-
-function computeConfigChecksum(serialized) {
-    return Array.from(serialized).reduce((sum, ch) => (sum + ch.charCodeAt(0)) % 1000000007, 0);
-}
-
-function buildConfigPayload(configName, tokens, models) {
-    const meta = {
-        configName,
-        schemaVersion: CONFIG_SCHEMA_VERSION,
-        exportedAt: Date.now(),
-        checksum: 0
-    };
-    const base = { meta, tokens, models };
-    const serialized = JSON.stringify({ ...base, meta: { ...meta, checksum: 0 } });
-    meta.checksum = computeConfigChecksum(serialized);
-    return {
-        meta,
-        tokens,
-        models,
-        configName
-    };
-}
-
-function validateImportedConfig(raw = {}) {
-    if (typeof raw !== "object" || raw === null) {
-        throw new Error("Invalid file shape");
-    }
-    const tokens = Array.isArray(raw.tokens) ? raw.tokens : [];
-    const models = Array.isArray(raw.models) ? raw.models : [];
-    const meta = raw.meta || {};
-    const configName = meta.configName || raw.configName || "Imported configuration";
-
-    if (meta.schemaVersion && meta.schemaVersion > CONFIG_SCHEMA_VERSION) {
-        throw new Error("Unsupported version");
-    }
-
-    const serialized = JSON.stringify({
-        meta: { ...meta, checksum: 0 },
-        tokens,
-        models
-    });
-    if (meta.checksum !== undefined) {
-        const computed = computeConfigChecksum(serialized);
-        if (computed !== meta.checksum) {
-            throw new Error("Checksum mismatch");
-        }
-    }
-
-    return { tokens, models, configName };
-}
+import { parseClipboard, applyParsedToTokenValues } from "../utils/clipboardParser.js";
 
 function highlightInputs(tokens = [], className = "input-warning") {
     tokens.forEach(token => {
@@ -67,7 +17,121 @@ function highlightInputs(tokens = [], className = "input-warning") {
         }
     });
 }
-function DataInputs({ tokens, values, setValues, onDirty }) {
+function DataInputs({ tokens, setTokens, values, setValues, onDirty }) {
+    const applyClipboardText = (text) => {
+        const parsed = parseClipboard(text);
+        const { nextValues, applied, unmapped } = applyParsedToTokenValues(parsed, tokens, values);
+        const appliedTokens = applied.map(a => a.token);
+        if (appliedTokens.length > 0) {
+            setValues(nextValues);
+            appliedTokens.forEach(tokenKey => {
+                localStorage.setItem("input_" + tokenKey, nextValues[tokenKey]);
+            });
+            if (onDirty) onDirty();
+            showToast("Champs remplis depuis le presse-papier", "info");
+        }
+        const availableTokens = (tokens || []).filter(t => !t.key);
+        const filteredUnmapped = unmapped.filter(kv => !ignoredKeys.includes(kv.key));
+        if (filteredUnmapped.length > 0 && availableTokens.length > 0) {
+            setPendingMappings(filteredUnmapped);
+            setMappingSelections({});
+            setMappingOpen(true);
+        } else if (appliedTokens.length === 0) {
+            showToast("Aucune clé reconnue", "warning");
+        }
+    };
+
+    const [clipboardParsable, setClipboardParsable] = useState(false);
+    const [lastPastedText, setLastPastedText] = useState("");
+    const [mappingOpen, setMappingOpen] = useState(false);
+    const [pendingMappings, setPendingMappings] = useState([]);
+    const [mappingSelections, setMappingSelections] = useState({});
+    const [ignoredKeys, setIgnoredKeys] = useState(() => {
+        try {
+            return JSON.parse(localStorage.getItem("ignored_token_keys") || "[]");
+        } catch {
+            return [];
+        }
+    });
+    const persistIgnoredKeys = (next) => {
+        setIgnoredKeys(next);
+        localStorage.setItem("ignored_token_keys", JSON.stringify(next));
+    };
+    const tokensRef = useRef(tokens);
+    const valuesRef = useRef(values);
+
+    useEffect(() => {
+        tokensRef.current = tokens;
+    }, [tokens]);
+
+    useEffect(() => {
+        valuesRef.current = values;
+    }, [values]);
+
+    const checkClipboardParsable = async () => {
+        try {
+            const text = await navigator.clipboard.readText();
+            const parsed = parseClipboard(text);
+            const hasPairs = (parsed.keyValues || []).length > 0 || parsed.ticketNumber || parsed.mobileNumber;
+            setClipboardParsable(Boolean(hasPairs));
+        } catch (e) {
+            if (lastPastedText) {
+                const parsed = parseClipboard(lastPastedText);
+                const hasPairs = (parsed.keyValues || []).length > 0 || parsed.ticketNumber || parsed.mobileNumber;
+                setClipboardParsable(Boolean(hasPairs));
+            } else {
+                setClipboardParsable(false);
+            }
+        }
+    };
+
+    const handleAutoFill = async () => {
+        try {
+            let text = "";
+            try {
+                text = await navigator.clipboard.readText();
+            } catch {
+                text = lastPastedText;
+            }
+            if (!text) {
+                showToast("Colle d’abord le contenu (Cmd+V) puis réessaie", "warning");
+                return;
+            }
+            applyClipboardText(text);
+            await checkClipboardParsable();
+        } catch (e) {
+            showToast("Impossible de lire le presse-papier", "error");
+        }
+    };
+
+    useEffect(() => {
+        checkClipboardParsable();
+        const onFocus = () => checkClipboardParsable();
+        const onVisibility = () => {
+            if (!document.hidden) checkClipboardParsable();
+        };
+        window.addEventListener("focus", onFocus);
+        document.addEventListener("visibilitychange", onVisibility);
+        return () => {
+            window.removeEventListener("focus", onFocus);
+            document.removeEventListener("visibilitychange", onVisibility);
+        };
+    }, []);
+
+    useEffect(() => {
+        const onPaste = (e) => {
+            const pasted = e.clipboardData?.getData("text/plain") || "";
+            if (pasted) {
+                setLastPastedText(pasted);
+                const parsed = parseClipboard(pasted);
+                const hasPairs = (parsed.keyValues || []).length > 0 || parsed.ticketNumber || parsed.mobileNumber;
+                setClipboardParsable(Boolean(hasPairs));
+            }
+        };
+        window.addEventListener("paste", onPaste);
+        return () => window.removeEventListener("paste", onPaste);
+    }, []);
+
     const handleChange = (token, value) => {
         setValues(prev => {
             const next = { ...prev, [token]: value };
@@ -99,11 +163,105 @@ function DataInputs({ tokens, values, setValues, onDirty }) {
                     );
                 })}
             </div>
-            <button id="resetFieldsBtn" className="reset-fields-btn" onClick={() => {
-                setValues({});
-                tokens.forEach(t => localStorage.removeItem("input_" + t.token));
-                if (onDirty) onDirty();
-            }}>Reset fields</button>
+            <div className="data-actions-row">
+                {clipboardParsable && (
+                    <button
+                        type="button"
+                        className="autofill-btn"
+                        onMouseEnter={checkClipboardParsable}
+                        onFocus={checkClipboardParsable}
+                        onClick={handleAutoFill}
+                    >
+                        Auto fill
+                    </button>
+                )}
+                <button id="resetFieldsBtn" className="reset-fields-btn" onClick={() => {
+                    setValues({});
+                    tokens.forEach(t => localStorage.removeItem("input_" + t.token));
+                    if (onDirty) onDirty();
+                    checkClipboardParsable();
+                }}>Reset fields</button>
+            </div>
+
+            {mappingOpen && typeof document !== "undefined" && createPortal(
+                <div className="popup">
+                    <div className="popup-box popup-box--wide">
+                        <div className="popup-header">
+                            <div>
+                                <p className="eyebrow">Auto fill</p>
+                                <h2>Clés détectées</h2>
+                                <p className="hint">Jumèle chaque clé avec un token sans clé.</p>
+                            </div>
+                            <button className="secondary-btn" onClick={() => setMappingOpen(false)}>Fermer</button>
+                        </div>
+
+                        <div className="popup-grid">
+                            {pendingMappings.map((kv, idx) => {
+                                const options = (tokens || []).filter(t => !t.key);
+                                const selectionKey = `${kv.key}_${idx}`;
+                                return (
+                                    <div key={selectionKey} className="popup-card">
+                                        <div className="field-line">
+                                            <label>{kv.rawKey}</label>
+                                            <div className="hint" style={{ whiteSpace: "pre-wrap" }}>{kv.value}</div>
+                                            <select
+                                                value={mappingSelections[selectionKey] || ""}
+                                                onChange={(e) => setMappingSelections(prev => ({ ...prev, [selectionKey]: e.target.value }))}
+                                            >
+                                                <option value="">— Choisir un token —</option>
+                                                {options.map(t => (
+                                                    <option key={t.id} value={t.id}>{t.label || t.token}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        <div className="popup-actions">
+                            <button
+                                className="secondary-btn"
+                                onClick={() => {
+                                    const nextIgnored = Array.from(new Set([
+                                        ...ignoredKeys,
+                                        ...pendingMappings.map(kv => kv.key)
+                                    ]));
+                                    persistIgnoredKeys(nextIgnored);
+                                    setMappingOpen(false);
+                                    showToast("Clés ignorées pour les prochaines fois", "info");
+                                }}
+                            >
+                                Ignorer
+                            </button>
+                            <button
+                                className="primary-btn"
+                                onClick={async () => {
+                                    const nextTokens = [...tokens];
+                                    const idToToken = new Map(nextTokens.map(t => [t.id, t]));
+                                    pendingMappings.forEach((kv, idx) => {
+                                        const selectionKey = `${kv.key}_${idx}`;
+                                        const id = mappingSelections[selectionKey];
+                                        if (!id) return;
+                                        const tok = idToToken.get(id);
+                                        if (!tok) return;
+                                        tok.key = kv.rawKey;
+                                    });
+                                    setTokens(nextTokens);
+                                    await saveTokens(nextTokens);
+                                    setMappingOpen(false);
+                                    showToast("Clés enregistrées", "info");
+                                    const clipboardText = await navigator.clipboard.readText();
+                                    applyClipboardText(clipboardText);
+                                }}
+                            >
+                                Jumeler et appliquer
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
         </section>
     );
 }
@@ -160,7 +318,6 @@ export default function Home() {
     const [configName, setConfigName] = useState(localStorage.getItem("local_configName") || "No configuration");
     const [empty, setEmpty] = useState(false);
     const [helpOpen, setHelpOpen] = useState(false);
-    const fileInputRef = useRef(null);
     const lastSectionClickVersion = useRef({});
     const inputChangeVersion = useRef(0);
     const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -278,49 +435,6 @@ export default function Home() {
         }
     };
 
-    const exportConfig = async () => {
-        const nextName = prompt("Nom de la configuration", configName) || configName;
-        setConfigName(nextName);
-        localStorage.setItem("local_configName", nextName);
-        const payload = buildConfigPayload(nextName, tokens, models);
-        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `${nextName || "config"}.templageConfig`;
-        a.click();
-        URL.revokeObjectURL(url);
-    };
-
-    const importConfig = () => {
-        if (fileInputRef.current) {
-            fileInputRef.current.value = "";
-            fileInputRef.current.click();
-        }
-    };
-
-    const handleFile = async (e) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        try {
-            const text = await file.text();
-            const json = JSON.parse(text);
-            const { tokens: importedTokens, models: importedModels, configName: importedName } = validateImportedConfig(json);
-            await saveJSON("tokens", importedTokens);
-            await saveTemplates(importedModels);
-            setTokens(importedTokens);
-            setModels(importedModels);
-            const name = importedName || "Imported configuration";
-            localStorage.setItem("local_configName", name);
-            setConfigName(name);
-            showToast("Configuration importée", "info");
-            setEmpty((importedModels || []).length === 0 && (importedTokens || []).length === 0);
-        } catch (err) {
-            console.error(err);
-            showToast("Import échoué", "error");
-        }
-    };
-
     const quickCreateTemplate = async () => {
         const sample = {
             id: crypto.randomUUID(),
@@ -343,20 +457,8 @@ export default function Home() {
         showToast("Template créé", "info");
     };
 
-    const resetLocal = async () => {
-        if (!confirm("Reset all stored data?")) return;
-        localStorage.clear();
-        setModels([]);
-        setTokens([]);
-        setValues({});
-        setConfigName("No configuration");
-        setEmpty(true);
-        showToast("Configuration réinitialisée", "warning");
-    };
-
     return (
         <main className="page-container">
-            <input ref={fileInputRef} type="file" accept=".templageConfig,application/json" style={{ display: "none" }} onChange={handleFile} />
             <header className="app-header">
                 <div className="app-title">Salt Templater</div>
                 <nav className="top-menu">
@@ -367,17 +469,7 @@ export default function Home() {
                                 <div className="dropdown-section">
                                     <div className="dropdown-title">Management</div>
                                     <button onClick={() => { navigate("/templates"); setDropdownOpen(false); }} className="dropdown-reset">Manage templates</button>
-                                </div>
-                                <div className="dropdown-section">
-                                    <div className="dropdown-title">Configuration</div>
-                                    <button onClick={() => { importConfig(); setDropdownOpen(false); }} className="dropdown-reset">Import configuration</button>
-                                    <button onClick={() => { exportConfig(); setDropdownOpen(false); }} className="dropdown-reset">Export configuration</button>
-                                    <button onClick={() => {
-                                        const name = prompt("Nom de la configuration", configName) || configName;
-                                        localStorage.setItem("local_configName", name);
-                                        setConfigName(name);
-                                    }} className="dropdown-reset">Rename configuration</button>
-                                    <button onClick={() => { resetLocal(); setDropdownOpen(false); }} className="reset-btn dropdown-reset">Reset saved data</button>
+                                    <button onClick={() => { navigate("/settings"); setDropdownOpen(false); }} className="dropdown-reset">Settings</button>
                                 </div>
                             </div>
                         )}
@@ -444,7 +536,7 @@ export default function Home() {
 
             {!empty && (
                 <div id="zones-grid" className="zones-grid">
-                    <DataInputs tokens={tokens} values={values} setValues={setValues} onDirty={() => { inputChangeVersion.current++; }} />
+                    <DataInputs tokens={tokens} setTokens={setTokens} values={values} setValues={setValues} onDirty={() => { inputChangeVersion.current++; }} />
 
                 <section id="email-col" className="zone-box">
                     <h3>Email</h3>

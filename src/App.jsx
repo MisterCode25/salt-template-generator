@@ -3,6 +3,7 @@ import { Routes, Route } from "react-router-dom";
 import Home from "./pages/Home.jsx";
 import ManageTemplates from "./pages/ManageTemplates.jsx";
 import ManageTokens from "./pages/ManageTokens.jsx";
+import Settings from "./pages/Settings.jsx";
 import PageHeader from "./components/PageHeader.jsx";
 import { applyTheme, getInitialTheme } from "./utils/theme.js";
 
@@ -34,6 +35,7 @@ export default function App() {
             <Route path="/" element={<Home />} />
             <Route path="/templates" element={<ManageTemplatesPage />} />
             <Route path="/tokens" element={<ManageTokensPage />} />
+            <Route path="/settings" element={<Settings />} />
         </Routes>
     );
 }

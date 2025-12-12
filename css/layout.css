@@ -67,6 +67,10 @@
     transition: transform 0.22s ease, box-shadow 0.22s ease;
 }
 
+#zone-left {
+    min-height: 220px;
+}
+
 .zone-box:hover {
     transform: translateY(-2px);
     box-shadow: 0 10px 24px rgba(0,0,0,0.5);
