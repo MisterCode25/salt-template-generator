@@ -616,7 +616,7 @@ textarea:focus {
 }
 
 .lang-col::after {
-    content: "Aperçu";
+    content: "Preview";
     position: absolute;
     top: 8px;
     right: 10px;
@@ -1376,6 +1376,18 @@ textarea:focus {
     width: 100%;
 }
 
+.settings-reset-btn {
+    width: auto;
+    align-self: flex-start;
+    margin-top: 6px;
+}
+
+.settings-restore-btn {
+    width: auto;
+    align-self: flex-start;
+    margin-top: 6px;
+}
+
 .empty-state {
     grid-column: 1 / -1;
     display: flex;
@@ -1500,6 +1512,12 @@ textarea:focus {
     opacity: 0;
     transform: translateY(6px);
     transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.dropdown-menu.is-open {
+    display: block;
+    opacity: 1;
+    transform: translateY(0);
 }
 
 .dropdown-menu a {
@@ -1883,6 +1901,207 @@ textarea:focus {
     background: #ffffff !important;
     color: #0f1a33 !important;
     border: 1px solid rgba(40,80,150,0.2) !important;
+}
+
+/* ---------- SALT THEME OVERRIDES ---------- */
+.salt-theme input[type="text"],
+.salt-theme input[type="number"],
+.salt-theme input[type="date"],
+.salt-theme select,
+.salt-theme textarea {
+    background: #0a0a0a;
+    border: 1px solid rgba(255,255,255,0.18);
+    color: #ffffff;
+    box-shadow: none;
+}
+
+.salt-theme input[type="text"]:focus,
+.salt-theme input[type="number"]:focus,
+.salt-theme select:focus,
+.salt-theme textarea:focus {
+    background: #0f0f0f;
+    border-color: #058750;
+    box-shadow: 0 0 8px rgba(5,135,80,0.5);
+}
+
+.salt-theme .primary-btn,
+.salt-theme .autofill-btn {
+    background: linear-gradient(135deg, #058750, #0a9a5d);
+    border: 1px solid rgba(5,135,80,0.65);
+    color: #ffffff;
+    box-shadow: 0 6px 16px rgba(5,135,80,0.35);
+}
+
+.salt-theme .primary-btn:hover,
+.salt-theme .autofill-btn:hover {
+    box-shadow: 0 8px 20px rgba(5,135,80,0.5);
+    filter: brightness(1.04);
+}
+
+.salt-theme .autofill-btn:disabled,
+.salt-theme .primary-btn:disabled {
+    background: #1b1b1b;
+    border: 1px solid rgba(255,255,255,0.12);
+    color: #8c8c8c;
+    box-shadow: none;
+}
+
+.salt-theme .secondary-btn {
+    background: #101010;
+    color: #ffffff;
+    border: 1px solid rgba(255,255,255,0.22);
+}
+
+.salt-theme .secondary-btn:hover {
+    background: #151515;
+    filter: brightness(1.03);
+}
+
+.salt-theme .dropdown-btn {
+    background: linear-gradient(135deg, #0a0a0a, #151515);
+    color: #ffffff;
+    border: 1px solid rgba(5,135,80,0.45);
+}
+
+.salt-theme .dropdown-menu {
+    background: #0a0a0a;
+    border: 1px solid rgba(255,255,255,0.14);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.9);
+}
+
+.salt-theme .dropdown-reset,
+.salt-theme .dropdown-menu a,
+.salt-theme .model-row,
+.salt-theme .token-row,
+.salt-theme .reset-btn,
+.salt-theme .model-section,
+.salt-theme .manage-card,
+.salt-theme .manage-token-card,
+.salt-theme .inputs-zone,
+.salt-theme .zone-box {
+    background: #0a0a0a;
+    color: #ffffff;
+    border: 1px solid rgba(255,255,255,0.14);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.8);
+}
+
+.salt-theme .dropdown-title {
+    color: #1ed764;
+}
+
+.salt-theme .dropdown-section {
+    border-top: 1px solid rgba(5,135,80,0.25);
+}
+
+.salt-theme .segment-group {
+    background: rgba(0,0,0,0.9);
+    border: 1px solid rgba(255,255,255,0.14);
+}
+
+.salt-theme .segment {
+    background: #111111;
+    color: #ffffff;
+}
+
+.salt-theme .segment.active {
+    background: linear-gradient(135deg, #058750, #1ed764);
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(5,135,80,0.45);
+}
+
+.salt-theme .popup {
+    background: rgba(0,0,0,0.7);
+}
+
+.salt-theme .popup-box {
+    background: #0a0a0a;
+    border: 1px solid rgba(255,255,255,0.14);
+    color: #ffffff;
+    box-shadow: 0 12px 28px rgba(0,0,0,0.9);
+}
+
+.salt-theme .popup-box label,
+.salt-theme .popup-box h2 {
+    color: #ffffff;
+}
+
+.salt-theme .popup-card input[type="text"],
+.salt-theme .popup-card input[type="number"],
+.salt-theme .popup-card select,
+.salt-theme .popup-card textarea,
+.salt-theme .popup-card .field-line input,
+.salt-theme .popup-card .field-line select {
+    background: #0f0f0f;
+    color: #ffffff;
+    border: 1px solid rgba(255,255,255,0.18);
+    box-shadow: none;
+}
+
+.salt-theme .popup-card input::placeholder,
+.salt-theme .popup-card textarea::placeholder {
+    color: #b5b5b5;
+}
+
+.salt-theme .theme-toggle {
+    border: 1px solid rgba(5,135,80,0.45);
+    background: #0a0a0a;
+    color: #ffffff;
+}
+
+.salt-theme .config-badge {
+    background: rgba(0,0,0,0.9);
+    border: 1px solid rgba(5,135,80,0.55);
+    color: #ffffff;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.85);
+}
+
+.salt-theme .icon-btn {
+    background: #0a0a0a;
+    border: 1px solid rgba(5,135,80,0.4);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.7);
+}
+
+.salt-theme .icon-btn:hover {
+    border-color: rgba(30,215,100,0.7);
+    box-shadow: 0 8px 18px rgba(5,135,80,0.35);
+}
+
+.salt-theme .icon-pencil {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.8' stroke='%231ed764' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 20h9'/%3E%3Cpath d='M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z'/%3E%3C/svg%3E");
+}
+
+.salt-theme .icon-trash {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23ff6b6b' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6h16'/%3E%3Cpath d='M10 6h4'/%3E%3Cpath d='M10 6l.5-2h3l.5 2'/%3E%3Cpath d='M9 6v12a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2V6'/%3E%3C/svg%3E");
+}
+
+.salt-theme #email-container .primary-btn {
+    background: linear-gradient(135deg, #0b2b1e, #125b3d, #058750);
+    border: 1px solid rgba(5,135,80,0.65);
+    box-shadow: 0 6px 18px rgba(18,91,61,0.55), inset 0 1px 0 rgba(255,255,255,0.08);
+}
+
+.salt-theme #email-container .primary-btn:hover {
+    box-shadow: 0 8px 24px rgba(18,91,61,0.7), inset 0 1px 0 rgba(255,255,255,0.12);
+}
+
+.salt-theme #sms-container .primary-btn {
+    background: linear-gradient(135deg, #0b2b1e, #125b3d, #058750);
+    border: 1px solid rgba(5,135,80,0.65);
+    box-shadow: 0 6px 18px rgba(18,91,61,0.55), inset 0 1px 0 rgba(255,255,255,0.08);
+}
+
+.salt-theme #sms-container .primary-btn:hover {
+    box-shadow: 0 8px 24px rgba(18,91,61,0.7), inset 0 1px 0 rgba(255,255,255,0.12);
+}
+
+.salt-theme #other-container .primary-btn {
+    background: linear-gradient(135deg, #0b2b1e, #125b3d, #058750);
+    border: 1px solid rgba(5,135,80,0.65);
+    box-shadow: 0 6px 18px rgba(18,91,61,0.55), inset 0 1px 0 rgba(255,255,255,0.08);
+}
+
+.salt-theme #other-container .primary-btn:hover {
+    box-shadow: 0 8px 24px rgba(18,91,61,0.7), inset 0 1px 0 rgba(255,255,255,0.12);
 }
 
 .light-theme .lang-fullscreen {

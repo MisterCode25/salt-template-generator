@@ -74,7 +74,7 @@ function TemplateModal({ initial, onClose, onSave }) {
     const addVariant = () => {
         const next = {
             id: crypto.randomUUID(),
-            name: `Variante ${variants.length + 1}`,
+            name: `Variant ${variants.length + 1}`,
             text_fr: "",
             text_en: "",
             text_de: "",
@@ -138,7 +138,7 @@ function TemplateModal({ initial, onClose, onSave }) {
                     data-tab-id="main"
                     onClick={() => setActiveTab("main")}
                 >
-                    Texte principal
+                    Main text
                 </button>
                 {variants.map((v, idx) => (
                     <button
@@ -147,11 +147,11 @@ function TemplateModal({ initial, onClose, onSave }) {
                         data-tab-id={v.id}
                         onClick={() => setActiveTab(v.id)}
                     >
-                        {v.name?.trim() || `Variante ${idx + 1}`}
+                        {v.name?.trim() || `Variant ${idx + 1}`}
                     </button>
                 ))}
             </div>
-            <button className="icon-btn add-variant-tab" onClick={addVariant} aria-label="Ajouter une variante">
+            <button className="icon-btn add-variant-tab" onClick={addVariant} aria-label="Add a variant">
                 +
             </button>
         </div>
@@ -159,10 +159,10 @@ function TemplateModal({ initial, onClose, onSave }) {
 
     const nameBar = () => (
         <div className="variant-name-bar">
-            <div className="variant-name-label">Nom de la variante</div>
+            <div className="variant-name-label">Variant name</div>
             <div className="variant-name-wrapper">
                 {activeTab === "main" ? (
-                    <span id="variantNameStatic" className="variant-name-static">Texte principal</span>
+                    <span id="variantNameStatic" className="variant-name-static">Main text</span>
                 ) : (
                     <input
                         type="text"
@@ -171,7 +171,7 @@ function TemplateModal({ initial, onClose, onSave }) {
                             const value = e.target.value;
                             setVariants(prev => prev.map(v => v.id === activeTab ? { ...v, name: value } : v));
                         }}
-                        placeholder="Nom de variante"
+                        placeholder="Variant name"
                     />
                 )}
             </div>
@@ -180,7 +180,7 @@ function TemplateModal({ initial, onClose, onSave }) {
                     type="button"
                     className="icon-btn variant-remove-icon"
                     onClick={() => removeVariant(activeTab)}
-                    aria-label="Supprimer la variante"
+                    aria-label="Delete variant"
                 >
                     <span className="icon-trash" aria-hidden="true"></span>
                 </button>
@@ -256,11 +256,11 @@ function TemplateModal({ initial, onClose, onSave }) {
 
         return (
             <div className="lang-fullscreen">
-                <button type="button" className="lang-fullscreen__nav lang-fullscreen__nav--prev" onClick={() => go(-1)} aria-label="Langue précédente">←</button>
+                <button type="button" className="lang-fullscreen__nav lang-fullscreen__nav--prev" onClick={() => go(-1)} aria-label="Previous language">←</button>
                 <div className="lang-fullscreen__card">
                     <div className="lang-fullscreen__head">
                         <div>
-                            <p className="eyebrow">Edition plein écran</p>
+                            <p className="eyebrow">Fullscreen editor</p>
                             <h3 className="lang-fullscreen__title">{item.label}</h3>
                         </div>
                         <span className="lang-fullscreen__badge">{item.dot}</span>
@@ -271,10 +271,10 @@ function TemplateModal({ initial, onClose, onSave }) {
                         onChange={e => setValue(e.target.value)}
                     />
                     <div className="lang-fullscreen__actions">
-                        <button type="button" className="primary-btn" data-close-fullscreen onClick={() => setFullscreen(null)}>Terminer</button>
+                        <button type="button" className="primary-btn" data-close-fullscreen onClick={() => setFullscreen(null)}>Done</button>
                     </div>
                 </div>
-                <button type="button" className="lang-fullscreen__nav lang-fullscreen__nav--next" onClick={() => go(1)} aria-label="Langue suivante">→</button>
+                <button type="button" className="lang-fullscreen__nav lang-fullscreen__nav--next" onClick={() => go(1)} aria-label="Next language">→</button>
             </div>
         );
     };
@@ -387,7 +387,7 @@ export default function ManageTemplates() {
                                 <span>{model.title}</span>
                                 {model.variants?.length > 0 && (
                                     <span className="variant-pill">
-                                        {model.variants.length} variante{model.variants.length > 1 ? "s" : ""}
+                                        {model.variants.length} variant{model.variants.length > 1 ? "s" : ""}
                                     </span>
                                 )}
                             </div>

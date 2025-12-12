@@ -26,7 +26,7 @@ export default function Settings() {
     }, []);
 
     const exportConfig = async () => {
-        const nextName = prompt("Nom de la configuration", configName) || configName;
+        const nextName = prompt("Configuration name", configName) || configName;
         setConfigName(nextName);
         localStorage.setItem("local_configName", nextName);
         const payload = buildConfigPayload(nextName, tokens, models);
@@ -60,25 +60,25 @@ export default function Settings() {
             const name = importedName || "Imported configuration";
             localStorage.setItem("local_configName", name);
             setConfigName(name);
-            showToast("Configuration importée", "info");
+            showToast("Configuration imported", "info");
             navigate("/");
         } catch (err) {
             console.error(err);
-            showToast("Import échoué", "error");
+            showToast("Import failed", "error");
         }
     };
 
     const resetStorage = async () => {
         if (!confirm("Reset all stored data?")) return;
         localStorage.clear();
-        showToast("Configuration réinitialisée", "warning");
+        showToast("Local data reset", "warning");
         window.location.href = "/";
     };
 
     const reenableIgnoredKeys = () => {
         localStorage.removeItem("ignored_token_keys");
         setIgnoredKeysCount(0);
-        showToast("Clés ignorées réactivées", "info");
+        showToast("Ignored keys restored", "info");
     };
 
     return (
@@ -102,19 +102,19 @@ export default function Settings() {
                 <div className="popup-grid" style={{ marginTop: 10 }}>
                     <div className="popup-card">
                         <label>Auto fill keys</label>
-                        <p className="hint">Réafficher les clés ignorées lors du collage.</p>
+                        <p className="hint">Show the mapping popup again for previously ignored keys.</p>
                         <button
-                            className="primary-btn"
+                            className="autofill-btn settings-restore-btn"
                             onClick={reenableIgnoredKeys}
                             disabled={ignoredKeysCount === 0}
                         >
-                            Réafficher popup des clés {ignoredKeysCount > 0 ? `(${ignoredKeysCount})` : ""}
+                            Restore ignored keys {ignoredKeysCount > 0 ? `(${ignoredKeysCount})` : ""}
                         </button>
                     </div>
 
                     <div className="popup-card">
                         <label>Configuration</label>
-                        <p className="hint">Importer ou exporter tes tokens et templates.</p>
+                        <p className="hint">Import or export your tokens and templates.</p>
                         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                             <button className="secondary-btn" onClick={importConfig}>Import configuration</button>
                             <button className="secondary-btn" onClick={exportConfig}>Export configuration</button>
@@ -123,9 +123,9 @@ export default function Settings() {
 
                     <div className="popup-card">
                         <label>Storage</label>
-                        <p className="hint">Réinitialiser toutes les données locales.</p>
-                        <button className="reset-btn dropdown-reset" onClick={resetStorage}>
-                            Reset saved data
+                        <p className="hint">Reset all local data stored in this browser.</p>
+                        <button className="reset-fields-btn settings-reset-btn" onClick={resetStorage}>
+                            Reset local data
                         </button>
                     </div>
                 </div>

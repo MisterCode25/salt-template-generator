@@ -6,7 +6,7 @@ import { applyTokens, generateFinalText } from "../core/tokenEngine.js";
 import { copyText, showToast } from "../services/clipboardService.js";
 import { loadJSON, saveJSON } from "../services/storageService.js";
 import { useNavigate } from "react-router-dom";
-import { applyTheme, getInitialTheme, getThemeToggleLabel } from "../utils/theme.js";
+import { applyTheme, getInitialTheme, getThemeToggleLabel, getNextTheme } from "../utils/theme.js";
 import { parseClipboard, applyParsedToTokenValues } from "../utils/clipboardParser.js";
 
 function highlightInputs(tokens = [], className = "input-warning") {
@@ -28,7 +28,7 @@ function DataInputs({ tokens, setTokens, values, setValues, onDirty }) {
                 localStorage.setItem("input_" + tokenKey, nextValues[tokenKey]);
             });
             if (onDirty) onDirty();
-            showToast("Champs remplis depuis le presse-papier", "info");
+            showToast("Fields filled from clipboard", "info");
         }
         const availableTokens = (tokens || []).filter(t => !t.key);
         const filteredUnmapped = unmapped.filter(kv => !ignoredKeys.includes(kv.key));
@@ -37,7 +37,7 @@ function DataInputs({ tokens, setTokens, values, setValues, onDirty }) {
             setMappingSelections({});
             setMappingOpen(true);
         } else if (appliedTokens.length === 0) {
-            showToast("Aucune clé reconnue", "warning");
+            showToast("No matching keys found", "warning");
         }
     };
 
@@ -94,13 +94,13 @@ function DataInputs({ tokens, setTokens, values, setValues, onDirty }) {
                 text = lastPastedText;
             }
             if (!text) {
-                showToast("Colle d’abord le contenu (Cmd+V) puis réessaie", "warning");
+                showToast("Paste the content (Cmd+V) then try again", "warning");
                 return;
             }
             applyClipboardText(text);
             await checkClipboardParsable();
         } catch (e) {
-            showToast("Impossible de lire le presse-papier", "error");
+            showToast("Unable to read clipboard", "error");
         }
     };
 
@@ -145,7 +145,7 @@ function DataInputs({ tokens, setTokens, values, setValues, onDirty }) {
         <section id="zone-left" className="zone-box">
             <h3>Data</h3>
             <div id="dynamic-inputs" className="inputs-zone">
-                {tokens.length === 0 && <p className="hint">Aucun token pour l’instant.</p>}
+                {tokens.length === 0 && <p className="hint">No tokens yet.</p>}
                 {tokens.map(tok => {
                     const stored = values[tok.token] ?? localStorage.getItem("input_" + tok.token) ?? tok.default ?? "";
                     const type = tok.input_type === "number" ? "number" : tok.input_type === "date" ? "date" : "text";
@@ -189,10 +189,10 @@ function DataInputs({ tokens, setTokens, values, setValues, onDirty }) {
                         <div className="popup-header">
                             <div>
                                 <p className="eyebrow">Auto fill</p>
-                                <h2>Clés détectées</h2>
-                                <p className="hint">Jumèle chaque clé avec un token sans clé.</p>
+                                <h2>Detected keys</h2>
+                                <p className="hint">Match each key to an unmapped token.</p>
                             </div>
-                            <button className="secondary-btn" onClick={() => setMappingOpen(false)}>Fermer</button>
+                            <button className="secondary-btn" onClick={() => setMappingOpen(false)}>Close</button>
                         </div>
 
                         <div className="popup-grid">
@@ -208,7 +208,7 @@ function DataInputs({ tokens, setTokens, values, setValues, onDirty }) {
                                                 value={mappingSelections[selectionKey] || ""}
                                                 onChange={(e) => setMappingSelections(prev => ({ ...prev, [selectionKey]: e.target.value }))}
                                             >
-                                                <option value="">— Choisir un token —</option>
+                                                <option value="">— Select a token —</option>
                                                 {options.map(t => (
                                                     <option key={t.id} value={t.id}>{t.label || t.token}</option>
                                                 ))}
@@ -229,10 +229,10 @@ function DataInputs({ tokens, setTokens, values, setValues, onDirty }) {
                                     ]));
                                     persistIgnoredKeys(nextIgnored);
                                     setMappingOpen(false);
-                                    showToast("Clés ignorées pour les prochaines fois", "info");
+                                    showToast("Keys ignored for next pastes", "info");
                                 }}
                             >
-                                Ignorer
+                                Ignore
                             </button>
                             <button
                                 className="primary-btn"
@@ -250,12 +250,12 @@ function DataInputs({ tokens, setTokens, values, setValues, onDirty }) {
                                     setTokens(nextTokens);
                                     await saveTokens(nextTokens);
                                     setMappingOpen(false);
-                                    showToast("Clés enregistrées", "info");
+                                    showToast("Keys saved", "info");
                                     const clipboardText = await navigator.clipboard.readText();
                                     applyClipboardText(clipboardText);
                                 }}
                             >
-                                Jumeler et appliquer
+                                Save mapping and apply
                             </button>
                         </div>
                     </div>
@@ -277,7 +277,7 @@ function TemplateButton({ model, onCopy }) {
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span>{model.title}</span>
                 {hasVariants && (
-                    <span className="variant-pill">{model.variants.length} variante{model.variants.length > 1 ? "s" : ""}</span>
+                    <span className="variant-pill">{model.variants.length} variant{model.variants.length > 1 ? "s" : ""}</span>
                 )}
             </div>
             {hasVariants && <span className="variant-caret">▾</span>}
@@ -292,14 +292,14 @@ function VariantModal({ model, onSelect, onClose }) {
                 <div className="popup-header">
                     <div>
                         <p className="eyebrow">{model.title}</p>
-                        <h2>Choisir une variante</h2>
+                        <h2>Choose a variant</h2>
                     </div>
-                    <button className="secondary-btn" onClick={onClose}>Fermer</button>
+                    <button className="secondary-btn" onClick={onClose}>Close</button>
                 </div>
                 <div className="variant-choice-grid">
                     {model.variants.map(v => (
                         <button key={v.id} className="primary-btn variant-choice-btn" onClick={() => onSelect(v)}>
-                            {v.name || "Variante"}
+                            {v.name || "Variant"}
                         </button>
                     ))}
                 </div>
@@ -310,7 +310,7 @@ function VariantModal({ model, onSelect, onClose }) {
 
 export default function Home() {
     const navigate = useNavigate();
-    const [lang, setLang] = useState("fr");
+    const [lang, setLang] = useState("en");
     const [tokens, setTokens] = useState([]);
     const [models, setModels] = useState([]);
     const [values, setValues] = useState({});
@@ -321,6 +321,7 @@ export default function Home() {
     const lastSectionClickVersion = useRef({});
     const inputChangeVersion = useRef(0);
     const [dropdownOpen, setDropdownOpen] = useState(false);
+    const [themeDropdownOpen, setThemeDropdownOpen] = useState(false);
     const [theme, setTheme] = useState(() => getInitialTheme());
 
     useEffect(() => {
@@ -338,8 +339,11 @@ export default function Home() {
 
     useEffect(() => {
         const handler = (e) => {
-            if (!e.target.closest(".dropdown")) {
+            if (!e.target.closest(".options-dropdown")) {
                 setDropdownOpen(false);
+            }
+            if (!e.target.closest(".theme-dropdown")) {
+                setThemeDropdownOpen(false);
             }
         };
         document.addEventListener("click", handler);
@@ -403,7 +407,7 @@ export default function Home() {
         const tokensNeeded = Array.from(new Set(text.match(/\{[^{}]+\}/g) || []));
         const { values: filled, missing } = collectInputValues(tokensNeeded);
         if (missing.length > 0) {
-            showToast("Il manque des données pour : " + missing.join(", "), "error");
+            showToast("Missing data for: " + missing.join(", "), "error");
             return;
         }
         const warnSameSection = lastSectionClickVersion.current[section] !== undefined
@@ -421,7 +425,7 @@ export default function Home() {
         Object.entries(filled).forEach(([token, val]) => map[token] = val);
         const finalText = generateFinalText(model, lang, map);
         await copyText(finalText, {
-            message: warnSameSection ? "Texte copié (données inchangées)." : "Texte copié",
+            message: warnSameSection ? "Text copied (data unchanged)." : "Text copied",
             variant: warnSameSection ? "warning" : "info"
         });
         lastSectionClickVersion.current[section] = inputChangeVersion.current;
@@ -441,8 +445,8 @@ export default function Home() {
             title: "Welcome email",
             type: "email",
             order: models.length + 1,
-            text_fr: "Bonjour {customer_name}",
-            text_en: "Hi {customer_name}",
+            text_fr: "Hello {customer_name}",
+            text_en: "Hello {customer_name}",
             text_de: "Hallo {customer_name}",
             text_it: "Ciao {customer_name}",
             variants: []
@@ -454,7 +458,7 @@ export default function Home() {
         setTokens(refreshedTokens);
         setModels(next);
         setEmpty(false);
-        showToast("Template créé", "info");
+        showToast("Template created", "info");
     };
 
     return (
@@ -462,10 +466,10 @@ export default function Home() {
             <header className="app-header">
                 <div className="app-title">Salt Templater</div>
                 <nav className="top-menu">
-                    <div className="dropdown">
+                    <div className="dropdown options-dropdown">
                         <button className="dropdown-btn" onClick={() => setDropdownOpen(o => !o)}>Options ▾</button>
                         {dropdownOpen && (
-                            <div className="dropdown-menu">
+                            <div className="dropdown-menu is-open">
                                 <div className="dropdown-section">
                                     <div className="dropdown-title">Management</div>
                                     <button onClick={() => { navigate("/templates"); setDropdownOpen(false); }} className="dropdown-reset">Manage templates</button>
@@ -474,14 +478,38 @@ export default function Home() {
                             </div>
                         )}
                     </div>
-                    <button
-                        id="themeToggle"
-                        className="theme-toggle"
-                        aria-label="Toggle theme"
-                        onClick={() => setTheme(prev => prev === "light" ? "dark" : "light")}
-                    >
-                        {getThemeToggleLabel(theme)}
-                    </button>
+                    <div className="dropdown theme-dropdown">
+                        <button
+                            id="themeToggle"
+                            className="theme-toggle"
+                            aria-label="Toggle theme"
+                            onClick={() => setThemeDropdownOpen(o => !o)}
+                        >
+                            {getThemeToggleLabel(theme)} Theme ▾
+                        </button>
+                        {themeDropdownOpen && (
+                            <div className="dropdown-menu is-open">
+                                <button
+                                    className="dropdown-reset"
+                                    onClick={() => { setTheme("dark"); setThemeDropdownOpen(false); }}
+                                >
+                                    Dark
+                                </button>
+                                <button
+                                    className="dropdown-reset"
+                                    onClick={() => { setTheme("light"); setThemeDropdownOpen(false); }}
+                                >
+                                    Clear
+                                </button>
+                                <button
+                                    className="dropdown-reset"
+                                    onClick={() => { setTheme("salt"); setThemeDropdownOpen(false); }}
+                                >
+                                    Salt
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </nav>
 
                 <div className="segmented-control">
@@ -508,7 +536,7 @@ export default function Home() {
                     onClick={(e) => { if (e.target === e.currentTarget) setHelpOpen(false); }}
                 >
                     <div className="help-modal__content">
-                        <button className="secondary-btn help-modal__close" onClick={() => setHelpOpen(false)}>Fermer</button>
+                        <button className="secondary-btn help-modal__close" onClick={() => setHelpOpen(false)}>Close</button>
                         <h2>Salt Templater — Quick guide</h2>
                         <div className="help-modal__section">
                             <h3>What it does</h3>
@@ -517,7 +545,7 @@ export default function Home() {
                         <div className="help-modal__section">
                             <h3>How to use</h3>
                             <ul>
-                                <li>Fill the fields in the “Data” column (one field per token comme {"{customer_name}"}).</li>
+                                <li>Fill the fields in the “Data” column (one field per token like {"{customer_name}"}).</li>
                                 <li>Pick a language (FR / EN / DE / IT).</li>
                                 <li>Click a template button to copy the final text (copy is blocked if required data is missing).</li>
                             </ul>
@@ -525,9 +553,9 @@ export default function Home() {
                         <div className="help-modal__section">
                             <h3>Manage templates</h3>
                             <ul>
-                                <li>Options → Manage Templates pour créer/éditer vos modèles.</li>
-                                <li>Chaque modèle a un titre, un type (Email/SMS/Other) et un texte par langue.</li>
-                                <li>Ajoutez des variantes pour proposer plusieurs versions d’un modèle.</li>
+                                <li>Options → Manage Templates to create/edit your models.</li>
+                                <li>Each model has a title, a type (Email/SMS/Other) and text per language.</li>
+                                <li>Add variants to provide multiple versions of a model.</li>
                             </ul>
                         </div>
                     </div>
@@ -541,7 +569,7 @@ export default function Home() {
                 <section id="email-col" className="zone-box">
                     <h3>Email</h3>
                     <div id="email-container">
-                        {grouped.email.length === 0 && <p className="hint">Aucun template email.</p>}
+                        {grouped.email.length === 0 && <p className="hint">No email templates.</p>}
                         {grouped.email.map(m => <TemplateButton key={m.id} model={m} onCopy={handleCopy} />)}
                     </div>
                 </section>
@@ -549,7 +577,7 @@ export default function Home() {
                 <section id="sms-col" className="zone-box">
                     <h3>SMS</h3>
                     <div id="sms-container">
-                        {grouped.sms.length === 0 && <p className="hint">Aucun template SMS.</p>}
+                        {grouped.sms.length === 0 && <p className="hint">No SMS templates.</p>}
                         {grouped.sms.map(m => <TemplateButton key={m.id} model={m} onCopy={handleCopy} />)}
                     </div>
                 </section>
@@ -557,7 +585,7 @@ export default function Home() {
                 <section id="other-col" className="zone-box">
                     <h3>Other</h3>
                     <div id="other-container">
-                        {grouped.other.length === 0 && <p className="hint">Aucun template Other.</p>}
+                        {grouped.other.length === 0 && <p className="hint">No Other templates.</p>}
                         {grouped.other.map(m => <TemplateButton key={m.id} model={m} onCopy={handleCopy} />)}
                     </div>
                 </section>
@@ -586,7 +614,7 @@ export default function Home() {
                         <p className="empty-text">Create your first template to unlock the workspace. You can always import an existing configuration later.</p>
                         <div className="empty-actions">
                             <button className="primary-btn" onClick={() => quickCreateTemplate()}>Create template</button>
-                            <button className="secondary-btn" onClick={() => importConfig()}>Import configuration</button>
+                            <button className="secondary-btn" onClick={() => navigate("/settings")}>Import configuration</button>
                             <button className="secondary-btn help-link-btn" onClick={() => setHelpOpen(true)}>How it works</button>
                         </div>
                     </div>

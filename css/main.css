@@ -81,6 +81,12 @@ h1, h2, h3 {
     scrollbar-color: #9eb4de #e8ecf7;
 }
 
+.salt-theme body {
+    background: #000000;
+    color: #ffffff;
+    scrollbar-color: #058750 #000000;
+}
+
 .light-theme .app-header {
     background: rgba(255, 255, 255, 0.82);
     color: #0f1a33;
@@ -88,8 +94,19 @@ h1, h2, h3 {
     box-shadow: 0 4px 16px rgba(0,0,0,0.08);
 }
 
+.salt-theme .app-header {
+    background: rgba(0, 0, 0, 0.92);
+    color: #ffffff;
+    border-bottom: 1px solid rgba(5, 135, 80, 0.45);
+    box-shadow: 0 4px 18px rgba(0,0,0,0.8);
+}
+
 .light-theme .app-title {
     color: #0f1a33;
+}
+
+.salt-theme .app-title {
+    color: #ffffff;
 }
 
 .light-theme .top-menu a {
@@ -99,6 +116,15 @@ h1, h2, h3 {
 .light-theme .top-menu a:hover {
     color: #0f1a33;
     text-shadow: none;
+}
+
+.salt-theme .top-menu a {
+    color: #c9f5de;
+}
+
+.salt-theme .top-menu a:hover {
+    color: #ffffff;
+    text-shadow: 0 0 6px rgba(5,135,80,0.6);
 }
 
 .light-theme ::-webkit-scrollbar-track {
@@ -114,6 +140,21 @@ h1, h2, h3 {
 
 .light-theme ::-webkit-scrollbar-thumb:hover {
     background: linear-gradient(180deg, #a9bce6, #7997d6);
+}
+
+.salt-theme ::-webkit-scrollbar-track {
+    background: #000000;
+    border-left: 1px solid rgba(5,135,80,0.3);
+}
+
+.salt-theme ::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #058750, #125b3d);
+    border: 2px solid #000000;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05);
+}
+
+.salt-theme ::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #0a9a5d, #0f6b47);
 }
 
 @media (max-width: 768px) {
