@@ -1377,6 +1377,10 @@ textarea:focus {
     width: 100%;
 }
 
+.data-actions-row .reset-fields-btn {
+    width: 50%;
+}
+
 .settings-reset-btn {
     width: auto;
     align-self: flex-start;
