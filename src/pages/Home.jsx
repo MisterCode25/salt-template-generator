@@ -610,7 +610,7 @@ export default function Home() {
             )}
 
             <div id="configBadge" className="config-badge">{configName}</div>
-            <button id="helpBtn" className="help-btn" onClick={() => setHelpOpen(true)}>?</button>
+            <div id="versionBadge" className="version-badge">V2.5</div>
 
             {empty && (
                 <section id="emptyState" className="empty-state">
