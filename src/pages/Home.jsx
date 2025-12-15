@@ -405,6 +405,12 @@ export default function Home() {
             }
         })() || "";
         const tokensNeeded = Array.from(new Set(text.match(/\{[^{}]+\}/g) || []));
+        if (tokensNeeded.length === 0) {
+            const finalText = generateFinalText(model, lang, {});
+            await copyText(finalText, { message: "Text copied", variant: "info" });
+            lastSectionClickVersion.current[section] = inputChangeVersion.current;
+            return;
+        }
         const { values: filled, missing } = collectInputValues(tokensNeeded);
         if (missing.length > 0) {
             showToast("Missing data for: " + missing.join(", "), "error");
