@@ -1315,22 +1315,22 @@ textarea:focus {
 .reset-fields-btn {
     margin-top: 0;
     align-self: flex-start;
-    padding: 10px 18px;
+    padding: 8px 14px;
     border-radius: 10px;
     cursor: pointer;
     font-size: 14px;
     font-weight: 700;
-    color: #ffecec;
-    background: linear-gradient(135deg, rgba(120, 40, 40, 0.9), rgba(170, 55, 55, 0.92));
-    border: 1px solid rgba(255,120,120,0.35);
-    box-shadow: 0 4px 14px rgba(120, 40, 40, 0.45);
+    color: #eef2f7;
+    background: linear-gradient(135deg, #3c4858, #2e3744);
+    border: 1px solid rgba(70, 82, 98, 0.55);
+    box-shadow: 0 4px 14px rgba(35, 43, 55, 0.45);
     transition: transform 0.22s ease, box-shadow 0.22s ease, filter 0.22s ease;
 }
 
 .reset-fields-btn:hover {
     transform: translateY(-2px);
-    filter: brightness(1.06);
-    box-shadow: 0 8px 22px rgba(210, 80, 80, 0.6);
+    filter: brightness(1.08);
+    box-shadow: 0 8px 22px rgba(35, 43, 55, 0.6);
 }
 
 .autofill-btn {
@@ -1814,15 +1814,15 @@ textarea:focus {
 }
 
 .light-theme .reset-fields-btn {
-    background: linear-gradient(135deg, #ff6b6b, #ff8c8c, #ffadad) !important;
-    color: #4a0a0a !important;
-    border: 1px solid rgba(255,120,120,0.4) !important;
-    box-shadow: 0 4px 12px rgba(255, 120, 120, 0.4) !important;
+    background: linear-gradient(135deg, #eef1f6, #e0e6ef) !important;
+    color: #1f2937 !important;
+    border: 1px solid rgba(70, 82, 98, 0.28) !important;
+    box-shadow: 0 4px 12px rgba(17, 24, 39, 0.12) !important;
 }
 
 .light-theme .reset-fields-btn:hover {
-    background: linear-gradient(135deg, #ff5a5a, #ff7b7b, #ff9c9c) !important;
-    box-shadow: 0 7px 18px rgba(255, 120, 120, 0.5) !important;
+    background: linear-gradient(135deg, #e6eaf1, #d7dde8) !important;
+    box-shadow: 0 7px 18px rgba(17, 24, 39, 0.16) !important;
 }
 
 .light-theme .segment-group {
@@ -2248,10 +2248,10 @@ textarea:focus {
 }
 
 .light-theme .reset-fields-btn {
-    background: linear-gradient(135deg, #eef2fb, #e1e8f7);
-    color: #0f1a33;
-    border: 1px solid rgba(40,80,150,0.18);
-    box-shadow: 0 4px 10px rgba(0,0,0,0.07);
+    background: linear-gradient(135deg, #eef1f6, #e0e6ef);
+    color: #1f2937;
+    border: 1px solid rgba(70, 82, 98, 0.28);
+    box-shadow: 0 4px 10px rgba(17,24,39,0.1);
 }
 
 .light-theme .dropdown-reset,

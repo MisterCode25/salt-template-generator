@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { loadTokens } from "../services/tokenService.js";
 import { loadTemplates, saveTemplates } from "../services/templateService.js";
 import { saveJSON } from "../services/storageService.js";
+import { AUTOFILL_ENABLED } from "../utils/featureFlags.js";
 import { buildConfigPayload, validateImportedConfig } from "../services/configService.js";
 import { showToast } from "../services/clipboardService.js";
 
@@ -102,11 +103,20 @@ export default function Settings() {
                 <div className="popup-grid" style={{ marginTop: 10 }}>
                     <div className="popup-card">
                         <label>Auto fill keys</label>
-                        <p className="hint">Show the mapping popup again for previously ignored keys.</p>
+                        <p className="hint">
+                            Auto fill is temporarily unavailable. Previously ignored keys cannot be restored while
+                            the feature is suspended.
+                        </p>
                         <button
                             className="autofill-btn settings-restore-btn"
-                            onClick={reenableIgnoredKeys}
-                            disabled={ignoredKeysCount === 0}
+                            onClick={() => {
+                                if (!AUTOFILL_ENABLED) {
+                                    showToast("Auto fill is temporarily unavailable", "info");
+                                    return;
+                                }
+                                reenableIgnoredKeys();
+                            }}
+                            disabled={!AUTOFILL_ENABLED || ignoredKeysCount === 0}
                         >
                             Restore ignored keys {ignoredKeysCount > 0 ? `(${ignoredKeysCount})` : ""}
                         </button>

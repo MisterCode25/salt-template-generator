@@ -8,6 +8,7 @@ import { loadJSON, saveJSON } from "../services/storageService.js";
 import { useNavigate } from "react-router-dom";
 import { applyTheme, getInitialTheme, getThemeToggleLabel, getNextTheme } from "../utils/theme.js";
 import { parseClipboard, applyParsedToTokenValues } from "../utils/clipboardParser.js";
+import { AUTOFILL_ENABLED } from "../utils/featureFlags.js";
 
 function highlightInputs(tokens = [], className = "input-warning") {
     tokens.forEach(token => {
@@ -69,6 +70,7 @@ function DataInputs({ tokens, setTokens, values, setValues, onDirty }) {
     }, [values]);
 
     const checkClipboardParsable = async () => {
+        if (!AUTOFILL_ENABLED) return;
         try {
             const text = await navigator.clipboard.readText();
             const parsed = parseClipboard(text);
@@ -86,6 +88,10 @@ function DataInputs({ tokens, setTokens, values, setValues, onDirty }) {
     };
 
     const handleAutoFill = async () => {
+        if (!AUTOFILL_ENABLED) {
+            showToast("Auto fill is temporarily unavailable", "warning");
+            return;
+        }
         try {
             let text = "";
             try {
@@ -105,6 +111,7 @@ function DataInputs({ tokens, setTokens, values, setValues, onDirty }) {
     };
 
     useEffect(() => {
+        if (!AUTOFILL_ENABLED) return undefined;
         checkClipboardParsable();
         const onFocus = () => checkClipboardParsable();
         const onVisibility = () => {
@@ -119,6 +126,7 @@ function DataInputs({ tokens, setTokens, values, setValues, onDirty }) {
     }, []);
 
     useEffect(() => {
+        if (!AUTOFILL_ENABLED) return undefined;
         const onPaste = (e) => {
             const pasted = e.clipboardData?.getData("text/plain") || "";
             if (pasted) {
@@ -164,7 +172,10 @@ function DataInputs({ tokens, setTokens, values, setValues, onDirty }) {
                 })}
             </div>
             <div className="data-actions-row">
-                {clipboardParsable && (
+                {!AUTOFILL_ENABLED && (
+                    <p className="hint">Auto fill is temporarily unavailable.</p>
+                )}
+                {AUTOFILL_ENABLED && clipboardParsable && (
                     <button
                         type="button"
                         className="autofill-btn"
