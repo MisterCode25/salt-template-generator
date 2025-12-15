@@ -1315,6 +1315,7 @@ textarea:focus {
 .reset-fields-btn {
     margin-top: 0;
     align-self: flex-start;
+    width: 50%;
     padding: 8px 14px;
     border-radius: 10px;
     cursor: pointer;
@@ -1374,6 +1375,10 @@ textarea:focus {
 
 .data-actions-row button {
     width: 100%;
+}
+
+.data-actions-row .reset-fields-btn {
+    width: 50%;
 }
 
 .settings-reset-btn {
