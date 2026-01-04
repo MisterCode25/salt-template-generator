@@ -405,7 +405,8 @@ export default function Home() {
         return { values: vals, missing };
     };
 
-    const copyModel = async (model, section = "global") => {
+    const copyModel = async (model, section) => {
+        const sectionKey = section || model?.type || "global";
         const text = (() => {
             switch (lang) {
                 case "fr": return model.text_fr;
@@ -419,7 +420,7 @@ export default function Home() {
         if (tokensNeeded.length === 0) {
             const finalText = generateFinalText(model, lang, {});
             await copyText(finalText, { message: "Text copied", variant: "info" });
-            lastSectionClickVersion.current[section] = inputChangeVersion.current;
+            lastSectionClickVersion.current[sectionKey] = inputChangeVersion.current;
             return;
         }
         const { values: filled, missing } = collectInputValues(tokensNeeded);
@@ -427,8 +428,8 @@ export default function Home() {
             showToast("Missing data for: " + missing.join(", "), "error");
             return;
         }
-        const warnSameSection = lastSectionClickVersion.current[section] !== undefined
-            && lastSectionClickVersion.current[section] === inputChangeVersion.current;
+        const warnSameSection = lastSectionClickVersion.current[sectionKey] !== undefined
+            && lastSectionClickVersion.current[sectionKey] === inputChangeVersion.current;
 
         if (warnSameSection && tokensNeeded.length > 0) {
             const toWarn = tokensNeeded.filter(tokenValue => {
@@ -445,7 +446,7 @@ export default function Home() {
             message: warnSameSection ? "Text copied (data unchanged)." : "Text copied",
             variant: warnSameSection ? "warning" : "info"
         });
-        lastSectionClickVersion.current[section] = inputChangeVersion.current;
+        lastSectionClickVersion.current[sectionKey] = inputChangeVersion.current;
     };
 
     const handleCopy = (model) => {
@@ -614,7 +615,7 @@ export default function Home() {
                     model={variantPicker}
                     onClose={() => setVariantPicker(null)}
                     onSelect={(variant) => {
-                        copyModel(variant, "variant");
+                        copyModel({ ...variant, type: variantPicker?.type }, variantPicker?.type);
                         setVariantPicker(null);
                     }}
                 />
