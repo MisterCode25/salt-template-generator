@@ -222,7 +222,7 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
                 )}
             </div>
             {activeTab !== "main" && (
-                <>
+                <div className="variant-actions">
                     <button
                         type="button"
                         className="secondary-btn"
@@ -238,7 +238,7 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
                     >
                         <span className="icon-trash" aria-hidden="true"></span>
                     </button>
-                </>
+                </div>
             )}
         </div>
     );
@@ -359,7 +359,7 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
 
     return (
         <div className="popup">
-            <div className="popup-box popup-box--wide">
+            <div className="popup-box popup-box--wide template-config-modal">
                 <div className="popup-header">
                     <div>
                         <p className="eyebrow">Template</p>
@@ -368,8 +368,10 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
                     <div className="pill">{isEdit ? "Existing" : "Draft"}</div>
                 </div>
 
-                <div className="popup-grid">
-                    <div className="popup-card">
+                <div className="popup-grid template-grid">
+                    <div className="popup-card popup-card--meta">
+                        <div className="popup-card-title">Template info</div>
+                        <div className="popup-card-subtitle">Give it a name and choose a type.</div>
                         <div className="field-line">
                             <label>Title</label>
                             <input
@@ -389,6 +391,8 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
                     </div>
 
             <div className="popup-card popup-card--langs">
+                <div className="popup-card-title">Content & variants</div>
+                <div className="popup-card-subtitle">Edit the main text, then add or convert variants.</div>
                 {renderTabs()}
                 {nameBar()}
                 {activeTab !== "main" && linkExistingTemplate()}
