@@ -184,7 +184,7 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
                     data-tab-id="main"
                     onClick={() => setActiveTab("main")}
                 >
-                    Main text
+                    {title || "Main text"}
                 </button>
                 {variants.map((v, idx) => (
                     <button
@@ -208,7 +208,7 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
             <div className="variant-name-label">Variant name</div>
             <div className="variant-name-wrapper">
                 {activeTab === "main" ? (
-                    <span id="variantNameStatic" className="variant-name-static">Main text</span>
+                    <span id="variantNameStatic" className="variant-name-static">{title || "Main text"}</span>
                 ) : (
                     <input
                         type="text"
