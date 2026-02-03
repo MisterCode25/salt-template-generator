@@ -369,33 +369,33 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
                 </div>
 
                 <div className="popup-grid template-grid">
-                    <div className="popup-card popup-card--meta">
-                        <div className="popup-card-title">Template info</div>
-                        <div className="popup-card-subtitle">Give it a name and choose a type.</div>
-                        <div className="field-line">
-                            <label>Title</label>
-                            <input
-                                value={title}
-                                placeholder="Onboarding email"
-                                onChange={e => setTitle(e.target.value)}
-                            />
-                        </div>
-                        <div className="field-line">
-                            <label>Type</label>
-                            <select value={type} onChange={e => setType(e.target.value)}>
-                                <option value="email">Email</option>
-                                <option value="sms">SMS</option>
-                                <option value="other">Other</option>
-                            </select>
-                        </div>
+                    <div className="popup-card popup-card--variants">
+                        <div className="popup-card-title">Variants</div>
+                        <div className="popup-card-subtitle">Pick or create a variant to edit.</div>
+                        {renderTabs()}
+                        {nameBar()}
+                        {activeTab !== "main" && linkExistingTemplate()}
                     </div>
 
             <div className="popup-card popup-card--langs">
-                <div className="popup-card-title">Content & variants</div>
-                <div className="popup-card-subtitle">Edit the main text, then add or convert variants.</div>
-                {renderTabs()}
-                {nameBar()}
-                {activeTab !== "main" && linkExistingTemplate()}
+                <div className="popup-card-title">Template</div>
+                <div className="popup-card-subtitle">Name, type, and text for the selected tab.</div>
+                <div className="field-line">
+                    <label>Title</label>
+                    <input
+                        value={title}
+                        placeholder="Onboarding email"
+                        onChange={e => setTitle(e.target.value)}
+                    />
+                </div>
+                <div className="field-line">
+                    <label>Type</label>
+                    <select value={type} onChange={e => setType(e.target.value)}>
+                        <option value="email">Email</option>
+                        <option value="sms">SMS</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
                 {langPanel()}
             </div>
         </div>

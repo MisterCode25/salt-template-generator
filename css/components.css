@@ -505,7 +505,7 @@ textarea:focus {
 }
 
 .popup-grid.template-grid {
-    grid-template-columns: minmax(240px, 320px) minmax(420px, 1fr);
+    grid-template-columns: minmax(260px, 360px) minmax(480px, 1fr);
     align-items: start;
 }
 
@@ -517,7 +517,7 @@ textarea:focus {
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
 }
 
-.popup-card--meta {
+.popup-card--variants {
     position: sticky;
     top: 0;
     align-self: start;
@@ -595,19 +595,16 @@ textarea:focus {
 }
 
 .lang-columns {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(220px, 1fr));
     gap: 14px;
     align-items: stretch;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    padding-bottom: 4px;
 }
 
 .lang-col {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    flex: 0 0 320px;
     position: relative;
 }
 
