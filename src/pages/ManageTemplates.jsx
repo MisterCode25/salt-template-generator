@@ -391,7 +391,7 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
             <div className="popup-card popup-card--langs">
                 {renderTabs()}
                 {nameBar()}
-                {linkExistingTemplate()}
+                {activeTab !== "main" && linkExistingTemplate()}
                 {langPanel()}
             </div>
         </div>
