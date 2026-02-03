@@ -505,15 +505,16 @@ textarea:focus {
 }
 
 .popup-grid.template-grid {
-    grid-template-columns: minmax(260px, 360px) minmax(480px, 1fr);
+    grid-template-columns: minmax(240px, 300px) minmax(520px, 1fr);
     align-items: start;
+    gap: 20px;
 }
 
 .popup-card {
     background: rgba(20,26,42,0.8);
     border: 1px solid rgba(80,120,255,0.25);
     border-radius: 12px;
-    padding: 14px;
+    padding: 18px;
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
 }
 
@@ -535,11 +536,15 @@ textarea:focus {
 .popup-card-subtitle {
     font-size: 12px;
     color: #8fa3d8;
-    margin-bottom: 12px;
+    margin-bottom: 14px;
 }
 
 .popup-card--langs {
-    padding: 16px;
+    padding: 20px;
+}
+
+.popup-card--langs .lang-columns {
+    margin-top: 14px;
 }
 
 .popup-card label {
@@ -821,7 +826,7 @@ textarea:focus {
     .popup-grid.template-grid {
         grid-template-columns: 1fr;
     }
-    .popup-card--meta {
+    .popup-card--variants {
         position: static;
     }
 }
@@ -858,9 +863,19 @@ textarea:focus {
 
 .variant-tab-bar {
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.variant-tabs {
+    display: flex;
+    flex-direction: column;
     gap: 8px;
-    margin-bottom: 10px;
+    max-height: 320px;
+    overflow-y: auto;
+    padding-right: 4px;
 }
 
 .add-variant-tab {
@@ -873,6 +888,7 @@ textarea:focus {
     font-size: 18px;
     cursor: pointer;
     transition: 0.18s ease;
+    align-self: flex-start;
 }
 
 .add-variant-tab:hover {
@@ -883,10 +899,20 @@ textarea:focus {
 .variant-name-bar {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin: 0 0 16px;
+    gap: 10px;
+    margin: 0 0 12px;
     flex-wrap: wrap;
     justify-content: flex-start;
+    padding-top: 10px;
+    border-top: 1px solid rgba(80,120,255,0.16);
+}
+
+.variant-name-label {
+    width: 100%;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: #c9d6ff;
 }
 
 .variant-actions {
@@ -896,21 +922,18 @@ textarea:focus {
     margin-left: auto;
 }
 
-.variant-name-label {
-    font-size: 13px;
-    color: #c9d6ff;
-}
 
 .variant-name-wrapper {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     min-width: 220px;
+    width: 100%;
 }
 
 .variant-name-wrapper input {
-    width: 220px;
-    max-width: 260px;
+    width: 100%;
+    max-width: 100%;
 }
 
 .variant-name-static {
@@ -965,12 +988,16 @@ textarea:focus {
 
 .variant-tabs {
     display: flex;
+    flex-direction: column;
     gap: 8px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    max-height: 320px;
+    overflow-y: auto;
+    padding-right: 4px;
 }
 
 .variant-tab {
-    padding: 8px 12px;
+    padding: 10px 12px;
     border-radius: 10px;
     border: 1px solid rgba(80,120,255,0.25);
     background: rgba(25, 32, 48, 0.85);
@@ -978,6 +1005,11 @@ textarea:focus {
     cursor: pointer;
     transition: 0.18s ease;
     font-weight: 600;
+    text-align: left;
+    width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .variant-tab:hover {
