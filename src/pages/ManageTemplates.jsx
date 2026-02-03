@@ -44,7 +44,7 @@ function LanguagePreview({ label, dot, value, onChange, onFullscreen }) {
     );
 }
 
-function TemplateModal({ initial, onClose, onSave }) {
+function TemplateModal({ initial, templates, onClose, onSave }) {
     const isEdit = Boolean(initial);
     const [title, setTitle] = useState(initial?.title || "");
     const [type, setType] = useState(initial?.type || "email");
@@ -64,8 +64,17 @@ function TemplateModal({ initial, onClose, onSave }) {
     })));
     const [activeTab, setActiveTab] = useState("main");
     const [fullscreen, setFullscreen] = useState(null);
+    const [attachedTemplateIds, setAttachedTemplateIds] = useState([]);
+    const [detachedVariants, setDetachedVariants] = useState([]);
+    const [selectedTemplateId, setSelectedTemplateId] = useState("");
 
     const activeVariant = variants.find(v => v.id === activeTab);
+    const availableTemplates = (templates || []).filter(t =>
+        t.id !== initial?.id
+        && t.type === type
+        && !(t.variants?.length > 0)
+        && !attachedTemplateIds.includes(t.id)
+    );
 
     const updateVariantText = (id, key, value) => {
         setVariants(prev => prev.map(v => v.id === id ? { ...v, [key]: value } : v));
@@ -87,6 +96,43 @@ function TemplateModal({ initial, onClose, onSave }) {
     const removeVariant = (id) => {
         setVariants(v => v.filter(x => x.id !== id));
         setActiveTab("main");
+    };
+
+    const detachVariant = () => {
+        if (activeTab === "main" || !activeVariant) return;
+        setVariants(prev => prev.filter(v => v.id !== activeTab));
+        setDetachedVariants(prev => ([
+            ...prev,
+            {
+                name: activeVariant.name || "Variant",
+                text_fr: activeVariant.text_fr || "",
+                text_en: activeVariant.text_en || "",
+                text_de: activeVariant.text_de || "",
+                text_it: activeVariant.text_it || ""
+            }
+        ]));
+        setActiveTab("main");
+    };
+
+    const attachTemplateAsVariant = () => {
+        if (!selectedTemplateId) return;
+        const tpl = (templates || []).find(t => t.id === selectedTemplateId);
+        if (!tpl) return;
+        const newId = crypto.randomUUID();
+        setVariants(prev => ([
+            ...prev,
+            {
+                id: newId,
+                name: tpl.title || "Variant",
+                text_fr: tpl.text_fr || "",
+                text_en: tpl.text_en || "",
+                text_de: tpl.text_de || "",
+                text_it: tpl.text_it || ""
+            }
+        ]));
+        setAttachedTemplateIds(prev => Array.from(new Set([...prev, tpl.id])));
+        setSelectedTemplateId("");
+        setActiveTab(newId);
     };
 
     const onSaveClick = async () => {
@@ -127,7 +173,7 @@ function TemplateModal({ initial, onClose, onSave }) {
             ...cleanedVariants.flatMap(v => [v.text_fr, v.text_en, v.text_de, v.text_it])
         ]);
 
-        onSave(model);
+        onSave(model, { attachedTemplateIds, detachedVariants });
     };
 
     const renderTabs = () => (
@@ -176,15 +222,47 @@ function TemplateModal({ initial, onClose, onSave }) {
                 )}
             </div>
             {activeTab !== "main" && (
-                <button
-                    type="button"
-                    className="icon-btn variant-remove-icon"
-                    onClick={() => removeVariant(activeTab)}
-                    aria-label="Delete variant"
-                >
-                    <span className="icon-trash" aria-hidden="true"></span>
-                </button>
+                <>
+                    <button
+                        type="button"
+                        className="secondary-btn"
+                        onClick={detachVariant}
+                    >
+                        Detach to template
+                    </button>
+                    <button
+                        type="button"
+                        className="icon-btn variant-remove-icon"
+                        onClick={() => removeVariant(activeTab)}
+                        aria-label="Delete variant"
+                    >
+                        <span className="icon-trash" aria-hidden="true"></span>
+                    </button>
+                </>
             )}
+        </div>
+    );
+
+    const linkExistingTemplate = () => (
+        <div className="field-line" style={{ marginTop: 12 }}>
+            <label>Add existing template as variant</label>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <select
+                    value={selectedTemplateId}
+                    onChange={e => setSelectedTemplateId(e.target.value)}
+                >
+                    <option value="">— Select a template —</option>
+                    {availableTemplates.map(t => (
+                        <option key={t.id} value={t.id}>{t.title}</option>
+                    ))}
+                </select>
+                <button type="button" className="secondary-btn" onClick={attachTemplateAsVariant} disabled={!selectedTemplateId}>
+                    Add
+                </button>
+            </div>
+            <div className="hint" style={{ marginTop: 6 }}>
+                Only templates without variants are listed.
+            </div>
         </div>
     );
 
@@ -313,6 +391,7 @@ function TemplateModal({ initial, onClose, onSave }) {
             <div className="popup-card popup-card--langs">
                 {renderTabs()}
                 {nameBar()}
+                {linkExistingTemplate()}
                 {langPanel()}
             </div>
         </div>
@@ -354,11 +433,30 @@ export default function ManageTemplates() {
         await persist(templates.filter(t => t.id !== id));
     };
 
-    const onSaveTemplate = async (model) => {
+    const onSaveTemplate = async (model, changes = {}) => {
+        const { attachedTemplateIds = [], detachedVariants = [] } = changes;
         const exists = templates.some(t => t.id === model.id);
-        const next = exists
+        let next = exists
             ? templates.map(t => t.id === model.id ? model : t)
             : [...templates, { ...model, order: templates.length + 1 }];
+        if (attachedTemplateIds.length > 0) {
+            next = next.filter(t => !attachedTemplateIds.includes(t.id));
+        }
+        if (detachedVariants.length > 0) {
+            const startOrder = next.length;
+            const promoted = detachedVariants.map((v, idx) => ({
+                id: crypto.randomUUID(),
+                title: v.name?.trim() || "Untitled template",
+                type: model.type,
+                order: startOrder + idx + 1,
+                text_fr: v.text_fr || "",
+                text_en: v.text_en || "",
+                text_de: v.text_de || "",
+                text_it: v.text_it || "",
+                variants: []
+            }));
+            next = [...next, ...promoted];
+        }
         await persist(next);
         setModalTemplate(null);
     };
@@ -411,6 +509,7 @@ export default function ManageTemplates() {
             {modalTemplate !== null && (
                 <TemplateModal
                     initial={modalTemplate.id ? modalTemplate : null}
+                    templates={templates}
                     onClose={() => setModalTemplate(null)}
                     onSave={onSaveTemplate}
                 />
