@@ -308,6 +308,9 @@ function VariantModal({ model, onSelect, onClose }) {
                     <button className="secondary-btn" onClick={onClose}>Close</button>
                 </div>
                 <div className="variant-choice-grid">
+                    <button className="primary-btn variant-choice-btn" onClick={() => onSelect(null)}>
+                        Main text
+                    </button>
                     {model.variants.map(v => (
                         <button key={v.id} className="primary-btn variant-choice-btn" onClick={() => onSelect(v)}>
                             {v.name || "Variant"}
@@ -376,6 +379,34 @@ export default function Home() {
         return () => document.removeEventListener("keydown", onKey);
     }, [helpOpen]);
 
+    const getTextByLang = (model, langCode) => {
+        switch (langCode) {
+            case "fr": return model?.text_fr ?? "";
+            case "en": return model?.text_en ?? "";
+            case "de": return model?.text_de ?? "";
+            case "it": return model?.text_it ?? "";
+            default: return model?.text_fr ?? "";
+        }
+    };
+
+    const resolveVariantModel = (base, variant) => {
+        if (!variant) return base;
+        const resolveText = (key) => {
+            const val = variant?.[key];
+            if (typeof val === "string" && val.trim() !== "") return val;
+            return base?.[key] ?? "";
+        };
+        return {
+            ...base,
+            ...variant,
+            text_fr: resolveText("text_fr"),
+            text_en: resolveText("text_en"),
+            text_de: resolveText("text_de"),
+            text_it: resolveText("text_it"),
+            title: base?.title || variant?.title || ""
+        };
+    };
+
     const collectInputValues = (requiredTokens) => {
         const vals = {};
         const missing = [];
@@ -405,20 +436,13 @@ export default function Home() {
         return { values: vals, missing };
     };
 
-    const copyModel = async (model, section) => {
+    const copyModel = async (model, section, baseModel = null) => {
         const sectionKey = section || model?.type || "global";
-        const text = (() => {
-            switch (lang) {
-                case "fr": return model.text_fr;
-                case "en": return model.text_en;
-                case "de": return model.text_de;
-                case "it": return model.text_it;
-                default: return model.text_fr;
-            }
-        })() || "";
+        const effectiveModel = baseModel ? resolveVariantModel(baseModel, model) : model;
+        const text = getTextByLang(effectiveModel, lang) || "";
         const tokensNeeded = Array.from(new Set(text.match(/\{[^{}]+\}/g) || []));
         if (tokensNeeded.length === 0) {
-            const finalText = generateFinalText(model, lang, {});
+            const finalText = generateFinalText(effectiveModel, lang, {});
             await copyText(finalText, { message: "Text copied", variant: "info" });
             lastSectionClickVersion.current[sectionKey] = inputChangeVersion.current;
             return;
@@ -441,7 +465,7 @@ export default function Home() {
 
         const map = {};
         Object.entries(filled).forEach(([token, val]) => map[token] = val);
-        const finalText = generateFinalText(model, lang, map);
+        const finalText = generateFinalText(effectiveModel, lang, map);
         await copyText(finalText, {
             message: warnSameSection ? "Text copied (data unchanged)." : "Text copied",
             variant: warnSameSection ? "warning" : "info"
@@ -453,7 +477,7 @@ export default function Home() {
         if (model.variants && model.variants.length > 0) {
             setVariantPicker(model);
         } else {
-            copyModel(model);
+            copyModel(model, `model_${model.id}`);
         }
     };
 
@@ -615,7 +639,11 @@ export default function Home() {
                     model={variantPicker}
                     onClose={() => setVariantPicker(null)}
                     onSelect={(variant) => {
-                        copyModel({ ...variant, type: variantPicker?.type }, variantPicker?.type);
+                        if (variant) {
+                            copyModel(variant, `variant_${variantPicker.id}_${variant.id}`, variantPicker);
+                        } else {
+                            copyModel(variantPicker, `main_${variantPicker.id}`);
+                        }
                         setVariantPicker(null);
                     }}
                 />
