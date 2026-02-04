@@ -415,6 +415,8 @@ export default function ManageTemplates() {
     const [templates, setTemplates] = useState([]);
     const [currentType, setCurrentType] = useState("email");
     const [modalTemplate, setModalTemplate] = useState(null);
+    const [draggingId, setDraggingId] = useState(null);
+    const [dragOverId, setDragOverId] = useState(null);
 
     useEffect(() => {
         loadTemplates().then(setTemplates);
@@ -485,6 +487,28 @@ export default function ManageTemplates() {
         await persist(next);
     };
 
+    const reorderTemplates = async (dragId, dropId) => {
+        if (!dragId || !dropId || dragId === dropId) return;
+        const grouped = groupTemplates(templates);
+        const currentList = currentType === "email"
+            ? grouped.email
+            : currentType === "sms"
+                ? grouped.sms
+                : grouped.other;
+        const dragIndex = currentList.findIndex(t => t.id === dragId);
+        const dropIndex = currentList.findIndex(t => t.id === dropId);
+        if (dragIndex === -1 || dropIndex === -1) return;
+        const reordered = [...currentList];
+        const [moved] = reordered.splice(dragIndex, 1);
+        reordered.splice(dropIndex, 0, moved);
+        const next = templates.map(t => {
+            const nextIndex = reordered.findIndex(r => r.id === t.id);
+            if (nextIndex === -1) return t;
+            return { ...t, order: nextIndex + 1 };
+        });
+        await persist(next);
+    };
+
     return (
         <main className="page-container">
             <div className="manage-card">
@@ -504,8 +528,36 @@ export default function ManageTemplates() {
                 <div id="models-list" className="models-list">
                     {list.length === 0 && <p>No template for this type.</p>}
                     {list.map((model, index) => (
-                        <div key={model.id} className="model-row">
+                        <div
+                            key={model.id}
+                            className={`model-row${dragOverId === model.id ? " drag-over" : ""}${draggingId === model.id ? " dragging" : ""}`}
+                            draggable
+                            onDragStart={(event) => {
+                                event.dataTransfer.effectAllowed = "move";
+                                event.dataTransfer.setData("text/plain", model.id);
+                                setDraggingId(model.id);
+                            }}
+                            onDragOver={(event) => {
+                                event.preventDefault();
+                                if (dragOverId !== model.id) setDragOverId(model.id);
+                            }}
+                            onDragLeave={() => {
+                                if (dragOverId === model.id) setDragOverId(null);
+                            }}
+                            onDrop={(event) => {
+                                event.preventDefault();
+                                const dragId = draggingId || event.dataTransfer.getData("text/plain");
+                                reorderTemplates(dragId, model.id);
+                                setDraggingId(null);
+                                setDragOverId(null);
+                            }}
+                            onDragEnd={() => {
+                                setDraggingId(null);
+                                setDragOverId(null);
+                            }}
+                        >
                             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                <span className="drag-handle" aria-hidden="true">⋮⋮</span>
                                 <span>{model.title}</span>
                                 {model.variants?.length > 0 && (
                                     <span className="variant-pill">
