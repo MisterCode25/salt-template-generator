@@ -97,6 +97,72 @@ textarea:focus {
     box-shadow: 0 8px 24px rgba(35,95,180,0.6), inset 0 1px 0 rgba(255,255,255,0.1);
 }
 
+.primary-btn.template-type-email,
+.primary-btn.template-type-sms,
+.primary-btn.template-type-other {
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.primary-btn.template-type-email {
+    background: linear-gradient(135deg, #10204f, #1d3674, #294d9d);
+    border: 1px solid rgba(60,95,185,0.48);
+    color: white;
+    padding: 12px 18px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 600;
+    box-shadow: 0 6px 18px rgba(26,55,115,0.55), inset 0 1px 0 rgba(255,255,255,0.08);
+    transition: 0.25s ease;
+}
+
+.primary-btn.template-type-email:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(44,120,255,0.6), inset 0 1px 0 rgba(255,255,255,0.12);
+    filter: brightness(1.07);
+}
+
+.primary-btn.template-type-sms {
+    background: linear-gradient(135deg, #3f177f, #5823ad, #763ad8);
+    border: 1px solid rgba(130,90,235,0.42);
+    color: white;
+    padding: 12px 18px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 600;
+    box-shadow: 0 6px 18px rgba(60,18,120,0.6), inset 0 1px 0 rgba(255,255,255,0.08);
+    transition: 0.25s ease;
+}
+
+.primary-btn.template-type-sms:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(130,80,235,0.62), inset 0 1px 0 rgba(255,255,255,0.12);
+    filter: brightness(1.07);
+}
+
+.primary-btn.template-type-other {
+    background: linear-gradient(135deg, #044e3d, #00785f, #009a78);
+    border: 1px solid rgba(0,160,135,0.48);
+    color: #ffffff;
+    padding: 12px 18px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 600;
+    box-shadow: 0 6px 18px rgba(0,95,80,0.6), inset 0 1px 0 rgba(255,255,255,0.08);
+    transition: 0.25s ease;
+}
+
+.primary-btn.template-type-other:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,150,125,0.62), inset 0 1px 0 rgba(255,255,255,0.12);
+    filter: brightness(1.06);
+}
+
 .model-list button {
     width: 100%;
     padding: 10px;
