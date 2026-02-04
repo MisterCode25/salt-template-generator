@@ -297,6 +297,8 @@ function TemplateButton({ model, onCopy }) {
 }
 
 function VariantModal({ model, onSelect, onClose }) {
+    const typeClass = model.type ? `template-type-${model.type}` : "";
+
     return (
         <div className="popup">
             <div className="popup-box variant-picker">
@@ -308,11 +310,11 @@ function VariantModal({ model, onSelect, onClose }) {
                     <button className="secondary-btn" onClick={onClose}>Close</button>
                 </div>
                 <div className="variant-choice-grid">
-                    <button className="primary-btn variant-choice-btn" onClick={() => onSelect(null)}>
+                    <button className={`primary-btn variant-choice-btn ${typeClass}`} onClick={() => onSelect(null)}>
                         {model.title || "Main text"}
                     </button>
                     {model.variants.map(v => (
-                        <button key={v.id} className="primary-btn variant-choice-btn" onClick={() => onSelect(v)}>
+                        <button key={v.id} className={`primary-btn variant-choice-btn ${typeClass}`} onClick={() => onSelect(v)}>
                             {v.name || "Variant"}
                         </button>
                     ))}
