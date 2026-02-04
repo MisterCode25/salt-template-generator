@@ -465,6 +465,26 @@ export default function ManageTemplates() {
         setModalTemplate(null);
     };
 
+    const moveTemplate = async (id, direction) => {
+        const grouped = groupTemplates(templates);
+        const currentList = currentType === "email"
+            ? grouped.email
+            : currentType === "sms"
+                ? grouped.sms
+                : grouped.other;
+        const index = currentList.findIndex(t => t.id === id);
+        const swapWith = index + direction;
+        if (index === -1 || swapWith < 0 || swapWith >= currentList.length) return;
+        const target = currentList[index];
+        const neighbor = currentList[swapWith];
+        const next = templates.map(t => {
+            if (t.id === target.id) return { ...t, order: neighbor.order };
+            if (t.id === neighbor.id) return { ...t, order: target.order };
+            return t;
+        });
+        await persist(next);
+    };
+
     return (
         <main className="page-container">
             <div className="manage-card">
@@ -483,7 +503,7 @@ export default function ManageTemplates() {
 
                 <div id="models-list" className="models-list">
                     {list.length === 0 && <p>No template for this type.</p>}
-                    {list.map(model => (
+                    {list.map((model, index) => (
                         <div key={model.id} className="model-row">
                             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                                 <span>{model.title}</span>
@@ -494,6 +514,22 @@ export default function ManageTemplates() {
                                 )}
                             </div>
                             <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
+                                <button
+                                    className="icon-btn move-btn"
+                                    onClick={() => moveTemplate(model.id, -1)}
+                                    disabled={index === 0}
+                                    aria-label="Move template up"
+                                >
+                                    ↑
+                                </button>
+                                <button
+                                    className="icon-btn move-btn"
+                                    onClick={() => moveTemplate(model.id, 1)}
+                                    disabled={index === list.length - 1}
+                                    aria-label="Move template down"
+                                >
+                                    ↓
+                                </button>
                                 <button className="icon-btn edit-btn" onClick={() => setModalTemplate(model)}>
                                     <span className="icon-pencil" aria-hidden="true"></span>
                                 </button>
