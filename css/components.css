@@ -1193,7 +1193,9 @@ textarea:focus {
 }
 
 .variant-choice-btn {
-    width: 100%;
+    width: auto;
+    min-width: 0;
+    justify-self: start;
     justify-content: center;
     text-align: center;
 }
