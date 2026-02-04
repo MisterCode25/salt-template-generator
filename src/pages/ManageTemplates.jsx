@@ -118,21 +118,32 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
         if (!selectedTemplateId) return;
         const tpl = (templates || []).find(t => t.id === selectedTemplateId);
         if (!tpl) return;
-        const newId = crypto.randomUUID();
-        setVariants(prev => ([
-            ...prev,
-            {
-                id: newId,
-                name: tpl.title || "Variant",
+        if (activeTab !== "main" && activeVariant) {
+            setVariants(prev => prev.map(v => v.id === activeVariant.id ? {
+                ...v,
+                name: tpl.title || v.name || "Variant",
                 text_fr: tpl.text_fr || "",
                 text_en: tpl.text_en || "",
                 text_de: tpl.text_de || "",
                 text_it: tpl.text_it || ""
-            }
-        ]));
+            } : v));
+        } else {
+            const newId = crypto.randomUUID();
+            setVariants(prev => ([
+                ...prev,
+                {
+                    id: newId,
+                    name: tpl.title || "Variant",
+                    text_fr: tpl.text_fr || "",
+                    text_en: tpl.text_en || "",
+                    text_de: tpl.text_de || "",
+                    text_it: tpl.text_it || ""
+                }
+            ]));
+            setActiveTab(newId);
+        }
         setAttachedTemplateIds(prev => Array.from(new Set([...prev, tpl.id])));
         setSelectedTemplateId("");
-        setActiveTab(newId);
     };
 
     const onSaveClick = async () => {
