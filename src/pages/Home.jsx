@@ -309,7 +309,7 @@ function VariantModal({ model, onSelect, onClose }) {
                 </div>
                 <div className="variant-choice-grid">
                     <button className="primary-btn variant-choice-btn" onClick={() => onSelect(null)}>
-                        {model.title || "Main text"}
+                        Main text
                     </button>
                     {model.variants.map(v => (
                         <button key={v.id} className="primary-btn variant-choice-btn" onClick={() => onSelect(v)}>
