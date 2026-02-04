@@ -1186,8 +1186,8 @@ textarea:focus {
 }
 
 .variant-choice-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    display: flex;
+    flex-direction: column;
     gap: 10px;
     margin-top: 12px;
 }
