@@ -467,26 +467,6 @@ export default function ManageTemplates() {
         setModalTemplate(null);
     };
 
-    const moveTemplate = async (id, direction) => {
-        const grouped = groupTemplates(templates);
-        const currentList = currentType === "email"
-            ? grouped.email
-            : currentType === "sms"
-                ? grouped.sms
-                : grouped.other;
-        const index = currentList.findIndex(t => t.id === id);
-        const swapWith = index + direction;
-        if (index === -1 || swapWith < 0 || swapWith >= currentList.length) return;
-        const target = currentList[index];
-        const neighbor = currentList[swapWith];
-        const next = templates.map(t => {
-            if (t.id === target.id) return { ...t, order: neighbor.order };
-            if (t.id === neighbor.id) return { ...t, order: target.order };
-            return t;
-        });
-        await persist(next);
-    };
-
     const reorderTemplates = async (dragId, dropId) => {
         if (!dragId || !dropId || dragId === dropId) return;
         const grouped = groupTemplates(templates);
@@ -527,7 +507,7 @@ export default function ManageTemplates() {
 
                 <div id="models-list" className="models-list">
                     {list.length === 0 && <p>No template for this type.</p>}
-                    {list.map((model, index) => (
+                    {list.map((model) => (
                         <div
                             key={model.id}
                             className={`model-row${dragOverId === model.id ? " drag-over" : ""}${draggingId === model.id ? " dragging" : ""}`}
@@ -557,7 +537,7 @@ export default function ManageTemplates() {
                             }}
                         >
                             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                <span className="drag-handle" aria-hidden="true">⋮⋮</span>
+                                <span className="drag-handle" aria-hidden="true"></span>
                                 <span>{model.title}</span>
                                 {model.variants?.length > 0 && (
                                     <span className="variant-pill">
@@ -566,22 +546,6 @@ export default function ManageTemplates() {
                                 )}
                             </div>
                             <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
-                                <button
-                                    className="icon-btn move-btn"
-                                    onClick={() => moveTemplate(model.id, -1)}
-                                    disabled={index === 0}
-                                    aria-label="Move template up"
-                                >
-                                    ↑
-                                </button>
-                                <button
-                                    className="icon-btn move-btn"
-                                    onClick={() => moveTemplate(model.id, 1)}
-                                    disabled={index === list.length - 1}
-                                    aria-label="Move template down"
-                                >
-                                    ↓
-                                </button>
                                 <button className="icon-btn edit-btn" onClick={() => setModalTemplate(model)}>
                                     <span className="icon-pencil" aria-hidden="true"></span>
                                 </button>
