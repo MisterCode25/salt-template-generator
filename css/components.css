@@ -63,13 +63,14 @@ textarea:focus {
 .primary-btn {
     background: linear-gradient(140deg, #0a1730, #12305a, #1c4375);
     border: 1px solid rgba(80,130,230,0.32);
-    color: #ffffff;
+    color: #f7f9ff;
     padding: 12px 22px;
     font-weight: 600;
     border-radius: 10px;
     cursor: pointer;
     transition: transform 0.22s ease, box-shadow 0.22s ease, filter 0.22s ease;
     box-shadow: 0 6px 20px rgba(18,45,90,0.5), inset 0 1px 0 rgba(255,255,255,0.08);
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.3);
 }
 
 .primary-btn:disabled {
@@ -182,7 +183,7 @@ textarea:focus {
 #email-container {
     display: flex;
     flex-direction: column;
-    align-items: stretch;
+    align-items: flex-start;
     gap: 12px;
     margin-top: 20px;
 }
@@ -190,7 +191,7 @@ textarea:focus {
 #sms-container {
     display: flex;
     flex-direction: column;
-    align-items: stretch;
+    align-items: flex-start;
     gap: 12px;
     margin-top: 20px;
 }
@@ -198,7 +199,7 @@ textarea:focus {
 #other-container {
     display: flex;
     flex-direction: column;
-    align-items: stretch;
+    align-items: flex-start;
     gap: 12px;
     margin-top: 20px;
 }
@@ -855,8 +856,9 @@ textarea:focus {
     border: 1px solid rgba(80,120,255,0.25);
     cursor: pointer;
     background: rgba(30, 36, 56, 0.75);
-    color: #e6ecff;
+    color: #f0f4ff;
     transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.3);
 }
 
 .secondary-btn:hover {
@@ -1199,6 +1201,7 @@ textarea:focus {
 .variant-choice-grid {
     display: flex;
     flex-direction: column;
+    align-items: flex-start;
     gap: 10px;
     margin-top: 12px;
 }
@@ -1207,8 +1210,9 @@ textarea:focus {
     width: auto;
     min-width: 0;
     justify-self: start;
-    justify-content: center;
-    text-align: center;
+    justify-content: flex-start;
+    text-align: left;
+    align-self: flex-start;
 }
 
 
