@@ -1487,6 +1487,8 @@ textarea:focus {
 
 /*********** RESET FIELDS BUTTON (DATA ZONE) ***********/
 .reset-fields-btn {
+    position: relative;
+    z-index: 3;
     margin-top: 0;
     align-self: flex-start;
     width: 50%;
@@ -1785,7 +1787,7 @@ textarea:focus {
     font-weight: 600;
     box-shadow: 0 6px 20px rgba(0,0,0,0.45);
     backdrop-filter: blur(12px);
-    z-index: 999999999 !important;
+    z-index: 1 !important;
     pointer-events: none;
     opacity: 0.95;
 }
