@@ -1772,11 +1772,16 @@ textarea:focus {
     filter: brightness(1.08);
 }
 
-/*********** CONFIGURATION BADGE (BOTTOM LEFT) ***********/
+/*********** CONFIGURATION + VERSION BADGES ***********/
+.status-badges {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 12px;
+}
+
 .config-badge,
 .version-badge {
-    position: fixed;
-    bottom: 18px;
     padding: 14px 22px;
     background: rgba(18, 22, 33, 0.85);
     border: 1px solid rgba(80,120,255,0.35);
@@ -1787,41 +1792,37 @@ textarea:focus {
     font-weight: 600;
     box-shadow: 0 6px 20px rgba(0,0,0,0.45);
     backdrop-filter: blur(12px);
-    z-index: 0 !important;
     pointer-events: none;
     opacity: 0.95;
-}
-
-.data-actions-row,
-.data-actions-row .reset-fields-btn {
-    position: relative;
-    z-index: 4;
+    min-width: 0;
 }
 
 .config-badge {
-    left: 18px;
+    text-align: left;
+    overflow-wrap: anywhere;
 }
 
 .version-badge {
-    right: 18px;
+    text-align: right;
     text-transform: uppercase;
 }
 
-/* Compact: place badges/buttons after the content instead of overlaying it */
 @media (max-width: 900px) {
+    .status-badges {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
     .config-badge,
     .version-badge {
-        position: static;
-        width: calc(100% - 24px);
-        margin: 12px auto 0 auto;
+        width: 100%;
+        margin: 0;
         display: block;
         text-align: center;
-        inset: auto;
-        transform: none;
     }
 
     .version-badge {
-        margin-top: 10px;
+        margin-top: 0;
     }
 }
 

@@ -651,8 +651,10 @@ export default function Home() {
                 />
             )}
 
-            <div id="configBadge" className="config-badge">{configName}</div>
-            <div id="versionBadge" className="version-badge">V2.5</div>
+            <div className="status-badges" aria-live="polite">
+                <div id="configBadge" className="config-badge">{configName}</div>
+                <div id="versionBadge" className="version-badge">V2.5</div>
+            </div>
 
             {empty && (
                 <section id="emptyState" className="empty-state">
