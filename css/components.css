@@ -1774,10 +1774,20 @@ textarea:focus {
 
 /*********** CONFIGURATION + VERSION BADGES ***********/
 .status-badges {
+    position: fixed;
+    left: 20px;
+    right: 20px;
+    bottom: 16px;
+    z-index: 2;
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
-    margin-top: 12px;
+    margin: 0;
+    pointer-events: none;
+}
+
+.page-container--home {
+    padding-bottom: 110px;
 }
 
 .config-badge,
@@ -1808,7 +1818,14 @@ textarea:focus {
 }
 
 @media (max-width: 900px) {
+    .page-container--home {
+        padding-bottom: 150px;
+    }
+
     .status-badges {
+        left: 12px;
+        right: 12px;
+        bottom: 12px;
         grid-template-columns: 1fr;
         gap: 10px;
     }
