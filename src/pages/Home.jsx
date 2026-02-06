@@ -506,7 +506,7 @@ export default function Home() {
     };
 
     return (
-        <main className="page-container">
+        <main className="page-container page-container--home">
             <header className="app-header">
                 <div className="app-title">Salt Templater</div>
                 <nav className="top-menu">
