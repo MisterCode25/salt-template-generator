@@ -603,13 +603,17 @@ textarea:focus {
 }
 
 .popup-grid.template-grid {
-    grid-template-columns: minmax(520px, 1fr) minmax(240px, 300px);
+    grid-template-columns: minmax(240px, 300px) minmax(520px, 1fr);
     align-items: start;
     gap: 12px;
 }
 
 .popup-card--meta {
     grid-column: 1 / -1;
+}
+
+.popup-card--langs {
+    grid-column: 2;
 }
 
 .popup-card {
@@ -621,6 +625,7 @@ textarea:focus {
 }
 
 .popup-card--variants {
+    grid-column: 1;
     position: sticky;
     top: 0;
     align-self: start;
@@ -974,6 +979,10 @@ textarea:focus {
     }
     .popup-grid.template-grid {
         grid-template-columns: 1fr;
+    }
+    .popup-card--langs,
+    .popup-card--variants {
+        grid-column: auto;
     }
     .popup-card--variants {
         position: static;
