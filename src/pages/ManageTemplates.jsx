@@ -190,7 +190,7 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
     };
 
     const renderTabs = () => (
-        <div className="variant-tab-bar">
+        <div className="variant-tab-bar variant-tab-bar--list-only">
             <div id="variantTabs" className="variant-tabs">
                 <button
                     className={`variant-tab ${activeTab === "main" ? "active" : ""}`}
@@ -210,9 +210,6 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
                     </button>
                 ))}
             </div>
-            <button className="icon-btn add-variant-tab" onClick={addVariant} aria-label="Add a variant">
-                +
-            </button>
         </div>
     );
 
@@ -240,8 +237,16 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
                     />
                 )}
             </div>
-            {activeTab !== "main" && (
-                <div className="variant-actions">
+            <div className="variant-actions">
+                <button
+                    type="button"
+                    className="secondary-btn"
+                    onClick={addVariant}
+                >
+                    + Add variant
+                </button>
+                {activeTab !== "main" && (
+                    <>
                     <button
                         type="button"
                         className="secondary-btn"
@@ -257,8 +262,9 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
                     >
                         <span className="icon-trash" aria-hidden="true"></span>
                     </button>
-                </div>
-            )}
+                    </>
+                )}
+            </div>
         </div>
     );
 
@@ -406,15 +412,15 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
                         </div>
                     </div>
 
-                    <div className="popup-card popup-card--variants">
-                        {renderTabs()}
+                    <div className="popup-card popup-card--langs">
                         {nameBar()}
                         {activeTab !== "main" && linkExistingTemplate()}
+                        {langPanel()}
                     </div>
 
-            <div className="popup-card popup-card--langs">
-                {langPanel()}
-            </div>
+                    <div className="popup-card popup-card--variants">
+                        {renderTabs()}
+                    </div>
         </div>
 
         <div className="popup-actions">

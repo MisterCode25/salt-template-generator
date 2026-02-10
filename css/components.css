@@ -603,7 +603,7 @@ textarea:focus {
 }
 
 .popup-grid.template-grid {
-    grid-template-columns: minmax(240px, 300px) minmax(520px, 1fr);
+    grid-template-columns: minmax(520px, 1fr) minmax(240px, 300px);
     align-items: start;
     gap: 12px;
 }
@@ -624,6 +624,10 @@ textarea:focus {
     position: sticky;
     top: 0;
     align-self: start;
+}
+
+.variant-tab-bar--list-only {
+    margin-bottom: 0;
 }
 
 .popup-card-title {
@@ -1075,7 +1079,8 @@ textarea:focus {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-left: auto;
+    margin-left: 0;
+    flex-wrap: wrap;
 }
 
 
