@@ -614,6 +614,7 @@ textarea:focus {
 
 .popup-card--langs {
     grid-column: 2;
+    grid-row: 2;
 }
 
 .popup-card {
@@ -626,6 +627,7 @@ textarea:focus {
 
 .popup-card--variants {
     grid-column: 1;
+    grid-row: 2;
     position: sticky;
     top: 0;
     align-self: start;
@@ -983,6 +985,7 @@ textarea:focus {
     .popup-card--langs,
     .popup-card--variants {
         grid-column: auto;
+        grid-row: auto;
     }
     .popup-card--variants {
         position: static;
