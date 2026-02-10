@@ -27,7 +27,6 @@ function LanguagePreview({ label, dot, value, onChange, onFullscreen }) {
             <div className="lang-head">
                 <span className="lang-dot">{dot}</span>
                 <span className="lang-label">{label}</span>
-                <span className="lang-preview-chip">Aperçu</span>
             </div>
             <textarea
                 className="plain-editor tall-textarea"
@@ -192,17 +191,12 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
 
     const renderTabs = () => (
         <div className="variant-tab-bar">
-            <div className="variant-tab-head">
-                <span>Variantes disponibles</span>
-                <span className="variant-count">{variants.length + 1}</span>
-            </div>
             <div id="variantTabs" className="variant-tabs">
                 <button
                     className={`variant-tab ${activeTab === "main" ? "active" : ""}`}
                     data-tab-id="main"
                     onClick={() => setActiveTab("main")}
                 >
-                    <span className="variant-tab-eyebrow">Principal</span>
                     <span className="variant-tab-name">{mainVariantName.trim() || title || "Main text"}</span>
                 </button>
                 {variants.map((v, idx) => (
@@ -212,7 +206,6 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
                         data-tab-id={v.id}
                         onClick={() => setActiveTab(v.id)}
                     >
-                        <span className="variant-tab-eyebrow">Variante {idx + 1}</span>
                         <span className="variant-tab-name">{v.name?.trim() || `Variant ${idx + 1}`}</span>
                     </button>
                 ))}
@@ -225,7 +218,6 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
 
     const nameBar = () => (
         <div className="variant-name-bar">
-            <div className="variant-name-label">Variant name</div>
             <div className="variant-name-wrapper">
                 {activeTab === "main" ? (
                     <input
@@ -287,9 +279,6 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
                     Add
                 </button>
             </div>
-            <div className="hint" style={{ marginTop: 6 }}>
-                Only templates without variants are listed.
-            </div>
         </div>
     );
 
@@ -329,15 +318,6 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
 
         return (
             <div className="lang-block">
-                <div className="lang-block-head">
-                    <div>
-                        <p className="eyebrow">Contenu multilingue</p>
-                        <p className="lang-block-title">
-                            {activeTab === "main" ? "Texte principal" : activeVariant?.name || "Variante"}
-                        </p>
-                    </div>
-                    <span className="lang-block-hint">Cliquer sur une langue pour l&apos;éditer en plein écran</span>
-                </div>
                 <div id="variantLangColumns" className="lang-columns lang-columns-panel">
                 <LanguagePreview label="French" dot="FR" value={values.fr} onChange={v => setValue("fr", v)} onFullscreen={() => openFullscreen("fr")} />
                 <LanguagePreview label="English" dot="EN" value={values.en} onChange={v => setValue("en", v)} onFullscreen={() => openFullscreen("en")} />
@@ -399,19 +379,12 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
         <div className="popup">
             <div className="popup-box popup-box--wide template-config-modal">
                 <div className="popup-header">
-                    <div>
-                        <p className="eyebrow">Template</p>
-                        <h2>{isEdit ? "Edit template" : "New template"}</h2>
-                    </div>
-                    <div className="pill">{isEdit ? "Existing" : "Draft"}</div>
+                    <h2>{isEdit ? "Edit template" : "New template"}</h2>
                 </div>
 
                 <div className="popup-grid template-grid">
                     <div className="popup-card popup-card--meta">
-                        <div className="popup-card-title">Template</div>
-                        <div className="popup-card-subtitle">Name and type for the template.</div>
                         <div className="modal-section modal-section--meta">
-                            <div className="modal-section-title">Informations générales</div>
                             <div className="field-line">
                                 <label>Title</label>
                                 <input
@@ -432,16 +405,12 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
                     </div>
 
                     <div className="popup-card popup-card--variants">
-                        <div className="popup-card-title">Variants</div>
-                        <div className="popup-card-subtitle">Pick or create a variant to edit.</div>
                         {renderTabs()}
                         {nameBar()}
                         {activeTab !== "main" && linkExistingTemplate()}
                     </div>
 
             <div className="popup-card popup-card--langs">
-                <div className="popup-card-title">Template</div>
-                <div className="popup-card-subtitle">Text editor for the selected tab.</div>
                 {langPanel()}
             </div>
         </div>
