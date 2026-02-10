@@ -47,6 +47,7 @@ function LanguagePreview({ label, dot, value, onChange, onFullscreen }) {
 function TemplateModal({ initial, templates, onClose, onSave }) {
     const isEdit = Boolean(initial);
     const [title, setTitle] = useState(initial?.title || "");
+    const [mainVariantName, setMainVariantName] = useState(initial?.mainVariantName || "");
     const [type, setType] = useState(initial?.type || "email");
     const [main, setMain] = useState({
         fr: initial?.text_fr || "",
@@ -167,6 +168,7 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
         const model = {
             id: initial?.id || crypto.randomUUID(),
             title: title.trim(),
+            mainVariantName: mainVariantName.trim(),
             type,
             order: initial?.order || (Number.isFinite(initial?.order) ? initial.order : 0),
             text_fr: main.fr,
@@ -195,7 +197,7 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
                     data-tab-id="main"
                     onClick={() => setActiveTab("main")}
                 >
-                    {title || "Main text"}
+                    {mainVariantName.trim() || title || "Main text"}
                 </button>
                 {variants.map((v, idx) => (
                     <button
@@ -219,7 +221,14 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
             <div className="variant-name-label">Variant name</div>
             <div className="variant-name-wrapper">
                 {activeTab === "main" ? (
-                    <span id="variantNameStatic" className="variant-name-static">{title || "Main text"}</span>
+                    <input
+                        id="variantNameStatic"
+                        type="text"
+                        className="variant-name-static"
+                        value={mainVariantName}
+                        onChange={e => setMainVariantName(e.target.value)}
+                        placeholder={title ? `Default: ${title}` : "Main variant name"}
+                    />
                 ) : (
                     <input
                         type="text"
@@ -397,6 +406,14 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
                         value={title}
                         placeholder="Onboarding email"
                         onChange={e => setTitle(e.target.value)}
+                    />
+                </div>
+                <div className="field-line">
+                    <label>Main variant name (optional)</label>
+                    <input
+                        value={mainVariantName}
+                        placeholder={title ? `Default: ${title}` : "Sales"}
+                        onChange={e => setMainVariantName(e.target.value)}
                     />
                 </div>
                 <div className="field-line">
