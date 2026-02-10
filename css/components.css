@@ -611,6 +611,10 @@ textarea:focus {
     gap: 20px;
 }
 
+.popup-card--meta {
+    grid-column: 1 / -1;
+}
+
 .popup-card {
     background: rgba(20,26,42,0.8);
     border: 1px solid rgba(80,120,255,0.25);

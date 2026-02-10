@@ -407,6 +407,30 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
                 </div>
 
                 <div className="popup-grid template-grid">
+                    <div className="popup-card popup-card--meta">
+                        <div className="popup-card-title">Template</div>
+                        <div className="popup-card-subtitle">Name and type for the template.</div>
+                        <div className="modal-section modal-section--meta">
+                            <div className="modal-section-title">Informations générales</div>
+                            <div className="field-line">
+                                <label>Title</label>
+                                <input
+                                    value={title}
+                                    placeholder="Onboarding email"
+                                    onChange={e => setTitle(e.target.value)}
+                                />
+                            </div>
+                            <div className="field-line">
+                                <label>Type</label>
+                                <select value={type} onChange={e => setType(e.target.value)}>
+                                    <option value="email">Email</option>
+                                    <option value="sms">SMS</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
                     <div className="popup-card popup-card--variants">
                         <div className="popup-card-title">Variants</div>
                         <div className="popup-card-subtitle">Pick or create a variant to edit.</div>
@@ -417,34 +441,7 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
 
             <div className="popup-card popup-card--langs">
                 <div className="popup-card-title">Template</div>
-                <div className="popup-card-subtitle">Name, type, and text for the selected tab.</div>
-                <div className="modal-section modal-section--meta">
-                    <div className="modal-section-title">Informations générales</div>
-                    <div className="field-line">
-                        <label>Title</label>
-                        <input
-                            value={title}
-                            placeholder="Onboarding email"
-                            onChange={e => setTitle(e.target.value)}
-                        />
-                    </div>
-                    <div className="field-line">
-                        <label>Main variant name (optional)</label>
-                        <input
-                            value={mainVariantName}
-                            placeholder={title ? `Default: ${title}` : "Sales"}
-                            onChange={e => setMainVariantName(e.target.value)}
-                        />
-                    </div>
-                    <div className="field-line">
-                        <label>Type</label>
-                        <select value={type} onChange={e => setType(e.target.value)}>
-                            <option value="email">Email</option>
-                            <option value="sms">SMS</option>
-                            <option value="other">Other</option>
-                        </select>
-                    </div>
-                </div>
+                <div className="popup-card-subtitle">Text editor for the selected tab.</div>
                 {langPanel()}
             </div>
         </div>
