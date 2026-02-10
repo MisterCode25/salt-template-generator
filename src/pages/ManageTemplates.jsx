@@ -27,6 +27,7 @@ function LanguagePreview({ label, dot, value, onChange, onFullscreen }) {
             <div className="lang-head">
                 <span className="lang-dot">{dot}</span>
                 <span className="lang-label">{label}</span>
+                <span className="lang-preview-chip">Aperçu</span>
             </div>
             <textarea
                 className="plain-editor tall-textarea"
@@ -191,13 +192,18 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
 
     const renderTabs = () => (
         <div className="variant-tab-bar">
+            <div className="variant-tab-head">
+                <span>Variantes disponibles</span>
+                <span className="variant-count">{variants.length + 1}</span>
+            </div>
             <div id="variantTabs" className="variant-tabs">
                 <button
                     className={`variant-tab ${activeTab === "main" ? "active" : ""}`}
                     data-tab-id="main"
                     onClick={() => setActiveTab("main")}
                 >
-                    {mainVariantName.trim() || title || "Main text"}
+                    <span className="variant-tab-eyebrow">Principal</span>
+                    <span className="variant-tab-name">{mainVariantName.trim() || title || "Main text"}</span>
                 </button>
                 {variants.map((v, idx) => (
                     <button
@@ -206,7 +212,8 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
                         data-tab-id={v.id}
                         onClick={() => setActiveTab(v.id)}
                     >
-                        {v.name?.trim() || `Variant ${idx + 1}`}
+                        <span className="variant-tab-eyebrow">Variante {idx + 1}</span>
+                        <span className="variant-tab-name">{v.name?.trim() || `Variant ${idx + 1}`}</span>
                     </button>
                 ))}
             </div>
@@ -264,9 +271,9 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
     );
 
     const linkExistingTemplate = () => (
-        <div className="field-line" style={{ marginTop: 12 }}>
+        <div className="field-line attach-template-field">
             <label>Add existing template as variant</label>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <div className="attach-template-controls">
                 <select
                     value={selectedTemplateId}
                     onChange={e => setSelectedTemplateId(e.target.value)}
@@ -321,11 +328,22 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
         };
 
         return (
-            <div id="variantLangColumns" className="lang-columns lang-columns-panel">
+            <div className="lang-block">
+                <div className="lang-block-head">
+                    <div>
+                        <p className="eyebrow">Contenu multilingue</p>
+                        <p className="lang-block-title">
+                            {activeTab === "main" ? "Texte principal" : activeVariant?.name || "Variante"}
+                        </p>
+                    </div>
+                    <span className="lang-block-hint">Cliquer sur une langue pour l&apos;éditer en plein écran</span>
+                </div>
+                <div id="variantLangColumns" className="lang-columns lang-columns-panel">
                 <LanguagePreview label="French" dot="FR" value={values.fr} onChange={v => setValue("fr", v)} onFullscreen={() => openFullscreen("fr")} />
                 <LanguagePreview label="English" dot="EN" value={values.en} onChange={v => setValue("en", v)} onFullscreen={() => openFullscreen("en")} />
                 <LanguagePreview label="German" dot="DE" value={values.de} onChange={v => setValue("de", v)} onFullscreen={() => openFullscreen("de")} />
                 <LanguagePreview label="Italian" dot="IT" value={values.it} onChange={v => setValue("it", v)} onFullscreen={() => openFullscreen("it")} />
+                </div>
             </div>
         );
     };
@@ -400,29 +418,32 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
             <div className="popup-card popup-card--langs">
                 <div className="popup-card-title">Template</div>
                 <div className="popup-card-subtitle">Name, type, and text for the selected tab.</div>
-                <div className="field-line">
-                    <label>Title</label>
-                    <input
-                        value={title}
-                        placeholder="Onboarding email"
-                        onChange={e => setTitle(e.target.value)}
-                    />
-                </div>
-                <div className="field-line">
-                    <label>Main variant name (optional)</label>
-                    <input
-                        value={mainVariantName}
-                        placeholder={title ? `Default: ${title}` : "Sales"}
-                        onChange={e => setMainVariantName(e.target.value)}
-                    />
-                </div>
-                <div className="field-line">
-                    <label>Type</label>
-                    <select value={type} onChange={e => setType(e.target.value)}>
-                        <option value="email">Email</option>
-                        <option value="sms">SMS</option>
-                        <option value="other">Other</option>
-                    </select>
+                <div className="modal-section modal-section--meta">
+                    <div className="modal-section-title">Informations générales</div>
+                    <div className="field-line">
+                        <label>Title</label>
+                        <input
+                            value={title}
+                            placeholder="Onboarding email"
+                            onChange={e => setTitle(e.target.value)}
+                        />
+                    </div>
+                    <div className="field-line">
+                        <label>Main variant name (optional)</label>
+                        <input
+                            value={mainVariantName}
+                            placeholder={title ? `Default: ${title}` : "Sales"}
+                            onChange={e => setMainVariantName(e.target.value)}
+                        />
+                    </div>
+                    <div className="field-line">
+                        <label>Type</label>
+                        <select value={type} onChange={e => setType(e.target.value)}>
+                            <option value="email">Email</option>
+                            <option value="sms">SMS</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
                 </div>
                 {langPanel()}
             </div>
