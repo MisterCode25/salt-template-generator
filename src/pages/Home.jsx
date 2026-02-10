@@ -298,6 +298,7 @@ function TemplateButton({ model, onCopy }) {
 
 function VariantModal({ model, onSelect, onClose }) {
     const typeClass = model.type ? `template-type-${model.type}` : "";
+    const mainVariantLabel = model.mainVariantName?.trim() || model.title || "Main text";
 
     return (
         <div className="popup">
@@ -311,7 +312,7 @@ function VariantModal({ model, onSelect, onClose }) {
                 </div>
                 <div className="variant-choice-grid">
                     <button className={`primary-btn variant-choice-btn ${typeClass}`} onClick={() => onSelect(null)}>
-                        {model.title || "Main text"}
+                        {mainVariantLabel}
                     </button>
                     {model.variants.map(v => (
                         <button key={v.id} className={`primary-btn variant-choice-btn ${typeClass}`} onClick={() => onSelect(v)}>

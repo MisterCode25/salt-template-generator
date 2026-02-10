@@ -16,6 +16,7 @@ function normalizeVariant(v) {
 function normalizeModel(m) {
     return {
         ...m,
+        mainVariantName: m.mainVariantName || "",
         variants: Array.isArray(m.variants) ? m.variants.map(normalizeVariant) : []
     };
 }
