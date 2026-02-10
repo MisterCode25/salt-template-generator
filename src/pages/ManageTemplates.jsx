@@ -209,6 +209,13 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
                         <span className="variant-tab-name">{v.name?.trim() || `Variant ${idx + 1}`}</span>
                     </button>
                 ))}
+                <button
+                    type="button"
+                    className="variant-tab variant-tab--add"
+                    onClick={addVariant}
+                >
+                    <span className="variant-tab-name">+ Add variant</span>
+                </button>
             </div>
         </div>
     );
@@ -238,13 +245,6 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
                 )}
             </div>
             <div className="variant-actions">
-                <button
-                    type="button"
-                    className="secondary-btn"
-                    onClick={addVariant}
-                >
-                    + Add variant
-                </button>
                 {activeTab !== "main" && (
                     <>
                     <button

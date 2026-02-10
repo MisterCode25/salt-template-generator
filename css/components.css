@@ -1081,7 +1081,7 @@ textarea:focus {
     align-items: center;
     gap: 10px;
     margin: 0 0 8px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     justify-content: flex-start;
     padding-top: 6px;
     border-top: 1px solid rgba(80,120,255,0.16);
@@ -1101,7 +1101,7 @@ textarea:focus {
     align-items: center;
     gap: 10px;
     min-width: 220px;
-    width: 100%;
+    flex: 1;
 }
 
 .variant-name-wrapper input {
@@ -1205,6 +1205,15 @@ textarea:focus {
     color: #ffffff;
     border-color: transparent;
     box-shadow: 0 4px 14px rgba(44,120,255,0.45);
+}
+
+.variant-tab.variant-tab--add {
+    border-style: dashed;
+    opacity: 0.9;
+}
+
+.variant-tab.variant-tab--add:hover {
+    opacity: 1;
 }
 
 .attach-template-field {
