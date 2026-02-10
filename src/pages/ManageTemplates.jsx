@@ -382,7 +382,14 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
     };
 
     return (
-        <div className="popup">
+        <div
+            className="popup"
+            onMouseDown={(event) => {
+                if (event.target === event.currentTarget) {
+                    onClose();
+                }
+            }}
+        >
             <div className="popup-box popup-box--wide template-config-modal">
                 <div className="popup-header">
                     <h2>{isEdit ? "Edit template" : "New template"}</h2>
