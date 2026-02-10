@@ -697,6 +697,41 @@ textarea:focus {
     margin-top: 12px;
 }
 
+.meta-fields-row {
+    display: grid;
+    grid-template-columns: minmax(280px, 1fr) minmax(220px, 280px);
+    gap: 12px;
+    align-items: center;
+}
+
+.meta-fields-row .field-line + .field-line {
+    margin-top: 0;
+}
+
+.field-line--inline {
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+}
+
+.field-line--inline label {
+    min-width: 42px;
+    margin: 0;
+}
+
+.field-line--inline input,
+.field-line--inline select {
+    flex: 1;
+}
+
+.field-line--type label {
+    min-width: 34px;
+}
+
+.field-line--type select {
+    max-width: 240px;
+}
+
 .modal-section {
     padding: 0;
     border: 0;
@@ -938,6 +973,24 @@ textarea:focus {
     }
     .popup-card--variants {
         position: static;
+    }
+
+    .meta-fields-row {
+        grid-template-columns: 1fr;
+    }
+
+    .field-line--inline {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+
+    .field-line--inline label {
+        min-width: 0;
+    }
+
+    .field-line--type select {
+        max-width: 520px;
     }
 }
 

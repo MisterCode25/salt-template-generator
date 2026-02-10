@@ -385,21 +385,23 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
                 <div className="popup-grid template-grid">
                     <div className="popup-card popup-card--meta">
                         <div className="modal-section modal-section--meta">
-                            <div className="field-line">
-                                <label>Title</label>
-                                <input
-                                    value={title}
-                                    placeholder="Onboarding email"
-                                    onChange={e => setTitle(e.target.value)}
-                                />
-                            </div>
-                            <div className="field-line">
-                                <label>Type</label>
-                                <select value={type} onChange={e => setType(e.target.value)}>
-                                    <option value="email">Email</option>
-                                    <option value="sms">SMS</option>
-                                    <option value="other">Other</option>
-                                </select>
+                            <div className="meta-fields-row">
+                                <div className="field-line field-line--inline">
+                                    <label>Title</label>
+                                    <input
+                                        value={title}
+                                        placeholder="Onboarding email"
+                                        onChange={e => setTitle(e.target.value)}
+                                    />
+                                </div>
+                                <div className="field-line field-line--type field-line--inline">
+                                    <label>Type</label>
+                                    <select value={type} onChange={e => setType(e.target.value)}>
+                                        <option value="email">Email</option>
+                                        <option value="sms">SMS</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
                     </div>
