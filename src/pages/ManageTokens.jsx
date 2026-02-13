@@ -26,29 +26,36 @@ function TokenModal({ initial, onClose, onSave }) {
     return (
         <div className="popup">
             <div className="popup-box">
-                <h2>{initial ? "Edit Token" : "New Token"}</h2>
-                <label>Token name (format: {"{my_token}"})</label>
-                <input value={token} onChange={e => setToken(e.target.value)} />
+                <div className="popup-header">
+                    <h2>{initial ? "Edit Token" : "New Token"}</h2>
+                </div>
 
-                <label>Display label</label>
-                <input value={label} onChange={e => setLabel(e.target.value)} />
+                <div className="popup-grid">
+                    <div className="popup-card">
+                        <label>Token name (format: {"{my_token}"})</label>
+                        <input value={token} onChange={e => setToken(e.target.value)} />
 
-                <label>Parsing key (optional)</label>
-                <input
-                    value={key}
-                    onChange={e => setKey(e.target.value)}
-                    placeholder="Ex: LastName, Mobile, Request…"
-                />
+                        <label>Display label</label>
+                        <input value={label} onChange={e => setLabel(e.target.value)} />
 
-                <label>Field type</label>
-                <select value={type} onChange={e => setType(e.target.value)}>
-                    <option value="text">Text</option>
-                    <option value="number">Number</option>
-                    <option value="date">Date</option>
-                </select>
+                        <label>Parsing key (optional)</label>
+                        <input
+                            value={key}
+                            onChange={e => setKey(e.target.value)}
+                            placeholder="Ex: LastName, Mobile, Request…"
+                        />
 
-                <label>Default value (optional)</label>
-                <input value={def} onChange={e => setDef(e.target.value)} />
+                        <label>Field type</label>
+                        <select value={type} onChange={e => setType(e.target.value)}>
+                            <option value="text">Text</option>
+                            <option value="number">Number</option>
+                            <option value="date">Date</option>
+                        </select>
+
+                        <label>Default value (optional)</label>
+                        <input value={def} onChange={e => setDef(e.target.value)} />
+                    </div>
+                </div>
 
                 <div className="popup-actions">
                     <button className="secondary-btn" onClick={onClose}>Cancel</button>
