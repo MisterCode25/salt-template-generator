@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { loadTokens, saveTokens } from "../services/tokenService.js";
+import { renameTokenInTemplates } from "../services/templateService.js";
 
 function TokenModal({ initial, onClose, onSave }) {
     const [token, setToken] = useState(initial?.token || "");
@@ -80,8 +81,12 @@ export default function ManageTokens() {
 
     const onSave = async (token) => {
         if (token.id) {
+            const previous = tokens.find(t => t.id === token.id);
             const next = tokens.map(t => t.id === token.id ? token : t);
             await persist(next);
+            if (previous?.token && previous.token !== token.token) {
+                await renameTokenInTemplates(previous.token, token.token);
+            }
         } else {
             const next = [...tokens, { ...token, id: crypto.randomUUID() }];
             await persist(next);
