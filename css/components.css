@@ -1600,29 +1600,42 @@ textarea:focus {
     box-shadow: 0 7px 18px rgba(255, 120, 120, 0.5) !important;
 }
 
+/*********** ZONE SECTION HEADER (title + inline actions) ***********/
+.zone-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0;
+}
+
+.zone-section-header h3 {
+    margin: 0;
+}
+
 /*********** RESET FIELDS BUTTON (DATA ZONE) ***********/
 .reset-fields-btn {
     position: relative;
     z-index: 3;
-    margin-top: 0;
-    align-self: flex-start;
-    width: 50%;
-    padding: 8px 14px;
-    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border-radius: 8px;
     cursor: pointer;
-    font-size: 14px;
-    font-weight: 700;
-    color: #eef2f7;
-    background: linear-gradient(135deg, #3c4858, #2e3744);
-    border: 1px solid rgba(70, 82, 98, 0.55);
-    box-shadow: 0 4px 14px rgba(35, 43, 55, 0.45);
-    transition: transform 0.22s ease, box-shadow 0.22s ease, filter 0.22s ease;
+    color: #aab4c4;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(70, 82, 98, 0.45);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+    transition: transform 0.22s ease, box-shadow 0.22s ease, color 0.22s ease, background 0.22s ease;
 }
 
 .reset-fields-btn:hover {
-    transform: translateY(-2px);
-    filter: brightness(1.08);
-    box-shadow: 0 8px 22px rgba(35, 43, 55, 0.6);
+    transform: translateY(-1px);
+    color: #eef2f7;
+    background: rgba(255, 255, 255, 0.12);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 .autofill-btn {
@@ -1668,9 +1681,6 @@ textarea:focus {
     width: 100%;
 }
 
-.data-actions-row .reset-fields-btn {
-    width: 50%;
-}
 
 .settings-reset-btn {
     width: auto;
