@@ -299,7 +299,12 @@ export default function Home() {
     return (
         <main className="page-container page-container--home">
             <header className="app-header">
-                <div className="app-title">Salt Templater</div>
+                <div className="app-title">
+                    Salt Templater
+                    {configName && configName !== "No configuration" && (
+                        <span className="app-title-config"> ({configName})</span>
+                    )}
+                </div>
                 <nav className="top-menu">
                     <div className="dropdown options-dropdown">
                         <button className="dropdown-btn" onClick={() => setDropdownOpen(o => !o)}>Options ▾</button>
@@ -441,11 +446,6 @@ export default function Home() {
                     }}
                 />
             )}
-
-            <div className="status-badges" aria-live="polite">
-                <div id="configBadge" className="config-badge">{configName}</div>
-                <div id="versionBadge" className="version-badge">V2.5</div>
-            </div>
 
             {empty && (
                 <section id="emptyState" className="empty-state">

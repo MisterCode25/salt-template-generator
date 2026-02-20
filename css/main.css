@@ -52,6 +52,14 @@ body {
     letter-spacing: 0.4px;
 }
 
+.app-title-config {
+    font-size: 14px;
+    font-weight: 500;
+    opacity: 0.55;
+    letter-spacing: 0;
+    margin-left: 4px;
+}
+
 .top-menu {
     display: flex;
     align-items: center;

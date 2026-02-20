@@ -80,7 +80,7 @@ export default function Settings() {
                 <div className="variant-editor-head" style={{ alignItems: "center" }}>
                     <div>
                         <p className="eyebrow">App</p>
-                        <h2>Settings</h2>
+                        <h2>Settings <span className="settings-version-tag">V2.5</span></h2>
                     </div>
                     <button className="secondary-btn" onClick={() => navigate("/")}>Back</button>
                 </div>
