@@ -151,7 +151,25 @@ function DataInputs({ tokens, setTokens, values, setValues, onDirty }) {
 
     return (
         <section id="zone-left" className="zone-box">
-            <h3>Data</h3>
+            <div className="zone-section-header">
+                <h3>Data</h3>
+                <button
+                    id="resetFieldsBtn"
+                    className="reset-fields-btn"
+                    title="Reset fields"
+                    onClick={() => {
+                        setValues({});
+                        tokens.forEach(t => localStorage.removeItem("input_" + t.token));
+                        if (onDirty) onDirty();
+                        checkClipboardParsable();
+                    }}
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="15" height="15">
+                        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                        <path d="M3 3v5h5"/>
+                    </svg>
+                </button>
+            </div>
             <div id="dynamic-inputs" className="inputs-zone">
                 {tokens.length === 0 && <p className="hint">No tokens yet.</p>}
                 {tokens.map(tok => {
@@ -186,12 +204,6 @@ function DataInputs({ tokens, setTokens, values, setValues, onDirty }) {
                         Auto fill
                     </button>
                 )}
-                <button id="resetFieldsBtn" className="reset-fields-btn" onClick={() => {
-                    setValues({});
-                    tokens.forEach(t => localStorage.removeItem("input_" + t.token));
-                    if (onDirty) onDirty();
-                    checkClipboardParsable();
-                }}>Reset fields</button>
             </div>
 
             {mappingOpen && typeof document !== "undefined" && createPortal(
