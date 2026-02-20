@@ -1,14 +1,10 @@
 import { useEffect, useMemo, useState, useRef } from "react";
-import { createPortal } from "react-dom";
-import { loadTokens, ensureTokensFromTexts, saveTokens } from "../services/tokenService.js";
+import { loadTokens, ensureTokensFromTexts } from "../services/tokenService.js";
 import { loadTemplates, groupTemplates, saveTemplates } from "../services/templateService.js";
-import { applyTokens, generateFinalText } from "../core/tokenEngine.js";
+import { generateFinalText } from "../core/tokenEngine.js";
 import { copyText, showToast } from "../services/clipboardService.js";
-import { loadJSON, saveJSON } from "../services/storageService.js";
 import { useNavigate } from "react-router-dom";
-import { applyTheme, getInitialTheme, getThemeToggleLabel, getNextTheme } from "../utils/theme.js";
-import { parseClipboard, applyParsedToTokenValues } from "../utils/clipboardParser.js";
-import { AUTOFILL_ENABLED } from "../utils/featureFlags.js";
+import { applyTheme, getInitialTheme, getThemeToggleLabel } from "../utils/theme.js";
 
 function highlightInputs(tokens = [], className = "input-warning") {
     tokens.forEach(token => {
@@ -18,128 +14,7 @@ function highlightInputs(tokens = [], className = "input-warning") {
         }
     });
 }
-function DataInputs({ tokens, setTokens, values, setValues, onDirty }) {
-    const applyClipboardText = (text) => {
-        const parsed = parseClipboard(text);
-        const { nextValues, applied, unmapped } = applyParsedToTokenValues(parsed, tokens, values);
-        const appliedTokens = applied.map(a => a.token);
-        if (appliedTokens.length > 0) {
-            setValues(nextValues);
-            appliedTokens.forEach(tokenKey => {
-                localStorage.setItem("input_" + tokenKey, nextValues[tokenKey]);
-            });
-            if (onDirty) onDirty();
-            showToast("Fields filled from clipboard", "info");
-        }
-        const availableTokens = (tokens || []).filter(t => !t.key);
-        const filteredUnmapped = unmapped.filter(kv => !ignoredKeys.includes(kv.key));
-        if (filteredUnmapped.length > 0 && availableTokens.length > 0) {
-            setPendingMappings(filteredUnmapped);
-            setMappingSelections({});
-            setMappingOpen(true);
-        } else if (appliedTokens.length === 0) {
-            showToast("No matching keys found", "warning");
-        }
-    };
-
-    const [clipboardParsable, setClipboardParsable] = useState(false);
-    const [lastPastedText, setLastPastedText] = useState("");
-    const [mappingOpen, setMappingOpen] = useState(false);
-    const [pendingMappings, setPendingMappings] = useState([]);
-    const [mappingSelections, setMappingSelections] = useState({});
-    const [ignoredKeys, setIgnoredKeys] = useState(() => {
-        try {
-            return JSON.parse(localStorage.getItem("ignored_token_keys") || "[]");
-        } catch {
-            return [];
-        }
-    });
-    const persistIgnoredKeys = (next) => {
-        setIgnoredKeys(next);
-        localStorage.setItem("ignored_token_keys", JSON.stringify(next));
-    };
-    const tokensRef = useRef(tokens);
-    const valuesRef = useRef(values);
-
-    useEffect(() => {
-        tokensRef.current = tokens;
-    }, [tokens]);
-
-    useEffect(() => {
-        valuesRef.current = values;
-    }, [values]);
-
-    const checkClipboardParsable = async () => {
-        if (!AUTOFILL_ENABLED) return;
-        try {
-            const text = await navigator.clipboard.readText();
-            const parsed = parseClipboard(text);
-            const hasPairs = (parsed.keyValues || []).length > 0 || parsed.ticketNumber || parsed.mobileNumber;
-            setClipboardParsable(Boolean(hasPairs));
-        } catch (e) {
-            if (lastPastedText) {
-                const parsed = parseClipboard(lastPastedText);
-                const hasPairs = (parsed.keyValues || []).length > 0 || parsed.ticketNumber || parsed.mobileNumber;
-                setClipboardParsable(Boolean(hasPairs));
-            } else {
-                setClipboardParsable(false);
-            }
-        }
-    };
-
-    const handleAutoFill = async () => {
-        if (!AUTOFILL_ENABLED) {
-            showToast("Auto fill is temporarily unavailable", "warning");
-            return;
-        }
-        try {
-            let text = "";
-            try {
-                text = await navigator.clipboard.readText();
-            } catch {
-                text = lastPastedText;
-            }
-            if (!text) {
-                showToast("Paste the content (Cmd+V) then try again", "warning");
-                return;
-            }
-            applyClipboardText(text);
-            await checkClipboardParsable();
-        } catch (e) {
-            showToast("Unable to read clipboard", "error");
-        }
-    };
-
-    useEffect(() => {
-        if (!AUTOFILL_ENABLED) return undefined;
-        checkClipboardParsable();
-        const onFocus = () => checkClipboardParsable();
-        const onVisibility = () => {
-            if (!document.hidden) checkClipboardParsable();
-        };
-        window.addEventListener("focus", onFocus);
-        document.addEventListener("visibilitychange", onVisibility);
-        return () => {
-            window.removeEventListener("focus", onFocus);
-            document.removeEventListener("visibilitychange", onVisibility);
-        };
-    }, []);
-
-    useEffect(() => {
-        if (!AUTOFILL_ENABLED) return undefined;
-        const onPaste = (e) => {
-            const pasted = e.clipboardData?.getData("text/plain") || "";
-            if (pasted) {
-                setLastPastedText(pasted);
-                const parsed = parseClipboard(pasted);
-                const hasPairs = (parsed.keyValues || []).length > 0 || parsed.ticketNumber || parsed.mobileNumber;
-                setClipboardParsable(Boolean(hasPairs));
-            }
-        };
-        window.addEventListener("paste", onPaste);
-        return () => window.removeEventListener("paste", onPaste);
-    }, []);
-
+function DataInputs({ tokens, values, setValues, onDirty }) {
     const handleChange = (token, value) => {
         setValues(prev => {
             const next = { ...prev, [token]: value };
@@ -161,7 +36,6 @@ function DataInputs({ tokens, setTokens, values, setValues, onDirty }) {
                         setValues({});
                         tokens.forEach(t => localStorage.removeItem("input_" + t.token));
                         if (onDirty) onDirty();
-                        checkClipboardParsable();
                     }}
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="15" height="15">
@@ -189,102 +63,6 @@ function DataInputs({ tokens, setTokens, values, setValues, onDirty }) {
                     );
                 })}
             </div>
-            <div className="data-actions-row">
-                {!AUTOFILL_ENABLED && (
-                    <p className="hint">Auto fill is temporarily unavailable.</p>
-                )}
-                {AUTOFILL_ENABLED && clipboardParsable && (
-                    <button
-                        type="button"
-                        className="autofill-btn"
-                        onMouseEnter={checkClipboardParsable}
-                        onFocus={checkClipboardParsable}
-                        onClick={handleAutoFill}
-                    >
-                        Auto fill
-                    </button>
-                )}
-            </div>
-
-            {mappingOpen && typeof document !== "undefined" && createPortal(
-                <div className="popup">
-                    <div className="popup-box popup-box--wide">
-                        <div className="popup-header">
-                            <div>
-                                <p className="eyebrow">Auto fill</p>
-                                <h2>Detected keys</h2>
-                                <p className="hint">Match each key to an unmapped token.</p>
-                            </div>
-                            <button className="secondary-btn" onClick={() => setMappingOpen(false)}>Close</button>
-                        </div>
-
-                        <div className="popup-grid">
-                            {pendingMappings.map((kv, idx) => {
-                                const options = (tokens || []).filter(t => !t.key);
-                                const selectionKey = `${kv.key}_${idx}`;
-                                return (
-                                    <div key={selectionKey} className="popup-card">
-                                        <div className="field-line">
-                                            <label>{kv.rawKey}</label>
-                                            <div className="hint" style={{ whiteSpace: "pre-wrap" }}>{kv.value}</div>
-                                            <select
-                                                value={mappingSelections[selectionKey] || ""}
-                                                onChange={(e) => setMappingSelections(prev => ({ ...prev, [selectionKey]: e.target.value }))}
-                                            >
-                                                <option value="">— Select a token —</option>
-                                                {options.map(t => (
-                                                    <option key={t.id} value={t.id}>{t.label || t.token}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-
-                        <div className="popup-actions">
-                            <button
-                                className="secondary-btn"
-                                onClick={() => {
-                                    const nextIgnored = Array.from(new Set([
-                                        ...ignoredKeys,
-                                        ...pendingMappings.map(kv => kv.key)
-                                    ]));
-                                    persistIgnoredKeys(nextIgnored);
-                                    setMappingOpen(false);
-                                    showToast("Keys ignored for next pastes", "info");
-                                }}
-                            >
-                                Ignore
-                            </button>
-                            <button
-                                className="primary-btn"
-                                onClick={async () => {
-                                    const nextTokens = [...tokens];
-                                    const idToToken = new Map(nextTokens.map(t => [t.id, t]));
-                                    pendingMappings.forEach((kv, idx) => {
-                                        const selectionKey = `${kv.key}_${idx}`;
-                                        const id = mappingSelections[selectionKey];
-                                        if (!id) return;
-                                        const tok = idToToken.get(id);
-                                        if (!tok) return;
-                                        tok.key = kv.rawKey;
-                                    });
-                                    setTokens(nextTokens);
-                                    await saveTokens(nextTokens);
-                                    setMappingOpen(false);
-                                    showToast("Keys saved", "info");
-                                    const clipboardText = await navigator.clipboard.readText();
-                                    applyClipboardText(clipboardText);
-                                }}
-                            >
-                                Save mapping and apply
-                            </button>
-                        </div>
-                    </div>
-                </div>,
-                document.body
-            )}
         </section>
     );
 }
@@ -621,7 +399,7 @@ export default function Home() {
 
             {!empty && (
                 <div id="zones-grid" className="zones-grid">
-                    <DataInputs tokens={tokens} setTokens={setTokens} values={values} setValues={setValues} onDirty={() => { inputChangeVersion.current++; }} />
+                    <DataInputs tokens={tokens} values={values} setValues={setValues} onDirty={() => { inputChangeVersion.current++; }} />
 
                 <section id="email-col" className="zone-box">
                     <h3>Email</h3>

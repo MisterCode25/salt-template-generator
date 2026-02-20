@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { loadTokens } from "../services/tokenService.js";
 import { loadTemplates, saveTemplates } from "../services/templateService.js";
 import { saveJSON } from "../services/storageService.js";
-import { AUTOFILL_ENABLED } from "../utils/featureFlags.js";
 import { buildConfigPayload, validateImportedConfig } from "../services/configService.js";
 import { showToast } from "../services/clipboardService.js";
 
@@ -13,17 +12,9 @@ export default function Settings() {
     const [tokens, setTokens] = useState([]);
     const [models, setModels] = useState([]);
     const [configName, setConfigName] = useState(localStorage.getItem("local_configName") || "No configuration");
-    const [ignoredKeysCount, setIgnoredKeysCount] = useState(0);
-
     useEffect(() => {
         loadTokens().then(setTokens);
         loadTemplates().then(setModels);
-        try {
-            const ignored = JSON.parse(localStorage.getItem("ignored_token_keys") || "[]");
-            setIgnoredKeysCount(Array.isArray(ignored) ? ignored.length : 0);
-        } catch {
-            setIgnoredKeysCount(0);
-        }
     }, []);
 
     const exportConfig = async () => {
@@ -76,12 +67,6 @@ export default function Settings() {
         window.location.href = "/";
     };
 
-    const reenableIgnoredKeys = () => {
-        localStorage.removeItem("ignored_token_keys");
-        setIgnoredKeysCount(0);
-        showToast("Ignored keys restored", "info");
-    };
-
     return (
         <main className="page-container">
             <input
@@ -101,27 +86,6 @@ export default function Settings() {
                 </div>
 
                 <div className="popup-grid" style={{ marginTop: 10 }}>
-                    <div className="popup-card">
-                        <label>Auto fill keys</label>
-                        <p className="hint">
-                            Auto fill is temporarily unavailable. Previously ignored keys cannot be restored while
-                            the feature is suspended.
-                        </p>
-                        <button
-                            className="autofill-btn settings-restore-btn"
-                            onClick={() => {
-                                if (!AUTOFILL_ENABLED) {
-                                    showToast("Auto fill is temporarily unavailable", "info");
-                                    return;
-                                }
-                                reenableIgnoredKeys();
-                            }}
-                            disabled={!AUTOFILL_ENABLED || ignoredKeysCount === 0}
-                        >
-                            Restore ignored keys {ignoredKeysCount > 0 ? `(${ignoredKeysCount})` : ""}
-                        </button>
-                    </div>
-
                     <div className="popup-card">
                         <label>Configuration</label>
                         <p className="hint">Import or export your tokens and templates.</p>
