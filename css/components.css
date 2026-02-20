@@ -1847,75 +1847,20 @@ textarea:focus {
     filter: brightness(1.08);
 }
 
-/*********** CONFIGURATION + VERSION BADGES ***********/
-.status-badges {
-    position: fixed;
-    left: 20px;
-    right: 20px;
-    bottom: 16px;
-    z-index: 2;
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-    margin: 0;
-    pointer-events: none;
-}
-
-.page-container--home {
-    padding-bottom: 110px;
-}
-
-.config-badge,
-.version-badge {
-    padding: 14px 22px;
-    background: rgba(18, 22, 33, 0.85);
-    border: 1px solid rgba(80,120,255,0.35);
-    border-radius: 12px;
-    color: #e6ecff;
-    font-size: 20px;
-    letter-spacing: 0.5px;
+/*********** SETTINGS VERSION TAG ***********/
+.settings-version-tag {
+    display: inline-block;
+    font-size: 13px;
     font-weight: 600;
-    box-shadow: 0 6px 20px rgba(0,0,0,0.45);
-    backdrop-filter: blur(12px);
-    pointer-events: none;
-    opacity: 0.95;
-    min-width: 0;
-}
-
-.config-badge {
-    text-align: left;
-    overflow-wrap: anywhere;
-}
-
-.version-badge {
-    text-align: right;
+    letter-spacing: 0.8px;
     text-transform: uppercase;
-}
-
-@media (max-width: 900px) {
-    .page-container--home {
-        padding-bottom: 150px;
-    }
-
-    .status-badges {
-        left: 12px;
-        right: 12px;
-        bottom: 12px;
-        grid-template-columns: 1fr;
-        gap: 10px;
-    }
-
-    .config-badge,
-    .version-badge {
-        width: 100%;
-        margin: 0;
-        display: block;
-        text-align: center;
-    }
-
-    .version-badge {
-        margin-top: 0;
-    }
+    padding: 2px 8px;
+    border-radius: 6px;
+    border: 1px solid rgba(80,120,255,0.4);
+    color: #9ab4ff;
+    vertical-align: middle;
+    margin-left: 10px;
+    opacity: 0.85;
 }
 
 .help-modal {
@@ -2294,13 +2239,6 @@ textarea:focus {
     color: #ffffff;
 }
 
-.salt-theme .config-badge {
-    background: rgba(0,0,0,0.9);
-    border: 1px solid rgba(5,135,80,0.55);
-    color: #ffffff;
-    box-shadow: 0 6px 20px rgba(0,0,0,0.85);
-}
-
 .salt-theme .icon-btn {
     background: #0a0a0a;
     border: 1px solid rgba(5,135,80,0.4);
@@ -2372,13 +2310,6 @@ textarea:focus {
     color: #0f1a33;
     border-color: rgba(40, 75, 180, 0.26);
     box-shadow: 0 8px 18px rgba(0,0,0,0.14);
-}
-
-.light-theme .config-badge {
-    background: #ffffff;
-    color: #0f1a33;
-    border: 1px solid rgba(30,60,120,0.18);
-    box-shadow: 0 6px 16px rgba(0,0,0,0.12);
 }
 
 .light-theme .model-list button {
