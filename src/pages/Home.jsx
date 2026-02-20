@@ -91,12 +91,11 @@ function VariantModal({ model, onSelect, onClose }) {
     const mainVariantLabel = model.mainVariantName?.trim() || model.title || "Main text";
 
     return (
-        <div className="popup">
+        <div className="popup" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
             <div className="popup-box variant-picker">
                 <div className="popup-header">
                     <div>
-                        <p className="eyebrow">{model.title}</p>
-                        <h2>Choose a variant</h2>
+                        <h2>{model.title}</h2>
                     </div>
                     <button className="secondary-btn" onClick={onClose}>Close</button>
                 </div>
