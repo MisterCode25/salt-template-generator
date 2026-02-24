@@ -431,9 +431,14 @@ export default function Home() {
                             <div className="dropdown-menu is-open">
                                 <div className="dropdown-section">
                                     <div className="dropdown-title">Management</div>
+                    <button
+                        className="dropdown-btn"
+                        onClick={() => setPartnersOpen(true)}
+                    >
+                        Partner
+                    </button>
                                     <button onClick={() => { navigate("/templates"); setDropdownOpen(false); }} className="dropdown-reset">Manage templates</button>
                                     <button onClick={() => { navigate("/settings"); setDropdownOpen(false); }} className="dropdown-reset">Settings</button>
-                                    <button onClick={() => { setPartnersOpen(true); setDropdownOpen(false); }} className="dropdown-reset">Partenaires</button>
                                 </div>
                             </div>
                         )}
