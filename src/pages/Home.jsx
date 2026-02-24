@@ -5,6 +5,7 @@ import { generateFinalText } from "../core/tokenEngine.js";
 import { copyText, showToast } from "../services/clipboardService.js";
 import { useNavigate } from "react-router-dom";
 import { applyTheme, getInitialTheme, getThemeToggleLabel } from "../utils/theme.js";
+import { PARTNER_COLUMNS, PARTNERS } from "../data/partnersData.js";
 
 function highlightInputs(tokens = [], className = "input-warning") {
     tokens.forEach(token => {
@@ -114,6 +115,124 @@ function VariantModal({ model, onSelect, onClose }) {
     );
 }
 
+function PartnersModal({ onClose }) {
+    const [query, setQuery] = useState("");
+    const [selectedPartnerKey, setSelectedPartnerKey] = useState(null);
+
+    const filteredPartners = useMemo(() => {
+        const needle = query.trim().toLowerCase();
+        if (!needle) return PARTNERS;
+
+        return PARTNERS.filter((partner) => {
+            const fieldsToSearch = [
+                partner["Firma Entität"],
+                partner["Unit/Rolle"],
+                partner["Email"],
+    useEffect(() => {
+        if (filteredPartners.length === 0) {
+            setSelectedPartnerKey(null);
+            return;
+        }
+
+        const firstKey = `${filteredPartners[0]["Firma Entität"]}_${filteredPartners[0]["ALA-P ID"]}_${filteredPartners[0]["Thema"]}`;
+        const keyExists = filteredPartners.some((partner) => {
+            const key = `${partner["Firma Entität"]}_${partner["ALA-P ID"]}_${partner["Thema"]}`;
+            return key === selectedPartnerKey;
+        });
+
+        if (!selectedPartnerKey || !keyExists) {
+            setSelectedPartnerKey(firstKey);
+        }
+    }, [filteredPartners, selectedPartnerKey]);
+
+    const selectedPartner = useMemo(() => {
+        return filteredPartners.find((partner) => `${partner["Firma Entität"]}_${partner["ALA-P ID"]}_${partner["Thema"]}` === selectedPartnerKey) || null;
+    }, [filteredPartners, selectedPartnerKey]);
+
+    const renderValue = (column, value) => {
+            return <span className="partners-detail-value-text">{textValue || "—"}</span>;
+
+            <div className="partners-detail-stack">
+                    <div key={`${column}_${idx}_${entry}`} className="partners-detail-contact-line">
+                        <span className="partners-detail-value-text">{entry}</span>
+
+                        <p className="partners-subtitle">Choisis un partenaire pour afficher sa fiche complète en grand.</p>
+                    placeholder="Rechercher (société, rôle, email, téléphone, remarque...)"
+                <div className="partners-layout">
+                    <aside className="partners-list-panel">
+                        <div className="partners-list-count">{filteredPartners.length} résultat(s)</div>
+                        <div className="partners-list">
+                            {filteredPartners.map((partner, index) => {
+                                const key = `${partner["Firma Entität"]}_${partner["ALA-P ID"]}_${partner["Thema"]}`;
+                                const active = key === selectedPartnerKey;
+                                return (
+                                    <button
+                                        key={`${key}_${index}`}
+                                        type="button"
+                                        className={`partners-list-item ${active ? "is-active" : ""}`}
+                                        onClick={() => setSelectedPartnerKey(key)}
+                                        <strong>{partner["Firma Entität"] || "Sans nom"}</strong>
+                                        <span>{partner["Thema"] || "—"}</span>
+                                        <small>{partner["ALA-P ID"] || "—"}</small>
+                                    </button>
+                                );
+                            })}
+                            {filteredPartners.length === 0 && <p className="hint">Aucun partenaire trouvé.</p>}
+                        </div>
+                    </aside>
+
+                    <section className="partners-detail-panel">
+                        {selectedPartner ? (
+                            <div className="partners-detail-card">
+                                <h3>{selectedPartner["Firma Entität"] || "Partenaire"}</h3>
+                                <div className="partners-detail-grid">
+                                        <div key={column} className="partners-detail-row">
+                                            <div className="partners-detail-label">{column}</div>
+                                            <div className="partners-detail-value">{renderValue(column, selectedPartner[column])}</div>
+                                        </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <p className="hint">Sélectionne un partenaire pour voir ses informations.</p>
+                        )}
+                    </section>
+                                {PARTNER_COLUMNS.map((column) => (
+                                    <th key={column}>{column}</th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filteredPartners.map((partner, index) => (
+                                <tr key={`${partner["ALA-P ID"]}_${partner["Firma Entität"]}_${index}`}>
+                                    {PARTNER_COLUMNS.map((column) => {
+                                        const value = partner[column] ?? "";
+                                        const isCopyField = column === "Telefon" || column === "Email";
+
+                                        return (
+                                            <td key={column}>
+                                                <span>{value}</span>
+                                                {isCopyField && value && (
+                                                    <button
+                                                        type="button"
+                                                        className="copy-chip"
+                                                        onClick={() => copyPartnerField(value, column)}
+                                                    >
+                                                        Copier
+                                                    </button>
+                                                )}
+                                            </td>
+                                        );
+                                    })}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function Home() {
     const navigate = useNavigate();
     const [lang, setLang] = useState("en");
@@ -129,6 +248,7 @@ export default function Home() {
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [themeDropdownOpen, setThemeDropdownOpen] = useState(false);
     const [theme, setTheme] = useState(() => getInitialTheme());
+    const [partnersOpen, setPartnersOpen] = useState(false);
 
     useEffect(() => {
         loadTokens().then(setTokens);
@@ -311,6 +431,12 @@ export default function Home() {
                             <div className="dropdown-menu is-open">
                                 <div className="dropdown-section">
                                     <div className="dropdown-title">Management</div>
+                    <button
+                        className="dropdown-btn"
+                        onClick={() => setPartnersOpen(true)}
+                    >
+                        Partner
+                    </button>
                                     <button onClick={() => { navigate("/templates"); setDropdownOpen(false); }} className="dropdown-reset">Manage templates</button>
                                     <button onClick={() => { navigate("/settings"); setDropdownOpen(false); }} className="dropdown-reset">Settings</button>
                                 </div>
@@ -445,6 +571,8 @@ export default function Home() {
                     }}
                 />
             )}
+
+            {partnersOpen && <PartnersModal onClose={() => setPartnersOpen(false)} />}
 
             {empty && (
                 <section id="emptyState" className="empty-state">
