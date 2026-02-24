@@ -6,6 +6,7 @@ import { copyText, showToast } from "../services/clipboardService.js";
 import { useNavigate } from "react-router-dom";
 import { applyTheme, getInitialTheme, getThemeToggleLabel } from "../utils/theme.js";
 import { PARTNER_COLUMNS, PARTNERS } from "../data/partnersData.js";
+import { partnerMatchesQuery } from "../utils/partnerSearch.js";
 
 function highlightInputs(tokens = [], className = "input-warning") {
     tokens.forEach(token => {
@@ -120,21 +121,10 @@ function PartnersModal({ onClose }) {
     const [selectedKey, setSelectedKey] = useState(null);
 
     const filteredPartners = useMemo(() => {
-        const needle = query.trim().toLowerCase();
+        const needle = query.trim();
         if (!needle) return PARTNERS;
 
-        return PARTNERS.filter((partner) => {
-            const fieldsToSearch = [
-                partner["Firma Entität"],
-                partner["Unit/Rolle"],
-                partner["Email"],
-                partner["Telefon"],
-                partner["Thema"],
-                partner["Bemerkung"]
-            ].join(" ").toLowerCase();
-
-            return fieldsToSearch.includes(needle);
-        });
+        return PARTNERS.filter((partner) => partnerMatchesQuery(partner, needle));
     }, [query]);
 
     useEffect(() => {
