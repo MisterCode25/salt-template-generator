@@ -117,6 +117,7 @@ function VariantModal({ model, onSelect, onClose }) {
 
 function PartnersModal({ onClose }) {
     const [query, setQuery] = useState("");
+    const [selectedKey, setSelectedKey] = useState(null);
 
     const filteredPartners = useMemo(() => {
         const needle = query.trim().toLowerCase();
@@ -127,16 +128,68 @@ function PartnersModal({ onClose }) {
                 partner["Firma Entität"],
                 partner["Unit/Rolle"],
                 partner["Email"],
-                partner["Telefon"]
+                partner["Telefon"],
+                partner["Thema"],
+                partner["Bemerkung"]
             ].join(" ").toLowerCase();
 
             return fieldsToSearch.includes(needle);
         });
     }, [query]);
 
+    useEffect(() => {
+        if (filteredPartners.length === 0) {
+            setSelectedKey(null);
+            return;
+        }
+        const firstKey = `${filteredPartners[0]["Firma Entität"]}_${filteredPartners[0]["ALA-P ID"]}`;
+        const exists = filteredPartners.some(
+            (p) => `${p["Firma Entität"]}_${p["ALA-P ID"]}` === selectedKey
+        );
+        if (!selectedKey || !exists) {
+            setSelectedKey(firstKey);
+        }
+    }, [filteredPartners, selectedKey]);
+
+    const selectedPartner = useMemo(() => {
+        return (
+            filteredPartners.find(
+                (p) => `${p["Firma Entität"]}_${p["ALA-P ID"]}` === selectedKey
+            ) || null
+        );
+    }, [filteredPartners, selectedKey]);
+
     const copyPartnerField = async (value, label) => {
         if (!value) return;
         await copyText(String(value), { message: `${label} copié`, variant: "info" });
+    };
+
+    const renderValue = (column, value) => {
+        const text = (value ?? "").trim();
+        if (!text) return <span className="partners-detail-value-text">—</span>;
+
+        const isCopyField = column === "Telefon" || column === "Email";
+        if (isCopyField) {
+            const entries = text.split(";").map((s) => s.trim()).filter(Boolean);
+            return (
+                <div className="partners-detail-stack">
+                    {entries.map((entry, idx) => (
+                        <div key={idx} className="partners-detail-contact-line">
+                            <span className="partners-detail-value-text">{entry}</span>
+                            <button
+                                type="button"
+                                className="copy-chip"
+                                onClick={() => copyPartnerField(entry, column)}
+                            >
+                                Copier
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            );
+        }
+
+        return <span className="partners-detail-value-text">{text}</span>;
     };
 
     return (
@@ -145,7 +198,7 @@ function PartnersModal({ onClose }) {
                 <div className="popup-header">
                     <div>
                         <h2>Partenaires</h2>
-                        <p className="partners-subtitle">{filteredPartners.length} / {PARTNERS.length} partenaires</p>
+                        <p className="partners-subtitle">Choisis un partenaire pour afficher sa fiche complète en grand.</p>
                     </div>
                     <button className="secondary-btn" onClick={onClose}>Fermer</button>
                 </div>
@@ -153,46 +206,56 @@ function PartnersModal({ onClose }) {
                 <input
                     type="text"
                     className="partners-search"
-                    placeholder="Rechercher (société, contact/rôle, email, téléphone...)"
+                    placeholder="Rechercher (société, rôle, email, téléphone, remarque...)"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                 />
 
-                <div className="partners-table-wrap">
-                    <table className="partners-table">
-                        <thead>
-                            <tr>
-                                {PARTNER_COLUMNS.map((column) => (
-                                    <th key={column}>{column}</th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filteredPartners.map((partner, index) => (
-                                <tr key={`${partner["ALA-P ID"]}_${partner["Firma Entität"]}_${index}`}>
-                                    {PARTNER_COLUMNS.map((column) => {
-                                        const value = partner[column] ?? "";
-                                        const isCopyField = column === "Telefon" || column === "Email";
+                <div className="partners-layout">
+                    <aside className="partners-list-panel">
+                        <div className="partners-list-count">{filteredPartners.length} résultat(s)</div>
+                        <div className="partners-list">
+                            {filteredPartners.map((partner, index) => {
+                                const key = `${partner["Firma Entität"]}_${partner["ALA-P ID"]}`;
+                                const active = key === selectedKey;
+                                return (
+                                    <button
+                                        key={`${key}_${index}`}
+                                        type="button"
+                                        className={`partners-list-item${active ? " is-active" : ""}`}
+                                        onClick={() => setSelectedKey(key)}
+                                    >
+                                        <strong>{partner["Firma Entität"] || "Sans nom"}</strong>
+                                        <span>{partner["Thema"] || "—"}</span>
+                                        <small>{partner["ALA-P ID"] || "—"}</small>
+                                    </button>
+                                );
+                            })}
+                            {filteredPartners.length === 0 && (
+                                <p className="hint">Aucun partenaire trouvé.</p>
+                            )}
+                        </div>
+                    </aside>
 
-                                        return (
-                                            <td key={column}>
-                                                <span>{value}</span>
-                                                {isCopyField && value && (
-                                                    <button
-                                                        type="button"
-                                                        className="copy-chip"
-                                                        onClick={() => copyPartnerField(value, column)}
-                                                    >
-                                                        Copier
-                                                    </button>
-                                                )}
-                                            </td>
-                                        );
-                                    })}
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                    <section className="partners-detail-panel">
+                        {selectedPartner ? (
+                            <div className="partners-detail-card">
+                                <h3>{selectedPartner["Firma Entität"] || "Partenaire"}</h3>
+                                <div className="partners-detail-grid">
+                                    {PARTNER_COLUMNS.map((column) => (
+                                        <div key={column} className="partners-detail-row">
+                                            <div className="partners-detail-label">{column}</div>
+                                            <div className="partners-detail-value">
+                                                {renderValue(column, selectedPartner[column])}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ) : (
+                            <p className="hint">Sélectionne un partenaire pour voir ses informations.</p>
+                        )}
+                    </section>
                 </div>
             </div>
         </div>
