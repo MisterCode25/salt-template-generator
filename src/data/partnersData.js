@@ -9,127 +9,146 @@ export const PARTNER_COLUMNS = [
     "Bemerkung"
 ];
 
-// Source: tableau partenaires fourni par le client (colonnes Excel).
-// Remplacez/complétez ce tableau avec votre export JSON complet si nécessaire.
-export const PARTNERS = [
+const PARTNERS_BY_THEME = [
     {
-        "Firma Entität": "ewb",
-        "ALA-P ID": "ALA-P 39",
-        "Thema": "Incident management",
-        "Unit/Rolle": "Incident Management / Leitstelle",
-        "Telefon": "+41 31 321 38 08",
-        "Email": "lsm_incident@ewb.ch",
-        "Verfügbarkeit": "7*24",
-        "Bemerkung": "Ausserhalb Bürozeiten wird die Nummer auf die Leitstelle umgeleitet"
+        partner: "ewb",
+        themes: [
+            { name: "Incident management", unit_role: "Incident Management / Leitstelle", telefon: "+41 31 321 38 08", email: "lsm_incident@ewb.ch", availability: "7*24" },
+            { name: "Incident management", unit_role: "Incident management", telefon: "+41 31 321 38 08", email: "incidentinfo@ewb.ch", availability: "Business hours" },
+            { name: "Fulfillment Management", unit_role: "Fulfillment Manager", telefon: "+41 31 321 35 91", email: "telecomorderdesk@ewb.ch", availability: "Business hours" }
+        ]
     },
     {
-        "Firma Entität": "ewl",
-        "ALA-P ID": "ALA-P 22",
-        "Thema": "Fulfillment Management",
-        "Unit/Rolle": "Glasfaser Betrieb",
-        "Telefon": "0800 395 395",
-        "Email": "ftth.anschluss@ewl-luzern.ch",
-        "Verfügbarkeit": "Business hours",
-        "Bemerkung": ""
+        partner: "ewl",
+        themes: [
+            { name: "Incident management", unit_role: "Glasfaser Betrieb", telefon: "0800 395 395", email: "ftth.stoerung@ewl-luzern.ch", availability: "Business hours" },
+            { name: "Fulfillment Management", unit_role: "Glasfaser Betrieb", telefon: "0800 395 395", email: "ftth.anschluss@ewl-luzern.ch", availability: "Business hours" }
+        ]
     },
     {
-        "Firma Entität": "sgsw",
-        "ALA-P ID": "ALA-P 19",
-        "Thema": "Incident management",
-        "Unit/Rolle": "Layer 1 BD",
-        "Telefon": "+41 74 029 07 09 (Pager)",
-        "Email": "bd.telecom@sgsw.ch",
-        "Verfügbarkeit": "7*24 (Pager), Email (Business hours)",
-        "Bemerkung": "Alarmierung muss zwingend über Pager ausgelöst werden"
+        partner: "sgsw",
+        themes: [
+            { name: "Incident management", unit_role: "Layer 1 BD", telefon: "+41 74 029 07 09 (Pager)", email: "bd.telecom@sgsw.ch", availability: "7*24 (Pager), Email (Business hours)" },
+            { name: "Fulfillment Management", unit_role: "Change Manager", telefon: "071 224 62 64", email: "order.telecom@sgsw.ch", availability: "Business hours" }
+        ]
     },
     {
-        "Firma Entität": "Didico (EWM)",
-        "ALA-P ID": "ALA-P 1",
-        "Thema": "Incident management",
-        "Unit/Rolle": "Support Desk",
-        "Telefon": "+41 44 512 61 15",
-        "Email": "fibx@didico.ch",
-        "Verfügbarkeit": "Business hours",
-        "Bemerkung": ""
+        partner: "Didico (EWM)",
+        themes: [
+            { name: "Incident management", unit_role: "Support Desk", telefon: "+41 44 512 61 15", email: "fibx@didico.ch", availability: "" },
+            { name: "Fulfillment Management", unit_role: "Support Desk", telefon: "+41 44 512 61 15", email: "fibx@didico.ch", availability: "Business hours" }
+        ]
     },
     {
-        "Firma Entität": "SAK",
-        "ALA-P ID": "ALA-P 6",
-        "Thema": "Incident management",
-        "Unit/Rolle": "SPOC FTTH Inhouse",
-        "Telefon": "+41 71 229 56 33",
-        "Email": "oto.ftth@sak.ch",
-        "Verfügbarkeit": "Business hours",
-        "Bemerkung": ""
+        partner: "Danet",
+        themes: [
+            { name: "Incident management", unit_role: "Service Desk", telefon: "41 27 924 11 88", email: "info@danet-oberwallis.ch", availability: "Business hours" },
+            { name: "Fulfillment Management", unit_role: "Service Desk", telefon: "41 27 924 11 88", email: "info@danet-oberwallis.ch", availability: "Business hours" }
+        ]
     },
     {
-        "Firma Entität": "TBW",
-        "ALA-P ID": "ALA-P 57",
-        "Thema": "Incident management",
-        "Unit/Rolle": "Störungsbehebung",
-        "Telefon": "+41 71 626 82 82",
-        "Email": "daniel.keller@tbweinfelden.ch; thomas.dudlitz@tbweinfelden.ch",
-        "Verfügbarkeit": "Im Notfall über +41 71 622 22 85",
-        "Bemerkung": "Rückruf KOM-Pikett anfordern"
+        partner: "GAW",
+        themes: [
+            { name: "Incident management", unit_role: "Kundenservice KDS / Betrieb", telefon: "+41 32 9 429 426", email: "partnernetz@ga-weissenstein.ch", availability: "7*24 German (Telefon)" },
+            { name: "Fulfillment Management", unit_role: "FttH / Migration", telefon: "+41 32 9 429 470", email: "ftth@ga-weissenstein.ch", availability: "Mo-Fr 09:00-12:00 und 13:00-17:00" }
+        ]
     },
     {
-        "Firma Entität": "EWLA (EW Lachen AG)",
-        "ALA-P ID": "ALA-P 72",
-        "Thema": "Incident Management",
-        "Unit/Rolle": "Incident Management",
-        "Telefon": "+41 55 451 20 90",
-        "Email": "ewlachen@ewlachen.ch",
-        "Verfügbarkeit": "Mo-Do 07:30-12:00 / 13:30-17:00; Fr 07:30-12:00 / 13:30-16:00",
-        "Bemerkung": ""
+        partner: "Leucom Stafag",
+        themes: [
+            { name: "Incident management", unit_role: "Leiter Operations", telefon: "+41 52 552 98 54", email: "patchauftrag@leucom.ch", availability: "Mo. – Fr. 08.00 – 12.00 / 13.00 – 16.30" },
+            { name: "Fulfillment Management", unit_role: "Leiter Operations", telefon: "+41 52 552 98 54", email: "patchauftrag@leucom.ch", availability: "Mo. – Fr. 08.00 – 12.00 / 13.00 – 16.30" }
+        ]
     },
     {
-        "Firma Entität": "EBS (TeleNet Schwyz)",
-        "ALA-P ID": "ALA-P 71",
-        "Thema": "Incident Management",
-        "Unit/Rolle": "Incident Management",
-        "Telefon": "+41 41 819 49 49",
-        "Email": "ftth@ebs.swiss",
-        "Verfügbarkeit": "Mo.-Do: 07.00-12.00 und 13.00-17.00 / Fr. 13.00-15.00",
-        "Bemerkung": ""
+        partner: "SAK",
+        themes: [
+            { name: "Incident management", unit_role: "SPOC FTTH Inhouse", telefon: "+41 71 229 56 33", email: "oto.ftth@sak.ch", availability: "Business hours" },
+            { name: "Fulfillment Management", unit_role: "", telefon: "+41 71 229 56 33", email: "oto.ftth@sak.ch", availability: "" }
+        ]
     },
     {
-        "Firma Entität": "GABU (GA Buchsi AG, Herzogenbuchsee)",
-        "ALA-P ID": "ALA-P 1002",
-        "Thema": "Fulfillment Management",
-        "Unit/Rolle": "Kundendienst GA Buchsi AG",
-        "Telefon": "+41 62 956 51 51",
-        "Email": "kundendienst.gab@ewk.ch",
-        "Verfügbarkeit": "Mo-Do 07.15-12.00 / 13.15-17.15; Fr 07.15-12.00 / 13.15-16.30",
-        "Bemerkung": ""
+        partner: "SWW",
+        themes: [
+            { name: "Incident management", unit_role: "Orderdesk", telefon: "+41 52 267 61 11", email: "assurance.telekom@win.ch", availability: "MO – FR 0800 bis 1700" },
+            { name: "Fulfillment Management", unit_role: "Orderdesk", telefon: "+41 52 267 61 11", email: "orderdesk.telekom@win.ch", availability: "MO – FR 0800 bis 1700" }
+        ]
     },
     {
-        "Firma Entität": "EWBU (Elektrizitäts- und Wasserwerke der Stadt Buchs)",
-        "ALA-P ID": "ALA-P 1019",
-        "Thema": "Incident management",
-        "Unit/Rolle": "Order Management, Kontakt: Marcos Cerezo",
-        "Telefon": "+41 81 755 44 33",
-        "Email": "dreamfiber@ewbuchs.ch",
-        "Verfügbarkeit": "Business hours",
-        "Bemerkung": ""
+        partner: "ftth fr",
+        themes: [
+            { name: "Incident management", unit_role: "Netzbetrieb", telefon: "+41 26 352 65 84 (5*8)\n+41 76 434 39 21 (ONLY out of business hours)", email: "ftth_operations@ftth-fr.ch", availability: "7*24" },
+            { name: "Fulfillment Management", unit_role: "Netzbetrieb", telefon: "+41 26 352 65 84", email: "ftth_operations@ftth-fr.ch", availability: "Business hours" }
+        ]
     },
     {
-        "Firma Entität": "WWZ",
-        "ALA-P ID": "ALA-P 1025",
-        "Thema": "Fulfillment Management",
-        "Unit/Rolle": "WWZ Engineering",
-        "Telefon": "+41 41 748 45 45",
-        "Email": "wwtengineering@wwz.ch",
-        "Verfügbarkeit": "Business hours",
-        "Bemerkung": ""
+        partner: "SEY",
+        themes: [
+            { name: "Incident management", unit_role: "Exploitation FTTH", telefon: "024 423 65 43", email: "ftth@yverdon-les-bains.ch", availability: "Montag - Freitag : 07:00-12:00 / 13:30 – 17:00" },
+            { name: "Incident management", unit_role: "Service de piquet", telefon: "024 423 65 77", email: "ftth@yverdon-les-bains.ch", availability: "Montag - Freitag : 17:00 – 07:00 et 12:00 – 13:30 + Samstag/Sonntag et Feiertage" },
+            { name: "Fulfillment Management", unit_role: "Exploitation FTTH", telefon: "024 423 65 43", email: "ftth@yverdon-les-bains.ch", availability: "Montag - Freitag : 07:00-12:00 / 13:30 – 17:00" }
+        ]
     },
     {
-        "Firma Entität": "ALO",
-        "ALA-P ID": "ALA-P 0",
-        "Thema": "Incident Management",
-        "Unit/Rolle": "Störungsbehebung",
-        "Telefon": "0800 877 007 / +41 58 221 99 50",
-        "Email": "Wholesale.WeCare@swisscom.com",
-        "Verfügbarkeit": "Business hours",
-        "Bemerkung": "Im Notfall über +41 71 622 22 85 --> Rückruf KOM-Pikett anfordern"
+        partner: "SEIC",
+        themes: [
+            { name: "Incident management", unit_role: "service MM", telefon: "+41 22 364 31 31", email: "ftth_externe@seicgland.ch", availability: "7*24" },
+            { name: "Fulfillment Management", unit_role: "service MM", telefon: "+41 22 364 31 31", email: "ftth_externe@seicgland.ch", availability: "7*24" }
+        ]
+    },
+    {
+        partner: "AMB",
+        themes: [
+            { name: "Incident management", unit_role: "Servicedesk", telefon: "+41 91 850 49 85", email: "ftth@amb.ch", availability: "08:30-11:30 / 14:00-17:00" },
+            { name: "Fulfillment Management", unit_role: "Servicedesk", telefon: "+41 91 850 49 85", email: "ftth@amb.ch", availability: "08:30-11:30 / 14:00-17:00" }
+        ]
+    },
+    {
+        partner: "TBW",
+        themes: [
+            { name: "Incident management", unit_role: "Störungsbehebung", telefon: "+41 71 626 82 82", email: "daniel.keller@tbweinfelden.ch\nthomas.dudlitz@tbweinfelden.ch", availability: "" },
+            { name: "Fulfillment Management", unit_role: "Aufschalten", telefon: "+41 71 626 82 82", email: "ff.ftth@tbweinfelden.ch", availability: "" }
+        ]
+    },
+    {
+        partner: "DWW",
+        themes: [
+            { name: "Incident management", unit_role: "Ordermanager", telefon: "+41 52 267 61 11", email: "assurance.telekom@win.ch", availability: "MO – FR 0800 bis 1700" },
+            { name: "Fulfillment Management", unit_role: "Ordermanager", telefon: "+41 52 267 61 11", email: "orderdesk.wallisellen@win.ch", availability: "MO – FR 0800 bis 1700" }
+        ]
+    },
+    {
+        partner: "PGL",
+        themes: [
+            { name: "Incident management", unit_role: "Orderdesk", telefon: "+41 52 267 61 11", email: "assurance.telekom@win.ch", availability: "MO – FR 0800 bis 1700" },
+            { name: "Fulfillment Management", unit_role: "Orderdesk", telefon: "+41 52 267 61 11", email: "orderdesk.lindau@win.ch", availability: "MO – FR 0800 bis 1700" }
+        ]
+    },
+    {
+        partner: "EWA",
+        themes: [
+            { name: "Incident management", unit_role: "Incident Management", telefon: "+41 32 391 60 30", email: "s_catv@ewaarberg.ch", availability: "7*24" },
+            { name: "Fulfillment Management", unit_role: "Fulfillment Management", telefon: "+41 32 391 60 30", email: "s_catv@ewaarberg.ch", availability: "Business hours" }
+        ]
+    },
+    {
+        partner: "EWH",
+        themes: [
+            { name: "Incident management", unit_role: "Telekom Support", telefon: "+41 55 415 31 21", email: "sfn@ewh.ch", availability: "Bürozeiten\nMo-Fr 07:30-11:45 / 13:15-17:00" },
+            { name: "Fulfillment Management", unit_role: "Telekom Support", telefon: "+41 55 415 31 21", email: "sfn@ewh.ch", availability: "Bürozeiten\nMo-Fr 07:30-11:45 / 13:15-17:00" }
+        ]
     }
 ];
+
+export const PARTNERS = PARTNERS_BY_THEME.flatMap((entry, partnerIndex) =>
+    entry.themes.map((theme, themeIndex) => ({
+        "Firma Entität": entry.partner,
+        "ALA-P ID": `MANUAL-${partnerIndex + 1}-${themeIndex + 1}`,
+        "Thema": theme.name,
+        "Unit/Rolle": theme.unit_role,
+        "Telefon": theme.telefon,
+        "Email": theme.email,
+        "Verfügbarkeit": theme.availability,
+        "Bemerkung": ""
+    }))
+);
