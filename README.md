@@ -12,7 +12,7 @@ npm run dev   # http://localhost:5173
 - `npm run dev` : dev server Vite
 - `npm run build` : build production
 - `npm run preview` : preview du build
-- `npm test` : tests tokenEngine (remplacement de tokens)
+- `npm test` : tests tokenEngine, templates et partenaires
 
 ## Structure
 - `src/pages/ManageTemplates.jsx` : CRUD templates + variantes (onglets) + aperçus par langue.
@@ -27,3 +27,7 @@ npm run dev   # http://localhost:5173
 ## Notes
 - Les anciens fichiers statiques (dossier `html/` et `js/`) ont été retirés après migration.
 - Les données sont persistées localement (`models`, `tokens` dans localStorage).
+
+## Données partenaires
+- Les partenaires sont chargés depuis `public/partners.json` (format `{ partner, themes[] }`).
+- Le front convertit ce format en lignes affichables via `mapPartnersByThemeToRows` (`src/data/partnersData.js`).

@@ -5,7 +5,8 @@ import { generateFinalText } from "../core/tokenEngine.js";
 import { copyText, showToast } from "../services/clipboardService.js";
 import { useNavigate } from "react-router-dom";
 import { applyTheme, getInitialTheme, getThemeToggleLabel } from "../utils/theme.js";
-import { PARTNER_COLUMNS, PARTNERS } from "../data/partnersData.js";
+import { PARTNER_COLUMNS } from "../data/partnersData.js";
+import { loadPartners } from "../services/partnersService.js";
 import { partnerMatchesQuery } from "../utils/partnerSearch.js";
 
 function highlightInputs(tokens = [], className = "input-warning") {
@@ -119,13 +120,37 @@ function VariantModal({ model, onSelect, onClose }) {
 function PartnersModal({ onClose }) {
     const [query, setQuery] = useState("");
     const [selectedKey, setSelectedKey] = useState(null);
+    const [partners, setPartners] = useState([]);
+    const [loadingPartners, setLoadingPartners] = useState(true);
+    const [partnersError, setPartnersError] = useState("");
+
+    useEffect(() => {
+        let alive = true;
+
+        (async () => {
+            try {
+                setLoadingPartners(true);
+                setPartnersError("");
+                const loaded = await loadPartners();
+                if (alive) setPartners(loaded);
+            } catch (error) {
+                if (alive) setPartnersError(error?.message || "Erreur de chargement des partenaires");
+            } finally {
+                if (alive) setLoadingPartners(false);
+            }
+        })();
+
+        return () => {
+            alive = false;
+        };
+    }, []);
 
     const filteredPartners = useMemo(() => {
         const needle = query.trim();
-        if (!needle) return PARTNERS;
+        if (!needle) return partners;
 
-        return PARTNERS.filter((partner) => partnerMatchesQuery(partner, needle));
-    }, [query]);
+        return partners.filter((partner) => partnerMatchesQuery(partner, needle));
+    }, [query, partners]);
 
     useEffect(() => {
         if (filteredPartners.length === 0) {
@@ -203,7 +228,7 @@ function PartnersModal({ onClose }) {
 
                 <div className="partners-layout">
                     <aside className="partners-list-panel">
-                        <div className="partners-list-count">{filteredPartners.length} résultat(s)</div>
+                        <div className="partners-list-count">{loadingPartners ? "Chargement..." : `${filteredPartners.length} résultat(s)`}</div>
                         <div className="partners-list">
                             {filteredPartners.map((partner, index) => {
                                 const key = `${partner["Firma Entität"]}_${partner["ALA-P ID"]}`;
@@ -221,9 +246,10 @@ function PartnersModal({ onClose }) {
                                     </button>
                                 );
                             })}
-                            {filteredPartners.length === 0 && (
+                            {!loadingPartners && !partnersError && filteredPartners.length === 0 && (
                                 <p className="hint">Aucun partenaire trouvé.</p>
                             )}
+                            {partnersError && <p className="hint">{partnersError}</p>}
                         </div>
                     </aside>
 
