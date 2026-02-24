@@ -12,7 +12,7 @@ npm run dev   # http://localhost:5173
 - `npm run dev` : dev server Vite
 - `npm run build` : build production
 - `npm run preview` : preview du build
-- `npm test` : tests tokenEngine (remplacement de tokens)
+- `npm test` : tests tokenEngine, templates et partenaires
 
 ## Structure
 - `src/pages/ManageTemplates.jsx` : CRUD templates + variantes (onglets) + aperçus par langue.
@@ -29,5 +29,5 @@ npm run dev   # http://localhost:5173
 - Les données sont persistées localement (`models`, `tokens` dans localStorage).
 
 ## Données partenaires
-- La recherche partenaires s'appuie uniquement sur les entrées statiques de `src/data/partnersData.js`.
-- Si un partenaire (ex: `ALO`) n'est pas présent dans ce fichier, il ne peut pas être trouvé, même si la recherche est insensible à la casse.
+- Les partenaires sont chargés depuis `public/partners.json` (format `{ partner, themes[] }`).
+- Le front convertit ce format en lignes affichables via `mapPartnersByThemeToRows` (`src/data/partnersData.js`).

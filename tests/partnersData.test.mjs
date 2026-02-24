@@ -1,18 +1,16 @@
 import assert from "node:assert/strict";
-import { PARTNERS } from "../src/data/partnersData.js";
+import fs from "node:fs";
+import { mapPartnersByThemeToRows } from "../src/data/partnersData.js";
 import { partnerMatchesQuery } from "../src/utils/partnerSearch.js";
 
-const uniquePartners = [...new Set(PARTNERS.map((partner) => partner["Firma Entität"]))];
+const source = JSON.parse(fs.readFileSync(new URL("../public/partners.json", import.meta.url), "utf8"));
+const partners = mapPartnersByThemeToRows(source);
 
-assert.ok(uniquePartners.length > 0, "partners dataset should not be empty");
-assert.equal(
-    uniquePartners.some((name) => name.toLowerCase() === "alo"),
-    false,
-    "ALO is currently missing from src/data/partnersData.js"
-);
+assert.ok(Array.isArray(source) && source.length > 0, "partners.json should contain entries");
+assert.ok(partners.length > 0, "mapped partners should not be empty");
 
-assert.equal(PARTNERS.filter((partner) => partnerMatchesQuery(partner, "SEY")).length > 0, true, "uppercase search should match existing partner");
-assert.equal(PARTNERS.filter((partner) => partnerMatchesQuery(partner, "sey")).length > 0, true, "lowercase search should match existing partner");
-assert.equal(PARTNERS.filter((partner) => partnerMatchesQuery(partner, "ALO")).length, 0, "search cannot return ALO because no ALO row exists");
+assert.equal(partners.some((p) => p["Firma Entität"] === "ALO"), true, "ALO must exist in dataset");
+assert.equal(partners.filter((p) => partnerMatchesQuery(p, "alo")).length > 0, true, "lowercase alo should match");
+assert.equal(partners.filter((p) => partnerMatchesQuery(p, "ALO")).length > 0, true, "uppercase ALO should match");
 
 console.log("partnersData tests passed");
