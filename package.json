@@ -6,7 +6,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node tests/tokenEngine.test.mjs && node tests/templateService.test.mjs"
+    "test": "node tests/tokenEngine.test.mjs && node tests/templateService.test.mjs && node tests/partnerSearch.test.mjs && node tests/partnersData.test.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

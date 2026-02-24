@@ -27,3 +27,7 @@ npm run dev   # http://localhost:5173
 ## Notes
 - Les anciens fichiers statiques (dossier `html/` et `js/`) ont été retirés après migration.
 - Les données sont persistées localement (`models`, `tokens` dans localStorage).
+
+## Données partenaires
+- La recherche partenaires s'appuie uniquement sur les entrées statiques de `src/data/partnersData.js`.
+- Si un partenaire (ex: `ALO`) n'est pas présent dans ce fichier, il ne peut pas être trouvé, même si la recherche est insensible à la casse.
