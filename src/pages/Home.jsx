@@ -117,6 +117,7 @@ function VariantModal({ model, onSelect, onClose }) {
 
 function PartnersModal({ onClose }) {
     const [query, setQuery] = useState("");
+    const [selectedPartnerKey, setSelectedPartnerKey] = useState(null);
 
     const filteredPartners = useMemo(() => {
         const needle = query.trim().toLowerCase();
@@ -127,41 +128,74 @@ function PartnersModal({ onClose }) {
                 partner["Firma Entität"],
                 partner["Unit/Rolle"],
                 partner["Email"],
-                partner["Telefon"]
-            ].join(" ").toLowerCase();
+    useEffect(() => {
+        if (filteredPartners.length === 0) {
+            setSelectedPartnerKey(null);
+            return;
+        }
 
-            return fieldsToSearch.includes(needle);
+        const firstKey = `${filteredPartners[0]["Firma Entität"]}_${filteredPartners[0]["ALA-P ID"]}_${filteredPartners[0]["Thema"]}`;
+        const keyExists = filteredPartners.some((partner) => {
+            const key = `${partner["Firma Entität"]}_${partner["ALA-P ID"]}_${partner["Thema"]}`;
+            return key === selectedPartnerKey;
         });
-    }, [query]);
 
-    const copyPartnerField = async (value, label) => {
-        if (!value) return;
-        await copyText(String(value), { message: `${label} copié`, variant: "info" });
-    };
+        if (!selectedPartnerKey || !keyExists) {
+            setSelectedPartnerKey(firstKey);
+        }
+    }, [filteredPartners, selectedPartnerKey]);
 
-    return (
-        <div className="popup" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-            <div className="popup-box partners-modal">
-                <div className="popup-header">
-                    <div>
-                        <h2>Partenaires</h2>
-                        <p className="partners-subtitle">{filteredPartners.length} / {PARTNERS.length} partenaires</p>
-                    </div>
-                    <button className="secondary-btn" onClick={onClose}>Fermer</button>
-                </div>
+    const selectedPartner = useMemo(() => {
+        return filteredPartners.find((partner) => `${partner["Firma Entität"]}_${partner["ALA-P ID"]}_${partner["Thema"]}` === selectedPartnerKey) || null;
+    }, [filteredPartners, selectedPartnerKey]);
 
-                <input
-                    type="text"
-                    className="partners-search"
-                    placeholder="Rechercher (société, contact/rôle, email, téléphone...)"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                />
+    const renderValue = (column, value) => {
+            return <span className="partners-detail-value-text">{textValue || "—"}</span>;
 
-                <div className="partners-table-wrap">
-                    <table className="partners-table">
-                        <thead>
-                            <tr>
+            <div className="partners-detail-stack">
+                    <div key={`${column}_${idx}_${entry}`} className="partners-detail-contact-line">
+                        <span className="partners-detail-value-text">{entry}</span>
+
+                        <p className="partners-subtitle">Choisis un partenaire pour afficher sa fiche complète en grand.</p>
+                    placeholder="Rechercher (société, rôle, email, téléphone, remarque...)"
+                <div className="partners-layout">
+                    <aside className="partners-list-panel">
+                        <div className="partners-list-count">{filteredPartners.length} résultat(s)</div>
+                        <div className="partners-list">
+                            {filteredPartners.map((partner, index) => {
+                                const key = `${partner["Firma Entität"]}_${partner["ALA-P ID"]}_${partner["Thema"]}`;
+                                const active = key === selectedPartnerKey;
+                                return (
+                                    <button
+                                        key={`${key}_${index}`}
+                                        type="button"
+                                        className={`partners-list-item ${active ? "is-active" : ""}`}
+                                        onClick={() => setSelectedPartnerKey(key)}
+                                        <strong>{partner["Firma Entität"] || "Sans nom"}</strong>
+                                        <span>{partner["Thema"] || "—"}</span>
+                                        <small>{partner["ALA-P ID"] || "—"}</small>
+                                    </button>
+                                );
+                            })}
+                            {filteredPartners.length === 0 && <p className="hint">Aucun partenaire trouvé.</p>}
+                        </div>
+                    </aside>
+
+                    <section className="partners-detail-panel">
+                        {selectedPartner ? (
+                            <div className="partners-detail-card">
+                                <h3>{selectedPartner["Firma Entität"] || "Partenaire"}</h3>
+                                <div className="partners-detail-grid">
+                                        <div key={column} className="partners-detail-row">
+                                            <div className="partners-detail-label">{column}</div>
+                                            <div className="partners-detail-value">{renderValue(column, selectedPartner[column])}</div>
+                                        </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <p className="hint">Sélectionne un partenaire pour voir ses informations.</p>
+                        )}
+                    </section>
                                 {PARTNER_COLUMNS.map((column) => (
                                     <th key={column}>{column}</th>
                                 ))}
