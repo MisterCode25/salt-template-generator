@@ -5,6 +5,7 @@ import { generateFinalText } from "../core/tokenEngine.js";
 import { copyText, showToast } from "../services/clipboardService.js";
 import { useNavigate } from "react-router-dom";
 import { applyTheme, getInitialTheme, getThemeToggleLabel } from "../utils/theme.js";
+import { PARTNER_COLUMNS, PARTNERS } from "../data/partnersData.js";
 
 function highlightInputs(tokens = [], className = "input-warning") {
     tokens.forEach(token => {
@@ -114,6 +115,90 @@ function VariantModal({ model, onSelect, onClose }) {
     );
 }
 
+function PartnersModal({ onClose }) {
+    const [query, setQuery] = useState("");
+
+    const filteredPartners = useMemo(() => {
+        const needle = query.trim().toLowerCase();
+        if (!needle) return PARTNERS;
+
+        return PARTNERS.filter((partner) => {
+            const fieldsToSearch = [
+                partner["Firma Entität"],
+                partner["Unit/Rolle"],
+                partner["Email"],
+                partner["Telefon"]
+            ].join(" ").toLowerCase();
+
+            return fieldsToSearch.includes(needle);
+        });
+    }, [query]);
+
+    const copyPartnerField = async (value, label) => {
+        if (!value) return;
+        await copyText(String(value), { message: `${label} copié`, variant: "info" });
+    };
+
+    return (
+        <div className="popup" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+            <div className="popup-box partners-modal">
+                <div className="popup-header">
+                    <div>
+                        <h2>Partenaires</h2>
+                        <p className="partners-subtitle">{filteredPartners.length} / {PARTNERS.length} partenaires</p>
+                    </div>
+                    <button className="secondary-btn" onClick={onClose}>Fermer</button>
+                </div>
+
+                <input
+                    type="text"
+                    className="partners-search"
+                    placeholder="Rechercher (société, contact/rôle, email, téléphone...)"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                />
+
+                <div className="partners-table-wrap">
+                    <table className="partners-table">
+                        <thead>
+                            <tr>
+                                {PARTNER_COLUMNS.map((column) => (
+                                    <th key={column}>{column}</th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filteredPartners.map((partner, index) => (
+                                <tr key={`${partner["ALA-P ID"]}_${partner["Firma Entität"]}_${index}`}>
+                                    {PARTNER_COLUMNS.map((column) => {
+                                        const value = partner[column] ?? "";
+                                        const isCopyField = column === "Telefon" || column === "Email";
+
+                                        return (
+                                            <td key={column}>
+                                                <span>{value}</span>
+                                                {isCopyField && value && (
+                                                    <button
+                                                        type="button"
+                                                        className="copy-chip"
+                                                        onClick={() => copyPartnerField(value, column)}
+                                                    >
+                                                        Copier
+                                                    </button>
+                                                )}
+                                            </td>
+                                        );
+                                    })}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function Home() {
     const navigate = useNavigate();
     const [lang, setLang] = useState("en");
@@ -129,6 +214,7 @@ export default function Home() {
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [themeDropdownOpen, setThemeDropdownOpen] = useState(false);
     const [theme, setTheme] = useState(() => getInitialTheme());
+    const [partnersOpen, setPartnersOpen] = useState(false);
 
     useEffect(() => {
         loadTokens().then(setTokens);
@@ -313,6 +399,7 @@ export default function Home() {
                                     <div className="dropdown-title">Management</div>
                                     <button onClick={() => { navigate("/templates"); setDropdownOpen(false); }} className="dropdown-reset">Manage templates</button>
                                     <button onClick={() => { navigate("/settings"); setDropdownOpen(false); }} className="dropdown-reset">Settings</button>
+                                    <button onClick={() => { setPartnersOpen(true); setDropdownOpen(false); }} className="dropdown-reset">Partenaires</button>
                                 </div>
                             </div>
                         )}
@@ -445,6 +532,8 @@ export default function Home() {
                     }}
                 />
             )}
+
+            {partnersOpen && <PartnersModal onClose={() => setPartnersOpen(false)} />}
 
             {empty && (
                 <section id="emptyState" className="empty-state">
