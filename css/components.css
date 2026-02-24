@@ -2479,6 +2479,9 @@ textarea:focus {
 
 .partners-modal {
     width: min(98vw, 1500px);
+    max-height: 95vh;
+}
+
 .partners-layout {
     display: grid;
     grid-template-columns: 330px 1fr;
@@ -2522,10 +2525,16 @@ textarea:focus {
     display: flex;
     flex-direction: column;
     gap: 4px;
+    border: 1px solid rgba(120, 160, 255, 0.2);
+    border-radius: 10px;
+}
+
 .partners-list-item.is-active {
     border-color: rgba(120,160,255,0.8);
     box-shadow: 0 0 0 1px rgba(120,160,255,0.45) inset;
     background: rgba(38, 56, 95, 0.9);
+}
+
 .partners-detail-panel {
     overflow: auto;
     padding: 12px;
@@ -2533,11 +2542,14 @@ textarea:focus {
 
 .partners-detail-card h3 {
     margin: 0 0 10px;
+}
 
 .partners-detail-grid {
     display: grid;
     grid-template-columns: 1fr;
     gap: 10px;
+}
+
 .partners-detail-row {
     display: grid;
     grid-template-columns: minmax(170px, 210px) 1fr;
@@ -2556,12 +2568,20 @@ textarea:focus {
 
 .partners-detail-value-text {
     line-height: 1.4;
+}
+
 .partners-detail-stack {
+    display: flex;
+    flex-direction: column;
     gap: 8px;
+}
 
 .partners-detail-contact-line {
+    display: flex;
     align-items: flex-start;
-        max-height: 95vh;
+}
+
+@media (max-width: 1100px) {
     .partners-layout {
         grid-template-columns: 1fr;
         min-height: auto;
@@ -2569,11 +2589,11 @@ textarea:focus {
 
     .partners-list-panel {
         max-height: 32vh;
+    }
+
     .partners-detail-row {
         grid-template-columns: 1fr;
-    font-size: 11px;
-    padding: 2px 7px;
-    cursor: pointer;
+    }
 }
 
 @media (max-width: 900px) {
