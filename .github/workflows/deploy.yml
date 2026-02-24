@@ -25,12 +25,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        env:
-          NODE_ENV: development
-        run: npm ci --no-audit --no-fund
-
-      - name: Verify build toolchain
-        run: npm ls vite --depth=0
+        run: npm ci --include=dev --no-audit --no-fund
 
       - name: Build project
         env:
