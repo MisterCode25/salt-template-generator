@@ -5,7 +5,8 @@ let partnersCache = null;
 export async function loadPartners() {
   if (partnersCache) return partnersCache;
 
-  const response = await fetch("/partners.json", { cache: "no-store" });
+  const partnersPath = `${import.meta.env.BASE_URL}partners.json`;
+  const response = await fetch(partnersPath, { cache: "no-store" });
   if (!response.ok) {
     throw new Error(`Unable to load partners.json (${response.status})`);
   }
