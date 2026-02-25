@@ -571,7 +571,7 @@ export default function Home() {
                 </div>
             )}
 
-            {!empty && (
+            {!empty && !settingsOpen && !manageTemplatesOpen && !partnersOpen && (
                 <div id="zones-grid" className="zones-grid">
                     <DataInputs tokens={tokens} values={values} setValues={setValues} onDirty={() => { inputChangeVersion.current++; }} />
 
@@ -620,7 +620,7 @@ export default function Home() {
 
             {settingsOpen && (
                 <div className="popup" onClick={(e) => { if (e.target === e.currentTarget) setSettingsOpen(false); }}>
-                    <div className="popup-box" onClick={(e) => e.stopPropagation()}>
+                    <div className="popup-box popup-box--wide" onClick={(e) => e.stopPropagation()}>
                         <Settings embedded onClose={() => setSettingsOpen(false)} />
                     </div>
                 </div>
