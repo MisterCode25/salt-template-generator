@@ -582,6 +582,9 @@ textarea:focus {
     border-radius: 0;
     padding: 0;
     box-shadow: none;
+    margin: 0;
+    max-width: none;
+    backdrop-filter: none;
 }
 
 .popup-box .manage-card:hover {
