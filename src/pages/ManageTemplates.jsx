@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { loadTemplates, saveTemplates } from "../services/templateService.js";
 import { ensureTokensFromTexts } from "../services/tokenService.js";
 import { groupTemplates } from "../services/templateService.js";
@@ -441,7 +441,8 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
     );
 }
 
-export default function ManageTemplates() {
+export default function ManageTemplates({ embedded = false, onClose = null, onNavigateTokens = null }) {
+    const navigate = useNavigate();
     const [templates, setTemplates] = useState([]);
     const [currentType, setCurrentType] = useState("email");
     const [modalTemplate, setModalTemplate] = useState(null);
@@ -519,12 +520,32 @@ export default function ManageTemplates() {
         await persist(next);
     };
 
-    return (
-        <main className="page-container">
-            <div className="manage-card">
+    const content = (
+        <div className="manage-card">
                 <div className="variant-editor-head" style={{ alignItems: "center" }}>
                     <h1 style={{ margin: 0 }}>Manage Templates</h1>
-                    <Link to="/tokens" className="secondary-btn">Manage Tokens</Link>
+                    <div style={{ display: "flex", gap: 8 }}>
+                        {embedded ? (
+                            <button
+                                type="button"
+                                className="secondary-btn"
+                                onClick={() => {
+                                    if (onNavigateTokens) {
+                                        onNavigateTokens();
+                                        return;
+                                    }
+                                    navigate("/tokens");
+                                }}
+                            >
+                                Manage Tokens
+                            </button>
+                        ) : (
+                            <Link to="/tokens" className="secondary-btn">Manage Tokens</Link>
+                        )}
+                        {embedded && (
+                            <button type="button" className="secondary-btn" onClick={onClose}>Close</button>
+                        )}
+                    </div>
                 </div>
 
                 <div className="segmented-control-managed-models">
@@ -600,6 +621,12 @@ export default function ManageTemplates() {
                     onSave={onSaveTemplate}
                 />
             )}
-        </main>
+        </div>
     );
+
+    if (embedded) {
+        return content;
+    }
+
+    return <main className="page-container">{content}</main>;
 }

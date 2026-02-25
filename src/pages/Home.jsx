@@ -8,6 +8,8 @@ import { applyTheme, getInitialTheme, getThemeToggleLabel } from "../utils/theme
 import { PARTNER_COLUMNS } from "../data/partnersData.js";
 import { loadPartners } from "../services/partnersService.js";
 import { partnerMatchesQuery } from "../utils/partnerSearch.js";
+import ManageTemplates from "./ManageTemplates.jsx";
+import Settings from "./Settings.jsx";
 
 function highlightInputs(tokens = [], className = "input-warning") {
     tokens.forEach(token => {
@@ -294,6 +296,8 @@ export default function Home() {
     const [themeDropdownOpen, setThemeDropdownOpen] = useState(false);
     const [theme, setTheme] = useState(() => getInitialTheme());
     const [partnersOpen, setPartnersOpen] = useState(false);
+    const [settingsOpen, setSettingsOpen] = useState(false);
+    const [manageTemplatesOpen, setManageTemplatesOpen] = useState(false);
 
     useEffect(() => {
         loadTokens().then(setTokens);
@@ -476,8 +480,8 @@ export default function Home() {
                             <div className="dropdown-menu is-open">
                                 <div className="dropdown-section">
                                     <div className="dropdown-title">Management</div>
-                                    <button onClick={() => { navigate("/templates"); setDropdownOpen(false); }} className="dropdown-reset">Manage templates</button>
-                                    <button onClick={() => { navigate("/settings"); setDropdownOpen(false); }} className="dropdown-reset">Settings</button>
+                                    <button onClick={() => { setManageTemplatesOpen(true); setDropdownOpen(false); }} className="dropdown-reset">Manage templates</button>
+                                    <button onClick={() => { setSettingsOpen(true); setDropdownOpen(false); }} className="dropdown-reset">Settings</button>
                                     <button onClick={() => { setPartnersOpen(true); setDropdownOpen(false); }} className="dropdown-reset">Partenaires</button>
                                 </div>
                             </div>
@@ -613,6 +617,29 @@ export default function Home() {
             )}
 
             {partnersOpen && <PartnersModal onClose={() => setPartnersOpen(false)} />}
+
+            {settingsOpen && (
+                <div className="popup" onClick={(e) => { if (e.target === e.currentTarget) setSettingsOpen(false); }}>
+                    <div className="popup-box" onClick={(e) => e.stopPropagation()}>
+                        <Settings embedded onClose={() => setSettingsOpen(false)} />
+                    </div>
+                </div>
+            )}
+
+            {manageTemplatesOpen && (
+                <div className="popup" onClick={(e) => { if (e.target === e.currentTarget) setManageTemplatesOpen(false); }}>
+                    <div className="popup-box popup-box--wide" onClick={(e) => e.stopPropagation()}>
+                        <ManageTemplates
+                            embedded
+                            onClose={() => setManageTemplatesOpen(false)}
+                            onNavigateTokens={() => {
+                                setManageTemplatesOpen(false);
+                                navigate("/tokens");
+                            }}
+                        />
+                    </div>
+                </div>
+            )}
 
             {empty && (
                 <section id="emptyState" className="empty-state">
