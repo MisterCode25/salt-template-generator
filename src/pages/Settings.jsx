@@ -6,7 +6,7 @@ import { saveJSON } from "../services/storageService.js";
 import { buildConfigPayload, validateImportedConfig } from "../services/configService.js";
 import { showToast } from "../services/clipboardService.js";
 
-export default function Settings() {
+export default function Settings({ embedded = false, onClose = null }) {
     const navigate = useNavigate();
     const fileInputRef = useRef(null);
     const [tokens, setTokens] = useState([]);
@@ -67,8 +67,8 @@ export default function Settings() {
         window.location.href = "/";
     };
 
-    return (
-        <main className="page-container">
+    const content = (
+        <>
             <input
                 ref={fileInputRef}
                 type="file"
@@ -82,7 +82,15 @@ export default function Settings() {
                         <p className="eyebrow">App</p>
                         <h2>Settings <span className="settings-version-tag">V2.5</span></h2>
                     </div>
-                    <button className="secondary-btn" onClick={() => navigate("/")}>Back</button>
+                    <button className="secondary-btn" onClick={() => {
+                        if (embedded && onClose) {
+                            onClose();
+                            return;
+                        }
+                        navigate("/");
+                    }}>
+                        {embedded ? "Close" : "Back"}
+                    </button>
                 </div>
 
                 <div className="popup-grid" style={{ marginTop: 10 }}>
@@ -104,6 +112,12 @@ export default function Settings() {
                     </div>
                 </div>
             </div>
-        </main>
+        </>
     );
+
+    if (embedded) {
+        return content;
+    }
+
+    return <main className="page-container">{content}</main>;
 }
