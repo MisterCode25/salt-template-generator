@@ -611,17 +611,16 @@ export default function ManageTemplates({ embedded = false, onClose = null, onNa
                 <div className="add-btn-container">
                     <button className="primary-btn" onClick={() => setModalTemplate({})}>+ Add Template</button>
                 </div>
-            </div>
 
-            {modalTemplate !== null && (
-                <TemplateModal
-                    initial={modalTemplate.id ? modalTemplate : null}
-                    templates={templates}
-                    onClose={() => setModalTemplate(null)}
-                    onSave={onSaveTemplate}
-                />
-            )}
-        </div>
+                {modalTemplate !== null && (
+                    <TemplateModal
+                        initial={modalTemplate.id ? modalTemplate : null}
+                        templates={templates}
+                        onClose={() => setModalTemplate(null)}
+                        onSave={onSaveTemplate}
+                    />
+                )}
+            </div>
     );
 
     if (embedded) {
