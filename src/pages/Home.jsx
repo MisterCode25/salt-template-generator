@@ -571,7 +571,7 @@ export default function Home() {
                 </div>
             )}
 
-            {!empty && !settingsOpen && !manageTemplatesOpen && !partnersOpen && (
+            {!empty && (
                 <div id="zones-grid" className="zones-grid">
                     <DataInputs tokens={tokens} values={values} setValues={setValues} onDirty={() => { inputChangeVersion.current++; }} />
 
