@@ -571,8 +571,8 @@ textarea:focus {
 }
 
 .popup-box--wide {
-    width: 78%;
-    max-width: 1080px;
+    width: 95%;
+    max-width: 1400px;
     padding: 20px;
 }
 
