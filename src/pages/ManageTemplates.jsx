@@ -1,25 +1,21 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { loadTemplates, saveTemplates } from "../services/templateService.js";
 import { ensureTokensFromTexts } from "../services/tokenService.js";
 import { groupTemplates } from "../services/templateService.js";
+import Modal from "../components/Modal.jsx";
 
 const emptyTexts = { fr: "", en: "", de: "", it: "" };
 
-function LanguagePreview({ label, dot, value, onChange, onFullscreen }) {
+function LanguagePreview({ label, dot, value, onFullscreen }) {
     const [height, setHeight] = useState("auto");
+    const textareaRef = useRef(null);
 
     useEffect(() => {
-        const temp = document.createElement("textarea");
-        temp.style.visibility = "hidden";
-        temp.style.position = "fixed";
-        temp.style.height = "auto";
-        temp.value = value || "";
-        document.body.appendChild(temp);
-        temp.style.height = "auto";
-        const h = temp.scrollHeight;
-        document.body.removeChild(temp);
-        setHeight(`${Math.max(160, h)}px`);
+        const el = textareaRef.current;
+        if (!el) return;
+        el.style.height = "auto";
+        setHeight(`${Math.max(160, el.scrollHeight)}px`);
     }, [value]);
 
     return (
@@ -29,17 +25,23 @@ function LanguagePreview({ label, dot, value, onChange, onFullscreen }) {
                 <span className="lang-label">{label}</span>
             </div>
             <textarea
+                ref={textareaRef}
                 className="plain-editor tall-textarea"
                 data-lang={dot.toLowerCase()}
                 placeholder={`Text ${dot}`}
                 value={value}
+                readOnly
                 style={{ height }}
-                onChange={e => onChange(e.target.value)}
+                aria-label={`${label} preview`}
+                title="Open fullscreen editor"
                 onClick={(e) => {
                     e.preventDefault();
                     if (onFullscreen) onFullscreen();
                 }}
             />
+            <button type="button" className="secondary-btn" onClick={() => onFullscreen?.()}>
+                Edit fullscreen
+            </button>
         </div>
     );
 }
@@ -68,6 +70,18 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
     const [attachedTemplateIds, setAttachedTemplateIds] = useState([]);
     const [detachedVariants, setDetachedVariants] = useState([]);
     const [selectedTemplateId, setSelectedTemplateId] = useState("");
+
+    useEffect(() => {
+        if (!fullscreen) return;
+        const onKeyDown = (event) => {
+            if (event.key === "Escape") {
+                event.preventDefault();
+                setFullscreen(null);
+            }
+        };
+        document.addEventListener("keydown", onKeyDown);
+        return () => document.removeEventListener("keydown", onKeyDown);
+    }, [fullscreen]);
 
     const activeVariant = variants.find(v => v.id === activeTab);
     const availableTemplates = (templates || []).filter(t =>
@@ -325,10 +339,10 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
         return (
             <div className="lang-block">
                 <div id="variantLangColumns" className="lang-columns lang-columns-panel">
-                <LanguagePreview label="French" dot="FR" value={values.fr} onChange={v => setValue("fr", v)} onFullscreen={() => openFullscreen("fr")} />
-                <LanguagePreview label="English" dot="EN" value={values.en} onChange={v => setValue("en", v)} onFullscreen={() => openFullscreen("en")} />
-                <LanguagePreview label="German" dot="DE" value={values.de} onChange={v => setValue("de", v)} onFullscreen={() => openFullscreen("de")} />
-                <LanguagePreview label="Italian" dot="IT" value={values.it} onChange={v => setValue("it", v)} onFullscreen={() => openFullscreen("it")} />
+                <LanguagePreview label="French" dot="FR" value={values.fr} onFullscreen={() => openFullscreen("fr")} />
+                <LanguagePreview label="English" dot="EN" value={values.en} onFullscreen={() => openFullscreen("en")} />
+                <LanguagePreview label="German" dot="DE" value={values.de} onFullscreen={() => openFullscreen("de")} />
+                <LanguagePreview label="Italian" dot="IT" value={values.it} onFullscreen={() => openFullscreen("it")} />
                 </div>
             </div>
         );
@@ -382,15 +396,12 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
     };
 
     return (
-        <div
-            className="popup"
-            onMouseDown={(event) => {
-                if (event.target === event.currentTarget) {
-                    onClose();
-                }
-            }}
+        <Modal
+            onClose={onClose}
+            dialogClassName="popup-box popup-box--wide template-config-modal"
+            ariaLabel={isEdit ? "Edit template" : "New template"}
+            disableEscapeClose={Boolean(fullscreen)}
         >
-            <div className="popup-box popup-box--wide template-config-modal">
                 <div className="popup-header">
                     <h2>{isEdit ? "Edit template" : "New template"}</h2>
                 </div>
@@ -436,8 +447,7 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
         </div>
 
         {fullscreenOverlay()}
-    </div>
-</div>
+    </Modal>
     );
 }
 

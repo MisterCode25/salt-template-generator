@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { loadTokens, saveTokens } from "../services/tokenService.js";
 import { renameTokenInTemplates } from "../services/templateService.js";
+import Modal from "../components/Modal.jsx";
 
-function TokenModal({ initial, onClose, onSave }) {
+function TokenModal({ initial, tokens, onClose, onSave }) {
     const [token, setToken] = useState(initial?.token || "");
     const [label, setLabel] = useState(initial?.label || "");
     const [key, setKey] = useState(initial?.key || "");
@@ -10,23 +11,34 @@ function TokenModal({ initial, onClose, onSave }) {
     const [def, setDef] = useState(initial?.default || "");
 
     const handleSave = () => {
-        if (!token.startsWith("{") || !token.endsWith("}")) {
+        const normalizedToken = token.trim();
+        const normalizedLabel = label.trim();
+        const normalizedKey = key.trim();
+        const normalizedDefault = def.trim();
+
+        if (!normalizedToken.startsWith("{") || !normalizedToken.endsWith("}")) {
             alert("Token must follow the {my_token} format.");
+            return;
+        }
+        const duplicate = (tokens || []).some((candidate) =>
+            candidate.id !== initial?.id && candidate.token === normalizedToken
+        );
+        if (duplicate) {
+            alert("A token with this name already exists.");
             return;
         }
         onSave({
             ...initial,
-            token,
-            label,
-            key: key.trim() || undefined,
+            token: normalizedToken,
+            label: normalizedLabel,
+            key: normalizedKey || undefined,
             input_type: type,
-            default: def !== "" ? def : undefined
+            default: normalizedDefault !== "" ? normalizedDefault : undefined
         });
     };
 
     return (
-        <div className="popup">
-            <div className="popup-box">
+        <Modal onClose={onClose} ariaLabel="Token editor">
                 <div className="popup-header">
                     <h2>{initial ? "Edit Token" : "New Token"}</h2>
                 </div>
@@ -59,11 +71,10 @@ function TokenModal({ initial, onClose, onSave }) {
                 </div>
 
                 <div className="popup-actions">
-                    <button className="secondary-btn" onClick={onClose}>Cancel</button>
-                    <button className="primary-btn" onClick={handleSave}>Save</button>
+                    <button type="button" className="secondary-btn" onClick={onClose}>Cancel</button>
+                    <button type="button" className="primary-btn" onClick={handleSave}>Save</button>
                 </div>
-            </div>
-        </div>
+        </Modal>
     );
 }
 
@@ -138,6 +149,7 @@ export default function ManageTokens() {
             {modalToken !== null && (
                 <TokenModal
                     initial={modalToken.id ? modalToken : null}
+                    tokens={tokens}
                     onClose={() => setModalToken(null)}
                     onSave={onSave}
                 />

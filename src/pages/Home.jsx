@@ -8,24 +8,26 @@ import { applyTheme, getInitialTheme, getThemeToggleLabel } from "../utils/theme
 import { PARTNER_COLUMNS } from "../data/partnersData.js";
 import { loadPartners } from "../services/partnersService.js";
 import { partnerMatchesQuery } from "../utils/partnerSearch.js";
-import ManageTemplates from "./ManageTemplates.jsx";
+import Modal from "../components/Modal.jsx";
 import Settings from "./Settings.jsx";
 
-function highlightInputs(tokens = [], className = "input-warning") {
-    tokens.forEach(token => {
-        const field = document.querySelector(`[data-token="${token}"]`);
-        if (field) {
-            field.classList.add(className);
-        }
-    });
-}
-function DataInputs({ tokens, values, setValues, onDirty }) {
+function DataInputs({
+    tokens,
+    values,
+    setValues,
+    onDirty,
+    inputErrors,
+    inputWarnings,
+    onClearTokenDecoration,
+    onResetDecorations
+}) {
     const handleChange = (token, value) => {
         setValues(prev => {
             const next = { ...prev, [token]: value };
             localStorage.setItem("input_" + token, value);
             return next;
         });
+        if (onClearTokenDecoration) onClearTokenDecoration(token);
         if (onDirty) onDirty();
     };
 
@@ -40,6 +42,7 @@ function DataInputs({ tokens, values, setValues, onDirty }) {
                     onClick={() => {
                         setValues({});
                         tokens.forEach(t => localStorage.removeItem("input_" + t.token));
+                        if (onResetDecorations) onResetDecorations();
                         if (onDirty) onDirty();
                     }}
                 >
@@ -52,13 +55,14 @@ function DataInputs({ tokens, values, setValues, onDirty }) {
             <div id="dynamic-inputs" className="inputs-zone">
                 {tokens.length === 0 && <p className="hint">No tokens yet.</p>}
                 {tokens.map(tok => {
-                    const stored = values[tok.token] ?? localStorage.getItem("input_" + tok.token) ?? tok.default ?? "";
+                    const stored = values[tok.token] ?? tok.default ?? "";
                     const type = tok.input_type === "number" ? "number" : tok.input_type === "date" ? "date" : "text";
                     return (
                         <div key={tok.id} className="form-field">
                             <label>{tok.label || tok.token}</label>
                             <input
                                 data-token={tok.token}
+                                className={`${inputErrors?.[tok.token] ? " input-error" : ""}${inputWarnings?.[tok.token] ? " input-warning" : ""}`.trim()}
                                 type={type}
                                 value={stored}
                                 placeholder={tok.token}
@@ -96,8 +100,7 @@ function VariantModal({ model, onSelect, onClose }) {
     const mainVariantLabel = model.mainVariantName?.trim() || model.title || "Main text";
 
     return (
-        <div className="popup" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-            <div className="popup-box variant-picker">
+        <Modal onClose={onClose} dialogClassName="popup-box variant-picker" ariaLabel="Choix de variante">
                 <div className="popup-header">
                     <div>
                         <h2>{model.title}</h2>
@@ -114,8 +117,7 @@ function VariantModal({ model, onSelect, onClose }) {
                         </button>
                     ))}
                 </div>
-            </div>
-        </div>
+        </Modal>
     );
 }
 
@@ -210,8 +212,7 @@ function PartnersModal({ onClose }) {
     };
 
     return (
-        <div className="popup" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-            <div className="popup-box partners-modal">
+        <Modal onClose={onClose} dialogClassName="popup-box partners-modal" ariaLabel="Partenaires">
                 <div className="popup-header">
                     <div>
                         <h2>Partenaires</h2>
@@ -275,8 +276,7 @@ function PartnersModal({ onClose }) {
                         )}
                     </section>
                 </div>
-            </div>
-        </div>
+        </Modal>
     );
 }
 
@@ -286,6 +286,8 @@ export default function Home() {
     const [tokens, setTokens] = useState([]);
     const [models, setModels] = useState([]);
     const [values, setValues] = useState({});
+    const [inputErrors, setInputErrors] = useState({});
+    const [inputWarnings, setInputWarnings] = useState({});
     const [variantPicker, setVariantPicker] = useState(null);
     const [configName, setConfigName] = useState(localStorage.getItem("local_configName") || "No configuration");
     const [empty, setEmpty] = useState(false);
@@ -297,12 +299,33 @@ export default function Home() {
     const [theme, setTheme] = useState(() => getInitialTheme());
     const [partnersOpen, setPartnersOpen] = useState(false);
     const [settingsOpen, setSettingsOpen] = useState(false);
-    const [manageTemplatesOpen, setManageTemplatesOpen] = useState(false);
 
     useEffect(() => {
         loadTokens().then(setTokens);
         loadTemplates().then(setModels);
     }, []);
+
+    useEffect(() => {
+        if (tokens.length === 0) return;
+        setValues((prev) => {
+            const next = { ...prev };
+            let changed = false;
+            tokens.forEach((tokenDef) => {
+                if (next[tokenDef.token] !== undefined) return;
+                const stored = localStorage.getItem("input_" + tokenDef.token);
+                if (stored !== null) {
+                    next[tokenDef.token] = stored;
+                    changed = true;
+                    return;
+                }
+                if (tokenDef.default !== undefined) {
+                    next[tokenDef.token] = tokenDef.default;
+                    changed = true;
+                }
+            });
+            return changed ? next : prev;
+        });
+    }, [tokens]);
 
     const grouped = useMemo(() => groupTemplates(models), [models]);
 
@@ -368,32 +391,42 @@ export default function Home() {
         };
     };
 
+    const clearInputDecorations = () => {
+        setInputErrors({});
+        setInputWarnings({});
+    };
+
+    const clearTokenDecoration = (token) => {
+        setInputErrors((prev) => {
+            if (!prev[token]) return prev;
+            const next = { ...prev };
+            delete next[token];
+            return next;
+        });
+        setInputWarnings((prev) => {
+            if (!prev[token]) return prev;
+            const next = { ...prev };
+            delete next[token];
+            return next;
+        });
+    };
+
     const collectInputValues = (requiredTokens) => {
         const vals = {};
         const missing = [];
         const set = new Set(requiredTokens || []);
+        const nextErrors = {};
         tokens.forEach(t => {
-            const stored = values[t.token] ?? localStorage.getItem("input_" + t.token) ?? t.default ?? "";
+            const stored = values[t.token] ?? t.default ?? "";
             if (set.size === 0 || set.has(t.token)) {
                 if (stored === "" || stored === null || stored === undefined) {
                     missing.push(t.token);
+                    nextErrors[t.token] = true;
                 }
             }
             vals[t.token] = stored;
-            const field = document.querySelector(`[data-token="${t.token}"]`);
-            if (field) {
-                field.classList.remove("input-warning");
-                field.classList.remove("input-error");
-                if (missing.includes(t.token)) {
-                    field.classList.add("input-error");
-                }
-                field.addEventListener("input", () => {
-                    field.classList.remove("input-warning");
-                    field.classList.remove("input-error");
-                    inputChangeVersion.current++;
-                }, { once: true });
-            }
         });
+        setInputErrors(nextErrors);
         return { values: vals, missing };
     };
 
@@ -417,11 +450,16 @@ export default function Home() {
             && lastSectionClickVersion.current[sectionKey] === inputChangeVersion.current;
 
         if (warnSameSection && tokensNeeded.length > 0) {
-            const toWarn = tokensNeeded.filter(tokenValue => {
+            const nextWarnings = {};
+            tokensNeeded.forEach((tokenValue) => {
                 const def = tokens.find(t => t.token === tokenValue);
-                return !def || def.default === undefined;
+                if (!def || def.default === undefined) {
+                    nextWarnings[tokenValue] = true;
+                }
             });
-            highlightInputs(toWarn, "input-warning");
+            setInputWarnings(nextWarnings);
+        } else {
+            setInputWarnings({});
         }
 
         const map = {};
@@ -475,42 +513,60 @@ export default function Home() {
                 </div>
                 <nav className="top-menu">
                     <div className="dropdown options-dropdown">
-                        <button className="dropdown-btn" onClick={() => setDropdownOpen(o => !o)}>Options ▾</button>
+                        <button
+                            type="button"
+                            className="dropdown-btn"
+                            aria-haspopup="menu"
+                            aria-expanded={dropdownOpen}
+                            onClick={() => setDropdownOpen(o => !o)}
+                        >
+                            Options ▾
+                        </button>
                         {dropdownOpen && (
-                            <div className="dropdown-menu is-open">
+                            <div className="dropdown-menu is-open" role="menu">
                                 <div className="dropdown-section">
                                     <div className="dropdown-title">Management</div>
-                                    <button onClick={() => { setManageTemplatesOpen(true); setDropdownOpen(false); }} className="dropdown-reset">Manage templates</button>
-                                    <button onClick={() => { setSettingsOpen(true); setDropdownOpen(false); }} className="dropdown-reset">Settings</button>
-                                    <button onClick={() => { setPartnersOpen(true); setDropdownOpen(false); }} className="dropdown-reset">Partenaires</button>
+                                    <button type="button" role="menuitem" onClick={() => { navigate("/templates"); setDropdownOpen(false); }} className="dropdown-reset">Manage templates</button>
+                                    <button type="button" role="menuitem" onClick={() => { navigate("/external-generator"); setDropdownOpen(false); }} className="dropdown-reset">External Generator</button>
+                                    <button type="button" role="menuitem" onClick={() => { setSettingsOpen(true); setDropdownOpen(false); }} className="dropdown-reset">Settings</button>
+                                    <button type="button" role="menuitem" onClick={() => { setPartnersOpen(true); setDropdownOpen(false); }} className="dropdown-reset">Partenaires</button>
                                 </div>
                             </div>
                         )}
                     </div>
                     <div className="dropdown theme-dropdown">
                         <button
+                            type="button"
                             id="themeToggle"
                             className="theme-toggle"
                             aria-label="Toggle theme"
+                            aria-haspopup="menu"
+                            aria-expanded={themeDropdownOpen}
                             onClick={() => setThemeDropdownOpen(o => !o)}
                         >
                             {getThemeToggleLabel(theme)} Theme ▾
                         </button>
                         {themeDropdownOpen && (
-                            <div className="dropdown-menu is-open">
+                            <div className="dropdown-menu is-open" role="menu">
                                 <button
+                                    type="button"
+                                    role="menuitem"
                                     className="dropdown-reset"
                                     onClick={() => { setTheme("dark"); setThemeDropdownOpen(false); }}
                                 >
                                     Dark
                                 </button>
                                 <button
+                                    type="button"
+                                    role="menuitem"
                                     className="dropdown-reset"
                                     onClick={() => { setTheme("light"); setThemeDropdownOpen(false); }}
                                 >
                                     Clear
                                 </button>
                                 <button
+                                    type="button"
+                                    role="menuitem"
                                     className="dropdown-reset"
                                     onClick={() => { setTheme("salt"); setThemeDropdownOpen(false); }}
                                 >
@@ -573,7 +629,16 @@ export default function Home() {
 
             {!empty && (
                 <div id="zones-grid" className="zones-grid">
-                    <DataInputs tokens={tokens} values={values} setValues={setValues} onDirty={() => { inputChangeVersion.current++; }} />
+                    <DataInputs
+                        tokens={tokens}
+                        values={values}
+                        setValues={setValues}
+                        onDirty={() => { inputChangeVersion.current++; }}
+                        inputErrors={inputErrors}
+                        inputWarnings={inputWarnings}
+                        onClearTokenDecoration={clearTokenDecoration}
+                        onResetDecorations={clearInputDecorations}
+                    />
 
                 <section id="email-col" className="zone-box">
                     <h3>Email</h3>
@@ -619,26 +684,9 @@ export default function Home() {
             {partnersOpen && <PartnersModal onClose={() => setPartnersOpen(false)} />}
 
             {settingsOpen && (
-                <div className="popup" onClick={(e) => { if (e.target === e.currentTarget) setSettingsOpen(false); }}>
-                    <div className="popup-box settings-modal" onClick={(e) => e.stopPropagation()}>
-                        <Settings embedded onClose={() => setSettingsOpen(false)} />
-                    </div>
-                </div>
-            )}
-
-            {manageTemplatesOpen && (
-                <div className="popup" onClick={(e) => { if (e.target === e.currentTarget) setManageTemplatesOpen(false); }}>
-                    <div className="popup-box manage-templates-modal" onClick={(e) => e.stopPropagation()}>
-                        <ManageTemplates
-                            embedded
-                            onClose={() => setManageTemplatesOpen(false)}
-                            onNavigateTokens={() => {
-                                setManageTemplatesOpen(false);
-                                navigate("/tokens");
-                            }}
-                        />
-                    </div>
-                </div>
+                <Modal onClose={() => setSettingsOpen(false)} dialogClassName="popup-box settings-modal" ariaLabel="Settings">
+                    <Settings embedded onClose={() => setSettingsOpen(false)} />
+                </Modal>
             )}
 
             {empty && (

@@ -62,7 +62,20 @@ export default function Settings({ embedded = false, onClose = null }) {
 
     const resetStorage = async () => {
         if (!confirm("Reset all stored data?")) return;
-        localStorage.clear();
+        const keysToDelete = [];
+        const appScopedLegacyKeys = new Set(["tokens", "models", "theme_pref"]);
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (!key) continue;
+            if (
+                key.startsWith("local_")
+                || key.startsWith("input_")
+                || appScopedLegacyKeys.has(key)
+            ) {
+                keysToDelete.push(key);
+            }
+        }
+        keysToDelete.forEach((key) => localStorage.removeItem(key));
         showToast("Local data reset", "warning");
         window.location.href = "/";
     };
