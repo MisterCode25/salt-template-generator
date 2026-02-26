@@ -35,6 +35,19 @@ const COMMENT_OPTIONS = [
     "3t Level escalation",
     "Box now online, issue solved"
 ];
+const MISSING_INFO_COMMENT_OPTIONS = [
+    "Pictures OTO and RX|TX values, Mail and SMS send",
+    "picture ( OTO number and plug ), Mail and SMS send",
+    "Pictures ( OTO Plug inside ), Mail and SMS send",
+    "RX|TX, Mail and SMS send",
+    "OTO @Beep, Mail and SMS send"
+];
+const ESCALATION_DETAIL_OPTIONS = [
+    "Partner mean no fault clearence",
+    "Fiber Blinking white|Red Huawei",
+    "Internet Led Off",
+    "No special Note"
+];
 
 const FIELD_PLACEHOLDERS = {
     flagging: "VALID / MINFO / WRCAT / UNTKT",
@@ -283,66 +296,208 @@ export default function ExternalGenerator() {
 
     const runPostVtiCompletionFlow = async (initialFields) => {
         let draft = { ...initialFields };
+        let meta = {
+            mode: null,
+            boxSwapStatus: null,
+            escalationType: null,
+            escalationCaseType: null,
+            boxSwapSerialImpact: null
+        };
+
         const apply = (patch) => {
             draft = { ...draft, ...patch };
             patchFields(patch);
         };
 
-        if (isBlank(draft.soTicket)) {
-            const soTicket = await requireInput("SO Ticket", "e.g. 31436062", "");
-            if (!soTicket) return false;
-            apply({ soTicket });
-        }
-
-        if (isBlank(draft.SignalStatus)) {
-            const signalValue = await askSignal("Signal Status");
-            if (!signalValue) return false;
-            apply({ SignalStatus: signalValue });
-        }
-
-        if (isBlank(draft.LedStatus)) {
-            const ledValue = await askLed("LED Status");
-            if (!ledValue) return false;
-            apply({ LedStatus: ledValue });
-        }
-
-        if (isBlank(draft.treatmentStep)) {
-            const treatment = await askChoice("Treatment Step", optionsOf(TREATMENT_STEP_OPTIONS));
-            if (!treatment) return false;
-            apply({ treatmentStep: treatment });
-        }
-
-        if (draft.treatmentStep === "FLL Ticket" && isBlank(draft.partner)) {
-            const partnerMode = await askChoice("Partner", [
-                { label: "Skip (empty)", value: "__skip__" },
-                { label: "ALO", value: "ALO" },
-                { label: "Search partner", value: "__search__" }
-            ]);
-            if (!partnerMode) return false;
-            if (partnerMode === "__search__") {
-                const selectedPartner = await askPartnerViaSearch();
-                if (!selectedPartner) return false;
-                apply({ partner: selectedPartner });
-            } else if (partnerMode !== "__skip__") {
-                apply({ partner: partnerMode });
+        const nextStep = () => {
+            if (isBlank(draft.soTicket)) {
+                return { kind: "input", key: "soTicket", title: "SO Ticket", placeholder: "e.g. 31436062" };
             }
-        }
+            if (isBlank(draft.treatmentStep)) {
+                return { kind: "choice", key: "treatmentStep", title: "Treatment Step", options: TREATMENT_STEP_OPTIONS };
+            }
 
-        if (!isBlank(draft.partner) && isBlank(draft.partnerTicketNumber)) {
-            const partnerTicketNumber = await requireInput("Partner Ticket Number", "e.g. 12345678", "");
-            if (!partnerTicketNumber) return false;
-            apply({ partnerTicketNumber });
-        }
+            // Branch for Box Swap
+            if (draft.treatmentStep === "Box Swap") {
+                if (!meta.boxSwapStatus) {
+                    return {
+                        kind: "choice-meta",
+                        key: "boxSwapStatus",
+                        title: "Box Swap Status",
+                        options: ["Old", "New", "Partner incriminate", "Booting"]
+                    };
+                }
+                if (meta.boxSwapStatus === "Booting" && !meta.boxSwapSerialImpact) {
+                    return {
+                        kind: "choice-meta",
+                        key: "boxSwapSerialImpact",
+                        title: "Serial Impact",
+                        options: ["Impacted Serial", "Not impacted Serial"]
+                    };
+                }
+            }
 
-        if (isBlank(draft.comment)) {
-            const baseComments = COMMENT_OPTIONS.filter(Boolean);
-            const commentChoice = await askChoice("Comment", [
-                { label: "Skip (empty)", value: "__skip__" },
-                ...baseComments.map((c) => ({ label: c, value: c }))
-            ], { searchable: true, searchPlaceholder: "Search comment..." });
-            if (!commentChoice) return false;
-            if (commentChoice !== "__skip__") {
-                apply({ comment: commentChoice });
+            // Branch for FLL Ticket
+            if (draft.treatmentStep === "FLL Ticket") {
+                if (isBlank(draft.SignalStatus)) {
+                    return { kind: "choice", key: "SignalStatus", title: "Signal Status", options: SIGNAL_OPTIONS };
+                }
+                if (isBlank(draft.LedStatus)) {
+                    return { kind: "choice", key: "LedStatus", title: "LED Status", options: LED_OPTIONS };
+                }
+                if (isBlank(draft.partner)) {
+                    return { kind: "partner-mode" };
+                }
+                if (!isBlank(draft.partner) && isBlank(draft.partnerTicketNumber)) {
+                    return { kind: "input", key: "partnerTicketNumber", title: "Partner Ticket Number", placeholder: "e.g. 12345678" };
+                }
+                if (isBlank(draft.comment)) {
+                    return { kind: "choice-search", key: "comment", title: "Comment", options: COMMENT_OPTIONS };
+                }
+            }
+
+            // Branch for Other (requires a mode)
+            if (draft.treatmentStep === "Other") {
+                if (!meta.mode) {
+                    return {
+                        kind: "choice-meta",
+                        key: "mode",
+                        title: "Flow",
+                        options: ["Power supply", "Missing info", "Escalation", "Generic"]
+                    };
+                }
+
+                if (meta.mode === "Power supply") {
+                    if (isBlank(draft.SignalStatus)) return { kind: "preset", patch: { SignalStatus: "Lost" } };
+                    if (isBlank(draft.LedStatus)) return { kind: "preset", patch: { LedStatus: "Fiber Off" } };
+                    if (isBlank(draft.comment)) return { kind: "preset", patch: { comment: "Power cable" } };
+                }
+
+                if (meta.mode === "Missing info") {
+                    if (isBlank(draft.SignalStatus)) return { kind: "choice", key: "SignalStatus", title: "Signal Status", options: SIGNAL_OPTIONS };
+                    if (isBlank(draft.LedStatus)) return { kind: "choice", key: "LedStatus", title: "LED Status", options: LED_OPTIONS };
+                    if (isBlank(draft.comment)) {
+                        return { kind: "choice-search", key: "comment", title: "Missing Info Comment", options: MISSING_INFO_COMMENT_OPTIONS };
+                    }
+                }
+
+                if (meta.mode === "Escalation") {
+                    if (!meta.escalationCaseType) {
+                        return { kind: "choice-meta", key: "escalationCaseType", title: "Escalation Case", options: ["Existing External ID", "New Case"] };
+                    }
+                    if (meta.escalationCaseType === "Existing External ID") {
+                        if (!meta.escalationType) {
+                            return { kind: "choice-meta", key: "escalationType", title: "Escalation Type", options: ["3tLevel", "Fixnet"] };
+                        }
+                        if (meta.escalationType === "3tLevel" && isBlank(draft.comment)) {
+                            return { kind: "choice", key: "comment", title: "3tLevel Detail", options: ESCALATION_DETAIL_OPTIONS, mapChoice: (v) => v === "No special Note" ? "3tLevel esclation" : `3tLevel esclation ${v}` };
+                        }
+                        if (meta.escalationType === "Fixnet" && isBlank(draft.comment)) {
+                            return { kind: "preset", patch: { comment: "Fixnet esclation" } };
+                        }
+                    } else {
+                        if (!meta.escalationType) {
+                            return { kind: "choice-meta", key: "escalationType", title: "Escalation Type", options: ["3tLevel", "Fixnet"] };
+                        }
+                        if (isBlank(draft.SignalStatus)) return { kind: "choice", key: "SignalStatus", title: "Signal Status", options: SIGNAL_OPTIONS_ESCALATION };
+                        if (isBlank(draft.LedStatus)) return { kind: "choice", key: "LedStatus", title: "LED Status", options: LED_OPTIONS };
+                        if (meta.escalationType === "3tLevel" && isBlank(draft.comment)) {
+                            return { kind: "choice", key: "comment", title: "3tLevel Detail", options: ESCALATION_DETAIL_OPTIONS, mapChoice: (v) => v === "No special Note" ? "3tLevel esclation" : `3tLevel esclation ${v}` };
+                        }
+                        if (meta.escalationType === "Fixnet" && isBlank(draft.comment)) {
+                            return { kind: "preset", patch: { comment: "Fixnet esclation" } };
+                        }
+                    }
+                }
+
+                if (meta.mode === "Generic") {
+                    if (isBlank(draft.SignalStatus)) return { kind: "choice", key: "SignalStatus", title: "Signal Status", options: SIGNAL_OPTIONS };
+                    if (isBlank(draft.LedStatus)) return { kind: "choice", key: "LedStatus", title: "LED Status", options: LED_OPTIONS };
+                    if (isBlank(draft.comment)) return { kind: "choice-search", key: "comment", title: "Comment", options: COMMENT_OPTIONS };
+                }
+            }
+
+            // Fallback generic fill for any remaining visible core fields
+            if (isBlank(draft.SignalStatus)) return { kind: "choice", key: "SignalStatus", title: "Signal Status", options: SIGNAL_OPTIONS };
+            if (isBlank(draft.LedStatus)) return { kind: "choice", key: "LedStatus", title: "LED Status", options: LED_OPTIONS };
+            if (isBlank(draft.comment)) return { kind: "choice-search", key: "comment", title: "Comment", options: COMMENT_OPTIONS };
+
+            return null;
+        };
+
+        while (true) {
+            const step = nextStep();
+            if (!step) break;
+
+            if (step.kind === "preset") {
+                apply(step.patch);
+                continue;
+            }
+
+            if (step.kind === "input") {
+                const value = await requireInput(step.title, step.placeholder || "", draft[step.key] || "");
+                if (!value) return false;
+                apply({ [step.key]: value });
+                continue;
+            }
+
+            if (step.kind === "choice") {
+                const value = await askChoice(step.title, optionsOf(step.options));
+                if (!value) return false;
+                apply({ [step.key]: step.mapChoice ? step.mapChoice(value) : value });
+
+                if (step.key === "treatmentStep" && value === "Box Swap") {
+                    // Reset branch-sensitive values to allow deterministic flow decisions.
+                    meta.boxSwapStatus = null;
+                    meta.boxSwapSerialImpact = null;
+                }
+                continue;
+            }
+
+            if (step.kind === "choice-search") {
+                const value = await askChoice(
+                    step.title,
+                    step.options.map((v) => ({ label: v, value: v })),
+                    { searchable: true, searchPlaceholder: `Search ${step.title.toLowerCase()}...` }
+                );
+                if (!value) return false;
+                apply({ [step.key]: value });
+                continue;
+            }
+
+            if (step.kind === "choice-meta") {
+                const value = await askChoice(step.title, optionsOf(step.options));
+                if (!value) return false;
+                meta = { ...meta, [step.key]: value };
+
+                if (step.key === "boxSwapStatus") {
+                    if (value === "Old") apply({ SignalStatus: "Lost", LedStatus: "Fiber Off", comment: "Box swap" });
+                    if (value === "New") apply({ SignalStatus: "Never", LedStatus: "Fiber Off", comment: "Box swap" });
+                    if (value === "Partner incriminate") apply({ SignalStatus: "Lost", LedStatus: "Fiber Off", comment: "FLL Partner Incriminate Box" });
+                    if (value === "Booting") apply({ SignalStatus: "Lost", LedStatus: "Fiber Off" });
+                }
+
+                if (step.key === "boxSwapSerialImpact") {
+                    apply({ comment: value === "Impacted Serial" ? "Box swap after Power supply change" : "Box swap" });
+                }
+                continue;
+            }
+
+            if (step.kind === "partner-mode") {
+                const partnerMode = await askChoice("Partner", [
+                    { label: "Skip (empty)", value: "__skip__" },
+                    { label: "ALO", value: "ALO" },
+                    { label: "Search partner", value: "__search__" }
+                ]);
+                if (!partnerMode) return false;
+                if (partnerMode === "__search__") {
+                    const selectedPartner = await askPartnerViaSearch();
+                    if (!selectedPartner) return false;
+                    apply({ partner: selectedPartner });
+                } else if (partnerMode !== "__skip__") {
+                    apply({ partner: partnerMode });
+                }
+                continue;
             }
         }
 
