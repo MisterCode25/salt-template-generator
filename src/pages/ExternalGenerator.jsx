@@ -81,7 +81,7 @@ function PromptModal({ state, onCancel, onSubmit }) {
 
     if (state.type === "input") {
         return (
-            <Modal onClose={onCancel} ariaLabel={state.title}>
+            <Modal onClose={onCancel} ariaLabel={state.title} dialogClassName="popup-box external-prompt-modal">
                 <div className="popup-header">
                     <h2>{state.title}</h2>
                 </div>
@@ -116,7 +116,11 @@ function PromptModal({ state, onCancel, onSubmit }) {
         : options;
 
     return (
-        <Modal onClose={onCancel} ariaLabel={state.title} dialogClassName="popup-box external-prompt-modal">
+        <Modal
+            onClose={onCancel}
+            ariaLabel={state.title}
+            dialogClassName={`popup-box external-prompt-modal${state.searchable ? " external-prompt-modal--search" : " external-prompt-modal--choices"}`}
+        >
             <div className="popup-header">
                 <h2>{state.title}</h2>
             </div>
@@ -135,7 +139,7 @@ function PromptModal({ state, onCancel, onSubmit }) {
                     <button
                         key={`${option.value}_${option.label}`}
                         type="button"
-                        className="partners-list-item"
+                        className="partners-list-item primary-btn template-type-email external-prompt-option-btn"
                         onClick={() => onSubmit(option.value)}
                     >
                         <strong>{option.label}</strong>
@@ -172,6 +176,7 @@ export default function ExternalGenerator() {
     const promptResolverRef = useRef(null);
     const hasMountedRef = useRef(false);
     const externalIdFieldRef = useRef(null);
+    const fieldsRef = useRef(fields);
 
     useEffect(() => {
         const tick = () => {
@@ -212,6 +217,10 @@ export default function ExternalGenerator() {
     }, []);
 
     const generatedCode = useMemo(() => buildExternalCode(fields), [fields]);
+
+    useEffect(() => {
+        fieldsRef.current = fields;
+    }, [fields]);
 
     useEffect(() => {
         setExternalIdFieldValue(generatedCode);
@@ -298,6 +307,7 @@ export default function ExternalGenerator() {
         let draft = { ...initialFields };
         let meta = {
             mode: null,
+            flaggingConfirmed: false,
             boxSwapStatus: null,
             escalationType: null,
             escalationCaseType: null,
@@ -310,6 +320,9 @@ export default function ExternalGenerator() {
         };
 
         const nextStep = () => {
+            if (!meta.flaggingConfirmed) {
+                return { kind: "choice", key: "flagging", title: "Flagging", options: FLAGGING_OPTIONS, markMeta: "flaggingConfirmed" };
+            }
             if (isBlank(draft.soTicket)) {
                 return { kind: "input", key: "soTicket", title: "SO Ticket", placeholder: "e.g. 31436062" };
             }
@@ -350,9 +363,6 @@ export default function ExternalGenerator() {
                 }
                 if (!isBlank(draft.partner) && isBlank(draft.partnerTicketNumber)) {
                     return { kind: "input", key: "partnerTicketNumber", title: "Partner Ticket Number", placeholder: "e.g. 12345678" };
-                }
-                if (isBlank(draft.comment)) {
-                    return { kind: "choice-search", key: "comment", title: "Comment", options: COMMENT_OPTIONS };
                 }
             }
 
@@ -445,6 +455,9 @@ export default function ExternalGenerator() {
                 const value = await askChoice(step.title, optionsOf(step.options));
                 if (!value) return false;
                 apply({ [step.key]: step.mapChoice ? step.mapChoice(value) : value });
+                if (step.markMeta) {
+                    meta = { ...meta, [step.markMeta]: true };
+                }
 
                 if (step.key === "treatmentStep" && value === "Box Swap") {
                     // Reset branch-sensitive values to allow deterministic flow decisions.
@@ -484,19 +497,9 @@ export default function ExternalGenerator() {
             }
 
             if (step.kind === "partner-mode") {
-                const partnerMode = await askChoice("Partner", [
-                    { label: "Skip (empty)", value: "__skip__" },
-                    { label: "ALO", value: "ALO" },
-                    { label: "Search partner", value: "__search__" }
-                ]);
-                if (!partnerMode) return false;
-                if (partnerMode === "__search__") {
-                    const selectedPartner = await askPartnerViaSearch();
-                    if (!selectedPartner) return false;
-                    apply({ partner: selectedPartner });
-                } else if (partnerMode !== "__skip__") {
-                    apply({ partner: partnerMode });
-                }
+                const selectedPartner = await askPartnerViaSearch();
+                if (!selectedPartner) return false;
+                apply({ partner: selectedPartner });
                 continue;
             }
         }
@@ -518,11 +521,8 @@ export default function ExternalGenerator() {
                 }
                 return;
             }
-            let computedNext = null;
-            setFields((prev) => {
-                computedNext = mergeExternalFields(prev, result.fields);
-                return computedNext;
-            });
+            const computedNext = mergeExternalFields(fieldsRef.current, result.fields);
+            setFields(computedNext);
             if (computedNext) {
                 const nextErrors = {};
                 Object.entries(computedNext).forEach(([key, value]) => {
@@ -558,7 +558,7 @@ export default function ExternalGenerator() {
             showToast("Flagging manquant", "warning");
             return;
         }
-        await copyText(generatedCode, { message: "External ID generated & copied", variant: "info" });
+        showToast("External ID généré", "info");
     };
 
     const fillFromExternalIdValue = (value) => {
