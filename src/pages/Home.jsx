@@ -620,7 +620,7 @@ export default function Home() {
 
             {settingsOpen && (
                 <div className="popup" onClick={(e) => { if (e.target === e.currentTarget) setSettingsOpen(false); }}>
-                    <div className="popup-box popup-box--wide" onClick={(e) => e.stopPropagation()}>
+                    <div className="popup-box settings-modal" onClick={(e) => e.stopPropagation()}>
                         <Settings embedded onClose={() => setSettingsOpen(false)} />
                     </div>
                 </div>
@@ -628,7 +628,7 @@ export default function Home() {
 
             {manageTemplatesOpen && (
                 <div className="popup" onClick={(e) => { if (e.target === e.currentTarget) setManageTemplatesOpen(false); }}>
-                    <div className="popup-box popup-box--wide" onClick={(e) => e.stopPropagation()}>
+                    <div className="popup-box manage-templates-modal" onClick={(e) => e.stopPropagation()}>
                         <ManageTemplates
                             embedded
                             onClose={() => setManageTemplatesOpen(false)}
