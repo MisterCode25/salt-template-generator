@@ -6,7 +6,6 @@ import {
     EXTERNAL_DEFAULT_FIELDS,
     EXTERNAL_GENERATOR_PARTNERS,
     buildExternalCode,
-    clearExternalFieldsExceptDate,
     formatDateForInput,
     mergeExternalFields,
     parseExternalId,
@@ -35,19 +34,6 @@ const COMMENT_OPTIONS = [
     "Need Pictures (OTO) Email and SMS send",
     "3t Level escalation",
     "Box now online, issue solved"
-];
-const MISSING_INFO_COMMENT_OPTIONS = [
-    "Pictures OTO and RX|TX values, Mail and SMS send",
-    "picture ( OTO number and plug ), Mail and SMS send",
-    "Pictures ( OTO Plug inside ), Mail and SMS send",
-    "RX|TX, Mail and SMS send",
-    "OTO @Beep, Mail and SMS send"
-];
-const ESCALATION_DETAIL_OPTIONS = [
-    "Partner mean no fault clearence",
-    "Fiber Blinking white|Red Huawei",
-    "Internet Led Off",
-    " "
 ];
 
 const FIELD_PLACEHOLDERS = {
@@ -155,6 +141,10 @@ function optionsOf(values) {
     return values.map((value) => ({ label: value, value }));
 }
 
+function isBlank(value) {
+    return String(value ?? "").trim() === "";
+}
+
 export default function ExternalGenerator() {
     const navigate = useNavigate();
     const [fields, setFields] = useState(() => ({
@@ -163,6 +153,7 @@ export default function ExternalGenerator() {
         data: formatDateForInput(new Date())
     }));
     const [externalIdFieldValue, setExternalIdFieldValue] = useState("");
+    const [vtiEmptyFieldErrors, setVtiEmptyFieldErrors] = useState({});
     const [clipboardState, setClipboardState] = useState("unknown");
     const [promptState, setPromptState] = useState(null);
     const promptResolverRef = useRef(null);
@@ -236,6 +227,12 @@ export default function ExternalGenerator() {
 
     const setField = (key, value) => {
         setFields((prev) => ({ ...prev, [key]: value }));
+        setVtiEmptyFieldErrors((prev) => {
+            if (!prev[key]) return prev;
+            const next = { ...prev };
+            delete next[key];
+            return next;
+        });
     };
 
     const patchFields = (patch) => {
@@ -284,6 +281,75 @@ export default function ExternalGenerator() {
         }
     };
 
+    const runPostVtiCompletionFlow = async (initialFields) => {
+        let draft = { ...initialFields };
+        const apply = (patch) => {
+            draft = { ...draft, ...patch };
+            patchFields(patch);
+        };
+
+        if (isBlank(draft.soTicket)) {
+            const soTicket = await requireInput("SO Ticket", "e.g. 31436062", "");
+            if (!soTicket) return false;
+            apply({ soTicket });
+        }
+
+        if (isBlank(draft.SignalStatus)) {
+            const signalValue = await askSignal("Signal Status");
+            if (!signalValue) return false;
+            apply({ SignalStatus: signalValue });
+        }
+
+        if (isBlank(draft.LedStatus)) {
+            const ledValue = await askLed("LED Status");
+            if (!ledValue) return false;
+            apply({ LedStatus: ledValue });
+        }
+
+        if (isBlank(draft.treatmentStep)) {
+            const treatment = await askChoice("Treatment Step", optionsOf(TREATMENT_STEP_OPTIONS));
+            if (!treatment) return false;
+            apply({ treatmentStep: treatment });
+        }
+
+        if (draft.treatmentStep === "FLL Ticket" && isBlank(draft.partner)) {
+            const partnerMode = await askChoice("Partner", [
+                { label: "Skip (empty)", value: "__skip__" },
+                { label: "ALO", value: "ALO" },
+                { label: "Search partner", value: "__search__" }
+            ]);
+            if (!partnerMode) return false;
+            if (partnerMode === "__search__") {
+                const selectedPartner = await askPartnerViaSearch();
+                if (!selectedPartner) return false;
+                apply({ partner: selectedPartner });
+            } else if (partnerMode !== "__skip__") {
+                apply({ partner: partnerMode });
+            }
+        }
+
+        if (!isBlank(draft.partner) && isBlank(draft.partnerTicketNumber)) {
+            const partnerTicketNumber = await requireInput("Partner Ticket Number", "e.g. 12345678", "");
+            if (!partnerTicketNumber) return false;
+            apply({ partnerTicketNumber });
+        }
+
+        if (isBlank(draft.comment)) {
+            const baseComments = COMMENT_OPTIONS.filter(Boolean);
+            const commentChoice = await askChoice("Comment", [
+                { label: "Skip (empty)", value: "__skip__" },
+                ...baseComments.map((c) => ({ label: c, value: c }))
+            ], { searchable: true, searchPlaceholder: "Search comment..." });
+            if (!commentChoice) return false;
+            if (commentChoice !== "__skip__") {
+                apply({ comment: commentChoice });
+            }
+        }
+
+        await generateExternalId();
+        return true;
+    };
+
     const parseClipboardVti = async () => {
         try {
             const raw = await navigator.clipboard.readText();
@@ -297,7 +363,24 @@ export default function ExternalGenerator() {
                 }
                 return;
             }
-            patchFields(result.fields);
+            let computedNext = null;
+            setFields((prev) => {
+                computedNext = mergeExternalFields(prev, result.fields);
+                return computedNext;
+            });
+            if (computedNext) {
+                const nextErrors = {};
+                Object.entries(computedNext).forEach(([key, value]) => {
+                    if (key === "data") return;
+                    const text = String(value ?? "").trim();
+                    if (!text) nextErrors[key] = true;
+                });
+                setVtiEmptyFieldErrors(nextErrors);
+                const completed = await runPostVtiCompletionFlow(computedNext);
+                if (completed) {
+                    setVtiEmptyFieldErrors({});
+                }
+            }
             showToast("Données VTI importées depuis le clipboard", "info");
         } catch (error) {
             console.error(error);
@@ -323,15 +406,6 @@ export default function ExternalGenerator() {
         await copyText(generatedCode, { message: "External ID generated & copied", variant: "info" });
     };
 
-    const clearPartnerFields = () => {
-        patchFields({ partner: "", partnerTicketNumber: "" });
-    };
-
-    const clearAllExceptDate = () => {
-        setFields((prev) => clearExternalFieldsExceptDate(prev));
-        showToast("All fields cleared (except date)", "warning");
-    };
-
     const fillFromExternalIdValue = (value) => {
         const parsed = parseExternalId(value);
         if (!parsed.ok) {
@@ -352,14 +426,6 @@ export default function ExternalGenerator() {
         return fillFromExternalIdValue(value);
     };
 
-    const askSoTicket = async () => {
-        return requireInput("SO Ticket", "e.g. 31436062", fields.soTicket);
-    };
-
-    const askPartnerTicket = async () => {
-        return requireInput("Partner Ticket Number", "e.g. 12345678", "");
-    };
-
     const askSignal = async (title = "Select Signal Status", escalation = false) => {
         const values = escalation ? SIGNAL_OPTIONS_ESCALATION : SIGNAL_OPTIONS;
         return askChoice(title, optionsOf(values));
@@ -375,189 +441,12 @@ export default function ExternalGenerator() {
         );
     };
 
-    const applyPowerSupply = async () => {
-        clearPartnerFields();
-        const soTicket = await askSoTicket();
-        if (!soTicket) return;
-        patchFields({
-            soTicket,
-            SignalStatus: "Lost",
-            LedStatus: "Fiber Off",
-            treatmentStep: "Other",
-            comment: "Power cable"
-        });
-    };
-
-    const partnerTicketFlow = async () => {
-        clearPartnerFields();
-        patchFields({ comment: " " });
-
-        const soTicket = await askSoTicket();
-        if (!soTicket) return;
-        const signalValue = await askSignal();
-        if (!signalValue) return;
-        const ledValue = await askLed();
-        if (!ledValue) return;
-        const partnerType = await askChoice("Partner Type", [
-            { label: "ALO", value: "ALO" },
-            { label: "ALEX / Search partner", value: "ALEX" }
-        ]);
-        if (!partnerType) return;
-
-        let partnerValue = "ALO";
-        if (partnerType === "ALEX") {
-            const selectedPartner = await askPartnerViaSearch();
-            if (!selectedPartner) return;
-            partnerValue = selectedPartner;
-        }
-        const partnerTicketNumber = await askPartnerTicket();
-        if (!partnerTicketNumber) return;
-
-        patchFields({
-            soTicket,
-            SignalStatus: signalValue,
-            LedStatus: ledValue,
-            treatmentStep: "FLL Ticket",
-            partner: partnerValue,
-            partnerTicketNumber,
-            comment: " "
-        });
-    };
-
-    const missingInfoFlow = async () => {
-        clearPartnerFields();
-        const soTicket = await askSoTicket();
-        if (!soTicket) return;
-        const signalValue = await askSignal("Signal Status");
-        if (!signalValue) return;
-        const ledValue = await askLed("LED Status");
-        if (!ledValue) return;
-        const comment = await askChoice("Missing Info Comment", optionsOf(MISSING_INFO_COMMENT_OPTIONS));
-        if (!comment) return;
-
-        patchFields({
-            soTicket,
-            SignalStatus: signalValue,
-            LedStatus: ledValue,
-            treatmentStep: "Other",
-            comment
-        });
-    };
-
-    const boxSwapFlow = async () => {
-        const soTicket = await askSoTicket();
-        if (!soTicket) return;
-        clearPartnerFields();
-        const choice = await askChoice("Select Box Status", [
-            { label: "Old (Lost/Off)", value: "Old" },
-            { label: "New (Never/Off)", value: "New" },
-            { label: "Partner incriminate", value: "PartnerIncriminate" },
-            { label: "Booting", value: "Booting" }
-        ]);
-        if (!choice) return;
-
-        const basePatch = {
-            soTicket,
-            treatmentStep: "Box Swap"
-        };
-
-        if (choice === "Old") {
-            patchFields({ ...basePatch, SignalStatus: "Lost", LedStatus: "Fiber Off", comment: "Box swap" });
-            return;
-        }
-        if (choice === "New") {
-            patchFields({ ...basePatch, SignalStatus: "Never", LedStatus: "Fiber Off", comment: "Box swap" });
-            return;
-        }
-        if (choice === "PartnerIncriminate") {
-            patchFields({ ...basePatch, SignalStatus: "Lost", LedStatus: "Fiber Off", comment: "FLL Partner Incriminate Box" });
-            return;
-        }
-        const serialChoice = await askChoice("Select Serial Impact", [
-            { label: "Impacted Serial", value: "Impacted" },
-            { label: "Not impacted Serial", value: "NotImpacted" }
-        ]);
-        if (!serialChoice) return;
-        patchFields({
-            ...basePatch,
-            SignalStatus: "Lost",
-            LedStatus: "Fiber Off",
-            comment: serialChoice === "Impacted" ? "Box swap after Power supply change" : "Box swap"
-        });
-    };
-
-    const askEscalationType = async () => askChoice("Select Escalation Type", [
-        { label: "3tLevel", value: "3tLevel" },
-        { label: "Fixnet", value: "Fixnet" }
-    ]);
-
-    const ask3tLevelComment = async () => {
-        const detail = await askChoice("Select 3tLevel Detail", optionsOf(ESCALATION_DETAIL_OPTIONS));
-        if (!detail) return null;
-        return detail === " " ? "3tLevel esclation" : `3tLevel esclation ${detail}`;
-    };
-
-    const escalationFlow = async () => {
-        const soTicket = await askSoTicket();
-        if (!soTicket) return;
-        clearPartnerFields();
-        patchFields({ soTicket, comment: " " });
-
-        const caseType = await askChoice("Select Case Type", [
-            { label: "Existing External ID", value: "Existing" },
-            { label: "New Case", value: "New" }
-        ]);
-        if (!caseType) return;
-
-        if (caseType === "Existing") {
-            const ok = await fillFromExternalId();
-            if (!ok) return;
-            patchFields({ soTicket });
-            const escType = await askEscalationType();
-            if (!escType) return;
-            if (escType === "3tLevel") {
-                const comment = await ask3tLevelComment();
-                if (!comment) return;
-                patchFields({ treatmentStep: "Other", comment });
-            } else {
-                patchFields({ treatmentStep: "Other", comment: "Fixnet esclation" });
-            }
-            return;
-        }
-
-        const escType = await askEscalationType();
-        if (!escType) return;
-        const signalValue = await askSignal("Select Signal Status", true);
-        if (!signalValue) return;
-        const ledValue = await askLed("Select LED Status");
-        if (!ledValue) return;
-
-        if (escType === "3tLevel") {
-            const comment = await ask3tLevelComment();
-            if (!comment) return;
-            patchFields({
-                soTicket,
-                SignalStatus: signalValue,
-                LedStatus: ledValue,
-                treatmentStep: "Other",
-                comment
-            });
-            return;
-        }
-        patchFields({
-            soTicket,
-            SignalStatus: signalValue,
-            LedStatus: ledValue,
-            treatmentStep: "Other",
-            comment: "Fixnet esclation"
-        });
-    };
-
     const InputField = ({ id, label, list, type = "text" }) => (
         <div className="form-field">
             <label htmlFor={`ext-${id}`}>{label}</label>
             <input
                 id={`ext-${id}`}
+                className={vtiEmptyFieldErrors[id] ? "input-error" : ""}
                 type={type}
                 list={list ? `${id}-options` : undefined}
                 value={fields[id]}
@@ -645,19 +534,6 @@ export default function ExternalGenerator() {
                             </div>
                         </section>
 
-                        <aside className="popup-card external-generator-actions-card">
-                            <div className="external-generator-block">
-                                <h3>Quick Actions</h3>
-                                <div className="external-actions-grid">
-                                    <button type="button" className="secondary-btn" onClick={clearAllExceptDate}>Clear All</button>
-                                    <button type="button" className="secondary-btn" onClick={applyPowerSupply}>Power supply</button>
-                                    <button type="button" className="secondary-btn" onClick={partnerTicketFlow}>Partner ticket</button>
-                                    <button type="button" className="secondary-btn" onClick={boxSwapFlow}>Box swap</button>
-                                    <button type="button" className="secondary-btn" onClick={escalationFlow}>Escalation</button>
-                                    <button type="button" className="secondary-btn" onClick={missingInfoFlow}>Missing info</button>
-                                </div>
-                            </div>
-                        </aside>
                     </div>
                 </div>
             </div>

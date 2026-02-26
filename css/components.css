@@ -2681,7 +2681,6 @@ textarea:focus {
 }
 
 .external-generator-form.popup-card,
-.external-generator-actions-card.popup-card,
 .external-generator-externalid-card.popup-card {
     background: var(--ext-surface);
     border: 1px solid var(--ext-line);
@@ -2706,53 +2705,11 @@ textarea:focus {
     color: #d9ecff;
 }
 
-.external-generator-actions-card .external-generator-block h3 {
-    color: #ffe5a6;
-}
-
-.external-actions-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 8px;
-}
-
 .external-generator-right-col {
     display: flex;
     flex-direction: column;
     gap: 16px;
     min-width: 0;
-}
-
-.external-generator-actions-card .secondary-btn,
-.external-generator-actions-card .primary-btn {
-    width: 100%;
-}
-
-.external-generator-actions-card {
-    width: min(320px, 100%);
-    justify-self: start;
-    align-self: start;
-}
-
-.external-generator-actions-card .secondary-btn {
-    background: rgba(20, 28, 46, 0.9);
-    border: 1px solid rgba(114, 154, 255, 0.22);
-    color: #eaf1ff;
-}
-
-.external-generator-actions-card .secondary-btn:hover {
-    background: rgba(28, 40, 66, 0.96);
-    border-color: rgba(131, 170, 255, 0.46);
-    box-shadow: 0 6px 14px rgba(0,0,0,0.22);
-}
-
-.external-generator-actions-card .external-actions-grid > button:nth-child(1) {
-    border-color: rgba(255, 191, 71, 0.36);
-    box-shadow: inset 0 0 0 1px rgba(255, 191, 71, 0.06);
-}
-
-.external-generator-actions-card .external-actions-grid > button:nth-child(2) {
-    border-color: rgba(39, 211, 255, 0.34);
 }
 
 .external-generator-externalid-card {
