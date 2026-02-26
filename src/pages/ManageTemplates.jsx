@@ -398,7 +398,7 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
     return (
         <Modal
             onClose={onClose}
-            dialogClassName="popup-box popup-box--wide template-config-modal"
+            dialogClassName="popup-box popup-box--wide template-config-modal template-config-modal--xl"
             ariaLabel={isEdit ? "Edit template" : "New template"}
             disableEscapeClose={Boolean(fullscreen)}
         >

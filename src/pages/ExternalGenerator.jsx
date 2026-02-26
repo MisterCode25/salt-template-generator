@@ -13,6 +13,7 @@ import {
 } from "../utils/externalGenerator.js";
 
 const FLAGGING_OPTIONS = ["VALID", "MINFO", "WRCAT", "UNTKT"];
+const PROMPT_BACK = "__PROMPT_BACK__";
 const SIGNAL_OPTIONS = ["Lost", "Never", "Low RX|TX "];
 const SIGNAL_OPTIONS_ESCALATION = ["Lost", "Never", "Low RX|TX", "Other"];
 const LED_OPTIONS = [
@@ -102,9 +103,14 @@ function PromptModal({ state, onCancel, onSubmit }) {
                         />
                     </div>
                 </div>
-                <div className="popup-actions">
-                    <button type="button" className="secondary-btn" onClick={onCancel}>Cancel</button>
-                    <button type="button" className="primary-btn" onClick={() => onSubmit(inputValue)}>OK</button>
+                <div className="popup-actions external-prompt-actions">
+                    <div className="external-prompt-actions__main">
+                        {state.showBack && (
+                            <button type="button" className="secondary-btn prompt-back-btn" onClick={() => onSubmit(PROMPT_BACK)}>Back</button>
+                        )}
+                        <button type="button" className="primary-btn prompt-continue-btn" onClick={() => onSubmit(inputValue)}>Continue</button>
+                    </div>
+                    <button type="button" className="secondary-btn prompt-cancel-btn" onClick={onCancel}>Cancel</button>
                 </div>
             </Modal>
         );
@@ -147,8 +153,13 @@ function PromptModal({ state, onCancel, onSubmit }) {
                 ))}
                 {filtered.length === 0 && <p className="hint">No result.</p>}
             </div>
-            <div className="popup-actions">
-                <button type="button" className="secondary-btn" onClick={onCancel}>Cancel</button>
+            <div className="popup-actions external-prompt-actions">
+                <div className="external-prompt-actions__main">
+                    {state.showBack && (
+                        <button type="button" className="secondary-btn prompt-back-btn" onClick={() => onSubmit(PROMPT_BACK)}>Back</button>
+                    )}
+                </div>
+                <button type="button" className="secondary-btn prompt-cancel-btn" onClick={onCancel}>Cancel</button>
             </div>
         </Modal>
     );
@@ -162,7 +173,7 @@ function isBlank(value) {
     return String(value ?? "").trim() === "";
 }
 
-export default function ExternalGenerator() {
+export default function ExternalGenerator({ embedded = false, onClose }) {
     const navigate = useNavigate();
     const [fields, setFields] = useState(() => ({
         ...EXTERNAL_DEFAULT_FIELDS,
@@ -170,6 +181,7 @@ export default function ExternalGenerator() {
         data: formatDateForInput(new Date())
     }));
     const [externalIdFieldValue, setExternalIdFieldValue] = useState("");
+    const [externalIdEditing, setExternalIdEditing] = useState(false);
     const [vtiEmptyFieldErrors, setVtiEmptyFieldErrors] = useState({});
     const [clipboardState, setClipboardState] = useState("unknown");
     const [promptState, setPromptState] = useState(null);
@@ -223,21 +235,15 @@ export default function ExternalGenerator() {
     }, [fields]);
 
     useEffect(() => {
-        setExternalIdFieldValue(generatedCode);
         if (!hasMountedRef.current) {
             hasMountedRef.current = true;
-            return;
         }
-        const timeout = setTimeout(async () => {
-            try {
-                await navigator.clipboard.writeText(generatedCode);
-            } catch (error) {
-                // Silent failure: clipboard may require user gesture in some contexts.
-                console.debug("Auto-copy external ID failed", error);
-            }
-        }, 120);
-        return () => clearTimeout(timeout);
-    }, [generatedCode]);
+        if (!externalIdEditing) {
+            setExternalIdFieldValue(generatedCode);
+        }
+    }, [generatedCode, externalIdEditing]);
+
+    const externalIdDisplayValue = externalIdEditing ? externalIdFieldValue : generatedCode;
 
     useEffect(() => {
         const el = externalIdFieldRef.current;
@@ -245,7 +251,7 @@ export default function ExternalGenerator() {
         el.style.height = "0px";
         const next = Math.min(Math.max(el.scrollHeight, 48), 120);
         el.style.height = `${next}px`;
-    }, [externalIdFieldValue]);
+    }, [externalIdDisplayValue]);
 
     const setField = (key, value) => {
         setFields((prev) => ({ ...prev, [key]: value }));
@@ -261,14 +267,15 @@ export default function ExternalGenerator() {
         setFields((prev) => mergeExternalFields(prev, patch));
     };
 
-    const askInput = (title, placeholder = "", initialValue = "") => {
+    const askInput = (title, placeholder = "", initialValue = "", extra = {}) => {
         return new Promise((resolve) => {
             promptResolverRef.current = resolve;
             setPromptState({
                 type: "input",
                 title,
                 placeholder,
-                initialValue
+                initialValue,
+                showBack: !!extra.showBack
             });
         });
     };
@@ -281,7 +288,8 @@ export default function ExternalGenerator() {
                 title,
                 options,
                 searchable: extra.searchable || false,
-                searchPlaceholder: extra.searchPlaceholder || ""
+                searchPlaceholder: extra.searchPlaceholder || "",
+                showBack: !!extra.showBack
             });
         });
     };
@@ -296,7 +304,7 @@ export default function ExternalGenerator() {
     const requireInput = async (title, placeholder, initialValue = "") => {
         while (true) {
             const result = await askInput(title, placeholder, initialValue);
-            if (result === null) return null;
+            if (result === null || result === PROMPT_BACK) return result;
             const cleaned = String(result).trim();
             if (cleaned) return cleaned;
             showToast("Champ requis", "error");
@@ -312,6 +320,18 @@ export default function ExternalGenerator() {
             escalationType: null,
             escalationCaseType: null,
             boxSwapSerialImpact: null
+        };
+        const history = [];
+
+        const snapshotState = () => ({
+            draft: { ...draft },
+            meta: { ...meta }
+        });
+
+        const restoreSnapshot = (snapshot) => {
+            draft = { ...snapshot.draft };
+            meta = { ...snapshot.meta };
+            setFields({ ...snapshot.draft });
         };
 
         const apply = (patch) => {
@@ -430,7 +450,9 @@ export default function ExternalGenerator() {
             // Fallback generic fill for any remaining visible core fields
             if (isBlank(draft.SignalStatus)) return { kind: "choice", key: "SignalStatus", title: "Signal Status", options: SIGNAL_OPTIONS };
             if (isBlank(draft.LedStatus)) return { kind: "choice", key: "LedStatus", title: "LED Status", options: LED_OPTIONS };
-            if (isBlank(draft.comment)) return { kind: "choice-search", key: "comment", title: "Comment", options: COMMENT_OPTIONS };
+            if (draft.treatmentStep !== "FLL Ticket" && isBlank(draft.comment)) {
+                return { kind: "choice-search", key: "comment", title: "Comment", options: COMMENT_OPTIONS };
+            }
 
             return null;
         };
@@ -445,15 +467,34 @@ export default function ExternalGenerator() {
             }
 
             if (step.kind === "input") {
-                const value = await requireInput(step.title, step.placeholder || "", draft[step.key] || "");
-                if (!value) return false;
-                apply({ [step.key]: value });
+                const before = snapshotState();
+                const value = await askInput(step.title, step.placeholder || "", draft[step.key] || "", { showBack: history.length > 0 });
+                if (value === PROMPT_BACK) {
+                    const previous = history.pop();
+                    if (previous) restoreSnapshot(previous);
+                    continue;
+                }
+                if (value === null) return false;
+                const cleaned = String(value).trim();
+                if (!cleaned) {
+                    showToast("Champ requis", "error");
+                    continue;
+                }
+                history.push(before);
+                apply({ [step.key]: cleaned });
                 continue;
             }
 
             if (step.kind === "choice") {
-                const value = await askChoice(step.title, optionsOf(step.options));
+                const before = snapshotState();
+                const value = await askChoice(step.title, optionsOf(step.options), { showBack: history.length > 0 });
+                if (value === PROMPT_BACK) {
+                    const previous = history.pop();
+                    if (previous) restoreSnapshot(previous);
+                    continue;
+                }
                 if (!value) return false;
+                history.push(before);
                 apply({ [step.key]: step.mapChoice ? step.mapChoice(value) : value });
                 if (step.markMeta) {
                     meta = { ...meta, [step.markMeta]: true };
@@ -468,19 +509,33 @@ export default function ExternalGenerator() {
             }
 
             if (step.kind === "choice-search") {
+                const before = snapshotState();
                 const value = await askChoice(
                     step.title,
                     step.options.map((v) => ({ label: v, value: v })),
-                    { searchable: true, searchPlaceholder: `Search ${step.title.toLowerCase()}...` }
+                    { searchable: true, searchPlaceholder: `Search ${step.title.toLowerCase()}...`, showBack: history.length > 0 }
                 );
+                if (value === PROMPT_BACK) {
+                    const previous = history.pop();
+                    if (previous) restoreSnapshot(previous);
+                    continue;
+                }
                 if (!value) return false;
+                history.push(before);
                 apply({ [step.key]: value });
                 continue;
             }
 
             if (step.kind === "choice-meta") {
-                const value = await askChoice(step.title, optionsOf(step.options));
+                const before = snapshotState();
+                const value = await askChoice(step.title, optionsOf(step.options), { showBack: history.length > 0 });
+                if (value === PROMPT_BACK) {
+                    const previous = history.pop();
+                    if (previous) restoreSnapshot(previous);
+                    continue;
+                }
                 if (!value) return false;
+                history.push(before);
                 meta = { ...meta, [step.key]: value };
 
                 if (step.key === "boxSwapStatus") {
@@ -497,14 +552,20 @@ export default function ExternalGenerator() {
             }
 
             if (step.kind === "partner-mode") {
+                const before = snapshotState();
                 const selectedPartner = await askPartnerViaSearch();
+                if (selectedPartner === PROMPT_BACK) {
+                    const previous = history.pop();
+                    if (previous) restoreSnapshot(previous);
+                    continue;
+                }
                 if (!selectedPartner) return false;
+                history.push(before);
                 apply({ partner: selectedPartner });
                 continue;
             }
         }
 
-        await generateExternalId();
         return true;
     };
 
@@ -552,33 +613,15 @@ export default function ExternalGenerator() {
         await copyText(generatedCode, { message: "Code copied", variant: "info" });
     };
 
-    const generateExternalId = async () => {
-        setExternalIdFieldValue(generatedCode);
-        if (!fields.flagging.trim()) {
-            showToast("Flagging manquant", "warning");
-            return;
-        }
-        showToast("External ID généré", "info");
-    };
-
-    const fillFromExternalIdValue = (value) => {
+    const fillFromExternalIdValue = (value, { silent = false } = {}) => {
         const parsed = parseExternalId(value);
         if (!parsed.ok) {
-            showToast("External ID invalide (15 segments attendus)", "error");
+            if (!silent) showToast("External ID invalide (15 segments attendus)", "error");
             return false;
         }
         patchFields(parsed.fields);
-        showToast("External ID importé", "info");
+        if (!silent) showToast("External ID importé", "info");
         return true;
-    };
-
-    const fillFromExternalId = async () => {
-        const value = externalIdFieldValue.trim();
-        if (!value) {
-            showToast("Colle un HCAMP External ID dans le champ dédié", "error");
-            return false;
-        }
-        return fillFromExternalIdValue(value);
     };
 
     const askSignal = async (title = "Select Signal Status", escalation = false) => {
@@ -592,8 +635,22 @@ export default function ExternalGenerator() {
         return askChoice(
             "Search Partner",
             EXTERNAL_GENERATOR_PARTNERS.map((p) => ({ label: p, value: p })),
-            { searchable: true, searchPlaceholder: "Type first letters (EWB, SGSW...)" }
+            { searchable: true, searchPlaceholder: "Type first letters (EWB, SGSW...)", showBack: true }
         );
+    };
+
+    const clearAllFields = () => {
+        setFields({
+            ...EXTERNAL_DEFAULT_FIELDS,
+            flagging: "VALID",
+            data: formatDateForInput(new Date())
+        });
+        setExternalIdFieldValue("");
+        setExternalIdEditing(false);
+        setVtiEmptyFieldErrors({});
+        setPromptState(null);
+        promptResolverRef.current = null;
+        showToast("Champs effacés", "info");
     };
 
     const InputField = ({ id, label, list, type = "text" }) => (
@@ -616,27 +673,20 @@ export default function ExternalGenerator() {
         </div>
     );
 
-    return (
-        <main className="page-container">
-            <div className="manage-card external-generator-page">
+    const pageContent = (
+            <div className={`manage-card external-generator-page${embedded ? " external-generator-page--embedded" : ""}`}>
                 <div className="variant-editor-head" style={{ alignItems: "center" }}>
                     <div>
                         <p className="eyebrow">HCAMP</p>
                         <h2>External Generator</h2>
                     </div>
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                        <button type="button" className="secondary-btn" onClick={() => navigate("/")}>Back</button>
+                        {embedded ? (
+                            <button type="button" className="secondary-btn" onClick={onClose}>Close</button>
+                        ) : (
+                            <button type="button" className="secondary-btn" onClick={() => navigate("/")}>Back</button>
+                        )}
                     </div>
-                </div>
-
-                <div className="external-generator-top-actions">
-                    <button
-                        type="button"
-                        className={`primary-btn clipboard-parse-btn is-${clipboardState}`}
-                        onClick={parseClipboardVti}
-                    >
-                        Paste & Parse VTI (Clipboard)
-                    </button>
                 </div>
 
                 <div className="external-generator-layout">
@@ -661,29 +711,50 @@ export default function ExternalGenerator() {
                     </section>
 
                     <div className="external-generator-right-col">
+                        <section className="popup-card external-generator-actions-card">
+                            <div className="external-generator-top-actions">
+                                <button
+                                    type="button"
+                                    className={`primary-btn clipboard-parse-btn is-${clipboardState}`}
+                                    onClick={parseClipboardVti}
+                                    disabled={clipboardState !== "ready"}
+                                >
+                                    Paste & Parse VTI (Clipboard)
+                                </button>
+                                <button
+                                    type="button"
+                                    className="secondary-btn"
+                                    onClick={clearAllFields}
+                                >
+                                    Clear All
+                                </button>
+                            </div>
+                        </section>
+
                         <section className="popup-card external-generator-externalid-card">
                             <div className="external-generator-block">
                             <h3>HCAMP External ID</h3>
                             <textarea
                                 ref={externalIdFieldRef}
                                 className="external-id-field"
-                                value={externalIdFieldValue}
+                                value={externalIdDisplayValue}
                                 placeholder="HCAMP External ID (15 segments séparés par //)"
-                                onChange={(e) => setExternalIdFieldValue(e.target.value)}
-                                onPaste={(e) => {
-                                    const pasted = e.clipboardData?.getData("text") ?? "";
-                                    if (!pasted) return;
-                                    setTimeout(() => {
-                                        fillFromExternalIdValue(pasted);
-                                    }, 0);
+                                onFocus={() => setExternalIdEditing(true)}
+                                onBlur={() => {
+                                    setExternalIdEditing(false);
+                                    setExternalIdFieldValue(generatedCode);
+                                }}
+                                onChange={(e) => {
+                                    const nextValue = e.target.value;
+                                    setExternalIdFieldValue(nextValue);
+                                    if (nextValue.trim()) {
+                                        fillFromExternalIdValue(nextValue, { silent: true });
+                                    }
                                 }}
                             />
                             <div className="popup-actions" style={{ marginTop: 10 }}>
-                                <button type="button" className="secondary-btn" onClick={fillFromExternalId}>
-                                    Lire / Remplir depuis le champ
-                                </button>
-                                <button type="button" className="primary-btn" onClick={generateExternalId}>
-                                    Générer
+                                <button type="button" className="primary-btn" onClick={copyCode}>
+                                    Copy
                                 </button>
                             </div>
                             </div>
@@ -692,12 +763,16 @@ export default function ExternalGenerator() {
                     </div>
                 </div>
             </div>
+    );
 
+    return (
+        <>
+            {embedded ? pageContent : <main className="page-container">{pageContent}</main>}
             <PromptModal
                 state={promptState}
                 onCancel={() => closePrompt(null)}
                 onSubmit={(value) => closePrompt(value)}
             />
-        </main>
+        </>
     );
 }

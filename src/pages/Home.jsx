@@ -10,6 +10,8 @@ import { loadPartners } from "../services/partnersService.js";
 import { partnerMatchesQuery } from "../utils/partnerSearch.js";
 import Modal from "../components/Modal.jsx";
 import Settings from "./Settings.jsx";
+import ExternalGenerator from "./ExternalGenerator.jsx";
+import ManageTemplates from "./ManageTemplates.jsx";
 
 function DataInputs({
     tokens,
@@ -299,6 +301,9 @@ export default function Home() {
     const [theme, setTheme] = useState(() => getInitialTheme());
     const [partnersOpen, setPartnersOpen] = useState(false);
     const [settingsOpen, setSettingsOpen] = useState(false);
+    const [externalGeneratorOpen, setExternalGeneratorOpen] = useState(false);
+    const [externalGeneratorClosing, setExternalGeneratorClosing] = useState(false);
+    const [manageTemplatesOpen, setManageTemplatesOpen] = useState(false);
 
     useEffect(() => {
         loadTokens().then(setTokens);
@@ -362,6 +367,19 @@ export default function Home() {
         document.addEventListener("keydown", onKey);
         return () => document.removeEventListener("keydown", onKey);
     }, [helpOpen]);
+
+    const openExternalGenerator = () => {
+        setExternalGeneratorClosing(false);
+        setExternalGeneratorOpen(true);
+    };
+
+    const closeExternalGenerator = () => {
+        setExternalGeneratorClosing(true);
+        window.setTimeout(() => {
+            setExternalGeneratorOpen(false);
+            setExternalGeneratorClosing(false);
+        }, 220);
+    };
 
     const getTextByLang = (model, langCode) => {
         switch (langCode) {
@@ -512,6 +530,13 @@ export default function Home() {
                     )}
                 </div>
                 <nav className="top-menu">
+                    <button
+                        type="button"
+                        className="secondary-btn external-generator-open-btn"
+                        onClick={openExternalGenerator}
+                    >
+                        External Generator
+                    </button>
                     <div className="dropdown options-dropdown">
                         <button
                             type="button"
@@ -526,8 +551,7 @@ export default function Home() {
                             <div className="dropdown-menu is-open" role="menu">
                                 <div className="dropdown-section">
                                     <div className="dropdown-title">Management</div>
-                                    <button type="button" role="menuitem" onClick={() => { navigate("/templates"); setDropdownOpen(false); }} className="dropdown-reset">Manage templates</button>
-                                    <button type="button" role="menuitem" onClick={() => { navigate("/external-generator"); setDropdownOpen(false); }} className="dropdown-reset">External Generator</button>
+                                    <button type="button" role="menuitem" onClick={() => { setManageTemplatesOpen(true); setDropdownOpen(false); }} className="dropdown-reset">Manage templates</button>
                                     <button type="button" role="menuitem" onClick={() => { setSettingsOpen(true); setDropdownOpen(false); }} className="dropdown-reset">Settings</button>
                                     <button type="button" role="menuitem" onClick={() => { setPartnersOpen(true); setDropdownOpen(false); }} className="dropdown-reset">Partenaires</button>
                                 </div>
@@ -686,6 +710,30 @@ export default function Home() {
             {settingsOpen && (
                 <Modal onClose={() => setSettingsOpen(false)} dialogClassName="popup-box settings-modal" ariaLabel="Settings">
                     <Settings embedded onClose={() => setSettingsOpen(false)} />
+                </Modal>
+            )}
+
+            {manageTemplatesOpen && (
+                <Modal onClose={() => setManageTemplatesOpen(false)} dialogClassName="popup-box manage-templates-modal" ariaLabel="Manage Templates">
+                    <ManageTemplates
+                        embedded
+                        onClose={() => setManageTemplatesOpen(false)}
+                        onNavigateTokens={() => {
+                            setManageTemplatesOpen(false);
+                            navigate("/tokens");
+                        }}
+                    />
+                </Modal>
+            )}
+
+            {externalGeneratorOpen && (
+                <Modal
+                    onClose={closeExternalGenerator}
+                    overlayClassName={`popup external-generator-overlay${externalGeneratorClosing ? " is-closing" : ""}`}
+                    dialogClassName={`popup-box external-generator-overlay-box${externalGeneratorClosing ? " is-closing" : ""}`}
+                    ariaLabel="External Generator"
+                >
+                    <ExternalGenerator embedded onClose={closeExternalGenerator} />
                 </Modal>
             )}
 
