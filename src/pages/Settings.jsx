@@ -5,6 +5,8 @@ import { loadTemplates, saveTemplates } from "../services/templateService.js";
 import { saveJSON } from "../services/storageService.js";
 import { buildConfigPayload, validateImportedConfig } from "../services/configService.js";
 import { showToast } from "../services/clipboardService.js";
+import Modal from "../components/Modal.jsx";
+import ConfirmDialog from "../components/ConfirmDialog.jsx";
 
 export default function Settings({ embedded = false, onClose = null }) {
     const navigate = useNavigate();
@@ -12,13 +14,22 @@ export default function Settings({ embedded = false, onClose = null }) {
     const [tokens, setTokens] = useState([]);
     const [models, setModels] = useState([]);
     const [configName, setConfigName] = useState(localStorage.getItem("local_configName") || "No configuration");
+    const [confirmReset, setConfirmReset] = useState(false);
+    const [exportNameOpen, setExportNameOpen] = useState(false);
+    const [exportNameValue, setExportNameValue] = useState("");
     useEffect(() => {
         loadTokens().then(setTokens);
         loadTemplates().then(setModels);
     }, []);
 
-    const exportConfig = async () => {
-        const nextName = prompt("Configuration name", configName) || configName;
+    const startExport = () => {
+        setExportNameValue(configName);
+        setExportNameOpen(true);
+    };
+
+    const doExport = () => {
+        const nextName = exportNameValue.trim() || configName;
+        setExportNameOpen(false);
         setConfigName(nextName);
         localStorage.setItem("local_configName", nextName);
         const payload = buildConfigPayload(nextName, tokens, models);
@@ -60,8 +71,10 @@ export default function Settings({ embedded = false, onClose = null }) {
         }
     };
 
+    const triggerReset = () => setConfirmReset(true);
+
     const resetStorage = async () => {
-        if (!confirm("Reset all stored data?")) return;
+        setConfirmReset(false);
         const keysToDelete = [];
         const appScopedLegacyKeys = new Set(["tokens", "models", "theme_pref"]);
         for (let i = 0; i < localStorage.length; i++) {
@@ -90,7 +103,7 @@ export default function Settings({ embedded = false, onClose = null }) {
                 onChange={handleFile}
             />
             <div className="manage-card">
-                <div className="variant-editor-head" style={{ alignItems: "center" }}>
+                <div className="variant-editor-head">
                     <div>
                         <p className="eyebrow">App</p>
                         <h2>Settings <span className="settings-version-tag">V2.5</span></h2>
@@ -106,25 +119,59 @@ export default function Settings({ embedded = false, onClose = null }) {
                     </button>
                 </div>
 
-                <div className="popup-grid" style={{ marginTop: 10 }}>
+                <div className="popup-grid mt-md">
                     <div className="popup-card">
                         <label>Configuration</label>
                         <p className="hint">Import or export your tokens and templates.</p>
-                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <div className="flex-row gap-sm flex-wrap">
                             <button className="secondary-btn" onClick={importConfig}>Import configuration</button>
-                            <button className="secondary-btn" onClick={exportConfig}>Export configuration</button>
+                            <button className="secondary-btn" onClick={startExport}>Export configuration</button>
                         </div>
                     </div>
 
                     <div className="popup-card">
                         <label>Storage</label>
                         <p className="hint">Reset all local data stored in this browser.</p>
-                        <button className="reset-fields-btn settings-reset-btn" onClick={resetStorage}>
+                        <button className="reset-fields-btn settings-reset-btn" onClick={triggerReset}>
                             Reset local data
                         </button>
                     </div>
                 </div>
             </div>
+            {exportNameOpen && (
+                <Modal onClose={() => setExportNameOpen(false)} ariaLabel="Configuration name">
+                    <div className="popup-header">
+                        <h2>Export configuration</h2>
+                    </div>
+                    <div className="confirm-dialog-body">
+                        <div className="form-field">
+                            <label>Configuration name</label>
+                            <input
+                                autoFocus
+                                value={exportNameValue}
+                                onChange={(e) => setExportNameValue(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === "Enter") doExport(); }}
+                                placeholder="My configuration"
+                            />
+                        </div>
+                    </div>
+                    <div className="popup-actions">
+                        <button type="button" className="secondary-btn" onClick={() => setExportNameOpen(false)}>Cancel</button>
+                        <button type="button" className="primary-btn" onClick={doExport}>Export</button>
+                    </div>
+                </Modal>
+            )}
+            {confirmReset && (
+                <ConfirmDialog
+                    title="Reset local data"
+                    message="Are you sure you want to reset all stored data? This will delete all your templates, tokens, and settings. This action cannot be undone."
+                    confirmLabel="Reset"
+                    cancelLabel="Cancel"
+                    variant="danger"
+                    onConfirm={resetStorage}
+                    onCancel={() => setConfirmReset(false)}
+                />
+            )}
         </>
     );
 

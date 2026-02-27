@@ -4,6 +4,9 @@ import { loadTemplates, saveTemplates } from "../services/templateService.js";
 import { ensureTokensFromTexts } from "../services/tokenService.js";
 import { groupTemplates } from "../services/templateService.js";
 import Modal from "../components/Modal.jsx";
+import ConfirmDialog from "../components/ConfirmDialog.jsx";
+import EmptyState from "../components/EmptyState.jsx";
+import { showToast } from "../services/clipboardService.js";
 
 const emptyTexts = { fr: "", en: "", de: "", it: "" };
 
@@ -163,7 +166,7 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
 
     const onSaveClick = async () => {
         if (!title.trim()) {
-            alert("Title is required.");
+            showToast("Title is required.", "error");
             return;
         }
         const cleanedVariants = variants
@@ -458,6 +461,7 @@ export default function ManageTemplates({ embedded = false, onClose = null, onNa
     const [modalTemplate, setModalTemplate] = useState(null);
     const [draggingId, setDraggingId] = useState(null);
     const [dragOverId, setDragOverId] = useState(null);
+    const [confirmDelete, setConfirmDelete] = useState(null);
 
     useEffect(() => {
         loadTemplates().then(setTemplates);
@@ -475,9 +479,14 @@ export default function ManageTemplates({ embedded = false, onClose = null, onNa
         return grouped.other;
     }, [templates, currentType]);
 
-    const onDelete = async (id) => {
-        if (!confirm("Delete this template?")) return;
-        await persist(templates.filter(t => t.id !== id));
+    const onDelete = (id) => {
+        setConfirmDelete(id);
+    };
+
+    const confirmDeleteTemplate = async () => {
+        if (!confirmDelete) return;
+        await persist(templates.filter(t => t.id !== confirmDelete));
+        setConfirmDelete(null);
     };
 
     const onSaveTemplate = async (model, changes = {}) => {
@@ -532,9 +541,9 @@ export default function ManageTemplates({ embedded = false, onClose = null, onNa
 
     const content = (
         <div className="manage-card">
-                <div className="variant-editor-head" style={{ alignItems: "center" }}>
-                    <h1 style={{ margin: 0 }}>Manage Templates</h1>
-                    <div style={{ display: "flex", gap: 8 }}>
+                <div className="variant-editor-head">
+                    <h1>Manage Templates</h1>
+                    <div className="flex-row gap-sm">
                         {embedded ? (
                             <button
                                 type="button"
@@ -567,7 +576,7 @@ export default function ManageTemplates({ embedded = false, onClose = null, onNa
                 </div>
 
                 <div id="models-list" className="models-list">
-                    {list.length === 0 && <p>No template for this type.</p>}
+                    {list.length === 0 && <EmptyState message="No templates for this type yet." />}
                     {list.map((model) => (
                         <div
                             key={model.id}
@@ -597,7 +606,7 @@ export default function ManageTemplates({ embedded = false, onClose = null, onNa
                                 setDragOverId(null);
                             }}
                         >
-                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <div className="flex-row gap-md">
                                 <span className="drag-handle" aria-hidden="true"></span>
                                 <span>{model.title}</span>
                                 {model.variants?.length > 0 && (
@@ -606,7 +615,7 @@ export default function ManageTemplates({ embedded = false, onClose = null, onNa
                                     </span>
                                 )}
                             </div>
-                            <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
+                            <div className="flex-row gap-sm" style={{ marginLeft: "auto" }}>
                                 <button className="icon-btn edit-btn" onClick={() => setModalTemplate(model)}>
                                     <span className="icon-pencil" aria-hidden="true"></span>
                                 </button>
@@ -628,6 +637,17 @@ export default function ManageTemplates({ embedded = false, onClose = null, onNa
                         templates={templates}
                         onClose={() => setModalTemplate(null)}
                         onSave={onSaveTemplate}
+                    />
+                )}
+                {confirmDelete !== null && (
+                    <ConfirmDialog
+                        title="Delete template"
+                        message="Are you sure you want to delete this template? This action cannot be undone."
+                        confirmLabel="Delete"
+                        cancelLabel="Cancel"
+                        variant="danger"
+                        onConfirm={confirmDeleteTemplate}
+                        onCancel={() => setConfirmDelete(null)}
                     />
                 )}
             </div>

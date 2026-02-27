@@ -9,6 +9,7 @@ import { PARTNER_COLUMNS } from "../data/partnersData.js";
 import { loadPartners } from "../services/partnersService.js";
 import { partnerMatchesQuery } from "../utils/partnerSearch.js";
 import Modal from "../components/Modal.jsx";
+import EmptyState from "../components/EmptyState.jsx";
 import Settings from "./Settings.jsx";
 import ExternalGenerator from "./ExternalGenerator.jsx";
 import ManageTemplates from "./ManageTemplates.jsx";
@@ -55,7 +56,7 @@ function DataInputs({
                 </button>
             </div>
             <div id="dynamic-inputs" className="inputs-zone">
-                {tokens.length === 0 && <p className="hint">No tokens yet.</p>}
+                {tokens.length === 0 && <EmptyState message="No tokens yet." />}
                 {tokens.map(tok => {
                     const stored = values[tok.token] ?? tok.default ?? "";
                     const type = tok.input_type === "number" ? "number" : tok.input_type === "date" ? "date" : "text";
@@ -86,7 +87,7 @@ function TemplateButton({ model, onCopy }) {
             className={`primary-btn ${hasVariants ? "has-variants" : ""}`}
             onClick={() => onCopy(model)}
         >
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div className="flex-row gap-sm">
                 <span>{model.title}</span>
                 {hasVariants && (
                     <span className="variant-pill">{model.variants.length} variant{model.variants.length > 1 ? "s" : ""}</span>
@@ -102,12 +103,9 @@ function VariantModal({ model, onSelect, onClose }) {
     const mainVariantLabel = model.mainVariantName?.trim() || model.title || "Main text";
 
     return (
-        <Modal onClose={onClose} dialogClassName="popup-box variant-picker" ariaLabel="Choix de variante">
+        <Modal onClose={onClose} dialogClassName="popup-box variant-picker" ariaLabel="Variant selection">
                 <div className="popup-header">
-                    <div>
-                        <h2>{model.title}</h2>
-                    </div>
-                    <button className="secondary-btn" onClick={onClose}>Close</button>
+                    <h2>{model.title}</h2>
                 </div>
                 <div className="variant-choice-grid">
                     <button className={`primary-btn variant-choice-btn ${typeClass}`} onClick={() => onSelect(null)}>
@@ -118,6 +116,9 @@ function VariantModal({ model, onSelect, onClose }) {
                             {v.name || "Variant"}
                         </button>
                     ))}
+                </div>
+                <div className="popup-actions">
+                    <button className="secondary-btn" onClick={onClose}>Close</button>
                 </div>
         </Modal>
     );
@@ -140,7 +141,7 @@ function PartnersModal({ onClose }) {
                 const loaded = await loadPartners();
                 if (alive) setPartners(loaded);
             } catch (error) {
-                if (alive) setPartnersError(error?.message || "Erreur de chargement des partenaires");
+                if (alive) setPartnersError(error?.message || "Error loading partners");
             } finally {
                 if (alive) setLoadingPartners(false);
             }
@@ -182,7 +183,7 @@ function PartnersModal({ onClose }) {
 
     const copyPartnerField = async (value, label) => {
         if (!value) return;
-        await copyText(String(value), { message: `${label} copié`, variant: "info" });
+        await copyText(String(value), { message: `${label} copied`, variant: "info" });
     };
 
     const renderValue = (column, value) => {
@@ -202,7 +203,7 @@ function PartnersModal({ onClose }) {
                                 className="copy-chip"
                                 onClick={() => copyPartnerField(entry, column)}
                             >
-                                Copier
+                                Copy
                             </button>
                         </div>
                     ))}
@@ -214,26 +215,26 @@ function PartnersModal({ onClose }) {
     };
 
     return (
-        <Modal onClose={onClose} dialogClassName="popup-box partners-modal" ariaLabel="Partenaires">
+        <Modal onClose={onClose} dialogClassName="popup-box partners-modal" ariaLabel="Partners">
                 <div className="popup-header">
                     <div>
-                        <h2>Partenaires</h2>
-                        <p className="partners-subtitle">Choisis un partenaire pour afficher sa fiche complète en grand.</p>
+                        <h2>Partners</h2>
+                        <p className="partners-subtitle">Select a partner to view their full details.</p>
                     </div>
-                    <button className="secondary-btn" onClick={onClose}>Fermer</button>
+                    <button className="secondary-btn" onClick={onClose}>Close</button>
                 </div>
 
                 <input
                     type="text"
                     className="partners-search"
-                    placeholder="Rechercher (société, rôle, email, téléphone, remarque...)"
+                    placeholder="Search (company, role, email, phone, notes...)"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                 />
 
                 <div className="partners-layout">
                     <aside className="partners-list-panel">
-                        <div className="partners-list-count">{loadingPartners ? "Chargement..." : `${filteredPartners.length} résultat(s)`}</div>
+                        <div className="partners-list-count">{loadingPartners ? "Loading..." : `${filteredPartners.length} result(s)`}</div>
                         <div className="partners-list">
                             {filteredPartners.map((partner, index) => {
                                 const key = `${partner["Firma Entität"]}_${partner["ALA-P ID"]}`;
@@ -245,14 +246,14 @@ function PartnersModal({ onClose }) {
                                         className={`partners-list-item${active ? " is-active" : ""}`}
                                         onClick={() => setSelectedKey(key)}
                                     >
-                                        <strong>{partner["Firma Entität"] || "Sans nom"}</strong>
+                                        <strong>{partner["Firma Entität"] || "No name"}</strong>
                                         <span>{partner["Thema"] || "—"}</span>
                                         <small>{partner["ALA-P ID"] || "—"}</small>
                                     </button>
                                 );
                             })}
                             {!loadingPartners && !partnersError && filteredPartners.length === 0 && (
-                                <p className="hint">Aucun partenaire trouvé.</p>
+                                <EmptyState message="No partner found." />
                             )}
                             {partnersError && <p className="hint">{partnersError}</p>}
                         </div>
@@ -261,7 +262,7 @@ function PartnersModal({ onClose }) {
                     <section className="partners-detail-panel">
                         {selectedPartner ? (
                             <div className="partners-detail-card">
-                                <h3>{selectedPartner["Firma Entität"] || "Partenaire"}</h3>
+                                <h3>{selectedPartner["Firma Entität"] || "Partner"}</h3>
                                 <div className="partners-detail-grid">
                                     {PARTNER_COLUMNS.map((column) => (
                                         <div key={column} className="partners-detail-row">
@@ -274,7 +275,7 @@ function PartnersModal({ onClose }) {
                                 </div>
                             </div>
                         ) : (
-                            <p className="hint">Sélectionne un partenaire pour voir ses informations.</p>
+                            <p className="hint">Select a partner to see their information.</p>
                         )}
                     </section>
                 </div>
@@ -356,17 +357,6 @@ export default function Home() {
     useEffect(() => {
         applyTheme(theme);
     }, [theme]);
-
-    useEffect(() => {
-        if (!helpOpen) return undefined;
-        const onKey = (e) => {
-            if (e.key === "Escape") {
-                setHelpOpen(false);
-            }
-        };
-        document.addEventListener("keydown", onKey);
-        return () => document.removeEventListener("keydown", onKey);
-    }, [helpOpen]);
 
     const openExternalGenerator = () => {
         setExternalGeneratorClosing(false);
@@ -530,6 +520,15 @@ export default function Home() {
                     )}
                 </div>
                 <nav className="top-menu">
+                    <div className="segmented-control">
+                        <div className="segment-group">
+                            {["fr", "en", "de", "it"].map(code => (
+                                <button key={code} className={`segment ${lang === code ? "active" : ""}`} data-lang={code} onClick={() => setLang(code)}>
+                                    {code.toUpperCase()}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
                     <button
                         type="button"
                         className="secondary-btn external-generator-open-btn"
@@ -538,13 +537,7 @@ export default function Home() {
                         External Generator
                     </button>
                     <div className="dropdown options-dropdown">
-                        <button
-                            type="button"
-                            className="dropdown-btn"
-                            aria-haspopup="menu"
-                            aria-expanded={dropdownOpen}
-                            onClick={() => setDropdownOpen(o => !o)}
-                        >
+                        <button type="button" className="dropdown-btn" aria-haspopup="menu" aria-expanded={dropdownOpen} onClick={() => setDropdownOpen(o => !o)}>
                             Options ▾
                         </button>
                         {dropdownOpen && (
@@ -553,102 +546,51 @@ export default function Home() {
                                     <div className="dropdown-title">Management</div>
                                     <button type="button" role="menuitem" onClick={() => { setManageTemplatesOpen(true); setDropdownOpen(false); }} className="dropdown-reset">Manage templates</button>
                                     <button type="button" role="menuitem" onClick={() => { setSettingsOpen(true); setDropdownOpen(false); }} className="dropdown-reset">Settings</button>
-                                    <button type="button" role="menuitem" onClick={() => { setPartnersOpen(true); setDropdownOpen(false); }} className="dropdown-reset">Partenaires</button>
+                                    <button type="button" role="menuitem" onClick={() => { setPartnersOpen(true); setDropdownOpen(false); }} className="dropdown-reset">Partners</button>
+                                </div>
+                                <div className="dropdown-section">
+                                    <div className="dropdown-title">Tools</div>
+                                    <button type="button" role="menuitem" onClick={() => { setHelpOpen(true); setDropdownOpen(false); }} className="dropdown-reset">Help</button>
+                                </div>
+                                <div className="dropdown-section">
+                                    <div className="dropdown-title">Theme</div>
+                                    <button type="button" role="menuitem" className={`dropdown-reset${theme === "dark" ? " is-active" : ""}`} onClick={() => { setTheme("dark"); setDropdownOpen(false); }}>Dark</button>
+                                    <button type="button" role="menuitem" className={`dropdown-reset${theme === "light" ? " is-active" : ""}`} onClick={() => { setTheme("light"); setDropdownOpen(false); }}>Clear</button>
+                                    <button type="button" role="menuitem" className={`dropdown-reset${theme === "salt" ? " is-active" : ""}`} onClick={() => { setTheme("salt"); setDropdownOpen(false); }}>Salt</button>
                                 </div>
                             </div>
                         )}
                     </div>
-                    <div className="dropdown theme-dropdown">
-                        <button
-                            type="button"
-                            id="themeToggle"
-                            className="theme-toggle"
-                            aria-label="Toggle theme"
-                            aria-haspopup="menu"
-                            aria-expanded={themeDropdownOpen}
-                            onClick={() => setThemeDropdownOpen(o => !o)}
-                        >
-                            {getThemeToggleLabel(theme)} Theme ▾
-                        </button>
-                        {themeDropdownOpen && (
-                            <div className="dropdown-menu is-open" role="menu">
-                                <button
-                                    type="button"
-                                    role="menuitem"
-                                    className="dropdown-reset"
-                                    onClick={() => { setTheme("dark"); setThemeDropdownOpen(false); }}
-                                >
-                                    Dark
-                                </button>
-                                <button
-                                    type="button"
-                                    role="menuitem"
-                                    className="dropdown-reset"
-                                    onClick={() => { setTheme("light"); setThemeDropdownOpen(false); }}
-                                >
-                                    Clear
-                                </button>
-                                <button
-                                    type="button"
-                                    role="menuitem"
-                                    className="dropdown-reset"
-                                    onClick={() => { setTheme("salt"); setThemeDropdownOpen(false); }}
-                                >
-                                    Salt
-                                </button>
-                            </div>
-                        )}
-                    </div>
                 </nav>
-
-                <div className="segmented-control">
-                    <div className="segment-group">
-                        {["fr", "en", "de", "it"].map(code => (
-                            <button
-                                key={code}
-                                className={`segment ${lang === code ? "active" : ""}`}
-                                data-lang={code}
-                                onClick={() => setLang(code)}
-                            >
-                                {code.toUpperCase()}
-                            </button>
-                        ))}
-                    </div>
-                </div>
             </header>
 
             {helpOpen && (
-                <div
-                    id="helpModal"
-                    className="help-modal"
-                    aria-hidden="false"
-                    onClick={(e) => { if (e.target === e.currentTarget) setHelpOpen(false); }}
-                >
-                    <div className="help-modal__content">
-                        <button className="secondary-btn help-modal__close" onClick={() => setHelpOpen(false)}>Close</button>
+                <Modal onClose={() => setHelpOpen(false)} dialogClassName="popup-box help-modal-box" ariaLabel="Quick guide">
+                    <div className="popup-header">
                         <h2>Salt Templater — Quick guide</h2>
-                        <div className="help-modal__section">
-                            <h3>What it does</h3>
-                            <p>Create emails, SMS, or other messages with reusable templates and fill them with your data instantly.</p>
-                        </div>
-                        <div className="help-modal__section">
-                            <h3>How to use</h3>
-                            <ul>
-                                <li>Fill the fields in the "Data" column (one field per token like {"{customer_name}"}).</li>
-                                <li>Pick a language (FR / EN / DE / IT).</li>
-                                <li>Click a template button to copy the final text (copy is blocked if required data is missing).</li>
-                            </ul>
-                        </div>
-                        <div className="help-modal__section">
-                            <h3>Manage templates</h3>
-                            <ul>
-                                <li>Options → Manage Templates to create/edit your models.</li>
-                                <li>Each model has a title, a type (Email/SMS/Other) and text per language.</li>
-                                <li>Add variants to provide multiple versions of a model.</li>
-                            </ul>
-                        </div>
+                        <button className="secondary-btn" onClick={() => setHelpOpen(false)}>Close</button>
                     </div>
-                </div>
+                    <div className="help-modal__section">
+                        <h3>What it does</h3>
+                        <p>Create emails, SMS, or other messages with reusable templates and fill them with your data instantly.</p>
+                    </div>
+                    <div className="help-modal__section">
+                        <h3>How to use</h3>
+                        <ul>
+                            <li>Fill the fields in the "Data" column (one field per token like {"{customer_name}"}).</li>
+                            <li>Pick a language (FR / EN / DE / IT).</li>
+                            <li>Click a template button to copy the final text (copy is blocked if required data is missing).</li>
+                        </ul>
+                    </div>
+                    <div className="help-modal__section">
+                        <h3>Manage templates</h3>
+                        <ul>
+                            <li>Options → Manage Templates to create/edit your models.</li>
+                            <li>Each model has a title, a type (Email/SMS/Other) and text per language.</li>
+                            <li>Add variants to provide multiple versions of a model.</li>
+                        </ul>
+                    </div>
+                </Modal>
             )}
 
             {!empty && (
@@ -667,7 +609,7 @@ export default function Home() {
                 <section id="email-col" className="zone-box">
                     <h3>Email</h3>
                     <div id="email-container">
-                        {grouped.email.length === 0 && <p className="hint">No email templates.</p>}
+                        {grouped.email.length === 0 && <EmptyState message="No email templates yet." />}
                         {grouped.email.map(m => <TemplateButton key={m.id} model={m} onCopy={handleCopy} />)}
                     </div>
                 </section>
@@ -675,7 +617,7 @@ export default function Home() {
                 <section id="sms-col" className="zone-box">
                     <h3>SMS</h3>
                     <div id="sms-container">
-                        {grouped.sms.length === 0 && <p className="hint">No SMS templates.</p>}
+                        {grouped.sms.length === 0 && <EmptyState message="No SMS templates yet." />}
                         {grouped.sms.map(m => <TemplateButton key={m.id} model={m} onCopy={handleCopy} />)}
                     </div>
                 </section>
@@ -683,7 +625,7 @@ export default function Home() {
                 <section id="other-col" className="zone-box">
                     <h3>Other</h3>
                     <div id="other-container">
-                        {grouped.other.length === 0 && <p className="hint">No Other templates.</p>}
+                        {grouped.other.length === 0 && <EmptyState message="No other templates yet." />}
                         {grouped.other.map(m => <TemplateButton key={m.id} model={m} onCopy={handleCopy} />)}
                     </div>
                 </section>

@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import { loadTokens, saveTokens } from "../services/tokenService.js";
 import { renameTokenInTemplates } from "../services/templateService.js";
 import Modal from "../components/Modal.jsx";
+import ConfirmDialog from "../components/ConfirmDialog.jsx";
+import EmptyState from "../components/EmptyState.jsx";
+import { showToast } from "../services/clipboardService.js";
 
 function TokenModal({ initial, tokens, onClose, onSave }) {
     const [token, setToken] = useState(initial?.token || "");
@@ -17,14 +20,14 @@ function TokenModal({ initial, tokens, onClose, onSave }) {
         const normalizedDefault = def.trim();
 
         if (!normalizedToken.startsWith("{") || !normalizedToken.endsWith("}")) {
-            alert("Token must follow the {my_token} format.");
+            showToast("Token must follow the {my_token} format.", "error");
             return;
         }
         const duplicate = (tokens || []).some((candidate) =>
             candidate.id !== initial?.id && candidate.token === normalizedToken
         );
         if (duplicate) {
-            alert("A token with this name already exists.");
+            showToast("A token with this name already exists.", "error");
             return;
         }
         onSave({
@@ -81,6 +84,7 @@ function TokenModal({ initial, tokens, onClose, onSave }) {
 export default function ManageTokens() {
     const [tokens, setTokens] = useState([]);
     const [modalToken, setModalToken] = useState(null);
+    const [confirmDelete, setConfirmDelete] = useState(null);
 
     useEffect(() => {
         loadTokens().then(setTokens);
@@ -91,10 +95,15 @@ export default function ManageTokens() {
         await saveTokens(next);
     };
 
-    const onDelete = async (id) => {
-        if (!confirm("Delete this token?")) return;
-        const next = tokens.filter(t => t.id !== id);
+    const onDelete = (id) => {
+        setConfirmDelete(id);
+    };
+
+    const confirmDeleteToken = async () => {
+        if (!confirmDelete) return;
+        const next = tokens.filter(t => t.id !== confirmDelete);
         await persist(next);
+        setConfirmDelete(null);
     };
 
     const onSave = async (token) => {
@@ -115,7 +124,7 @@ export default function ManageTokens() {
     return (
         <main className="page-container">
             <div className="manage-card">
-                <div className="variant-editor-head" style={{ alignItems: "center" }}>
+                <div className="variant-editor-head">
                     <div>
                         <p className="eyebrow">Data tokens</p>
                         <h2>Manage Tokens</h2>
@@ -123,14 +132,14 @@ export default function ManageTokens() {
                 </div>
 
                 <div id="tokens-list" className="models-list">
-                    {tokens.length === 0 && <p>No token yet.</p>}
+                    {tokens.length === 0 && <EmptyState message="No tokens yet." />}
                     {tokens.map(t => (
                         <div key={t.id} className="model-row">
                             <div>
                                 <strong>{t.label || t.token}</strong> <span className="hint">{t.token}</span>
-                                {t.key && <div className="hint" style={{ marginTop: 2 }}>Key: {t.key}</div>}
+                                {t.key && <div className="hint mt-sm">Key: {t.key}</div>}
                             </div>
-                            <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
+                            <div className="flex-row gap-sm" style={{ marginLeft: "auto" }}>
                                 <button className="icon-btn edit-btn" onClick={() => setModalToken(t)}>
                                     <span className="icon-pencil" aria-hidden="true"></span>
                                 </button>
@@ -152,6 +161,17 @@ export default function ManageTokens() {
                     tokens={tokens}
                     onClose={() => setModalToken(null)}
                     onSave={onSave}
+                />
+            )}
+            {confirmDelete !== null && (
+                <ConfirmDialog
+                    title="Delete token"
+                    message="Are you sure you want to delete this token? This action cannot be undone."
+                    confirmLabel="Delete"
+                    cancelLabel="Cancel"
+                    variant="danger"
+                    onConfirm={confirmDeleteToken}
+                    onCancel={() => setConfirmDelete(null)}
                 />
             )}
         </main>

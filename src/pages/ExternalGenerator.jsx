@@ -82,35 +82,35 @@ function PromptModal({ state, onCancel, onSubmit }) {
 
     if (state.type === "input") {
         return (
-            <Modal onClose={onCancel} ariaLabel={state.title} dialogClassName="popup-box external-prompt-modal">
-                <div className="popup-header">
+            <Modal onClose={onCancel} ariaLabel={state.title} dialogClassName="prompt-dialog">
+                <div className="prompt-dialog__header">
+                    <span className="prompt-dialog__indicator" />
                     <h2>{state.title}</h2>
                 </div>
-                <div className="popup-grid">
-                    <div className="popup-card">
-                        <input
-                            autoFocus
-                            type="text"
-                            placeholder={state.placeholder || ""}
-                            value={inputValue}
-                            onChange={(e) => setInputValue(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                    e.preventDefault();
-                                    onSubmit(inputValue);
-                                }
-                            }}
-                        />
-                    </div>
+                <div className="prompt-dialog__body">
+                    <input
+                        autoFocus
+                        type="text"
+                        className="prompt-dialog__input"
+                        placeholder={state.placeholder || ""}
+                        value={inputValue}
+                        onChange={(e) => setInputValue(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                                e.preventDefault();
+                                onSubmit(inputValue);
+                            }
+                        }}
+                    />
                 </div>
-                <div className="popup-actions external-prompt-actions">
-                    <div className="external-prompt-actions__main">
-                        {state.showBack && (
-                            <button type="button" className="secondary-btn prompt-back-btn" onClick={() => onSubmit(PROMPT_BACK)}>Back</button>
-                        )}
-                        <button type="button" className="primary-btn prompt-continue-btn" onClick={() => onSubmit(inputValue)}>Continue</button>
+                <div className="prompt-dialog__actions">
+                    {state.showBack && (
+                        <button type="button" className="prompt-dialog__btn prompt-dialog__btn--back" onClick={() => onSubmit(PROMPT_BACK)}>← Back</button>
+                    )}
+                    <div className="prompt-dialog__actions-end">
+                        <button type="button" className="prompt-dialog__btn prompt-dialog__btn--cancel" onClick={onCancel}>Cancel</button>
+                        <button type="button" className="prompt-dialog__btn prompt-dialog__btn--continue" onClick={() => onSubmit(inputValue)}>Continue →</button>
                     </div>
-                    <button type="button" className="secondary-btn prompt-cancel-btn" onClick={onCancel}>Cancel</button>
                 </div>
             </Modal>
         );
@@ -125,41 +125,42 @@ function PromptModal({ state, onCancel, onSubmit }) {
         <Modal
             onClose={onCancel}
             ariaLabel={state.title}
-            dialogClassName={`popup-box external-prompt-modal${state.searchable ? " external-prompt-modal--search" : " external-prompt-modal--choices"}`}
+            dialogClassName={`prompt-dialog${state.searchable ? " prompt-dialog--search" : " prompt-dialog--choices"}`}
         >
-            <div className="popup-header">
+            <div className="prompt-dialog__header">
+                <span className="prompt-dialog__indicator" />
                 <h2>{state.title}</h2>
             </div>
             {state.searchable && (
                 <input
                     autoFocus
                     type="text"
-                    className="partners-search"
+                    className="prompt-dialog__search"
                     placeholder={state.searchPlaceholder || "Search..."}
                     value={searchValue}
                     onChange={(e) => setSearchValue(e.target.value)}
                 />
             )}
-            <div className="external-prompt-options">
+            <div className="prompt-dialog__options">
                 {filtered.map((option) => (
                     <button
                         key={`${option.value}_${option.label}`}
                         type="button"
-                        className="partners-list-item primary-btn template-type-email external-prompt-option-btn"
+                        className={`prompt-dialog__option${state.currentValue === option.value ? " is-selected" : ""}`}
                         onClick={() => onSubmit(option.value)}
                     >
-                        <strong>{option.label}</strong>
+                        {option.label}
                     </button>
                 ))}
-                {filtered.length === 0 && <p className="hint">No result.</p>}
+                {filtered.length === 0 && <p className="prompt-dialog__empty">No result.</p>}
             </div>
-            <div className="popup-actions external-prompt-actions">
-                <div className="external-prompt-actions__main">
-                    {state.showBack && (
-                        <button type="button" className="secondary-btn prompt-back-btn" onClick={() => onSubmit(PROMPT_BACK)}>Back</button>
-                    )}
+            <div className="prompt-dialog__actions">
+                {state.showBack && (
+                    <button type="button" className="prompt-dialog__btn prompt-dialog__btn--back" onClick={() => onSubmit(PROMPT_BACK)}>← Back</button>
+                )}
+                <div className="prompt-dialog__actions-end">
+                    <button type="button" className="prompt-dialog__btn prompt-dialog__btn--cancel" onClick={onCancel}>Cancel</button>
                 </div>
-                <button type="button" className="secondary-btn prompt-cancel-btn" onClick={onCancel}>Cancel</button>
             </div>
         </Modal>
     );
@@ -289,7 +290,8 @@ export default function ExternalGenerator({ embedded = false, onClose }) {
                 options,
                 searchable: extra.searchable || false,
                 searchPlaceholder: extra.searchPlaceholder || "",
-                showBack: !!extra.showBack
+                showBack: !!extra.showBack,
+                currentValue: extra.currentValue ?? null
             });
         });
     };
@@ -307,13 +309,13 @@ export default function ExternalGenerator({ embedded = false, onClose }) {
             if (result === null || result === PROMPT_BACK) return result;
             const cleaned = String(result).trim();
             if (cleaned) return cleaned;
-            showToast("Champ requis", "error");
+            showToast("Field required", "error");
         }
     };
 
-    const runPostVtiCompletionFlow = async (initialFields) => {
+    const runPostVtiCompletionFlow = async (initialFields, initialMeta = null) => {
         let draft = { ...initialFields };
-        let meta = {
+        let meta = initialMeta || {
             mode: null,
             flaggingConfirmed: false,
             boxSwapStatus: null,
@@ -477,7 +479,7 @@ export default function ExternalGenerator({ embedded = false, onClose }) {
                 if (value === null) return false;
                 const cleaned = String(value).trim();
                 if (!cleaned) {
-                    showToast("Champ requis", "error");
+                    showToast("Field required", "error");
                     continue;
                 }
                 history.push(before);
@@ -576,9 +578,9 @@ export default function ExternalGenerator({ embedded = false, onClose }) {
             const result = parseVtiClipboard(raw);
             if (!result.ok) {
                 if (result.error === "EMPTY_VTI_CLIPBOARD") {
-                    showToast("Clipboard vide", "error");
+                    showToast("Empty clipboard", "error");
                 } else {
-                    showToast("Format VTI invalide / non parsable", "error");
+                    showToast("Invalid VTI format", "error");
                 }
                 return;
             }
@@ -597,17 +599,17 @@ export default function ExternalGenerator({ embedded = false, onClose }) {
                     setVtiEmptyFieldErrors({});
                 }
             }
-            showToast("Données VTI importées depuis le clipboard", "info");
+            showToast("VTI data imported from clipboard", "info");
         } catch (error) {
             console.error(error);
             setClipboardState("unknown");
-            showToast("Impossible de lire le clipboard", "error");
+            showToast("Unable to read clipboard", "error");
         }
     };
 
     const copyCode = async () => {
         if (!fields.flagging.trim()) {
-            showToast("Flagging manquant", "error");
+            showToast("Flagging required", "error");
             return;
         }
         await copyText(generatedCode, { message: "Code copied", variant: "info" });
@@ -616,11 +618,11 @@ export default function ExternalGenerator({ embedded = false, onClose }) {
     const fillFromExternalIdValue = (value, { silent = false } = {}) => {
         const parsed = parseExternalId(value);
         if (!parsed.ok) {
-            if (!silent) showToast("External ID invalide (15 segments attendus)", "error");
+            if (!silent) showToast("Invalid External ID (15 segments expected)", "error");
             return false;
         }
         patchFields(parsed.fields);
-        if (!silent) showToast("External ID importé", "info");
+        if (!silent) showToast("External ID imported", "info");
         return true;
     };
 
@@ -650,37 +652,95 @@ export default function ExternalGenerator({ embedded = false, onClose }) {
         setVtiEmptyFieldErrors({});
         setPromptState(null);
         promptResolverRef.current = null;
-        showToast("Champs effacés", "info");
+        showToast("Fields cleared", "info");
     };
 
-    const InputField = ({ id, label, list, type = "text" }) => (
-        <div className="form-field">
-            <label htmlFor={`ext-${id}`}>{label}</label>
-            <input
-                id={`ext-${id}`}
-                className={vtiEmptyFieldErrors[id] ? "input-error" : ""}
-                type={type}
-                list={list ? `${id}-options` : undefined}
-                value={fields[id]}
-                placeholder={FIELD_PLACEHOLDERS[id] || label}
-                onChange={(e) => setField(id, e.target.value)}
-            />
-            {list && (
-                <datalist id={`${id}-options`}>
-                    {list.map((option) => <option key={`${id}_${option}`} value={option} />)}
-                </datalist>
-            )}
-        </div>
-    );
+    const FIELD_POPUP_CONFIG = {
+        flagging: { type: "choice", options: FLAGGING_OPTIONS, title: "Flagging" },
+        SignalStatus: { type: "choice", options: SIGNAL_OPTIONS_ESCALATION, title: "Signal Status" },
+        LedStatus: { type: "choice", options: LED_OPTIONS, title: "LED Status" },
+        treatmentStep: { type: "choice", options: TREATMENT_STEP_OPTIONS, title: "Treatment Step" },
+        boxType: { type: "choice", options: BOX_TYPE_OPTIONS, title: "Box Type" },
+        partner: { type: "search", title: "Partner", options: EXTERNAL_GENERATOR_PARTNERS, searchPlaceholder: "Type first letters (EWB, SGSW...)" },
+        comment: { type: "search", title: "Comment", options: COMMENT_OPTIONS },
+        customer: { type: "input", title: "Customer", placeholder: "Contractor number" },
+        soTicket: { type: "input", title: "SO Ticket", placeholder: "e.g. 31436062" },
+        partnerTicketNumber: { type: "input", title: "Partner Ticket Number", placeholder: "e.g. 12345678" },
+        lexId: { type: "input", title: "LEX ID", placeholder: "LEX ID" },
+        oltName: { type: "input", title: "OLT Name", placeholder: "OLT Name" },
+        oltBoard: { type: "input", title: "OLT Board", placeholder: "OLT Board" },
+        bokBof: { type: "input", title: "BOK|BOF", placeholder: "BOK|BOF|Fiber" },
+    };
+
+    const handleFieldClick = async (fieldId) => {
+        if (promptState) return;
+        if (fieldId === "data") return;
+
+        const config = FIELD_POPUP_CONFIG[fieldId];
+        if (!config) return;
+
+        let value;
+        if (config.type === "choice") {
+            value = await askChoice(config.title, optionsOf(config.options), { currentValue: fields[fieldId] });
+        } else if (config.type === "search") {
+            value = await askChoice(
+                config.title,
+                config.options.map((v) => ({ label: v, value: v })),
+                { searchable: true, searchPlaceholder: config.searchPlaceholder || "Search...", currentValue: fields[fieldId] }
+            );
+        } else {
+            value = await askInput(config.title, config.placeholder || "", fields[fieldId] || "");
+        }
+
+        if (value === null) return;
+        const cleaned = String(value).trim();
+        if (!cleaned) return;
+
+        setField(fieldId, cleaned);
+
+        // Let React flush the prompt-close state before opening the next one
+        await new Promise((r) => setTimeout(r, 0));
+
+        const updatedFields = { ...fieldsRef.current, [fieldId]: cleaned };
+        await runPostVtiCompletionFlow(updatedFields, {
+            flaggingConfirmed: !isBlank(updatedFields.flagging),
+            mode: null,
+            boxSwapStatus: null,
+            escalationType: null,
+            escalationCaseType: null,
+            boxSwapSerialImpact: null
+        });
+    };
+
+    const InputField = ({ id, label, type = "text" }) => {
+        const isPopupField = id !== "data";
+        return (
+            <div
+                className={`form-field${isPopupField ? " ext-field--interactive" : ""}`}
+                onClick={isPopupField ? () => handleFieldClick(id) : undefined}
+            >
+                <label htmlFor={`ext-${id}`}>{label}</label>
+                <input
+                    id={`ext-${id}`}
+                    className={vtiEmptyFieldErrors[id] ? "input-error" : ""}
+                    type={type}
+                    value={fields[id]}
+                    placeholder={FIELD_PLACEHOLDERS[id] || label}
+                    readOnly={isPopupField}
+                    onChange={isPopupField ? undefined : (e) => setField(id, e.target.value)}
+                />
+            </div>
+        );
+    };
 
     const pageContent = (
             <div className={`manage-card external-generator-page${embedded ? " external-generator-page--embedded" : ""}`}>
-                <div className="variant-editor-head" style={{ alignItems: "center" }}>
+                <div className="variant-editor-head">
                     <div>
                         <p className="eyebrow">HCAMP</p>
                         <h2>External Generator</h2>
                     </div>
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <div className="flex-row gap-sm flex-wrap">
                         {embedded ? (
                             <button type="button" className="secondary-btn" onClick={onClose}>Close</button>
                         ) : (
@@ -692,21 +752,21 @@ export default function ExternalGenerator({ embedded = false, onClose }) {
                 <div className="external-generator-layout">
                     <section className="popup-card external-generator-form">
                         <div className="popup-grid">
-                            <InputField id="flagging" label="Flagging" list={FLAGGING_OPTIONS} />
+                            <InputField id="flagging" label="Flagging" />
                             <InputField id="data" label="Date" type="date" />
                             <InputField id="customer" label="Customer" />
                             <InputField id="soTicket" label="SO Ticket" />
-                            <InputField id="SignalStatus" label="Signal Status" list={SIGNAL_OPTIONS_ESCALATION} />
-                            <InputField id="LedStatus" label="LED Status" list={LED_OPTIONS} />
-                            <InputField id="treatmentStep" label="Treatment Step" list={TREATMENT_STEP_OPTIONS} />
-                            <InputField id="boxType" label="Box-type" list={BOX_TYPE_OPTIONS} />
-                            <InputField id="partner" label="Partner or Empty" list={EXTERNAL_GENERATOR_PARTNERS} />
-                            <InputField id="partnerTicketNumber" label="Partner Ticketnumber or Empty" />
+                            <InputField id="SignalStatus" label="Signal Status" />
+                            <InputField id="LedStatus" label="LED Status" />
+                            <InputField id="treatmentStep" label="Treatment Step" />
+                            <InputField id="boxType" label="Box-type" />
+                            <InputField id="partner" label="Partner or Empty" />
+                            <InputField id="partnerTicketNumber" label="Partner Ticket or Empty" />
                             <InputField id="lexId" label="LEX ID" />
                             <InputField id="oltName" label="OLT Name" />
                             <InputField id="oltBoard" label="OLT Board" />
                             <InputField id="bokBof" label="BOK|BOF" />
-                            <InputField id="comment" label="Comment" list={COMMENT_OPTIONS} />
+                            <InputField id="comment" label="Comment" />
                         </div>
                     </section>
 
@@ -752,7 +812,7 @@ export default function ExternalGenerator({ embedded = false, onClose }) {
                                     }
                                 }}
                             />
-                            <div className="popup-actions" style={{ marginTop: 10 }}>
+                            <div className="popup-actions mt-md">
                                 <button type="button" className="primary-btn" onClick={copyCode}>
                                     Copy
                                 </button>

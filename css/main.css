@@ -1,11 +1,80 @@
+:root {
+  /* Colors - Primary */
+  --color-primary: #1d4fff;
+  --color-primary-light: #4a8dff;
+  --color-primary-lighter: #46c0ff;
 
+  /* Colors - Background */
+  --bg-body: #0b0f19;
+  --bg-surface: rgba(18, 24, 38, 0.82);
+  --bg-surface-elevated: rgba(20, 26, 40, 0.85);
+  --bg-overlay: rgba(3, 7, 15, 0.55);
+
+  /* Colors - Text */
+  --text-primary: #e3ecff;
+  --text-secondary: #9eb5ff;
+  --text-muted: #6880b0;
+
+  /* Colors - Border */
+  --border-default: rgba(80, 120, 255, 0.25);
+  --border-focus: rgba(80, 120, 255, 0.45);
+
+  /* Colors - Semantic */
+  --color-error: #ff4d6a;
+  --color-warning: #ffb84d;
+  --color-success: #00c853;
+
+  /* Colors - Template types */
+  --color-email: #1d3674;
+  --color-sms: #5823ad;
+  --color-other: #00785f;
+
+  /* Spacing */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  --space-2xl: 32px;
+
+  /* Border Radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+
+  /* Shadows */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
+
+  /* Transitions */
+  --transition-fast: 0.15s ease;
+  --transition-base: 0.22s ease;
+  --transition-slow: 0.35s ease;
+
+  /* Z-index scale */
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-overlay: 300;
+  --z-modal: 400;
+  --z-popover: 500;
+  --z-tooltip: 600;
+
+  /* Typography */
+  --font-xs: 11px;
+  --font-sm: 12px;
+  --font-base: 14px;
+  --font-md: 16px;
+  --font-lg: 18px;
+  --font-xl: 24px;
+}
 
 body {
     margin: 0;
     padding: 0;
     font-family: Arial, sans-serif;
-    background: #0b0f19;
-    color: #e3ecff;
+    background: var(--bg-body);
+    color: var(--text-primary);
     scrollbar-color: #3d4f82 #0f1320;
     scrollbar-width: thin;
 }
@@ -17,7 +86,7 @@ body {
 
 ::-webkit-scrollbar-track {
     background: #0f1320;
-    border-left: 1px solid rgba(80,120,255,0.25);
+    border-left: 1px solid var(--border-default);
 }
 
 ::-webkit-scrollbar-thumb {
@@ -34,14 +103,14 @@ body {
 .app-header {
     background: rgba(20, 28, 48, 0.75);
     backdrop-filter: blur(14px);
-    padding: 12px 18px 18px 18px;
+    padding: var(--space-md) 18px 18px 18px;
     color: #e8f0ff;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 12px;
+    gap: var(--space-md);
     flex-wrap: wrap;
-    border-bottom: 1px solid rgba(80,120,255,0.25);
+    border-bottom: 1px solid var(--border-default);
     box-shadow: 0 4px 18px rgba(0,0,0,0.45);
     position: relative;
 }
@@ -53,17 +122,17 @@ body {
 }
 
 .app-title-config {
-    font-size: 14px;
+    font-size: var(--font-base);
     font-weight: 500;
     opacity: 0.55;
     letter-spacing: 0;
-    margin-left: 4px;
+    margin-left: var(--space-xs);
 }
 
 .top-menu {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: var(--space-md);
 }
 
 .top-menu a {
@@ -71,7 +140,7 @@ body {
     margin-left: 15px;
     text-decoration: none;
     font-weight: bold;
-    transition: 0.25s ease;
+    transition: var(--transition-base);
 }
 
 .top-menu a:hover {
@@ -84,14 +153,10 @@ h1, h2, h3 {
 }
 
 .light-theme body {
-    background: #f4f6fb;
-    color: #0b1a33;
     scrollbar-color: #9eb4de #e8ecf7;
 }
 
 .salt-theme body {
-    background: #000000;
-    color: #ffffff;
     scrollbar-color: #058750 #000000;
 }
 
@@ -175,4 +240,34 @@ h1, h2, h3 {
         width: 100%;
         justify-content: flex-start;
     }
+}
+
+/* ---------- THEME VARIABLE OVERRIDES ---------- */
+.light-theme {
+  --bg-body: #f4f6fb;
+  --bg-surface: rgba(255, 255, 255, 0.82);
+  --bg-surface-elevated: rgba(255, 255, 255, 0.92);
+  --bg-overlay: rgba(0, 0, 0, 0.35);
+  --text-primary: #0b1a33;
+  --text-secondary: #3a4a6b;
+  --text-muted: #7a8aab;
+  --border-default: rgba(0, 20, 60, 0.15);
+  --border-focus: rgba(0, 20, 60, 0.30);
+  --color-primary: #0f3ad9;
+}
+
+.salt-theme {
+  --bg-body: #000000;
+  --bg-surface: rgba(0, 10, 5, 0.85);
+  --bg-surface-elevated: rgba(0, 15, 8, 0.9);
+  --bg-overlay: rgba(0, 0, 0, 0.6);
+  --text-primary: #ffffff;
+  --text-secondary: #a0d8b8;
+  --text-muted: #5a8a6a;
+  --border-default: rgba(5, 135, 80, 0.3);
+  --border-focus: rgba(5, 135, 80, 0.5);
+  --color-primary: #058750;
+  --color-email: #0a4a6b;
+  --color-sms: #4a1a8a;
+  --color-other: #058750;
 }
