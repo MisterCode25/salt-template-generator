@@ -693,6 +693,56 @@ export default function ExternalGenerator({ embedded = false, onClose }) {
         showToast("Fields cleared", "info");
     };
 
+    // Reconstruct meta state from existing field values so that handleFieldClick
+    // can resume the flow from the correct branch without re-asking already-answered
+    // meta questions (e.g. boxSwapStatus, mode, escalationType).
+    const inferMetaFromFields = (f) => {
+        const meta = {
+            flaggingConfirmed: !isBlank(f.flagging),
+            mode: null,
+            boxSwapStatus: null,
+            escalationType: null,
+            escalationCaseType: null,
+            boxSwapSerialImpact: null
+        };
+
+        if (f.treatmentStep === "Box Swap") {
+            const comment = String(f.comment ?? "").trim();
+            const signal = String(f.SignalStatus ?? "").trim();
+            const led = String(f.LedStatus ?? "").trim();
+            if (comment === "FLL Partner Incriminate Box") {
+                meta.boxSwapStatus = "Partner incriminate";
+            } else if (comment === "Box swap after Power supply change") {
+                meta.boxSwapStatus = "Booting";
+                meta.boxSwapSerialImpact = "Impacted Serial";
+            } else if (!isBlank(comment)) {
+                // "Box swap" comment: Old → Signal=Lost, New → Signal=Never
+                meta.boxSwapStatus = signal === "Never" ? "New" : "Old";
+            } else if (!isBlank(signal) && !isBlank(led)) {
+                // Signal+LED set but no comment → Booting (awaiting serial impact)
+                meta.boxSwapStatus = "Booting";
+            }
+        }
+
+        if (f.treatmentStep === "Other") {
+            const comment = String(f.comment ?? "").trim();
+            if (comment === "Power cable") {
+                meta.mode = "Power supply";
+            } else if (MISSING_INFO_COMMENT_OPTIONS.includes(comment)) {
+                meta.mode = "Missing info";
+            } else if (comment.startsWith("3tLevel esclation") || comment === "Fixnet esclation") {
+                meta.mode = "Escalation";
+                meta.escalationType = comment.startsWith("3tLevel") ? "3tLevel" : "Fixnet";
+                // New Case sets Signal+LED; Existing External ID does not
+                meta.escalationCaseType = !isBlank(f.SignalStatus) ? "New Case" : "Existing External ID";
+            } else if (!isBlank(comment)) {
+                meta.mode = "Generic";
+            }
+        }
+
+        return meta;
+    };
+
     const FIELD_POPUP_CONFIG = {
         flagging: { type: "choice", options: FLAGGING_OPTIONS, title: "Flagging" },
         SignalStatus: { type: "choice", options: SIGNAL_OPTIONS_ESCALATION, title: "Signal Status" },
@@ -740,14 +790,7 @@ export default function ExternalGenerator({ embedded = false, onClose }) {
         await new Promise((r) => setTimeout(r, 0));
 
         const updatedFields = { ...fieldsRef.current, [fieldId]: cleaned };
-        await runPostVtiCompletionFlow(updatedFields, {
-            flaggingConfirmed: !isBlank(updatedFields.flagging),
-            mode: null,
-            boxSwapStatus: null,
-            escalationType: null,
-            escalationCaseType: null,
-            boxSwapSerialImpact: null
-        });
+        await runPostVtiCompletionFlow(updatedFields, inferMetaFromFields(updatedFields));
     };
 
     const InputField = ({ id, label, type = "text" }) => {
