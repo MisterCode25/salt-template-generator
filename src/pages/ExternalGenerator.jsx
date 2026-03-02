@@ -77,95 +77,132 @@ const FIELD_PLACEHOLDERS = {
 function PromptModal({ state, onCancel, onSubmit }) {
     const [inputValue, setInputValue] = useState("");
     const [searchValue, setSearchValue] = useState("");
+    // displayState buffers the null transition so the modal stays open between wizard steps
+    const [displayState, setDisplayState] = useState(state);
+    const [contentKey, setContentKey] = useState(0);
+    const closeTimerRef = useRef(null);
+    const wasShownRef = useRef(state !== null);
 
     useEffect(() => {
-        if (!state) return;
-        setInputValue(state.initialValue || "");
-        setSearchValue("");
+        if (state !== null) {
+            if (closeTimerRef.current !== null) {
+                clearTimeout(closeTimerRef.current);
+                closeTimerRef.current = null;
+            }
+            // Only animate the content transition when the modal was already open
+            if (wasShownRef.current) {
+                setContentKey((k) => k + 1);
+            }
+            wasShownRef.current = true;
+            setDisplayState(state);
+        } else {
+            // Delay the close so a quick null→newState (wizard step change) never flashes
+            closeTimerRef.current = window.setTimeout(() => {
+                closeTimerRef.current = null;
+                wasShownRef.current = false;
+                setDisplayState(null);
+            }, 20);
+        }
+        return () => {
+            if (closeTimerRef.current !== null) {
+                clearTimeout(closeTimerRef.current);
+                closeTimerRef.current = null;
+            }
+        };
     }, [state]);
 
-    if (!state) return null;
+    useEffect(() => {
+        if (!displayState) return;
+        setInputValue(displayState.initialValue || "");
+        setSearchValue("");
+    }, [displayState]);
 
-    if (state.type === "input") {
+    if (!displayState) return null;
+
+    if (displayState.type === "input") {
         return (
-            <Modal onClose={onCancel} ariaLabel={state.title} dialogClassName="prompt-dialog">
-                <div className="prompt-dialog__header">
-                    <span className="prompt-dialog__indicator" />
-                    <h2>{state.title}</h2>
-                </div>
-                <div className="prompt-dialog__body">
-                    <input
-                        autoFocus
-                        type="text"
-                        className="prompt-dialog__input"
-                        placeholder={state.placeholder || ""}
-                        value={inputValue}
-                        onChange={(e) => setInputValue(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                                e.preventDefault();
-                                onSubmit(inputValue);
-                            }
-                        }}
-                    />
-                </div>
-                <div className="prompt-dialog__actions">
-                    {state.showBack && (
-                        <button type="button" className="prompt-dialog__btn prompt-dialog__btn--back" onClick={() => onSubmit(PROMPT_BACK)}>← Back</button>
-                    )}
-                    <div className="prompt-dialog__actions-end">
-                        <button type="button" className="prompt-dialog__btn prompt-dialog__btn--cancel" onClick={onCancel}>Cancel</button>
-                        <button type="button" className="prompt-dialog__btn prompt-dialog__btn--continue" onClick={() => onSubmit(inputValue)}>Continue →</button>
+            <Modal onClose={onCancel} ariaLabel={displayState.title} dialogClassName="prompt-dialog">
+                <div key={contentKey} className="prompt-dialog__step">
+                    <div className="prompt-dialog__header">
+                        <span className="prompt-dialog__indicator" />
+                        <h2>{displayState.title}</h2>
+                    </div>
+                    <div className="prompt-dialog__body">
+                        <input
+                            autoFocus
+                            type="text"
+                            className="prompt-dialog__input"
+                            placeholder={displayState.placeholder || ""}
+                            value={inputValue}
+                            onChange={(e) => setInputValue(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    onSubmit(inputValue);
+                                }
+                            }}
+                        />
+                    </div>
+                    <div className="prompt-dialog__actions">
+                        {displayState.showBack && (
+                            <button type="button" className="prompt-dialog__btn prompt-dialog__btn--back" onClick={() => onSubmit(PROMPT_BACK)}>← Back</button>
+                        )}
+                        <div className="prompt-dialog__actions-end">
+                            <button type="button" className="prompt-dialog__btn prompt-dialog__btn--cancel" onClick={onCancel}>Cancel</button>
+                            <button type="button" className="prompt-dialog__btn prompt-dialog__btn--continue" onClick={() => onSubmit(inputValue)}>Continue →</button>
+                        </div>
                     </div>
                 </div>
             </Modal>
         );
     }
 
-    const options = state.options || [];
-    const filtered = state.searchable
+    const options = displayState.options || [];
+    const filtered = displayState.searchable
         ? options.filter((opt) => opt.label.toLowerCase().includes(searchValue.trim().toLowerCase()))
         : options;
 
     return (
         <Modal
             onClose={onCancel}
-            ariaLabel={state.title}
-            dialogClassName={`prompt-dialog${state.searchable ? " prompt-dialog--search" : " prompt-dialog--choices"}`}
+            ariaLabel={displayState.title}
+            dialogClassName={`prompt-dialog${displayState.searchable ? " prompt-dialog--search" : " prompt-dialog--choices"}`}
         >
-            <div className="prompt-dialog__header">
-                <span className="prompt-dialog__indicator" />
-                <h2>{state.title}</h2>
-            </div>
-            {state.searchable && (
-                <input
-                    autoFocus
-                    type="text"
-                    className="prompt-dialog__search"
-                    placeholder={state.searchPlaceholder || "Search..."}
-                    value={searchValue}
-                    onChange={(e) => setSearchValue(e.target.value)}
-                />
-            )}
-            <div className="prompt-dialog__options">
-                {filtered.map((option) => (
-                    <button
-                        key={`${option.value}_${option.label}`}
-                        type="button"
-                        className={`prompt-dialog__option${state.currentValue === option.value ? " is-selected" : ""}`}
-                        onClick={() => onSubmit(option.value)}
-                    >
-                        {option.label}
-                    </button>
-                ))}
-                {filtered.length === 0 && <p className="prompt-dialog__empty">No result.</p>}
-            </div>
-            <div className="prompt-dialog__actions">
-                {state.showBack && (
-                    <button type="button" className="prompt-dialog__btn prompt-dialog__btn--back" onClick={() => onSubmit(PROMPT_BACK)}>← Back</button>
+            <div key={contentKey} className="prompt-dialog__step">
+                <div className="prompt-dialog__header">
+                    <span className="prompt-dialog__indicator" />
+                    <h2>{displayState.title}</h2>
+                </div>
+                {displayState.searchable && (
+                    <input
+                        autoFocus
+                        type="text"
+                        className="prompt-dialog__search"
+                        placeholder={displayState.searchPlaceholder || "Search..."}
+                        value={searchValue}
+                        onChange={(e) => setSearchValue(e.target.value)}
+                    />
                 )}
-                <div className="prompt-dialog__actions-end">
-                    <button type="button" className="prompt-dialog__btn prompt-dialog__btn--cancel" onClick={onCancel}>Cancel</button>
+                <div className="prompt-dialog__options">
+                    {filtered.map((option) => (
+                        <button
+                            key={`${option.value}_${option.label}`}
+                            type="button"
+                            className={`prompt-dialog__option${displayState.currentValue === option.value ? " is-selected" : ""}`}
+                            onClick={() => onSubmit(option.value)}
+                        >
+                            {option.label}
+                        </button>
+                    ))}
+                    {filtered.length === 0 && <p className="prompt-dialog__empty">No result.</p>}
+                </div>
+                <div className="prompt-dialog__actions">
+                    {displayState.showBack && (
+                        <button type="button" className="prompt-dialog__btn prompt-dialog__btn--back" onClick={() => onSubmit(PROMPT_BACK)}>← Back</button>
+                    )}
+                    <div className="prompt-dialog__actions-end">
+                        <button type="button" className="prompt-dialog__btn prompt-dialog__btn--cancel" onClick={onCancel}>Cancel</button>
+                    </div>
                 </div>
             </div>
         </Modal>
