@@ -156,6 +156,7 @@ export function parseVtiClipboard(rawInput) {
     }
 
     delete next.data;
+    delete next.soTicket; // not present in VTI data — preserve any pre-filled value
     return { ok: true, fields: next };
 }
 
