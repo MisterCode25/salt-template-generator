@@ -2695,6 +2695,11 @@ textarea:focus {
     }
 }
 
+@keyframes promptStepIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
 .partners-modal {
     width: min(98vw, 1500px);
     max-height: 88vh;
@@ -3141,6 +3146,18 @@ textarea:focus {
     overflow: hidden;
     box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
     animation: modalSheetIn 0.25s cubic-bezier(0.22, 0.9, 0.2, 1);
+}
+
+.prompt-dialog__step {
+    animation: promptStepIn 0.18s ease;
+    display: flex;
+    flex-direction: column;
+}
+
+.prompt-dialog--search .prompt-dialog__step {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
 }
 
 .prompt-dialog--choices {
