@@ -125,16 +125,27 @@ function VariantModal({ model, onSelect, onClose }) {
 }
 
 function TokenPromptModal({ title, tokenDefs, values, missingTokens, onChange, onConfirm, onClose }) {
+    const isMultiCol = tokenDefs.length > 2;
     return (
-        <Modal onClose={onClose} dialogClassName="popup-box" ariaLabel="Template tokens">
-            <div className="popup-header">
+        <Modal onClose={onClose} dialogClassName="popup-box token-prompt-modal" ariaLabel="Template tokens">
+            <div className="popup-header token-prompt-header">
+                <div className="token-prompt-icon" aria-hidden="true">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                    </svg>
+                </div>
                 <div>
                     <h2>{title || "Template"}</h2>
-                    <p className="hint">Fill required tokens before copying.</p>
+                    <p className="hint">
+                        {tokenDefs.length === 1
+                            ? "Fill in the required field before copying."
+                            : `Fill in ${tokenDefs.length} required fields before copying.`}
+                    </p>
                 </div>
             </div>
-            <div className="popup-grid mt-md">
-                {tokenDefs.map((tokenDef) => {
+            <div className={`token-prompt-grid mt-md${isMultiCol ? " token-prompt-grid--multi" : ""}`}>
+                {tokenDefs.map((tokenDef, idx) => {
                     const type = tokenDef.input_type === "number"
                         ? "number"
                         : tokenDef.input_type === "date"
@@ -142,22 +153,33 @@ function TokenPromptModal({ title, tokenDefs, values, missingTokens, onChange, o
                             : "text";
                     const hasError = missingTokens.includes(tokenDef.token);
                     return (
-                        <div key={tokenDef.token} className="form-field">
-                            <label>{tokenDef.label || tokenDef.token}</label>
+                        <div key={tokenDef.token} className={`token-prompt-field${hasError ? " token-prompt-field--error" : ""}`}>
+                            <label htmlFor={`tp-${tokenDef.token}`}>{tokenDef.label || tokenDef.token}</label>
                             <input
+                                id={`tp-${tokenDef.token}`}
                                 type={type}
+                                autoFocus={idx === 0}
                                 value={values[tokenDef.token] ?? tokenDef.default ?? ""}
                                 className={hasError ? "input-error" : ""}
                                 placeholder={tokenDef.token}
                                 onChange={(e) => onChange(tokenDef.token, e.target.value)}
                             />
+                            {hasError && (
+                                <span className="token-prompt-field-error">This field is required</span>
+                            )}
                         </div>
                     );
                 })}
             </div>
             <div className="popup-actions">
                 <button className="secondary-btn" onClick={onClose}>Cancel</button>
-                <button className="primary-btn" onClick={onConfirm}>Copy text</button>
+                <button className="primary-btn" onClick={onConfirm}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{marginRight: "6px"}}>
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                    </svg>
+                    Copy text
+                </button>
             </div>
         </Modal>
     );
@@ -557,6 +579,17 @@ export default function Home() {
         lastSectionClickVersion.current[sectionKey] = inputChangeVersion.current;
     };
 
+    const clearOnDemandValues = (tokenDefs) => {
+        setValues((prev) => {
+            const next = { ...prev };
+            tokenDefs.forEach(({ token }) => {
+                delete next[token];
+                localStorage.removeItem("input_" + token);
+            });
+            return next;
+        });
+    };
+
     const confirmTokenPrompt = async () => {
         if (!tokenPrompt) return;
         const requiredTokens = tokenPrompt.tokenDefs.map((tokenDef) => tokenDef.token);
@@ -566,10 +599,11 @@ export default function Home() {
             showToast("Missing data for: " + missing.join(", "), "error");
             return;
         }
-        const { effectiveModel, sectionKey } = tokenPrompt;
+        const { effectiveModel, sectionKey, tokenDefs } = tokenPrompt;
         setTokenPrompt(null);
         setPromptMissingTokens([]);
         await copyModel(effectiveModel, sectionKey, null, true);
+        clearOnDemandValues(tokenDefs);
     };
 
     const handleCopy = (model) => {
@@ -768,8 +802,10 @@ export default function Home() {
                     }}
                     onConfirm={confirmTokenPrompt}
                     onClose={() => {
+                        const defs = tokenPrompt?.tokenDefs ?? [];
                         setPromptMissingTokens([]);
                         setTokenPrompt(null);
+                        clearOnDemandValues(defs);
                     }}
                 />
             )}
