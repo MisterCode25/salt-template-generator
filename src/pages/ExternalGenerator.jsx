@@ -158,7 +158,7 @@ function PromptModal({ state, onCancel, onSubmit }) {
     }
 
     const options = displayState.options || [];
-    const filtered = displayState.searchable
+    const filtered = (displayState.searchable && !displayState.customNote)
         ? options.filter((opt) => opt.label.toLowerCase().includes(searchValue.trim().toLowerCase()))
         : options;
 
@@ -166,14 +166,29 @@ function PromptModal({ state, onCancel, onSubmit }) {
         <Modal
             onClose={onCancel}
             ariaLabel={displayState.title}
-            dialogClassName={`prompt-dialog${displayState.searchable ? " prompt-dialog--search" : " prompt-dialog--choices"}`}
+            dialogClassName={`prompt-dialog${(displayState.searchable || displayState.customNote) ? " prompt-dialog--search" : " prompt-dialog--choices"}`}
         >
             <div key={contentKey} className="prompt-dialog__step">
                 <div className="prompt-dialog__header">
                     <span className="prompt-dialog__indicator" />
                     <h2>{displayState.title}</h2>
                 </div>
-                {displayState.searchable && (
+                {displayState.customNote ? (
+                    <input
+                        autoFocus
+                        type="text"
+                        className="prompt-dialog__search"
+                        placeholder="Custom note..."
+                        value={inputValue}
+                        onChange={(e) => setInputValue(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter" && inputValue.trim()) {
+                                e.preventDefault();
+                                onSubmit(inputValue.trim());
+                            }
+                        }}
+                    />
+                ) : displayState.searchable && (
                     <input
                         autoFocus
                         type="text"
@@ -202,6 +217,15 @@ function PromptModal({ state, onCancel, onSubmit }) {
                     )}
                     <div className="prompt-dialog__actions-end">
                         <button type="button" className="prompt-dialog__btn prompt-dialog__btn--cancel" onClick={onCancel}>Cancel</button>
+                        {displayState.customNote && (
+                            <button
+                                type="button"
+                                className="prompt-dialog__btn prompt-dialog__btn--continue"
+                                onClick={() => inputValue.trim() && onSubmit(inputValue.trim())}
+                            >
+                                Continue →
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
@@ -364,9 +388,11 @@ export default function ExternalGenerator({ embedded = false, onClose }) {
                 title,
                 options,
                 searchable: extra.searchable || false,
+                customNote: extra.customNote || false,
                 searchPlaceholder: extra.searchPlaceholder || "",
                 showBack: !!extra.showBack,
-                currentValue: extra.currentValue ?? null
+                currentValue: extra.currentValue ?? null,
+                initialValue: extra.customNote ? (extra.currentValue || "") : ""
             });
         });
     };
@@ -484,7 +510,7 @@ export default function ExternalGenerator({ embedded = false, onClose }) {
                     if (isBlank(draft.SignalStatus)) return { kind: "choice", key: "SignalStatus", title: "Signal Status", options: SIGNAL_OPTIONS };
                     if (isBlank(draft.LedStatus)) return { kind: "choice", key: "LedStatus", title: "LED Status", options: LED_OPTIONS };
                     if (isBlank(draft.comment)) {
-                        return { kind: "choice-search", key: "comment", title: "Missing Info Comment", options: MISSING_INFO_COMMENT_OPTIONS };
+                        return { kind: "choice-search", key: "comment", title: "Missing Info Comment", options: MISSING_INFO_COMMENT_OPTIONS, customNote: true };
                     }
                 }
 
@@ -520,7 +546,7 @@ export default function ExternalGenerator({ embedded = false, onClose }) {
                 if (meta.mode === "Generic") {
                     if (isBlank(draft.SignalStatus)) return { kind: "choice", key: "SignalStatus", title: "Signal Status", options: SIGNAL_OPTIONS };
                     if (isBlank(draft.LedStatus)) return { kind: "choice", key: "LedStatus", title: "LED Status", options: LED_OPTIONS };
-                    if (isBlank(draft.comment)) return { kind: "choice-search", key: "comment", title: "Comment", options: COMMENT_OPTIONS };
+                    if (isBlank(draft.comment)) return { kind: "choice-search", key: "comment", title: "Comment", options: COMMENT_OPTIONS, customNote: true };
                 }
             }
 
@@ -528,7 +554,7 @@ export default function ExternalGenerator({ embedded = false, onClose }) {
             if (isBlank(draft.SignalStatus)) return { kind: "choice", key: "SignalStatus", title: "Signal Status", options: SIGNAL_OPTIONS };
             if (isBlank(draft.LedStatus)) return { kind: "choice", key: "LedStatus", title: "LED Status", options: LED_OPTIONS };
             if (draft.treatmentStep !== "FLL Ticket" && isBlank(draft.comment)) {
-                return { kind: "choice-search", key: "comment", title: "Comment", options: COMMENT_OPTIONS };
+                return { kind: "choice-search", key: "comment", title: "Comment", options: COMMENT_OPTIONS, customNote: true };
             }
 
             return null;
@@ -590,7 +616,9 @@ export default function ExternalGenerator({ embedded = false, onClose }) {
                 const value = await askChoice(
                     step.title,
                     step.options.map((v) => ({ label: v, value: v })),
-                    { searchable: true, searchPlaceholder: `Search ${step.title.toLowerCase()}...`, showBack: history.length > 0 }
+                    step.customNote
+                        ? { customNote: true, showBack: history.length > 0 }
+                        : { searchable: true, searchPlaceholder: `Search ${step.title.toLowerCase()}...`, showBack: history.length > 0 }
                 );
                 if (value === PROMPT_BACK) {
                     const previous = history.pop();
@@ -794,7 +822,7 @@ export default function ExternalGenerator({ embedded = false, onClose }) {
         treatmentStep: { type: "choice", options: TREATMENT_STEP_OPTIONS, title: "Treatment Step" },
         boxType: { type: "choice", options: BOX_TYPE_OPTIONS, title: "Box Type" },
         partner: { type: "search", title: "Partner", options: EXTERNAL_GENERATOR_PARTNERS, searchPlaceholder: "Type first letters (EWB, SGSW...)" },
-        comment: { type: "search", title: "Comment", options: COMMENT_OPTIONS },
+        comment: { type: "custom-note", title: "Comment", options: COMMENT_OPTIONS },
         customer: { type: "input", title: "Customer", placeholder: "Contractor number" },
         soTicket: { type: "input", title: "SO Ticket", placeholder: "e.g. 31436062" },
         partnerTicketNumber: { type: "input", title: "Partner Ticket Number", placeholder: "e.g. 12345678" },
@@ -819,6 +847,12 @@ export default function ExternalGenerator({ embedded = false, onClose }) {
                 config.title,
                 config.options.map((v) => ({ label: v, value: v })),
                 { searchable: true, searchPlaceholder: config.searchPlaceholder || "Search...", currentValue: fields[fieldId] }
+            );
+        } else if (config.type === "custom-note") {
+            value = await askChoice(
+                config.title,
+                config.options.map((v) => ({ label: v, value: v })),
+                { customNote: true, currentValue: fields[fieldId] }
             );
         } else {
             value = await askInput(config.title, config.placeholder || "", fields[fieldId] || "");
