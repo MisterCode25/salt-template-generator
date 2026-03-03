@@ -475,9 +475,9 @@ export default function ExternalGenerator({ embedded = false, onClose }) {
                 }
 
                 if (meta.mode === "Power supply") {
-                    if (isBlank(draft.SignalStatus)) return { kind: "preset", patch: { SignalStatus: "Lost" } };
-                    if (isBlank(draft.LedStatus)) return { kind: "preset", patch: { LedStatus: "Fiber Off" } };
-                    if (isBlank(draft.comment)) return { kind: "preset", patch: { comment: "Power cable" } };
+                    if (draft.SignalStatus !== "Lost") return { kind: "preset", patch: { SignalStatus: "Lost" } };
+                    if (draft.LedStatus !== "Fiber Off") return { kind: "preset", patch: { LedStatus: "Fiber Off" } };
+                    if (draft.comment !== "Power cable") return { kind: "preset", patch: { comment: "Power cable" } };
                 }
 
                 if (meta.mode === "Missing info") {
@@ -827,7 +827,14 @@ export default function ExternalGenerator({ embedded = false, onClose }) {
         await new Promise((r) => setTimeout(r, 0));
 
         const updatedFields = { ...fieldsRef.current, [fieldId]: cleaned };
-        await runPostVtiCompletionFlow(updatedFields, inferMetaFromFields(updatedFields));
+        await runPostVtiCompletionFlow(updatedFields, {
+            flaggingConfirmed: !isBlank(updatedFields.flagging),
+            mode: null,
+            boxSwapStatus: null,
+            escalationType: null,
+            escalationCaseType: null,
+            boxSwapSerialImpact: null,
+        });
     };
 
     const InputField = ({ id, label, type = "text" }) => {
