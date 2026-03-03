@@ -48,28 +48,38 @@ function TokenModal({ initial, tokens, onClose, onSave }) {
 
                 <div className="popup-grid">
                     <div className="popup-card">
-                        <label>Token name (format: {"{my_token}"})</label>
-                        <input value={token} onChange={e => setToken(e.target.value)} />
+                        <div className="field-line">
+                            <label>Token name (format: {"{my_token}"})</label>
+                            <input value={token} onChange={e => setToken(e.target.value)} />
+                        </div>
 
-                        <label>Display label</label>
-                        <input value={label} onChange={e => setLabel(e.target.value)} />
+                        <div className="field-line">
+                            <label>Display label</label>
+                            <input value={label} onChange={e => setLabel(e.target.value)} />
+                        </div>
 
-                        <label>Parsing key (optional)</label>
-                        <input
-                            value={key}
-                            onChange={e => setKey(e.target.value)}
-                            placeholder="Ex: LastName, Mobile, Request…"
-                        />
+                        <div className="field-line">
+                            <label>Parsing key (optional)</label>
+                            <input
+                                value={key}
+                                onChange={e => setKey(e.target.value)}
+                                placeholder="Ex: LastName, Mobile, Request…"
+                            />
+                        </div>
 
-                        <label>Field type</label>
-                        <select value={type} onChange={e => setType(e.target.value)}>
-                            <option value="text">Text</option>
-                            <option value="number">Number</option>
-                            <option value="date">Date</option>
-                        </select>
+                        <div className="field-line">
+                            <label>Field type</label>
+                            <select value={type} onChange={e => setType(e.target.value)}>
+                                <option value="text">Text</option>
+                                <option value="number">Number</option>
+                                <option value="date">Date</option>
+                            </select>
+                        </div>
 
-                        <label>Default value (optional)</label>
-                        <input value={def} onChange={e => setDef(e.target.value)} />
+                        <div className="field-line">
+                            <label>Default value (optional)</label>
+                            <input value={def} onChange={e => setDef(e.target.value)} />
+                        </div>
                     </div>
                 </div>
 
