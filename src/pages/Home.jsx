@@ -14,8 +14,6 @@ import Settings from "./Settings.jsx";
 import ExternalGenerator from "./ExternalGenerator.jsx";
 import ManageTemplates from "./ManageTemplates.jsx";
 
-const TOKEN_DISPLAY_MODE_KEY = "local_tokenDisplayMode";
-
 function DataInputs({
     tokens,
     values,
@@ -346,9 +344,6 @@ export default function Home() {
     const [externalGeneratorOpen, setExternalGeneratorOpen] = useState(false);
     const [externalGeneratorClosing, setExternalGeneratorClosing] = useState(false);
     const [manageTemplatesOpen, setManageTemplatesOpen] = useState(false);
-    const [tokenDisplayMode, setTokenDisplayMode] = useState(
-        () => localStorage.getItem(TOKEN_DISPLAY_MODE_KEY) || "all"
-    );
     const [tokenPrompt, setTokenPrompt] = useState(null);
     const [promptMissingTokens, setPromptMissingTokens] = useState([]);
 
@@ -484,26 +479,30 @@ export default function Home() {
         return { values: vals, missing };
     };
 
-    const copyModel = async (model, section, baseModel = null, forcePrompt = false) => {
+    const copyModel = async (model, section, baseModel = null, skipPopup = false) => {
         const sectionKey = section || model?.type || "global";
         const effectiveModel = baseModel ? resolveVariantModel(baseModel, model) : model;
         const text = getTextByLang(effectiveModel, lang) || "";
         const tokensNeeded = Array.from(new Set(text.match(/\{[^{}]+\}/g) || []));
 
-        if ((forcePrompt || tokenDisplayMode === "on_demand_popup") && tokensNeeded.length > 0) {
+        if (!skipPopup && tokensNeeded.length > 0) {
             const tokenMap = new Map(tokens.map((tokenDef) => [tokenDef.token, tokenDef]));
-            setPromptMissingTokens([]);
-            setTokenPrompt({
-                title: effectiveModel.title,
-                tokenDefs: tokensNeeded.map((tokenName) => tokenMap.get(tokenName) || {
-                    token: tokenName,
-                    label: tokenName,
-                    input_type: "text"
-                }),
-                effectiveModel,
-                sectionKey
-            });
-            return;
+            const onDemandNeeded = tokensNeeded
+                .filter((tokenName) => tokenMap.get(tokenName)?.display_mode === "on_demand");
+            if (onDemandNeeded.length > 0) {
+                setPromptMissingTokens([]);
+                setTokenPrompt({
+                    title: effectiveModel.title,
+                    tokenDefs: onDemandNeeded.map((tokenName) => tokenMap.get(tokenName) || {
+                        token: tokenName,
+                        label: tokenName,
+                        input_type: "text"
+                    }),
+                    effectiveModel,
+                    sectionKey
+                });
+                return;
+            }
         }
 
         if (tokensNeeded.length === 0) {
@@ -555,7 +554,7 @@ export default function Home() {
         const { effectiveModel, sectionKey } = tokenPrompt;
         setTokenPrompt(null);
         setPromptMissingTokens([]);
-        await copyModel(effectiveModel, sectionKey, null, false);
+        await copyModel(effectiveModel, sectionKey, null, true);
     };
 
     const handleCopy = (model) => {
@@ -673,23 +672,16 @@ export default function Home() {
 
             {!empty && (
                 <div id="zones-grid" className="zones-grid">
-                    {tokenDisplayMode === "all" ? (
-                        <DataInputs
-                            tokens={tokens}
-                            values={values}
-                            setValues={setValues}
-                            onDirty={() => { inputChangeVersion.current++; }}
-                            inputErrors={inputErrors}
-                            inputWarnings={inputWarnings}
-                            onClearTokenDecoration={clearTokenDecoration}
-                            onResetDecorations={clearInputDecorations}
-                        />
-                    ) : (
-                        <section id="zone-left" className="zone-box">
-                            <h3>Data</h3>
-                            <p className="hint">Token fields are hidden on Home. Click a template to fill required tokens in a popup.</p>
-                        </section>
-                    )}
+                    <DataInputs
+                        tokens={tokens.filter(t => t.display_mode !== "on_demand")}
+                        values={values}
+                        setValues={setValues}
+                        onDirty={() => { inputChangeVersion.current++; }}
+                        inputErrors={inputErrors}
+                        inputWarnings={inputWarnings}
+                        onClearTokenDecoration={clearTokenDecoration}
+                        onResetDecorations={clearInputDecorations}
+                    />
 
                 <section id="email-col" className="zone-box">
                     <h3>Email</h3>
@@ -739,7 +731,6 @@ export default function Home() {
                     <Settings
                         embedded
                         onClose={() => setSettingsOpen(false)}
-                        onTokenDisplayModeChange={setTokenDisplayMode}
                     />
                 </Modal>
             )}

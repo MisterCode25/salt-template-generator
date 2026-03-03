@@ -8,9 +8,7 @@ import { showToast } from "../services/clipboardService.js";
 import Modal from "../components/Modal.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
 
-const TOKEN_DISPLAY_MODE_KEY = "local_tokenDisplayMode";
-
-export default function Settings({ embedded = false, onClose = null, onTokenDisplayModeChange = null }) {
+export default function Settings({ embedded = false, onClose = null }) {
     const navigate = useNavigate();
     const fileInputRef = useRef(null);
     const [tokens, setTokens] = useState([]);
@@ -19,9 +17,6 @@ export default function Settings({ embedded = false, onClose = null, onTokenDisp
     const [confirmReset, setConfirmReset] = useState(false);
     const [exportNameOpen, setExportNameOpen] = useState(false);
     const [exportNameValue, setExportNameValue] = useState("");
-    const [tokenDisplayMode, setTokenDisplayMode] = useState(
-        () => localStorage.getItem(TOKEN_DISPLAY_MODE_KEY) || "all"
-    );
     useEffect(() => {
         loadTokens().then(setTokens);
         loadTemplates().then(setModels);
@@ -77,12 +72,6 @@ export default function Settings({ embedded = false, onClose = null, onTokenDisp
     };
 
     const triggerReset = () => setConfirmReset(true);
-
-    const handleTokenDisplayModeChange = (mode) => {
-        setTokenDisplayMode(mode);
-        localStorage.setItem(TOKEN_DISPLAY_MODE_KEY, mode);
-        if (onTokenDisplayModeChange) onTokenDisplayModeChange(mode);
-    };
 
     const resetStorage = async () => {
         setConfirmReset(false);
@@ -148,19 +137,7 @@ export default function Settings({ embedded = false, onClose = null, onTokenDisp
                         </button>
                     </div>
 
-                    <div className="popup-card">
-                        <label>Token display</label>
-                        <p className="hint">Choose whether token fields are always visible on Home, or shown in a popup when using a template.</p>
-                        <div className="form-field">
-                            <select
-                                value={tokenDisplayMode}
-                                onChange={(e) => handleTokenDisplayModeChange(e.target.value)}
-                            >
-                                <option value="all">Show token fields on Home page</option>
-                                <option value="on_demand_popup">Show token fields only in template popup</option>
-                            </select>
-                        </div>
-                    </div>
+
                 </div>
             </div>
             {exportNameOpen && (

@@ -12,6 +12,7 @@ function TokenModal({ initial, tokens, onClose, onSave }) {
     const [key, setKey] = useState(initial?.key || "");
     const [type, setType] = useState(initial?.input_type || "text");
     const [def, setDef] = useState(initial?.default || "");
+    const [displayMode, setDisplayMode] = useState(initial?.display_mode || "always");
 
     const handleSave = () => {
         const normalizedToken = token.trim();
@@ -36,7 +37,8 @@ function TokenModal({ initial, tokens, onClose, onSave }) {
             label: normalizedLabel,
             key: normalizedKey || undefined,
             input_type: type,
-            default: normalizedDefault !== "" ? normalizedDefault : undefined
+            default: normalizedDefault !== "" ? normalizedDefault : undefined,
+            display_mode: displayMode
         });
     };
 
@@ -79,6 +81,14 @@ function TokenModal({ initial, tokens, onClose, onSave }) {
                         <div className="field-line">
                             <label>Default value (optional)</label>
                             <input value={def} onChange={e => setDef(e.target.value)} />
+                        </div>
+
+                        <div className="field-line">
+                            <label>Display mode</label>
+                            <select value={displayMode} onChange={e => setDisplayMode(e.target.value)}>
+                                <option value="always">Always visible on Home</option>
+                                <option value="on_demand">Ask in popup when using a template</option>
+                            </select>
                         </div>
                     </div>
                 </div>
@@ -147,6 +157,9 @@ export default function ManageTokens() {
                         <div key={t.id} className="model-row">
                             <div>
                                 <strong>{t.label || t.token}</strong> <span className="hint">{t.token}</span>
+                                {t.display_mode === "on_demand" && (
+                                    <span className="variant-pill" style={{ marginLeft: "0.4rem" }}>on demand</span>
+                                )}
                                 {t.key && <div className="hint mt-sm">Key: {t.key}</div>}
                             </div>
                             <div className="flex-row gap-sm" style={{ marginLeft: "auto" }}>
