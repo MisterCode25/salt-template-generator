@@ -14,6 +14,8 @@ import Settings from "./Settings.jsx";
 import ExternalGenerator from "./ExternalGenerator.jsx";
 import ManageTemplates from "./ManageTemplates.jsx";
 
+const TOKEN_DISPLAY_MODE_KEY = "local_tokenDisplayMode";
+
 function DataInputs({
     tokens,
     values,
@@ -120,6 +122,45 @@ function VariantModal({ model, onSelect, onClose }) {
                 <div className="popup-actions">
                     <button className="secondary-btn" onClick={onClose}>Close</button>
                 </div>
+        </Modal>
+    );
+}
+
+function TokenPromptModal({ title, tokenDefs, values, missingTokens, onChange, onConfirm, onClose }) {
+    return (
+        <Modal onClose={onClose} dialogClassName="popup-box" ariaLabel="Template tokens">
+            <div className="popup-header">
+                <div>
+                    <h2>{title || "Template"}</h2>
+                    <p className="hint">Fill required tokens before copying.</p>
+                </div>
+            </div>
+            <div className="popup-grid mt-md">
+                {tokenDefs.map((tokenDef) => {
+                    const type = tokenDef.input_type === "number"
+                        ? "number"
+                        : tokenDef.input_type === "date"
+                            ? "date"
+                            : "text";
+                    const hasError = missingTokens.includes(tokenDef.token);
+                    return (
+                        <div key={tokenDef.token} className="form-field">
+                            <label>{tokenDef.label || tokenDef.token}</label>
+                            <input
+                                type={type}
+                                value={values[tokenDef.token] ?? tokenDef.default ?? ""}
+                                className={hasError ? "input-error" : ""}
+                                placeholder={tokenDef.token}
+                                onChange={(e) => onChange(tokenDef.token, e.target.value)}
+                            />
+                        </div>
+                    );
+                })}
+            </div>
+            <div className="popup-actions">
+                <button className="secondary-btn" onClick={onClose}>Cancel</button>
+                <button className="primary-btn" onClick={onConfirm}>Copy text</button>
+            </div>
         </Modal>
     );
 }
@@ -305,6 +346,11 @@ export default function Home() {
     const [externalGeneratorOpen, setExternalGeneratorOpen] = useState(false);
     const [externalGeneratorClosing, setExternalGeneratorClosing] = useState(false);
     const [manageTemplatesOpen, setManageTemplatesOpen] = useState(false);
+    const [tokenDisplayMode, setTokenDisplayMode] = useState(
+        () => localStorage.getItem(TOKEN_DISPLAY_MODE_KEY) || "all"
+    );
+    const [tokenPrompt, setTokenPrompt] = useState(null);
+    const [promptMissingTokens, setPromptMissingTokens] = useState([]);
 
     useEffect(() => {
         loadTokens().then(setTokens);
@@ -438,11 +484,28 @@ export default function Home() {
         return { values: vals, missing };
     };
 
-    const copyModel = async (model, section, baseModel = null) => {
+    const copyModel = async (model, section, baseModel = null, forcePrompt = false) => {
         const sectionKey = section || model?.type || "global";
         const effectiveModel = baseModel ? resolveVariantModel(baseModel, model) : model;
         const text = getTextByLang(effectiveModel, lang) || "";
         const tokensNeeded = Array.from(new Set(text.match(/\{[^{}]+\}/g) || []));
+
+        if ((forcePrompt || tokenDisplayMode === "on_demand_popup") && tokensNeeded.length > 0) {
+            const tokenMap = new Map(tokens.map((tokenDef) => [tokenDef.token, tokenDef]));
+            setPromptMissingTokens([]);
+            setTokenPrompt({
+                title: effectiveModel.title,
+                tokenDefs: tokensNeeded.map((tokenName) => tokenMap.get(tokenName) || {
+                    token: tokenName,
+                    label: tokenName,
+                    input_type: "text"
+                }),
+                effectiveModel,
+                sectionKey
+            });
+            return;
+        }
+
         if (tokensNeeded.length === 0) {
             const finalText = generateFinalText(effectiveModel, lang, {});
             await copyText(finalText, { message: "Text copied", variant: "info" });
@@ -478,6 +541,21 @@ export default function Home() {
             variant: warnSameSection ? "warning" : "info"
         });
         lastSectionClickVersion.current[sectionKey] = inputChangeVersion.current;
+    };
+
+    const confirmTokenPrompt = async () => {
+        if (!tokenPrompt) return;
+        const requiredTokens = tokenPrompt.tokenDefs.map((tokenDef) => tokenDef.token);
+        const { missing } = collectInputValues(requiredTokens);
+        if (missing.length > 0) {
+            setPromptMissingTokens(missing);
+            showToast("Missing data for: " + missing.join(", "), "error");
+            return;
+        }
+        const { effectiveModel, sectionKey } = tokenPrompt;
+        setTokenPrompt(null);
+        setPromptMissingTokens([]);
+        await copyModel(effectiveModel, sectionKey, null, false);
     };
 
     const handleCopy = (model) => {
@@ -595,16 +673,23 @@ export default function Home() {
 
             {!empty && (
                 <div id="zones-grid" className="zones-grid">
-                    <DataInputs
-                        tokens={tokens}
-                        values={values}
-                        setValues={setValues}
-                        onDirty={() => { inputChangeVersion.current++; }}
-                        inputErrors={inputErrors}
-                        inputWarnings={inputWarnings}
-                        onClearTokenDecoration={clearTokenDecoration}
-                        onResetDecorations={clearInputDecorations}
-                    />
+                    {tokenDisplayMode === "all" ? (
+                        <DataInputs
+                            tokens={tokens}
+                            values={values}
+                            setValues={setValues}
+                            onDirty={() => { inputChangeVersion.current++; }}
+                            inputErrors={inputErrors}
+                            inputWarnings={inputWarnings}
+                            onClearTokenDecoration={clearTokenDecoration}
+                            onResetDecorations={clearInputDecorations}
+                        />
+                    ) : (
+                        <section id="zone-left" className="zone-box">
+                            <h3>Data</h3>
+                            <p className="hint">Token fields are hidden on Home. Click a template to fill required tokens in a popup.</p>
+                        </section>
+                    )}
 
                 <section id="email-col" className="zone-box">
                     <h3>Email</h3>
@@ -651,8 +736,36 @@ export default function Home() {
 
             {settingsOpen && (
                 <Modal onClose={() => setSettingsOpen(false)} dialogClassName="popup-box settings-modal" ariaLabel="Settings">
-                    <Settings embedded onClose={() => setSettingsOpen(false)} />
+                    <Settings
+                        embedded
+                        onClose={() => setSettingsOpen(false)}
+                        onTokenDisplayModeChange={setTokenDisplayMode}
+                    />
                 </Modal>
+            )}
+
+            {tokenPrompt && (
+                <TokenPromptModal
+                    title={tokenPrompt.title}
+                    tokenDefs={tokenPrompt.tokenDefs}
+                    values={values}
+                    missingTokens={promptMissingTokens}
+                    onChange={(token, nextValue) => {
+                        setValues((prev) => {
+                            const next = { ...prev, [token]: nextValue };
+                            localStorage.setItem("input_" + token, nextValue);
+                            return next;
+                        });
+                        clearTokenDecoration(token);
+                        setPromptMissingTokens((prev) => prev.filter((name) => name !== token));
+                        inputChangeVersion.current++;
+                    }}
+                    onConfirm={confirmTokenPrompt}
+                    onClose={() => {
+                        setPromptMissingTokens([]);
+                        setTokenPrompt(null);
+                    }}
+                />
             )}
 
             {manageTemplatesOpen && (
