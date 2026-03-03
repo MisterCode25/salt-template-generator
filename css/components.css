@@ -1067,6 +1067,153 @@ textarea:focus {
     gap: 10px;
 }
 
+/*********** TOKEN PROMPT MODAL ***********/
+.token-prompt-modal {
+    max-width: 520px;
+    width: 94%;
+}
+
+.token-prompt-header {
+    gap: 14px;
+    align-items: flex-start;
+    margin-bottom: var(--space-lg);
+}
+
+.token-prompt-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    border-radius: var(--radius-md);
+    background: rgba(80, 120, 255, 0.14);
+    border: 1px solid rgba(80, 120, 255, 0.28);
+    color: #a0b8ff;
+}
+
+.token-prompt-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+}
+
+.token-prompt-grid--multi {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.token-prompt-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.token-prompt-field label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #c9d6ff;
+    letter-spacing: 0.2px;
+}
+
+.token-prompt-field input {
+    width: 100%;
+    max-width: none;
+    background: rgba(20, 26, 42, 0.9);
+    border: 1px solid rgba(80, 120, 255, 0.32);
+    border-radius: var(--radius-sm);
+    padding: var(--space-md) var(--space-lg);
+    color: #ffffff;
+    font-size: var(--font-base);
+    transition: var(--transition-base);
+}
+
+.token-prompt-field input:focus {
+    border-color: rgba(120, 160, 255, 0.72);
+    box-shadow: 0 0 0 2px rgba(80, 120, 255, 0.18);
+    outline: none;
+}
+
+.token-prompt-field--error label {
+    color: #ffb3b3;
+}
+
+.token-prompt-field-error {
+    font-size: 12px;
+    color: #ff8a8a;
+    margin-top: 2px;
+}
+
+.token-prompt-modal .popup-actions {
+    margin-top: var(--space-lg);
+    border-top: 1px solid rgba(80, 120, 255, 0.15);
+    padding-top: var(--space-lg);
+}
+
+.token-prompt-modal .primary-btn {
+    display: inline-flex;
+    align-items: center;
+}
+
+/* Light theme overrides */
+.light-theme .token-prompt-icon {
+    background: rgba(30, 60, 120, 0.08);
+    border-color: rgba(30, 60, 120, 0.18);
+    color: #2a4fa0;
+}
+
+.light-theme .token-prompt-field label {
+    color: #1a2a50;
+}
+
+.light-theme .token-prompt-field input {
+    background: #ffffff;
+    border-color: rgba(30, 60, 120, 0.22);
+    color: #0f1a33;
+}
+
+.light-theme .token-prompt-field input:focus {
+    border-color: rgba(30, 90, 200, 0.55);
+    box-shadow: 0 0 0 2px rgba(30, 80, 180, 0.10);
+}
+
+.light-theme .token-prompt-field--error label {
+    color: #c0392b;
+}
+
+.light-theme .token-prompt-field-error {
+    color: #c0392b;
+}
+
+.light-theme .token-prompt-modal .popup-actions {
+    border-top-color: rgba(30, 60, 120, 0.12);
+}
+
+/* Salt theme overrides */
+.salt-theme .token-prompt-icon {
+    background: rgba(0, 200, 100, 0.10);
+    border-color: rgba(5, 200, 100, 0.25);
+    color: #00cc70;
+}
+
+.salt-theme .token-prompt-field label {
+    color: #e0ffe8;
+}
+
+.salt-theme .token-prompt-field input {
+    background: #0f0f0f;
+    border-color: rgba(255, 255, 255, 0.18);
+    color: #ffffff;
+}
+
+.salt-theme .token-prompt-field input:focus {
+    border-color: rgba(5, 200, 100, 0.55);
+    box-shadow: 0 0 0 2px rgba(5, 170, 80, 0.15);
+}
+
+.salt-theme .token-prompt-modal .popup-actions {
+    border-top-color: rgba(255, 255, 255, 0.10);
+}
+
 .secondary-btn {
     padding: 10px var(--space-lg);
     font-size: var(--font-base);
