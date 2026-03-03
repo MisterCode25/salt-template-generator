@@ -485,8 +485,29 @@ export default function Home() {
         const text = getTextByLang(effectiveModel, lang) || "";
         const tokensNeeded = Array.from(new Set(text.match(/\{[^{}]+\}/g) || []));
 
-        if (!skipPopup && tokensNeeded.length > 0) {
-            const tokenMap = new Map(tokens.map((tokenDef) => [tokenDef.token, tokenDef]));
+        if (tokensNeeded.length === 0) {
+            const finalText = generateFinalText(effectiveModel, lang, {});
+            await copyText(finalText, { message: "Text copied", variant: "info" });
+            lastSectionClickVersion.current[sectionKey] = inputChangeVersion.current;
+            return;
+        }
+
+        const tokenMap = new Map(tokens.map((tokenDef) => [tokenDef.token, tokenDef]));
+
+        // Always verify visible tokens first, before showing any popup
+        const visibleTokensNeeded = tokensNeeded.filter(
+            (tokenName) => tokenMap.get(tokenName)?.display_mode !== "on_demand"
+        );
+        if (visibleTokensNeeded.length > 0) {
+            const { missing: missingVisible } = collectInputValues(visibleTokensNeeded);
+            if (missingVisible.length > 0) {
+                showToast("Missing data for: " + missingVisible.join(", "), "error");
+                return;
+            }
+        }
+
+        // Then check on-demand tokens and show popup if needed
+        if (!skipPopup) {
             const onDemandNeeded = tokensNeeded
                 .filter((tokenName) => tokenMap.get(tokenName)?.display_mode === "on_demand");
             if (onDemandNeeded.length > 0) {
@@ -505,12 +526,6 @@ export default function Home() {
             }
         }
 
-        if (tokensNeeded.length === 0) {
-            const finalText = generateFinalText(effectiveModel, lang, {});
-            await copyText(finalText, { message: "Text copied", variant: "info" });
-            lastSectionClickVersion.current[sectionKey] = inputChangeVersion.current;
-            return;
-        }
         const { values: filled, missing } = collectInputValues(tokensNeeded);
         if (missing.length > 0) {
             showToast("Missing data for: " + missing.join(", "), "error");
