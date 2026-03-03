@@ -780,6 +780,13 @@ export default function ExternalGenerator({ embedded = false, onClose }) {
         return meta;
     };
 
+    // When the user modifies a branching field via field click, clear the fields that
+    // logically come after it in the wizard so the flow re-asks for them.
+    const WIZARD_DOWNSTREAM_FIELDS = {
+        flagging: ["treatmentStep", "SignalStatus", "LedStatus", "partner", "partnerTicketNumber", "comment"],
+        treatmentStep: ["SignalStatus", "LedStatus", "partner", "partnerTicketNumber", "comment"],
+    };
+
     const FIELD_POPUP_CONFIG = {
         flagging: { type: "choice", options: FLAGGING_OPTIONS, title: "Flagging" },
         SignalStatus: { type: "choice", options: SIGNAL_OPTIONS_ESCALATION, title: "Signal Status" },
@@ -821,12 +828,23 @@ export default function ExternalGenerator({ embedded = false, onClose }) {
         const cleaned = String(value).trim();
         if (!cleaned) return;
 
-        setField(fieldId, cleaned);
+        // When modifying a branching field, clear its downstream fields so the wizard
+        // re-asks for them in the correct context rather than skipping them.
+        const downstreamFields = WIZARD_DOWNSTREAM_FIELDS[fieldId] || [];
+        const clearPatch = downstreamFields.reduce((acc, f) => ({ ...acc, [f]: "" }), {});
+
+        const updatedFields = { ...fieldsRef.current, [fieldId]: cleaned, ...clearPatch };
+        setFields(updatedFields);
+        setVtiEmptyFieldErrors((prev) => {
+            const next = { ...prev };
+            delete next[fieldId];
+            downstreamFields.forEach((f) => delete next[f]);
+            return next;
+        });
 
         // Let React flush the prompt-close state before opening the next one
         await new Promise((r) => setTimeout(r, 0));
 
-        const updatedFields = { ...fieldsRef.current, [fieldId]: cleaned };
         await runPostVtiCompletionFlow(updatedFields, inferMetaFromFields(updatedFields));
     };
 
