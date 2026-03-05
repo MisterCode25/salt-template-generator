@@ -25,6 +25,8 @@ import {
     assert.equal(parsed.fields.customer, "123");
     assert.equal(parsed.fields.partner, "EWB");
     assert.equal(parsed.fields.comment, "Comment");
+    // Date must be converted from DD.MM.YYYY to YYYY-MM-DD
+    assert.equal(parsed.fields.data, "2026-02-26");
 }
 
 {
@@ -32,6 +34,8 @@ import {
     assert.equal(parsed.ok, true);
     assert.equal(parsed.fields.flagging, "");
     assert.equal(parsed.fields.customer, "123");
+    // Date must be correctly parsed even without flagging prefix
+    assert.equal(parsed.fields.data, "2026-02-26");
 }
 
 {

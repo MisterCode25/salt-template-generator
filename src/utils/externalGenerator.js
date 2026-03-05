@@ -86,11 +86,15 @@ export function parseExternalId(externalId) {
     for (let i = 0; i < EXTERNAL_FIELD_ORDER.length; i++) {
         const key = EXTERNAL_FIELD_ORDER[i];
         if (key === "data") {
+            const datePart = (parts[i] ?? "").trim();
+            const dateMatch = datePart.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+            if (dateMatch) {
+                next.data = `${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}`;
+            }
             continue;
         }
         next[key] = parts[i] ?? "";
     }
-    delete next.data;
     return { ok: true, fields: next };
 }
 
