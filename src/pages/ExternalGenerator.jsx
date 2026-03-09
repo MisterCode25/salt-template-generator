@@ -560,6 +560,24 @@ export default function ExternalGenerator({ embedded = false, onClose }) {
             return null;
         };
 
+        const autoCopyResult = async () => {
+            const code = buildExternalCode(draft);
+            if (!code) return;
+            try {
+                await navigator.clipboard.writeText(code);
+            } catch {
+                const ta = document.createElement("textarea");
+                ta.value = code;
+                ta.style.position = "fixed";
+                ta.style.opacity = "0";
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand("copy");
+                document.body.removeChild(ta);
+            }
+            showToast("External ID copied!", "success");
+        };
+
         while (true) {
             const step = nextStep();
             if (!step) break;
@@ -671,6 +689,7 @@ export default function ExternalGenerator({ embedded = false, onClose }) {
             }
         }
 
+        await autoCopyResult();
         return true;
     };
 
