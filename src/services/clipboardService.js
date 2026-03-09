@@ -37,6 +37,7 @@ export function showToast(message, variant = "info") {
     toast.style.transform = "translateX(-50%)";
     const palette = {
         info: { bg: "white", fg: "black" },
+        success: { bg: "#15803d", fg: "#f0fdf4" },
         error: { bg: "#b91c1c", fg: "#ffecec" },
         warning: { bg: "#b45309", fg: "#fff5e6" }
     };
