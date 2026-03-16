@@ -40,21 +40,35 @@ export async function copyHtml(html, opts = {}) {
         ? html
         : html.split(/\n\n+/).map(p => `<p>${p.replace(/\n/g, "<br />\n")}</p>`).join("\n");
 
-    const fullDoc = `<html>\n<head>\n\t<title></title>\n</head>\n<body style="font: normal 11pt 'Verdana'">\n${body}\n</body>\n</html>`;
+    const plainText = body
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<\/p>/gi, "\n\n")
+        .replace(/<[^>]+>/g, "")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
 
     try {
-        await navigator.clipboard.writeText(fullDoc);
+        const item = new ClipboardItem({
+            "text/html": new Blob([body], { type: "text/html" }),
+            "text/plain": new Blob([plainText], { type: "text/plain" }),
+        });
+        await navigator.clipboard.write([item]);
         showToast(message, variant);
         return;
     } catch (e) {
-        const textarea = document.createElement("textarea");
-        textarea.value = fullDoc;
-        textarea.style.position = "fixed";
-        textarea.style.opacity = "0";
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand("copy");
-        document.body.removeChild(textarea);
+        // Fallback: plain text only
+        try {
+            await navigator.clipboard.writeText(plainText);
+        } catch {
+            const textarea = document.createElement("textarea");
+            textarea.value = plainText;
+            textarea.style.position = "fixed";
+            textarea.style.opacity = "0";
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand("copy");
+            document.body.removeChild(textarea);
+        }
         showToast(message, variant);
     }
 }
