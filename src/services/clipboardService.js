@@ -1,15 +1,27 @@
+function decodeHtmlEntities(str) {
+    return str
+        .replace(/&nbsp;/g, " ")
+        .replace(/&amp;/g, "&")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'");
+}
+
 export async function copyText(text, opts = {}) {
     if (!text) return;
     const {
         message = "Content copied!",
         variant = "info"
     } = opts;
-    const plainText = text
-        .replace(/<br\s*\/?>/gi, "\n")
-        .replace(/<\/p>/gi, "\n\n")
-        .replace(/<[^>]+>/g, "")
-        .replace(/\n{3,}/g, "\n\n")
-        .trim();
+    const plainText = decodeHtmlEntities(
+        text
+            .replace(/<br\s*\/?>/gi, "\n")
+            .replace(/<\/p>/gi, "\n\n")
+            .replace(/<[^>]+>/g, "")
+            .replace(/\n{3,}/g, "\n\n")
+            .trim()
+    );
 
     try {
         await navigator.clipboard.writeText(plainText);
@@ -40,12 +52,14 @@ export async function copyHtml(html, opts = {}) {
         ? html
         : html.split(/\n\n+/).map(p => `<p>${p.replace(/\n/g, "<br />\n")}</p>`).join("\n");
 
-    const plainText = body
-        .replace(/<br\s*\/?>/gi, "\n")
-        .replace(/<\/p>/gi, "\n\n")
-        .replace(/<[^>]+>/g, "")
-        .replace(/\n{3,}/g, "\n\n")
-        .trim();
+    const plainText = decodeHtmlEntities(
+        body
+            .replace(/<br\s*\/?>/gi, "\n")
+            .replace(/<\/p>/gi, "\n\n")
+            .replace(/<[^>]+>/g, "")
+            .replace(/\n{3,}/g, "\n\n")
+            .trim()
+    );
 
     try {
         const item = new ClipboardItem({
