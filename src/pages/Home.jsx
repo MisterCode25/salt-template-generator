@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import { loadTokens, ensureTokensFromTexts } from "../services/tokenService.js";
 import { loadTemplates, groupTemplates, saveTemplates } from "../services/templateService.js";
 import { generateFinalText } from "../core/tokenEngine.js";
-import { copyText, showToast } from "../services/clipboardService.js";
+import { copyText, copyHtml, showToast } from "../services/clipboardService.js";
 import { useNavigate } from "react-router-dom";
 import { applyTheme, getInitialTheme, getThemeToggleLabel } from "../utils/theme.js";
 import { PARTNER_COLUMNS } from "../data/partnersData.js";
@@ -509,7 +509,7 @@ export default function Home() {
 
         if (tokensNeeded.length === 0) {
             const finalText = generateFinalText(effectiveModel, lang, {});
-            await copyText(finalText, { message: "Text copied", variant: "info" });
+            await copyHtml(finalText, { message: "Text copied", variant: "info" });
             lastSectionClickVersion.current[sectionKey] = inputChangeVersion.current;
             return;
         }
@@ -572,7 +572,7 @@ export default function Home() {
         const map = {};
         Object.entries(filled).forEach(([token, val]) => map[token] = val);
         const finalText = generateFinalText(effectiveModel, lang, map);
-        await copyText(finalText, {
+        await copyHtml(finalText, {
             message: warnSameSection ? "Text copied (data unchanged)." : "Text copied",
             variant: warnSameSection ? "warning" : "info"
         });

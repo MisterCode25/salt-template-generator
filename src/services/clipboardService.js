@@ -28,6 +28,37 @@ export async function copyText(text, opts = {}) {
     }
 }
 
+export async function copyHtml(html, opts = {}) {
+    if (!html) return;
+    const {
+        message = "Content copied!",
+        variant = "info"
+    } = opts;
+
+    const isHtml = /<[a-z][\s\S]*>/i.test(html);
+    const body = isHtml
+        ? html
+        : html.split(/\n\n+/).map(p => `<p>${p.replace(/\n/g, "<br />\n")}</p>`).join("\n");
+
+    const fullDoc = `<html>\n<head>\n\t<title></title>\n</head>\n<body style="font: normal 11pt 'Verdana'">\n${body}\n</body>\n</html>`;
+
+    try {
+        await navigator.clipboard.writeText(fullDoc);
+        showToast(message, variant);
+        return;
+    } catch (e) {
+        const textarea = document.createElement("textarea");
+        textarea.value = fullDoc;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+        showToast(message, variant);
+    }
+}
+
 export function showToast(message, variant = "info") {
     const toast = document.createElement("div");
     toast.textContent = message;

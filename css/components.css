@@ -3725,3 +3725,122 @@ textarea:focus {
 .dropdown-reset.is-active::before {
     content: "✓ ";
 }
+
+/*********** Rich Text Editor ***********/
+
+.rich-editor {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid rgba(80, 120, 255, 0.35);
+    border-radius: var(--radius-sm);
+    background: var(--bg-surface-elevated);
+    overflow: hidden;
+}
+
+.rich-editor__toolbar {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 6px 8px;
+    border-bottom: 1px solid rgba(80, 120, 255, 0.2);
+    background: rgba(255, 255, 255, 0.03);
+    flex-wrap: wrap;
+}
+
+.rich-editor__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+    height: 28px;
+    padding: 0 6px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--color-text-secondary, #b0bec5);
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.rich-editor__btn:hover {
+    background: rgba(80, 120, 255, 0.15);
+    border-color: rgba(80, 120, 255, 0.3);
+    color: #fff;
+}
+
+.rich-editor__sep {
+    display: inline-block;
+    width: 1px;
+    height: 18px;
+    background: rgba(80, 120, 255, 0.25);
+    margin: 0 4px;
+    align-self: center;
+}
+
+.rich-editor__content {
+    min-height: 160px;
+    padding: var(--space-md) var(--space-lg);
+    color: #ffffff;
+    font-size: var(--font-base);
+    outline: none;
+    line-height: 1.6;
+    overflow-y: auto;
+}
+
+.rich-editor__content:empty::before {
+    content: attr(data-placeholder);
+    color: rgba(255, 255, 255, 0.3);
+    pointer-events: none;
+}
+
+.rich-editor__content p {
+    margin: 0 0 0.6em 0;
+}
+
+.rich-editor__content ul,
+.rich-editor__content ol {
+    padding-left: 1.4em;
+    margin: 0 0 0.6em 0;
+}
+
+/* Fullscreen editor overrides */
+.lang-fullscreen__textarea.rich-editor {
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+}
+
+.lang-fullscreen__textarea.rich-editor .rich-editor__toolbar {
+    background: rgba(255, 255, 255, 0.04);
+    border-bottom: 1px solid rgba(80, 120, 255, 0.2);
+    border-radius: 0;
+    flex-shrink: 0;
+}
+
+.lang-fullscreen__textarea.rich-editor .rich-editor__content {
+    flex: 1;
+    min-height: 48vh;
+    font-size: 16px;
+    padding: 14px;
+}
+
+/* Read-only HTML preview in the template card */
+.rich-preview {
+    cursor: pointer;
+    min-height: 80px;
+    overflow: auto;
+    line-height: 1.5;
+    white-space: normal;
+    resize: none;
+}
+
+.rich-preview p {
+    margin: 0 0 0.5em 0;
+}
+
+.rich-preview ul,
+.rich-preview ol {
+    padding-left: 1.4em;
+    margin: 0 0 0.5em 0;
+}

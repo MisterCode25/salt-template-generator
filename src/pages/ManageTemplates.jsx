@@ -7,19 +7,12 @@ import Modal from "../components/Modal.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import { showToast } from "../services/clipboardService.js";
+import RichTextEditor from "../components/RichTextEditor.jsx";
 
 const emptyTexts = { fr: "", en: "", de: "", it: "" };
 
 function LanguagePreview({ label, dot, value, onFullscreen }) {
-    const [height, setHeight] = useState("auto");
-    const textareaRef = useRef(null);
-
-    useEffect(() => {
-        const el = textareaRef.current;
-        if (!el) return;
-        el.style.height = "auto";
-        setHeight(`${Math.max(160, el.scrollHeight)}px`);
-    }, [value]);
+    const isHtml = value && /<[a-z][\s\S]*>/i.test(value);
 
     return (
         <div className="lang-col">
@@ -27,21 +20,26 @@ function LanguagePreview({ label, dot, value, onFullscreen }) {
                 <span className="lang-dot">{dot}</span>
                 <span className="lang-label">{label}</span>
             </div>
-            <textarea
-                ref={textareaRef}
-                className="plain-editor tall-textarea"
-                data-lang={dot.toLowerCase()}
-                placeholder={`Text ${dot}`}
-                value={value}
-                readOnly
-                style={{ height }}
-                aria-label={`${label} preview`}
-                title="Open fullscreen editor"
-                onClick={(e) => {
-                    e.preventDefault();
-                    if (onFullscreen) onFullscreen();
-                }}
-            />
+            {isHtml ? (
+                <div
+                    className="plain-editor tall-textarea rich-preview"
+                    aria-label={`${label} preview`}
+                    title="Open fullscreen editor"
+                    onClick={() => onFullscreen?.()}
+                    dangerouslySetInnerHTML={{ __html: value }}
+                />
+            ) : (
+                <textarea
+                    className="plain-editor tall-textarea"
+                    data-lang={dot.toLowerCase()}
+                    placeholder={`Text ${dot}`}
+                    value={value}
+                    readOnly
+                    aria-label={`${label} preview`}
+                    title="Open fullscreen editor"
+                    onClick={(e) => { e.preventDefault(); onFullscreen?.(); }}
+                />
+            )}
             <button type="button" className="secondary-btn" onClick={() => onFullscreen?.()}>
                 Edit fullscreen
             </button>
@@ -384,10 +382,11 @@ function TemplateModal({ initial, templates, onClose, onSave }) {
                         </div>
                         <span className="lang-fullscreen__badge">{item.dot}</span>
                     </div>
-                    <textarea
+                    <RichTextEditor
                         className="lang-fullscreen__textarea"
                         value={currentValue}
-                        onChange={e => setValue(e.target.value)}
+                        onChange={setValue}
+                        placeholder={`Write text in ${item.label}...`}
                     />
                     <div className="lang-fullscreen__actions">
                         <button type="button" className="primary-btn" data-close-fullscreen onClick={() => setFullscreen(null)}>Done</button>
