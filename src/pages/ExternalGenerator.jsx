@@ -258,6 +258,7 @@ export default function ExternalGenerator({ embedded = false, onClose, clientPay
     const hasMountedRef = useRef(false);
     const externalIdFieldRef = useRef(null);
     const fieldsRef = useRef(fields);
+    const appliedClientSignatureRef = useRef("");
 
     useEffect(() => {
         const tick = () => {
@@ -668,18 +669,18 @@ export default function ExternalGenerator({ embedded = false, onClose, clientPay
         return true;
     };
 
-    const importActiveClientData = async () => {
+    const applyActiveClientData = async ({ runFlow = false, notify = false } = {}) => {
         const payload = clientPayload || storedClientPayload || loadActiveClientPayload();
         const result = buildExternalFieldsFromClientPayload(payload);
 
         if (!result.ok) {
-            showToast("No active customer data", "error");
+            if (notify) showToast("No active customer data", "error");
             return;
         }
 
         const computedNext = mergeExternalFields(fieldsRef.current, result.fields);
         setFields(computedNext);
-        if (computedNext) {
+        if (runFlow && computedNext) {
             const nextErrors = {};
             Object.entries(computedNext).forEach(([key, value]) => {
                 if (key === "data") return;
@@ -692,8 +693,18 @@ export default function ExternalGenerator({ embedded = false, onClose, clientPay
                 setVtiEmptyFieldErrors({});
             }
         }
-        showToast("Customer data imported", "info");
+        if (notify) showToast("Customer data refreshed", "info");
     };
+
+    useEffect(() => {
+        const payload = clientPayload || storedClientPayload || loadActiveClientPayload();
+        if (!payload) return;
+
+        const signature = JSON.stringify(payload);
+        if (appliedClientSignatureRef.current === signature) return;
+        appliedClientSignatureRef.current = signature;
+        applyActiveClientData({ runFlow: false, notify: false });
+    }, [clientPayload, storedClientPayload]);
 
     const copyCode = async () => {
         if (!fields.flagging.trim()) {
@@ -928,12 +939,15 @@ export default function ExternalGenerator({ embedded = false, onClose, clientPay
                     <div className="external-generator-right-col">
                         <section className="popup-card external-generator-actions-card">
                             <div className="external-generator-top-actions">
+                                <p className="hint external-generator-active-client-status">
+                                    Customer data is loaded automatically from the active customer.
+                                </p>
                                 <button
                                     type="button"
-                                    className="primary-btn clipboard-parse-btn is-ready"
-                                    onClick={importActiveClientData}
+                                    className="secondary-btn"
+                                    onClick={() => applyActiveClientData({ runFlow: false, notify: true })}
                                 >
-                                    Import active customer
+                                    Refresh customer data
                                 </button>
                                 <button
                                     type="button"

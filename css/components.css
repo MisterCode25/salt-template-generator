@@ -3026,6 +3026,7 @@ textarea:focus {
 
 .external-generator-top-actions {
     display: flex;
+    flex-direction: column;
     align-items: stretch;
     justify-content: center;
     gap: 8px;
@@ -3154,7 +3155,11 @@ textarea:focus {
 }
 
 .external-generator-top-actions .hint {
-    display: none;
+    display: block;
+    margin: 0;
+    font-size: var(--font-xs);
+    line-height: 1.35;
+    text-align: center;
 }
 
 .external-generator-layout {
