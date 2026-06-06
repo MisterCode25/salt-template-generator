@@ -8,6 +8,7 @@ import { applyTheme, getInitialTheme, getThemeToggleLabel } from "../utils/theme
 import { PARTNER_COLUMNS } from "../data/partnersData.js";
 import { loadPartners } from "../services/partnersService.js";
 import { partnerMatchesQuery } from "../utils/partnerSearch.js";
+import { getClientInfoSections, matchClientDataToTokens, parseClientClipboardJSON } from "../utils/clientClipboard.js";
 import Modal from "../components/Modal.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import Settings from "./Settings.jsx";
@@ -344,6 +345,83 @@ function PartnersModal({ onClose }) {
     );
 }
 
+function ClientInfoPanel({
+    sections,
+    status,
+    matchedTokens,
+    loading,
+    onReadClipboard
+}) {
+    const hasInfo = sections.length > 0;
+    const visibleMatches = matchedTokens.slice(0, 8);
+    const hiddenMatchCount = matchedTokens.length - visibleMatches.length;
+
+    return (
+        <section className="client-info-panel" aria-label="Client information">
+            <div className="client-info-header">
+                <div>
+                    <p className="eyebrow">Client JSON</p>
+                    <h2>Client information</h2>
+                </div>
+                <button
+                    type="button"
+                    className="secondary-btn client-info-read-btn"
+                    onClick={onReadClipboard}
+                    disabled={loading}
+                >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <rect x="9" y="9" width="13" height="13" rx="2" />
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                    </svg>
+                    {loading ? "Reading..." : "Read clipboard"}
+                </button>
+            </div>
+
+            {status.message && (
+                <p className={`client-info-status client-info-status--${status.type}`} aria-live="polite">
+                    {status.message}
+                </p>
+            )}
+
+            {hasInfo ? (
+                <div className="client-info-grid">
+                    {sections.map((section) => (
+                        <div key={section.id} className="client-info-section">
+                            <h3>{section.title}</h3>
+                            <div className="client-info-fields">
+                                {section.fields.map((field) => (
+                                    <div key={`${section.id}-${field.label}`} className="client-info-field">
+                                        <span className="client-info-label">{field.label}</span>
+                                        <span className="client-info-value">{field.value}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <p className="client-info-empty">
+                    Put the client JSON in the clipboard, then read it here before copying a template.
+                </p>
+            )}
+
+            {matchedTokens.length > 0 && (
+                <div className="client-info-matches" aria-label="Matched template tokens">
+                    <span className="client-info-match-label">Filled tokens</span>
+                    {visibleMatches.map((match) => (
+                        <span key={match.token} className="client-info-match-chip">
+                            {match.label}
+                        </span>
+                    ))}
+                    {hiddenMatchCount > 0 && (
+                        <span className="client-info-match-chip">+{hiddenMatchCount}</span>
+                    )}
+                </div>
+            )}
+        </section>
+    );
+}
+
 export default function Home() {
     const navigate = useNavigate();
     const [lang, setLang] = useState("en");
@@ -368,6 +446,10 @@ export default function Home() {
     const [manageTemplatesOpen, setManageTemplatesOpen] = useState(false);
     const [tokenPrompt, setTokenPrompt] = useState(null);
     const [promptMissingTokens, setPromptMissingTokens] = useState([]);
+    const [clientPayload, setClientPayload] = useState(null);
+    const [clientImportStatus, setClientImportStatus] = useState({ type: "idle", message: "" });
+    const [clientMatchedTokens, setClientMatchedTokens] = useState([]);
+    const [clientImportLoading, setClientImportLoading] = useState(false);
 
     useEffect(() => {
         loadTokens().then(setTokens);
@@ -397,6 +479,7 @@ export default function Home() {
     }, [tokens]);
 
     const grouped = useMemo(() => groupTemplates(models), [models]);
+    const clientInfoSections = useMemo(() => getClientInfoSections(clientPayload), [clientPayload]);
 
     useEffect(() => {
         const hasTemplates = models.length > 0;
@@ -480,6 +563,47 @@ export default function Home() {
             delete next[token];
             return next;
         });
+    };
+
+    const readClientClipboard = async () => {
+        setClientImportLoading(true);
+        try {
+            if (!navigator.clipboard?.readText) {
+                throw new Error("Clipboard reading is not available in this browser.");
+            }
+
+            const clipboardText = await navigator.clipboard.readText();
+            const payload = parseClientClipboardJSON(clipboardText);
+            const { values: matchedValues, matchedTokens } = matchClientDataToTokens(payload, tokens);
+            const matchCount = matchedTokens.length;
+
+            setClientPayload(payload);
+            setClientMatchedTokens(matchedTokens);
+
+            if (matchCount > 0) {
+                setValues((prev) => {
+                    const next = { ...prev, ...matchedValues };
+                    Object.entries(matchedValues).forEach(([token, value]) => {
+                        localStorage.setItem("input_" + token, value);
+                    });
+                    return next;
+                });
+                inputChangeVersion.current++;
+                clearInputDecorations();
+            }
+
+            const message = matchCount === 0
+                ? "Client JSON loaded. No configured token matched automatically."
+                : `Client JSON loaded. ${matchCount} token${matchCount > 1 ? "s" : ""} filled.`;
+            setClientImportStatus({ type: "success", message });
+            showToast(message, "info");
+        } catch (error) {
+            const message = error?.message || "Unable to read client JSON from clipboard.";
+            setClientImportStatus({ type: "error", message });
+            showToast(message, "error");
+        } finally {
+            setClientImportLoading(false);
+        }
     };
 
     const collectInputValues = (requiredTokens) => {
@@ -689,6 +813,14 @@ export default function Home() {
                     </div>
                 </nav>
             </header>
+
+            <ClientInfoPanel
+                sections={clientInfoSections}
+                status={clientImportStatus}
+                matchedTokens={clientMatchedTokens}
+                loading={clientImportLoading}
+                onReadClipboard={readClientClipboard}
+            />
 
             {helpOpen && (
                 <Modal onClose={() => setHelpOpen(false)} dialogClassName="popup-box help-modal-box" ariaLabel="Quick guide">
