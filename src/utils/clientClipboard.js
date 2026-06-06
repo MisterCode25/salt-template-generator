@@ -59,6 +59,18 @@ const CLIENT_FIELD_GROUPS = [
                 aliases: ["communicationLanguage", "language", "lang", "langue", "clientLanguage"]
             },
             {
+                label: "Activation date",
+                aliases: ["activationDate", "activation_date", "activation", "dateActivation", "date_activation"],
+                compute: (payload) => firstValue([
+                    payload?.client?.activationDate,
+                    payload?.client?.activation_date,
+                    payload?.client?.activation,
+                    payload?.client?.dateActivation,
+                    payload?.contact?.activationDate,
+                    payload?.healthcheck?.activationDate
+                ])
+            },
+            {
                 label: "Eligibility",
                 path: "client.eligibilitySource",
                 aliases: ["eligibilitySource", "eligibility", "sourceEligibility"]
@@ -244,6 +256,14 @@ function displayValue(value) {
     return "";
 }
 
+function firstValue(values) {
+    for (const value of values) {
+        const formatted = displayValue(value);
+        if (formatted !== "") return formatted;
+    }
+    return "";
+}
+
 function valueForField(payload, field) {
     if (field.compute) return displayValue(field.compute(payload));
     return displayValue(readPath(payload, field.path));
@@ -297,6 +317,66 @@ export function getClientInfoSections(payload) {
             }))
             .filter((field) => field.value !== "")
     })).filter((group) => group.fields.length > 0);
+}
+
+export function getClientSummaryFields(payload) {
+    if (!payload) return [];
+
+    const client = payload.client || {};
+    const contact = payload.contact || {};
+    const healthcheck = payload.healthcheck || {};
+    const fullName = [client.title, client.firstName, client.lastName]
+        .map(displayValue)
+        .filter(Boolean)
+        .join(" ");
+
+    return [
+        {
+            label: "Name",
+            value: fullName || firstValue([client.firstName, client.lastName])
+        },
+        {
+            label: "Sex",
+            value: firstValue([client.sex, client.gender])
+        },
+        {
+            label: "Language",
+            value: firstValue([client.communicationLanguage, contact.communicationLanguage])
+        },
+        {
+            label: "Mobile",
+            value: firstValue([client.mobile, client.mobileRaw, client.phone, client.telephone])
+        },
+        {
+            label: "Contractor",
+            value: firstValue([client.contractorNumber, client.contractor, healthcheck.customerId])
+        },
+        {
+            label: "Activation",
+            value: firstValue([
+                client.activationDate,
+                client.activation_date,
+                client.activation,
+                client.dateActivation,
+                contact.activationDate,
+                healthcheck.activationDate
+            ])
+        }
+    ].map((field) => ({
+        ...field,
+        value: field.value || "-"
+    }));
+}
+
+export function getClientLanguageCode(payload) {
+    const rawLanguage = firstValue([
+        payload?.client?.communicationLanguage,
+        payload?.contact?.communicationLanguage,
+        payload?.client?.language,
+        payload?.contact?.language
+    ]).toLowerCase();
+    const code = rawLanguage.slice(0, 2);
+    return ["fr", "en", "de", "it"].includes(code) ? code : "";
 }
 
 function addIndexEntry(index, alias, value) {

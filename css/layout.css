@@ -106,6 +106,49 @@
     color: #ffb3b3;
 }
 
+.client-info-summary {
+    display: grid;
+    grid-template-columns: minmax(220px, 1.5fr) repeat(auto-fit, minmax(130px, 1fr));
+    gap: 12px;
+    margin-top: 16px;
+    align-items: stretch;
+}
+
+.client-info-summary-item {
+    min-width: 0;
+    padding: 10px 12px;
+    border: 1px solid rgba(110, 145, 220, 0.18);
+    border-radius: var(--radius-sm);
+    background: rgba(14, 18, 30, 0.35);
+}
+
+.client-info-summary-item--wide {
+    grid-column: span 2;
+}
+
+.client-info-summary-value {
+    display: block;
+    margin-top: 4px;
+    color: var(--text-primary);
+    font-size: var(--font-md);
+    font-weight: 700;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+}
+
+.client-info-detail-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 14px;
+}
+
+.client-info-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+}
+
 .client-info-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -282,6 +325,23 @@
     .client-info-read-btn {
         width: 100%;
         white-space: normal;
+    }
+
+    .client-info-summary {
+        grid-template-columns: 1fr;
+    }
+
+    .client-info-summary-item--wide {
+        grid-column: auto;
+    }
+
+    .client-info-detail-actions {
+        justify-content: stretch;
+    }
+
+    .client-info-toggle-btn {
+        width: 100%;
+        justify-content: center;
     }
 
     .zones-grid {
@@ -514,6 +574,11 @@
     border-left-color: rgba(35, 95, 180, 0.35);
 }
 
+.light-theme .client-info-summary-item {
+    background: #f7f9ff;
+    border-color: rgba(30,60,120,0.14);
+}
+
 .light-theme .client-info-status--success {
     color: #0c7a45;
 }
@@ -571,6 +636,11 @@
 
 .salt-theme .client-info-section {
     border-left-color: rgba(5,135,80,0.65);
+}
+
+.salt-theme .client-info-summary-item {
+    background: rgba(5, 135, 80, 0.08);
+    border-color: rgba(5,135,80,0.25);
 }
 
 .salt-theme .client-info-status--success {

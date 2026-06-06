@@ -8,7 +8,13 @@ import { applyTheme, getInitialTheme, getThemeToggleLabel } from "../utils/theme
 import { PARTNER_COLUMNS } from "../data/partnersData.js";
 import { loadPartners } from "../services/partnersService.js";
 import { partnerMatchesQuery } from "../utils/partnerSearch.js";
-import { getClientInfoSections, matchClientDataToTokens, parseClientClipboardJSON } from "../utils/clientClipboard.js";
+import {
+    getClientInfoSections,
+    getClientLanguageCode,
+    getClientSummaryFields,
+    matchClientDataToTokens,
+    parseClientClipboardJSON
+} from "../utils/clientClipboard.js";
 import Modal from "../components/Modal.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import Settings from "./Settings.jsx";
@@ -347,10 +353,13 @@ function PartnersModal({ onClose }) {
 
 function ClientInfoPanel({
     sections,
+    summaryFields,
     status,
     matchedTokens,
     loading,
-    onReadClipboard
+    detailsExpanded,
+    onReadClipboard,
+    onToggleDetails
 }) {
     const hasInfo = sections.length > 0;
     const visibleMatches = matchedTokens.slice(0, 8);
@@ -384,21 +393,46 @@ function ClientInfoPanel({
             )}
 
             {hasInfo ? (
-                <div className="client-info-grid">
-                    {sections.map((section) => (
-                        <div key={section.id} className="client-info-section">
-                            <h3>{section.title}</h3>
-                            <div className="client-info-fields">
-                                {section.fields.map((field) => (
-                                    <div key={`${section.id}-${field.label}`} className="client-info-field">
-                                        <span className="client-info-label">{field.label}</span>
-                                        <span className="client-info-value">{field.value}</span>
-                                    </div>
-                                ))}
+                <>
+                    <div className="client-info-summary">
+                        {summaryFields.map((field) => (
+                            <div key={field.label} className={`client-info-summary-item${field.label === "Name" ? " client-info-summary-item--wide" : ""}`}>
+                                <span className="client-info-label">{field.label}</span>
+                                <span className="client-info-summary-value">{field.value}</span>
                             </div>
+                        ))}
+                    </div>
+
+                    <div className="client-info-detail-actions">
+                        <button
+                            type="button"
+                            className="secondary-btn client-info-toggle-btn"
+                            aria-expanded={detailsExpanded}
+                            onClick={onToggleDetails}
+                        >
+                            {detailsExpanded ? "Hide details" : "Show details"}
+                            <span aria-hidden="true">{detailsExpanded ? "▴" : "▾"}</span>
+                        </button>
+                    </div>
+
+                    {detailsExpanded && (
+                        <div className="client-info-grid">
+                            {sections.map((section) => (
+                                <div key={section.id} className="client-info-section">
+                                    <h3>{section.title}</h3>
+                                    <div className="client-info-fields">
+                                        {section.fields.map((field) => (
+                                            <div key={`${section.id}-${field.label}`} className="client-info-field">
+                                                <span className="client-info-label">{field.label}</span>
+                                                <span className="client-info-value">{field.value}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
                         </div>
-                    ))}
-                </div>
+                    )}
+                </>
             ) : (
                 <p className="client-info-empty">
                     Put the client JSON in the clipboard, then read it here before copying a template.
@@ -450,6 +484,7 @@ export default function Home() {
     const [clientImportStatus, setClientImportStatus] = useState({ type: "idle", message: "" });
     const [clientMatchedTokens, setClientMatchedTokens] = useState([]);
     const [clientImportLoading, setClientImportLoading] = useState(false);
+    const [clientDetailsExpanded, setClientDetailsExpanded] = useState(false);
 
     useEffect(() => {
         loadTokens().then(setTokens);
@@ -480,6 +515,7 @@ export default function Home() {
 
     const grouped = useMemo(() => groupTemplates(models), [models]);
     const clientInfoSections = useMemo(() => getClientInfoSections(clientPayload), [clientPayload]);
+    const clientSummaryFields = useMemo(() => getClientSummaryFields(clientPayload), [clientPayload]);
 
     useEffect(() => {
         const hasTemplates = models.length > 0;
@@ -575,10 +611,13 @@ export default function Home() {
             const clipboardText = await navigator.clipboard.readText();
             const payload = parseClientClipboardJSON(clipboardText);
             const { values: matchedValues, matchedTokens } = matchClientDataToTokens(payload, tokens);
+            const nextLanguage = getClientLanguageCode(payload);
             const matchCount = matchedTokens.length;
 
             setClientPayload(payload);
             setClientMatchedTokens(matchedTokens);
+            setClientDetailsExpanded(false);
+            if (nextLanguage) setLang(nextLanguage);
 
             if (matchCount > 0) {
                 setValues((prev) => {
@@ -595,8 +634,9 @@ export default function Home() {
             const message = matchCount === 0
                 ? "Client JSON loaded. No configured token matched automatically."
                 : `Client JSON loaded. ${matchCount} token${matchCount > 1 ? "s" : ""} filled.`;
-            setClientImportStatus({ type: "success", message });
-            showToast(message, "info");
+            const languageMessage = nextLanguage ? ` Language set to ${nextLanguage.toUpperCase()}.` : "";
+            setClientImportStatus({ type: "success", message: `${message}${languageMessage}` });
+            showToast(`${message}${languageMessage}`, "info");
         } catch (error) {
             const message = error?.message || "Unable to read client JSON from clipboard.";
             setClientImportStatus({ type: "error", message });
@@ -816,10 +856,13 @@ export default function Home() {
 
             <ClientInfoPanel
                 sections={clientInfoSections}
+                summaryFields={clientSummaryFields}
                 status={clientImportStatus}
                 matchedTokens={clientMatchedTokens}
                 loading={clientImportLoading}
+                detailsExpanded={clientDetailsExpanded}
                 onReadClipboard={readClientClipboard}
+                onToggleDetails={() => setClientDetailsExpanded((expanded) => !expanded)}
             />
 
             {helpOpen && (
