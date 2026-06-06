@@ -147,17 +147,18 @@
 .client-info-summary {
     display: grid;
     grid-template-columns: minmax(220px, 1.5fr) repeat(auto-fit, minmax(130px, 1fr));
-    gap: 12px;
+    gap: 10px;
     margin-top: 16px;
     align-items: stretch;
 }
 
 .client-info-summary-item {
     min-width: 0;
-    padding: 9px 10px;
-    border: 1px solid rgba(110, 145, 220, 0.18);
+    padding: 8px 10px;
+    border: 1px solid rgba(125, 160, 230, 0.34);
     border-radius: var(--radius-sm);
-    background: rgba(14, 18, 30, 0.35);
+    background: rgba(8, 13, 24, 0.68);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .client-info-summary-item--wide {
@@ -171,11 +172,15 @@
     min-width: 0;
 }
 
+.client-info-summary .client-info-label {
+    color: #b5c7e8;
+}
+
 .client-info-summary-value {
     display: block;
-    margin-top: 4px;
-    color: var(--text-primary);
-    font-size: 15px;
+    margin-top: 3px;
+    color: #f4f8ff;
+    font-size: 14px;
     font-weight: 700;
     line-height: 1.22;
     overflow-wrap: anywhere;
@@ -184,9 +189,15 @@
 .client-info-toggle-btn {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    font-size: 13px;
+    justify-content: center;
+    width: 42px;
+    min-width: 42px;
+    height: 100%;
+    min-height: 42px;
+    padding: 0;
+    color: #ffffff;
+    border-color: rgba(90, 150, 255, 0.46);
+    background: rgba(32, 72, 150, 0.54);
 }
 
 .client-info-grid {
@@ -710,8 +721,23 @@
 }
 
 .light-theme .client-info-summary-item {
-    background: #f7f9ff;
-    border-color: rgba(30,60,120,0.14);
+    background: #f3f7ff;
+    border-color: rgba(30, 70, 140, 0.26);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+.light-theme .client-info-summary .client-info-label {
+    color: #536684;
+}
+
+.light-theme .client-info-summary-value {
+    color: #07162f;
+}
+
+.light-theme .client-info-toggle-btn {
+    background: rgba(15, 58, 217, 0.1);
+    border-color: rgba(15, 58, 217, 0.28);
+    color: #0f3ad9;
 }
 
 .light-theme .client-info-status--success {
@@ -768,8 +794,18 @@
 }
 
 .salt-theme .client-info-summary-item {
-    background: rgba(5, 135, 80, 0.08);
-    border-color: rgba(5,135,80,0.25);
+    background: rgba(5, 135, 80, 0.12);
+    border-color: rgba(5,135,80,0.38);
+}
+
+.salt-theme .client-info-summary .client-info-label {
+    color: #a7e8c7;
+}
+
+.salt-theme .client-info-toggle-btn {
+    background: rgba(5, 135, 80, 0.22);
+    border-color: rgba(5, 135, 80, 0.5);
+    color: #e8fff3;
 }
 
 .salt-theme .client-info-status--success {
