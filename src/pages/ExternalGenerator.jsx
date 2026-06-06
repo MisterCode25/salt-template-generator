@@ -949,13 +949,6 @@ export default function ExternalGenerator({ embedded = false, onClose, clientPay
                                 <div className="external-generator-subtle-actions">
                                     <button
                                         type="button"
-                                        className="secondary-btn external-generator-build-btn"
-                                        onClick={launchCompletionFlow}
-                                    >
-                                        Build
-                                    </button>
-                                    <button
-                                        type="button"
                                         className="secondary-btn"
                                         onClick={() => applyActiveClientData({ runFlow: false, notify: true })}
                                     >
@@ -994,6 +987,9 @@ export default function ExternalGenerator({ embedded = false, onClose, clientPay
                                 }}
                             />
                             <div className="popup-actions mt-md">
+                                <button type="button" className="primary-btn external-generator-build-btn" onClick={launchCompletionFlow}>
+                                    Build
+                                </button>
                                 <button type="button" className="primary-btn" onClick={copyCode}>
                                     Copy
                                 </button>

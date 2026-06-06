@@ -3162,12 +3162,6 @@ textarea:focus {
     flex-wrap: wrap;
 }
 
-.external-generator-top-actions .external-generator-build-btn {
-    color: #dff8ee;
-    background: rgba(20, 145, 95, 0.22);
-    border-color: rgba(65, 220, 150, 0.26);
-}
-
 .external-generator-layout {
     display: grid;
     grid-template-columns: minmax(380px, 420px) minmax(520px, 1fr);
@@ -3274,6 +3268,17 @@ textarea:focus {
     border: 1px solid rgba(255,255,255,0.12);
     color: #f6fbff;
     box-shadow: 0 10px 20px rgba(37, 111, 244, 0.24);
+}
+
+.external-generator-externalid-card .popup-actions .external-generator-build-btn {
+    background: linear-gradient(135deg, #2563eb, #22a7ff);
+    color: #ffffff;
+    box-shadow: 0 10px 20px rgba(34, 120, 255, 0.26);
+}
+
+.external-generator-externalid-card .popup-actions .primary-btn:not(.external-generator-build-btn) {
+    background: linear-gradient(135deg, #0f766e, #2dd4bf);
+    box-shadow: 0 10px 20px rgba(20, 184, 166, 0.22);
 }
 
 .external-generator-externalid-card .popup-actions .primary-btn:hover {
