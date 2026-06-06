@@ -372,18 +372,31 @@ function ClientInfoPanel({
                     <p className="eyebrow">Client JSON</p>
                     <h2>Client information</h2>
                 </div>
-                <button
-                    type="button"
-                    className="secondary-btn client-info-read-btn"
-                    onClick={onReadClipboard}
-                    disabled={loading}
-                >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <rect x="9" y="9" width="13" height="13" rx="2" />
-                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                    </svg>
-                    {loading ? "Reading..." : "Read clipboard"}
-                </button>
+                <div className="client-info-actions">
+                    <button
+                        type="button"
+                        className="secondary-btn client-info-read-btn"
+                        onClick={onReadClipboard}
+                        disabled={loading}
+                    >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <rect x="9" y="9" width="13" height="13" rx="2" />
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                        </svg>
+                        {loading ? "Reading..." : "Read clipboard"}
+                    </button>
+                    {hasInfo && (
+                        <button
+                            type="button"
+                            className="secondary-btn client-info-toggle-btn"
+                            aria-expanded={detailsExpanded}
+                            onClick={onToggleDetails}
+                        >
+                            {detailsExpanded ? "Hide details" : "Show details"}
+                            <span aria-hidden="true">{detailsExpanded ? "▴" : "▾"}</span>
+                        </button>
+                    )}
+                </div>
             </div>
 
             {status.message && (
@@ -401,18 +414,6 @@ function ClientInfoPanel({
                                 <span className="client-info-summary-value">{field.value}</span>
                             </div>
                         ))}
-                    </div>
-
-                    <div className="client-info-detail-actions">
-                        <button
-                            type="button"
-                            className="secondary-btn client-info-toggle-btn"
-                            aria-expanded={detailsExpanded}
-                            onClick={onToggleDetails}
-                        >
-                            {detailsExpanded ? "Hide details" : "Show details"}
-                            <span aria-hidden="true">{detailsExpanded ? "▴" : "▾"}</span>
-                        </button>
                     </div>
 
                     {detailsExpanded && (

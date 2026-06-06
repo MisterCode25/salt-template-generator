@@ -77,6 +77,14 @@
     font-size: 20px;
 }
 
+.client-info-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
 .client-info-read-btn {
     display: inline-flex;
     align-items: center;
@@ -134,12 +142,6 @@
     font-weight: 700;
     line-height: 1.25;
     overflow-wrap: anywhere;
-}
-
-.client-info-detail-actions {
-    display: flex;
-    justify-content: flex-end;
-    margin-top: 14px;
 }
 
 .client-info-toggle-btn {
@@ -322,9 +324,8 @@
         align-items: stretch;
     }
 
-    .client-info-read-btn {
-        width: 100%;
-        white-space: normal;
+    .client-info-actions {
+        justify-content: flex-start;
     }
 
     .client-info-summary {
@@ -333,15 +334,6 @@
 
     .client-info-summary-item--wide {
         grid-column: auto;
-    }
-
-    .client-info-detail-actions {
-        justify-content: stretch;
-    }
-
-    .client-info-toggle-btn {
-        width: 100%;
-        justify-content: center;
     }
 
     .zones-grid {
