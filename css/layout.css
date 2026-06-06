@@ -99,15 +99,6 @@
     transform: none;
 }
 
-.client-info-read-btn.is-ready {
-    border-color: rgba(0, 170, 120, 0.42);
-}
-
-.client-info-read-btn.is-empty,
-.client-info-read-btn.is-unknown {
-    opacity: 0.55;
-}
-
 .client-info-status,
 .client-info-empty {
     margin: 12px 0 0;

@@ -357,7 +357,6 @@ function ClientInfoPanel({
     status,
     matchedTokens,
     loading,
-    clipboardState,
     detailsExpanded,
     onReadClipboard,
     onClearClient,
@@ -377,16 +376,16 @@ function ClientInfoPanel({
                 <div className="client-info-actions">
                     <button
                         type="button"
-                        className={`secondary-btn client-info-read-btn is-${clipboardState}`}
+                        className="secondary-btn client-info-read-btn"
                         onClick={onReadClipboard}
-                        disabled={loading || clipboardState !== "ready"}
-                        title={clipboardState === "ready" ? "Read client JSON from clipboard" : "Clipboard is not ready"}
+                        disabled={loading}
+                        title="Import customer data from clipboard"
                     >
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                             <rect x="9" y="9" width="13" height="13" rx="2" />
                             <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
                         </svg>
-                        {loading ? "Reading..." : "Read clipboard"}
+                        {loading ? "Importing..." : "Import customer data"}
                     </button>
                     {hasInfo && (
                         <>
@@ -448,7 +447,7 @@ function ClientInfoPanel({
                 </>
             ) : (
                 <p className="client-info-empty">
-                    Put the client JSON in the clipboard, then read it here before copying a template.
+                    Put the customer JSON in the clipboard, then import it here before copying a template.
                 </p>
             )}
 
@@ -497,7 +496,6 @@ export default function Home() {
     const [clientImportStatus, setClientImportStatus] = useState({ type: "idle", message: "" });
     const [clientMatchedTokens, setClientMatchedTokens] = useState([]);
     const [clientImportLoading, setClientImportLoading] = useState(false);
-    const [clientClipboardState, setClientClipboardState] = useState("unknown");
     const [clientDetailsExpanded, setClientDetailsExpanded] = useState(false);
 
     useEffect(() => {
@@ -666,45 +664,16 @@ export default function Home() {
         showToast(fullMessage, "info");
     };
 
-    useEffect(() => {
-        let cancelled = false;
-        const probeClipboard = async () => {
-            try {
-                const text = await navigator.clipboard.readText();
-                if (cancelled) return;
-                setClientClipboardState(text.trim() ? "ready" : "empty");
-            } catch {
-                if (cancelled) return;
-                setClientClipboardState("unknown");
-            }
-        };
-
-        probeClipboard();
-        const onFocus = () => probeClipboard();
-        const onVisibility = () => {
-            if (document.visibilityState === "visible") probeClipboard();
-        };
-        window.addEventListener("focus", onFocus);
-        document.addEventListener("visibilitychange", onVisibility);
-        const intervalId = window.setInterval(probeClipboard, 4000);
-
-        return () => {
-            cancelled = true;
-            window.removeEventListener("focus", onFocus);
-            document.removeEventListener("visibilitychange", onVisibility);
-            window.clearInterval(intervalId);
-        };
-    }, []);
-
     const readClientClipboard = async () => {
         setClientImportLoading(true);
         try {
+            if (!navigator.clipboard?.readText) {
+                throw new Error("Clipboard reading is not available in this browser.");
+            }
             const clipboardText = await navigator.clipboard.readText();
-            setClientClipboardState(clipboardText.trim() ? "ready" : "empty");
             loadClientFromText(clipboardText);
         } catch (error) {
             const message = error?.message || "Unable to read client JSON from clipboard.";
-            setClientClipboardState("unknown");
             setClientImportStatus({ type: "error", message });
             showToast(message, "error");
         } finally {
@@ -926,7 +895,6 @@ export default function Home() {
                 status={clientImportStatus}
                 matchedTokens={clientMatchedTokens}
                 loading={clientImportLoading}
-                clipboardState={clientClipboardState}
                 detailsExpanded={clientDetailsExpanded}
                 onReadClipboard={readClientClipboard}
                 onClearClient={clearClientInfo}
