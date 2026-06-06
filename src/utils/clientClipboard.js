@@ -312,6 +312,18 @@ function valueForField(payload, field) {
     return displayValue(readPath(payload, field.path));
 }
 
+function knownClientFieldPaths() {
+    const paths = new Set();
+
+    CLIENT_FIELD_GROUPS.forEach((group) => {
+        group.fields.forEach((field) => {
+            if (field.path) paths.add(field.path);
+        });
+    });
+
+    return paths;
+}
+
 export function normalizeClientTokenName(name = "") {
     return String(name)
         .replace(/[{}]/g, "")
@@ -412,7 +424,8 @@ export function parseClientClipboardJSON(text) {
 export function getClientInfoSections(payload) {
     if (!payload) return [];
 
-    return CLIENT_FIELD_GROUPS.map((group) => ({
+    const knownPaths = knownClientFieldPaths();
+    const sections = CLIENT_FIELD_GROUPS.map((group) => ({
         id: group.id,
         title: group.title,
         fields: group.fields
@@ -422,6 +435,24 @@ export function getClientInfoSections(payload) {
             }))
             .filter((field) => field.value !== "")
     })).filter((group) => group.fields.length > 0);
+
+    const dynamicFields = walkPayloadLeaves(payload)
+        .filter((leaf) => leaf.value !== "")
+        .filter((leaf) => !knownPaths.has(leaf.path.join(".")))
+        .map((leaf) => ({
+            label: formatPathLabel(leaf.path),
+            value: leaf.value
+        }));
+
+    if (dynamicFields.length > 0) {
+        sections.push({
+            id: "vtiData",
+            title: "VTI data",
+            fields: dynamicFields
+        });
+    }
+
+    return sections;
 }
 
 export function getClientSummaryFields(payload) {

@@ -94,6 +94,34 @@ const sampleClientJSON = {
 }
 
 {
+  const nextShapeJSON = {
+    ...sampleClientJSON,
+    client: {
+      ...sampleClientJSON.client,
+      billingProfile: "VIP"
+    },
+    contact: {
+      ...sampleClientJSON.contact,
+      preferredSlot: "Morning"
+    },
+    healthcheck: {
+      ...sampleClientJSON.healthcheck,
+      diagnostics: {
+        signalQuality: "GOOD"
+      }
+    }
+  };
+  const sections = getClientInfoSections(nextShapeJSON);
+  const vtiData = sections.find((section) => section.id === "vtiData");
+  const summary = getClientSummaryFields(nextShapeJSON);
+
+  assert.ok(vtiData.fields.some((field) => field.label === "client billing Profile" && field.value === "VIP"));
+  assert.ok(vtiData.fields.some((field) => field.label === "contact preferred Slot" && field.value === "Morning"));
+  assert.ok(vtiData.fields.some((field) => field.label === "healthcheck diagnostics signal Quality" && field.value === "GOOD"));
+  assert.equal(summary.some((field) => field.label === "billing Profile"), false);
+}
+
+{
   const summary = getClientSummaryFields(sampleClientJSON);
   assert.equal(summary.find((field) => field.label === "Name").value, "Mr. Peter manuel BILLIG");
   assert.equal(summary.find((field) => field.label === "Sex"), undefined);
