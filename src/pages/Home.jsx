@@ -1010,6 +1010,7 @@ export default function Home() {
                                 </div>
                                 <div className="dropdown-section">
                                     <div className="dropdown-title">Tools</div>
+                                    <button type="button" role="menuitem" onClick={() => { navigate("/vti-bookmarklet"); setDropdownOpen(false); }} className="dropdown-reset">VTI shortcut</button>
                                     <button type="button" role="menuitem" onClick={() => { setHelpOpen(true); setDropdownOpen(false); }} className="dropdown-reset">Help</button>
                                 </div>
                                 <div className="dropdown-section">

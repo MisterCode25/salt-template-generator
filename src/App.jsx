@@ -5,6 +5,7 @@ import ManageTemplates from "./pages/ManageTemplates.jsx";
 import ManageTokens from "./pages/ManageTokens.jsx";
 import Settings from "./pages/Settings.jsx";
 import ExternalGenerator from "./pages/ExternalGenerator.jsx";
+import VtiBookmarklet from "./pages/VtiBookmarklet.jsx";
 import PageHeader from "./components/PageHeader.jsx";
 import { applyTheme, getInitialTheme } from "./utils/theme.js";
 
@@ -35,6 +36,15 @@ function ExternalGeneratorPage() {
     );
 }
 
+function VtiBookmarkletPage() {
+    return (
+        <>
+            <PageHeader title="VTI Shortcut" />
+            <VtiBookmarklet />
+        </>
+    );
+}
+
 export default function App() {
     useEffect(() => {
         applyTheme(getInitialTheme());
@@ -47,6 +57,7 @@ export default function App() {
             <Route path="/tokens" element={<ManageTokensPage />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/external-generator" element={<ExternalGeneratorPage />} />
+            <Route path="/vti-bookmarklet" element={<VtiBookmarkletPage />} />
         </Routes>
     );
 }

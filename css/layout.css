@@ -237,6 +237,115 @@
     line-height: 1.45;
 }
 
+.vti-bookmarklet-page {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 28px 20px 44px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.vti-bookmarklet-hero,
+.vti-bookmarklet-panel {
+    background: rgba(18, 24, 38, 0.82);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+}
+
+.vti-bookmarklet-hero {
+    min-height: 210px;
+    padding: 28px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 24px;
+}
+
+.vti-bookmarklet-hero h1 {
+    margin-top: 6px;
+    font-size: 30px;
+}
+
+.vti-bookmarklet-lead {
+    max-width: 680px;
+    margin: 12px 0 0;
+    color: var(--text-secondary);
+    font-size: var(--font-md);
+    line-height: 1.55;
+}
+
+.vti-bookmarklet-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 48px;
+    padding: 0 18px;
+    border-radius: var(--radius-sm);
+    background: #1d4fff;
+    color: #ffffff;
+    text-decoration: none;
+    font-size: 15px;
+    font-weight: 800;
+    cursor: grab;
+    box-shadow: 0 10px 24px rgba(29, 79, 255, 0.32);
+    user-select: none;
+    white-space: nowrap;
+}
+
+.vti-bookmarklet-button:active {
+    cursor: grabbing;
+}
+
+.vti-bookmarklet-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+}
+
+.vti-bookmarklet-panel {
+    padding: 20px;
+}
+
+.vti-bookmarklet-panel h2 {
+    font-size: 18px;
+    margin-bottom: 12px;
+}
+
+.vti-bookmarklet-steps {
+    margin: 0;
+    padding-left: 20px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+.vti-bookmarklet-steps li + li {
+    margin-top: 8px;
+}
+
+.vti-bookmarklet-code-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 14px;
+}
+
+.vti-bookmarklet-code {
+    width: 100%;
+    min-height: 240px;
+    padding: 12px;
+    resize: vertical;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-default);
+    background: rgba(10, 14, 24, 0.86);
+    color: var(--text-primary);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 12px;
+    line-height: 1.45;
+}
+
 .zone-box {
     background: rgba(18, 22, 33, 0.85);
     border: 1px solid var(--border-default);
@@ -324,6 +433,22 @@
 
 /* --- RESPONSIVE: STACK ZONES ON SMALL SCREENS --- */
 @media (max-width: 900px) {
+    .vti-bookmarklet-hero,
+    .vti-bookmarklet-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .vti-bookmarklet-button {
+        justify-self: flex-start;
+        white-space: normal;
+        text-align: center;
+    }
+
+    .vti-bookmarklet-code-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
     .client-info-panel {
         margin-top: 18px;
     }
