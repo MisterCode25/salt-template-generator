@@ -280,28 +280,90 @@ export function normalizeClientTokenName(name = "") {
         .replace(/[^a-z0-9]+/g, "");
 }
 
+function extractFirstJSONObject(text) {
+    let start = -1;
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+
+    for (let index = 0; index < text.length; index++) {
+        const char = text[index];
+
+        if (inString) {
+            if (escaped) {
+                escaped = false;
+            } else if (char === "\\") {
+                escaped = true;
+            } else if (char === "\"") {
+                inString = false;
+            }
+            continue;
+        }
+
+        if (char === "\"") {
+            inString = true;
+            continue;
+        }
+
+        if (char === "{") {
+            if (depth === 0) start = index;
+            depth++;
+            continue;
+        }
+
+        if (char === "}" && depth > 0) {
+            depth--;
+            if (depth === 0 && start >= 0) {
+                return text.slice(start, index + 1);
+            }
+        }
+    }
+
+    return "";
+}
+
 export function parseClientClipboardJSON(text) {
-    const raw = String(text ?? "").trim();
+    const raw = String(text ?? "").replace(/^\uFEFF/, "").trim();
     if (!raw) {
         throw new Error("Clipboard is empty.");
     }
 
-    let parsed;
-    try {
-        parsed = JSON.parse(raw);
-    } catch {
-        throw new Error("Clipboard does not contain valid JSON.");
+    const candidates = [raw, extractFirstJSONObject(raw)]
+        .map((candidate) => candidate.trim())
+        .filter(Boolean)
+        .filter((candidate, index, list) => list.indexOf(candidate) === index);
+    let parsedInvalidObject = false;
+    let parsedInvalidShape = false;
+
+    for (const candidate of candidates) {
+        let parsed;
+        try {
+            parsed = JSON.parse(candidate);
+        } catch {
+            continue;
+        }
+
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+            parsedInvalidObject = true;
+            continue;
+        }
+
+        if (!parsed.client && !parsed.contact && !parsed.healthcheck) {
+            parsedInvalidShape = true;
+            continue;
+        }
+
+        return parsed;
     }
 
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    if (parsedInvalidObject) {
         throw new Error("Client JSON must be an object.");
     }
-
-    if (!parsed.client && !parsed.contact && !parsed.healthcheck) {
+    if (parsedInvalidShape) {
         throw new Error("Client JSON must contain client, contact, or healthcheck data.");
     }
 
-    return parsed;
+    throw new Error("Clipboard does not contain valid JSON.");
 }
 
 export function getClientInfoSections(payload) {

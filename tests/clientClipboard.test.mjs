@@ -65,6 +65,11 @@ const sampleClientJSON = {
 }
 
 {
+  const parsed = parseClientClipboardJSON(`Voici le JSON:\n\n\`\`\`json\n${JSON.stringify(sampleClientJSON, null, 2)}\n\`\`\``);
+  assert.equal(parsed.healthcheck.otoId, "B.111.783.391.7");
+}
+
+{
   assert.throws(
     () => parseClientClipboardJSON("{bad"),
     /valid JSON/

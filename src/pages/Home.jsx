@@ -631,6 +631,38 @@ export default function Home() {
         clearInputDecorations();
     };
 
+    const loadClientFromText = (text) => {
+        const payload = parseClientClipboardJSON(text);
+        const { values: matchedValues, matchedTokens } = matchClientDataToTokens(payload, tokens);
+        const nextLanguage = getClientLanguageCode(payload);
+        const matchCount = matchedTokens.length;
+
+        setClientPayload(payload);
+        setClientMatchedTokens(matchedTokens);
+        setClientDetailsExpanded(false);
+        if (nextLanguage) setLang(nextLanguage);
+
+        if (matchCount > 0) {
+            setValues((prev) => {
+                const next = { ...prev, ...matchedValues };
+                Object.entries(matchedValues).forEach(([token, value]) => {
+                    localStorage.setItem("input_" + token, value);
+                });
+                return next;
+            });
+            inputChangeVersion.current++;
+            clearInputDecorations();
+        }
+
+        const message = matchCount === 0
+            ? "Client JSON loaded. No configured token matched automatically."
+            : `Client JSON loaded. ${matchCount} token${matchCount > 1 ? "s" : ""} filled.`;
+        const languageMessage = nextLanguage ? ` Language set to ${nextLanguage.toUpperCase()}.` : "";
+        const fullMessage = `${message}${languageMessage}`;
+        setClientImportStatus({ type: "success", message: fullMessage });
+        showToast(fullMessage, "info");
+    };
+
     const readClientClipboard = async () => {
         setClientImportLoading(true);
         try {
@@ -639,34 +671,7 @@ export default function Home() {
             }
 
             const clipboardText = await navigator.clipboard.readText();
-            const payload = parseClientClipboardJSON(clipboardText);
-            const { values: matchedValues, matchedTokens } = matchClientDataToTokens(payload, tokens);
-            const nextLanguage = getClientLanguageCode(payload);
-            const matchCount = matchedTokens.length;
-
-            setClientPayload(payload);
-            setClientMatchedTokens(matchedTokens);
-            setClientDetailsExpanded(false);
-            if (nextLanguage) setLang(nextLanguage);
-
-            if (matchCount > 0) {
-                setValues((prev) => {
-                    const next = { ...prev, ...matchedValues };
-                    Object.entries(matchedValues).forEach(([token, value]) => {
-                        localStorage.setItem("input_" + token, value);
-                    });
-                    return next;
-                });
-                inputChangeVersion.current++;
-                clearInputDecorations();
-            }
-
-            const message = matchCount === 0
-                ? "Client JSON loaded. No configured token matched automatically."
-                : `Client JSON loaded. ${matchCount} token${matchCount > 1 ? "s" : ""} filled.`;
-            const languageMessage = nextLanguage ? ` Language set to ${nextLanguage.toUpperCase()}.` : "";
-            setClientImportStatus({ type: "success", message: `${message}${languageMessage}` });
-            showToast(`${message}${languageMessage}`, "info");
+            loadClientFromText(clipboardText);
         } catch (error) {
             const message = error?.message || "Unable to read client JSON from clipboard.";
             setClientImportStatus({ type: "error", message });
@@ -675,6 +680,37 @@ export default function Home() {
             setClientImportLoading(false);
         }
     };
+
+    useEffect(() => {
+        const handleClientPaste = (event) => {
+            const target = event.target;
+            if (target instanceof Element) {
+                const isEditable = target.closest("input, textarea, select") || target.isContentEditable;
+                if (isEditable) return;
+            }
+
+            const pastedText = event.clipboardData?.getData("text/plain");
+            if (!pastedText?.trim()) return;
+
+            try {
+                parseClientClipboardJSON(pastedText);
+            } catch {
+                return;
+            }
+
+            event.preventDefault();
+            try {
+                loadClientFromText(pastedText);
+            } catch (error) {
+                const message = error?.message || "Unable to load pasted client JSON.";
+                setClientImportStatus({ type: "error", message });
+                showToast(message, "error");
+            }
+        };
+
+        window.addEventListener("paste", handleClientPaste);
+        return () => window.removeEventListener("paste", handleClientPaste);
+    }, [tokens]);
 
     const collectInputValues = (requiredTokens) => {
         const vals = {};
