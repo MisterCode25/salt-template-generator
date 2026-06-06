@@ -157,11 +157,25 @@ async function readClipboardTextFromItems() {
     }
 
     const items = await withClipboardTimeout(() => navigator.clipboard.read());
+    const htmlCandidates = [];
     for (const item of items || []) {
-        if (!item.types?.includes("text/plain")) continue;
-        const blob = await item.getType("text/plain");
-        const text = await blob.text();
-        if (text) return text;
+        if (item.types?.includes("text/plain")) {
+            const blob = await item.getType("text/plain");
+            const text = await blob.text();
+            if (text) return text;
+        }
+        if (item.types?.includes("text/html")) {
+            const blob = await item.getType("text/html");
+            const html = await blob.text();
+            if (html) htmlCandidates.push(html);
+        }
+    }
+    for (const html of htmlCandidates) {
+        const doc = new DOMParser().parseFromString(html, "text/html");
+        const codeText = doc.querySelector("pre code, code, pre")?.textContent?.trim();
+        if (codeText) return codeText;
+        const bodyText = doc.body?.textContent?.trim();
+        if (bodyText) return bodyText;
     }
     throw new Error("Clipboard does not contain text.");
 }

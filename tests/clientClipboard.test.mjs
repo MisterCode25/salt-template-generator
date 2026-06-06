@@ -71,6 +71,25 @@ const sampleClientJSON = {
 }
 
 {
+  const parsed = parseClientClipboardJSON(`Oui, voilà :
+
+\`\`\`json
+${JSON.stringify(sampleClientJSON, null, 2)}
+\`\`\``);
+  assert.equal(parsed.client.contractorNumber, "31447756");
+  assert.equal(parsed.healthcheck.otoPortId, "3");
+}
+
+{
+  const parsed = parseClientClipboardJSON(`Oui, voilà :
+
+json
+${JSON.stringify(sampleClientJSON, null, 2)}`);
+  assert.equal(parsed.client.firstName, "Peter manuel");
+  assert.equal(parsed.healthcheck.otoId, "B.111.783.391.7");
+}
+
+{
   assert.throws(
     () => parseClientClipboardJSON("{bad"),
     /valid VTI data/

@@ -377,13 +377,29 @@ function extractFirstJSONObject(text) {
     return "";
 }
 
+function extractMarkdownJSONBlocks(text) {
+    const blocks = [];
+    const fencePattern = /```(?:json|javascript|js)?\s*([\s\S]*?)```/gi;
+    let match;
+    while ((match = fencePattern.exec(text)) !== null) {
+        if (match[1]?.trim()) blocks.push(match[1].trim());
+    }
+    return blocks;
+}
+
 export function parseClientClipboardJSON(text) {
     const raw = String(text ?? "").replace(/^\uFEFF/, "").trim();
     if (!raw) {
         throw new Error("Clipboard is empty.");
     }
 
-    const candidates = [raw, extractFirstJSONObject(raw)]
+    const markdownBlocks = extractMarkdownJSONBlocks(raw);
+    const candidates = [
+        ...markdownBlocks,
+        ...markdownBlocks.map(extractFirstJSONObject),
+        raw,
+        extractFirstJSONObject(raw)
+    ]
         .map((candidate) => candidate.trim())
         .filter(Boolean)
         .filter((candidate, index, list) => list.indexOf(candidate) === index);
