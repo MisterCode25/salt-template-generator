@@ -152,6 +152,20 @@
     font-size: 13px;
 }
 
+.client-paste-modal {
+    max-width: 760px;
+}
+
+.client-paste-textarea {
+    width: 100%;
+    max-width: none;
+    min-height: 320px;
+    box-sizing: border-box;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
 .client-info-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));

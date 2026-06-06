@@ -360,6 +360,7 @@ function ClientInfoPanel({
     detailsExpanded,
     onReadClipboard,
     onClearClient,
+    onOpenPaste,
     onToggleDetails
 }) {
     const hasInfo = sections.length > 0;
@@ -385,6 +386,13 @@ function ClientInfoPanel({
                             <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
                         </svg>
                         {loading ? "Reading..." : "Read clipboard"}
+                    </button>
+                    <button
+                        type="button"
+                        className="secondary-btn client-info-paste-btn"
+                        onClick={onOpenPaste}
+                    >
+                        Paste JSON
                     </button>
                     {hasInfo && (
                         <>
@@ -446,7 +454,7 @@ function ClientInfoPanel({
                 </>
             ) : (
                 <p className="client-info-empty">
-                    Put the client JSON in the clipboard, then read it here before copying a template.
+                    Put the client JSON in the clipboard, then read it here, or paste it manually.
                 </p>
             )}
 
@@ -464,6 +472,31 @@ function ClientInfoPanel({
                 </div>
             )}
         </section>
+    );
+}
+
+function ClientPasteModal({ value, onChange, onClose, onLoad }) {
+    return (
+        <Modal onClose={onClose} dialogClassName="popup-box client-paste-modal" ariaLabel="Paste client JSON">
+            <div className="popup-header">
+                <div>
+                    <h2>Paste client JSON</h2>
+                    <p className="hint">Paste the client JSON here if the browser blocks clipboard access.</p>
+                </div>
+                <button type="button" className="secondary-btn" onClick={onClose}>Close</button>
+            </div>
+            <textarea
+                className="client-paste-textarea"
+                value={value}
+                onChange={(event) => onChange(event.target.value)}
+                placeholder='{"client": {...}, "contact": {...}, "healthcheck": {...}}'
+                autoFocus
+            />
+            <div className="popup-actions">
+                <button type="button" className="secondary-btn" onClick={onClose}>Cancel</button>
+                <button type="button" className="primary-btn" onClick={onLoad}>Load client</button>
+            </div>
+        </Modal>
     );
 }
 
@@ -496,6 +529,8 @@ export default function Home() {
     const [clientMatchedTokens, setClientMatchedTokens] = useState([]);
     const [clientImportLoading, setClientImportLoading] = useState(false);
     const [clientDetailsExpanded, setClientDetailsExpanded] = useState(false);
+    const [clientPasteOpen, setClientPasteOpen] = useState(false);
+    const [clientPasteText, setClientPasteText] = useState("");
 
     useEffect(() => {
         loadTokens().then(setTokens);
@@ -667,17 +702,33 @@ export default function Home() {
         setClientImportLoading(true);
         try {
             if (!navigator.clipboard?.readText) {
-                throw new Error("Clipboard reading is not available in this browser.");
+                setClientPasteOpen(true);
+                throw new Error("Clipboard reading is blocked. Paste the JSON manually.");
             }
 
             const clipboardText = await navigator.clipboard.readText();
             loadClientFromText(clipboardText);
         } catch (error) {
             const message = error?.message || "Unable to read client JSON from clipboard.";
+            if (/clipboard|focus|permission|denied|blocked/i.test(message)) {
+                setClientPasteOpen(true);
+            }
             setClientImportStatus({ type: "error", message });
             showToast(message, "error");
         } finally {
             setClientImportLoading(false);
+        }
+    };
+
+    const loadClientFromPasteModal = () => {
+        try {
+            loadClientFromText(clientPasteText);
+            setClientPasteText("");
+            setClientPasteOpen(false);
+        } catch (error) {
+            const message = error?.message || "Unable to load pasted client JSON.";
+            setClientImportStatus({ type: "error", message });
+            showToast(message, "error");
         }
     };
 
@@ -929,8 +980,18 @@ export default function Home() {
                 detailsExpanded={clientDetailsExpanded}
                 onReadClipboard={readClientClipboard}
                 onClearClient={clearClientInfo}
+                onOpenPaste={() => setClientPasteOpen(true)}
                 onToggleDetails={() => setClientDetailsExpanded((expanded) => !expanded)}
             />
+
+            {clientPasteOpen && (
+                <ClientPasteModal
+                    value={clientPasteText}
+                    onChange={setClientPasteText}
+                    onClose={() => setClientPasteOpen(false)}
+                    onLoad={loadClientFromPasteModal}
+                />
+            )}
 
             {helpOpen && (
                 <Modal onClose={() => setHelpOpen(false)} dialogClassName="popup-box help-modal-box" ariaLabel="Quick guide">
