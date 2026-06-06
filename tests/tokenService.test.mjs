@@ -26,8 +26,10 @@ await ensureTokensFromTexts([
 ]);
 
 const tokens = await loadTokens();
+const customerToken = tokens.find((tokenDef) => tokenDef.token === "{customer_name}");
 
-assert.ok(tokens.some((tokenDef) => tokenDef.token === "{customer_name}"));
+assert.ok(customerToken);
+assert.equal(customerToken.display_mode, "on_demand");
 assert.equal(tokens.some((tokenDef) => tokenDef.token === "{client_first_name}"), false);
 assert.equal(tokens.some((tokenDef) => tokenDef.token === "{contact_error}"), false);
 assert.equal(tokens.some((tokenDef) => tokenDef.token === "{healthcheck_oto_id}"), false);

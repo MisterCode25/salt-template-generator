@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { loadTokens, saveTokens } from "../services/tokenService.js";
-import { renameTokenInTemplates } from "../services/templateService.js";
+import { renameTokenInTemplateTree } from "../services/templateTreeService.js";
 import Modal from "../components/Modal.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import EmptyState from "../components/EmptyState.jsx";
@@ -12,7 +12,6 @@ function TokenModal({ initial, tokens, onClose, onSave }) {
     const [key, setKey] = useState(initial?.key || "");
     const [type, setType] = useState(initial?.input_type || "text");
     const [def, setDef] = useState(initial?.default || "");
-    const [displayMode, setDisplayMode] = useState(initial?.display_mode || "always");
 
     const handleSave = () => {
         const normalizedToken = token.trim();
@@ -38,7 +37,7 @@ function TokenModal({ initial, tokens, onClose, onSave }) {
             key: normalizedKey || undefined,
             input_type: type,
             default: normalizedDefault !== "" ? normalizedDefault : undefined,
-            display_mode: displayMode
+            display_mode: "on_demand"
         });
     };
 
@@ -83,13 +82,6 @@ function TokenModal({ initial, tokens, onClose, onSave }) {
                             <input value={def} onChange={e => setDef(e.target.value)} />
                         </div>
 
-                        <div className="field-line">
-                            <label>Display mode</label>
-                            <select value={displayMode} onChange={e => setDisplayMode(e.target.value)}>
-                                <option value="always">Always visible on Home</option>
-                                <option value="on_demand">Ask in popup when using a template</option>
-                            </select>
-                        </div>
                     </div>
                 </div>
 
@@ -132,7 +124,7 @@ export default function ManageTokens() {
             const next = tokens.map(t => t.id === token.id ? token : t);
             await persist(next);
             if (previous?.token && previous.token !== token.token) {
-                await renameTokenInTemplates(previous.token, token.token);
+                await renameTokenInTemplateTree(previous.token, token.token);
             }
         } else {
             const next = [...tokens, { ...token, id: crypto.randomUUID() }];

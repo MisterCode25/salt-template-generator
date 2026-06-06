@@ -4,13 +4,21 @@ const TOKEN_PATH = "tokens";
 const TOKEN_PATTERN = /\{[^{}]+\}/g;
 const INTERNAL_TOKEN_PREFIX_PATTERN = /^\{(?:client|contact|healthcheck)_/i;
 
+function normalizeTokenDefinition(tokenDef) {
+    if (!tokenDef || typeof tokenDef !== "object") return tokenDef;
+    return {
+        ...tokenDef,
+        display_mode: "on_demand"
+    };
+}
+
 export async function loadTokens() {
     const tokens = await loadJSON(TOKEN_PATH, []);
-    return Array.isArray(tokens) ? tokens : [];
+    return Array.isArray(tokens) ? tokens.map(normalizeTokenDefinition) : [];
 }
 
 export async function saveTokens(tokens) {
-    await saveJSON(TOKEN_PATH, tokens);
+    await saveJSON(TOKEN_PATH, Array.isArray(tokens) ? tokens.map(normalizeTokenDefinition) : tokens);
 }
 
 export async function ensureTokensFromTexts(texts = []) {
@@ -33,7 +41,8 @@ export async function ensureTokensFromTexts(texts = []) {
             id: crypto.randomUUID(),
             token: tokenValue,
             label,
-            input_type: "text"
+            input_type: "text",
+            display_mode: "on_demand"
         });
         dirty = true;
     });

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { loadTokens } from "../services/tokenService.js";
-import { loadTemplates, saveTemplates } from "../services/templateService.js";
+import { loadTemplateTreeData, saveTemplateTreeData } from "../services/templateTreeService.js";
 import { saveJSON } from "../services/storageService.js";
 import { clearAppIndexedDB } from "../services/indexedDbService.js";
 import { buildConfigPayload, validateImportedConfig } from "../services/configService.js";
@@ -14,7 +14,7 @@ export default function Settings({ embedded = false, onClose = null }) {
     const navigate = useNavigate();
     const fileInputRef = useRef(null);
     const [tokens, setTokens] = useState([]);
-    const [models, setModels] = useState([]);
+    const [treeData, setTreeData] = useState({ nodes: [], templates: [] });
     const [configName, setConfigName] = useState(localStorage.getItem("local_configName") || "No configuration");
     const [confirmReset, setConfirmReset] = useState(false);
     const [exportNameOpen, setExportNameOpen] = useState(false);
@@ -22,7 +22,7 @@ export default function Settings({ embedded = false, onClose = null }) {
     const [storageInfo, setStorageInfo] = useState(null);
     useEffect(() => {
         loadTokens().then(setTokens);
-        loadTemplates().then(setModels);
+        loadTemplateTreeData().then(setTreeData);
         getStorageInfo().then(setStorageInfo).catch(() => setStorageInfo(null));
     }, []);
 
@@ -49,7 +49,7 @@ export default function Settings({ embedded = false, onClose = null }) {
         setExportNameOpen(false);
         setConfigName(nextName);
         localStorage.setItem("local_configName", nextName);
-        const payload = buildConfigPayload(nextName, tokens, models);
+        const payload = buildConfigPayload(nextName, tokens, treeData);
         const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -72,11 +72,16 @@ export default function Settings({ embedded = false, onClose = null }) {
         try {
             const text = await file.text();
             const json = JSON.parse(text);
-            const { tokens: importedTokens, models: importedModels, configName: importedName } = validateImportedConfig(json);
+            const {
+                tokens: importedTokens,
+                nodes: importedNodes,
+                templates: importedTemplates,
+                configName: importedName
+            } = validateImportedConfig(json);
             await saveJSON("tokens", importedTokens);
-            await saveTemplates(importedModels);
+            await saveTemplateTreeData({ nodes: importedNodes, templates: importedTemplates });
             setTokens(importedTokens);
-            setModels(importedModels);
+            setTreeData({ nodes: importedNodes, templates: importedTemplates });
             refreshStorageInfo();
             const name = importedName || "Imported configuration";
             localStorage.setItem("local_configName", name);

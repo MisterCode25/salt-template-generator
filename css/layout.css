@@ -1,13 +1,3 @@
-.inputs-zone {
-    padding: 20px;
-    background: rgba(18, 22, 33, 0.85);
-    border-radius: var(--radius-md);
-    margin: 20px;
-    box-shadow: var(--shadow-md);
-    border: 1px solid var(--border-default);
-    backdrop-filter: blur(16px);
-}
-
 .form-container {
     padding: 20px;
 }
@@ -39,7 +29,7 @@
     border-radius: var(--radius-sm);
 }
 
-/* --- MAIN GRID WITH 4 ZONES (2x2) --- */
+/* --- MAIN TEMPLATE GRID --- */
 
 .zones-grid {
     display: grid;
@@ -50,6 +40,10 @@
     align-items: start;
     box-sizing: border-box;
     background: transparent;
+}
+
+.zones-grid--templates {
+    grid-template-columns: repeat(3, minmax(260px, 1fr));
 }
 
 .zones-grid.zones-grid--empty {
@@ -370,10 +364,6 @@
     padding: 15px 20px;
     min-height: 150px;
     transition: transform var(--transition-base), box-shadow var(--transition-base);
-}
-
-#zone-left {
-    min-height: 220px;
 }
 
 .zone-box:hover {

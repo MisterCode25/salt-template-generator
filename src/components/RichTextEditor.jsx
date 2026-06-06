@@ -1,4 +1,16 @@
-import { useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect, useCallback, useMemo, useState } from "react";
+import {
+    formatRichTextForEditor,
+    getCompletedSlashContext,
+    getSlashContext,
+    makeTokenChip,
+    normalizePastedPlainText,
+    normalizePastedRichTextHTML,
+    serializeRichText,
+    serializeRichTextPlain,
+    slugifyTokenLabel,
+    tokenName
+} from "../utils/richTextTokens.js";
 
 const TOOLBAR_ACTIONS = [
     { command: "bold", label: <strong>B</strong>, title: "Bold" },
@@ -13,9 +25,51 @@ const TOOLBAR_ACTIONS = [
     { command: "removeFormat", label: "✕", title: "Clear formatting" },
 ];
 
-export default function RichTextEditor({ value, onChange, placeholder, className = "" }) {
+function buildTokenMatches(queryValue, tokens = []) {
+    const query = queryValue.trim().toLowerCase();
+    const base = (tokens || []).filter((item) => {
+        if (!query) return true;
+        return (item.label || "").toLowerCase().includes(query)
+            || (item.token || "").toLowerCase().includes(query);
+    });
+
+    if (query) {
+        const exact = base.some((item) =>
+            (item.label || "").toLowerCase() === query
+            || tokenName(item.token).toLowerCase() === query
+        );
+        if (!exact) {
+            const label = queryValue.trim();
+            base.unshift({
+                id: `create:${label}`,
+                label: `+ Create and insert "${label}"`,
+                token: `{${slugifyTokenLabel(label)}}`,
+                createLabel: label
+            });
+        }
+    }
+
+    return base;
+}
+
+export default function RichTextEditor({
+    value,
+    onChange,
+    placeholder,
+    className = "",
+    tokens = [],
+    onTokenCreate
+}) {
     const editorRef = useRef(null);
+    const menuRef = useRef(null);
     const skipSync = useRef(false);
+    const slashRange = useRef(null);
+    const [slashQuery, setSlashQuery] = useState("");
+    const [activeIndex, setActiveIndex] = useState(0);
+    const [menuOpen, setMenuOpen] = useState(false);
+    const [menuStyle, setMenuStyle] = useState({});
+
+    const tokenMatches = useMemo(() => buildTokenMatches(slashQuery, tokens), [slashQuery, tokens]);
 
     useEffect(() => {
         const el = editorRef.current;
@@ -24,17 +78,241 @@ export default function RichTextEditor({ value, onChange, placeholder, className
             skipSync.current = false;
             return;
         }
-        if (el.innerHTML !== (value || "")) {
-            el.innerHTML = value || "";
+        const nextHtml = formatRichTextForEditor(value || "", tokens);
+        if (el.innerHTML !== nextHtml) {
+            el.innerHTML = nextHtml;
         }
-    }, [value]);
+    }, [value, tokens]);
 
     const handleInput = useCallback(() => {
         const el = editorRef.current;
         if (!el) return;
         skipSync.current = true;
-        onChange?.(el.innerHTML);
+        onChange?.(serializeRichText(el));
     }, [onChange]);
+
+    const closeMenu = useCallback(() => {
+        slashRange.current = null;
+        setSlashQuery("");
+        setActiveIndex(0);
+        setMenuOpen(false);
+    }, []);
+
+    const updateMenuPosition = useCallback(() => {
+        const selection = window.getSelection();
+        const editor = editorRef.current;
+        const menu = menuRef.current;
+        if (!selection?.rangeCount || !editor || !menu) return;
+
+        const caretRange = selection.getRangeAt(0).cloneRange();
+        caretRange.collapse(false);
+        const caretRect = caretRange.getBoundingClientRect();
+        const editorRect = editor.getBoundingClientRect();
+        const shellRect = editor.parentElement.getBoundingClientRect();
+        const baseRect = caretRect.width || caretRect.height ? caretRect : editorRect;
+        const menuWidth = Math.min(340, shellRect.width - 36);
+        const menuHeight = menu.offsetHeight || 220;
+        const gap = 10;
+
+        let left = baseRect.left - shellRect.left;
+        left = Math.max(18, Math.min(left, shellRect.width - menuWidth - 18));
+
+        let top = baseRect.bottom - shellRect.top + gap;
+        const wouldOverflowEditor = top + menuHeight > editorRect.bottom - shellRect.top;
+        if (wouldOverflowEditor && baseRect.top - shellRect.top > menuHeight + gap) {
+            top = baseRect.top - shellRect.top - menuHeight - gap;
+        }
+
+        setMenuStyle({
+            "--token-menu-left": `${left}px`,
+            "--token-menu-top": `${top}px`
+        });
+    }, []);
+
+    useEffect(() => {
+        if (!menuOpen) return;
+        updateMenuPosition();
+    }, [menuOpen, slashQuery, activeIndex, updateMenuPosition]);
+
+    const createTokenDefinition = useCallback(async (label) => {
+        const normalizedLabel = label.trim();
+        const token = `{${slugifyTokenLabel(normalizedLabel)}}`;
+        const existing = (tokens || []).find((item) =>
+            item.token === token
+            || (item.label || "").toLowerCase() === normalizedLabel.toLowerCase()
+        );
+        if (existing) return existing;
+
+        const nextToken = {
+            id: crypto.randomUUID(),
+            token,
+            label: normalizedLabel,
+            input_type: "text",
+            display_mode: "on_demand"
+        };
+        if (onTokenCreate) {
+            const created = await onTokenCreate(nextToken);
+            return created || nextToken;
+        }
+        return nextToken;
+    }, [onTokenCreate, tokens]);
+
+    const getCurrentSlashRange = useCallback(() => {
+        const editor = editorRef.current;
+        if (editor) {
+            const context = getSlashContext(editor);
+            if (context?.range) return context.range;
+        }
+        return slashRange.current?.cloneRange() || null;
+    }, []);
+
+    const insertToken = useCallback(async (tokenDef) => {
+        const editor = editorRef.current;
+        const selection = window.getSelection();
+        const range = getCurrentSlashRange();
+        if (!editor || !selection || !range) return;
+
+        const resolvedToken = tokenDef.createLabel
+            ? await createTokenDefinition(tokenDef.createLabel)
+            : tokenDef;
+        if (!resolvedToken?.token) return;
+
+        range.deleteContents();
+        const chip = makeTokenChip(document, resolvedToken.token, [resolvedToken, ...tokens]);
+        const space = document.createTextNode(" ");
+        range.insertNode(space);
+        range.insertNode(chip);
+
+        const nextRange = document.createRange();
+        nextRange.setStartAfter(space);
+        nextRange.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(nextRange);
+
+        closeMenu();
+        handleInput();
+        editor.focus();
+    }, [closeMenu, createTokenDefinition, getCurrentSlashRange, handleInput, tokens]);
+
+    const handleEditorInput = useCallback(() => {
+        const selection = window.getSelection();
+        if (!selection?.rangeCount) {
+            handleInput();
+            return;
+        }
+
+        const editor = editorRef.current;
+        const slashContext = editor ? getSlashContext(editor) : null;
+        const completedSlashContext = !slashContext && editor ? getCompletedSlashContext(editor) : null;
+
+        if (slashContext) {
+            slashRange.current = slashContext.range;
+            setSlashQuery(slashContext.query);
+            setActiveIndex(0);
+            setMenuOpen(true);
+        } else if (completedSlashContext) {
+            slashRange.current = completedSlashContext.range;
+            const selected = buildTokenMatches(completedSlashContext.query, tokens)[0];
+            if (selected) {
+                insertToken(selected);
+                return;
+            }
+        } else if (slashRange.current) {
+            closeMenu();
+        }
+
+        handleInput();
+    }, [closeMenu, handleInput, insertToken, tokens]);
+
+    const handleKeyDown = useCallback((event) => {
+        if (event.key === " ") {
+            const editor = editorRef.current;
+            const context = editor ? getSlashContext(editor) : null;
+            if (context?.query.trim()) {
+                event.preventDefault();
+                slashRange.current = context.range;
+                const matches = buildTokenMatches(context.query, tokens);
+                const selected = matches[Math.min(activeIndex, Math.max(matches.length - 1, 0))];
+                if (selected) insertToken(selected);
+                return;
+            }
+        }
+
+        if (!menuOpen) return;
+
+        if (event.key === "ArrowDown") {
+            event.preventDefault();
+            setActiveIndex((current) => Math.min(current + 1, Math.max(tokenMatches.length - 1, 0)));
+            return;
+        }
+        if (event.key === "ArrowUp") {
+            event.preventDefault();
+            setActiveIndex((current) => Math.max(current - 1, 0));
+            return;
+        }
+        if (event.key === "Enter" || event.key === "Tab") {
+            event.preventDefault();
+            const selected = tokenMatches[activeIndex];
+            if (selected) insertToken(selected);
+            return;
+        }
+        if (event.key === " " && slashQuery.trim()) {
+            event.preventDefault();
+            const selected = tokenMatches[activeIndex];
+            if (selected) insertToken(selected);
+            return;
+        }
+        if (event.key === "Escape") {
+            event.preventDefault();
+            closeMenu();
+        }
+    }, [activeIndex, closeMenu, insertToken, menuOpen, slashQuery, tokenMatches, tokens]);
+
+    const writeSelectionToClipboard = useCallback((event) => {
+        const editor = editorRef.current;
+        const selection = window.getSelection();
+        if (!editor || !selection?.rangeCount || selection.isCollapsed) return false;
+
+        const range = selection.getRangeAt(0);
+        if (!editor.contains(range.commonAncestorContainer)) return false;
+
+        const fragment = range.cloneContents();
+        const wrapper = document.createElement("div");
+        wrapper.appendChild(fragment);
+
+        event.preventDefault();
+        event.clipboardData.setData("text/html", serializeRichText(wrapper));
+        event.clipboardData.setData("text/plain", serializeRichTextPlain(wrapper));
+        return true;
+    }, []);
+
+    const handleCopy = useCallback((event) => {
+        writeSelectionToClipboard(event);
+    }, [writeSelectionToClipboard]);
+
+    const handleCut = useCallback((event) => {
+        if (!writeSelectionToClipboard(event)) return;
+        document.execCommand("delete", false, null);
+        handleInput();
+    }, [handleInput, writeSelectionToClipboard]);
+
+    const handlePaste = useCallback((event) => {
+        const editor = editorRef.current;
+        if (!editor) return;
+
+        const html = event.clipboardData?.getData("text/html") || "";
+        const text = event.clipboardData?.getData("text/plain") || "";
+        if (!html && !text) return;
+
+        const nextHtml = html
+            ? normalizePastedRichTextHTML(html, tokens)
+            : normalizePastedPlainText(text, tokens);
+
+        event.preventDefault();
+        document.execCommand("insertHTML", false, nextHtml);
+        closeMenu();
+        handleInput();
+    }, [closeMenu, handleInput, tokens]);
 
     const insertImageByUrl = () => {
         editorRef.current?.focus();
@@ -83,9 +361,40 @@ export default function RichTextEditor({ value, onChange, placeholder, className
                 className="rich-editor__content"
                 contentEditable
                 suppressContentEditableWarning
-                onInput={handleInput}
+                onInput={handleEditorInput}
+                onKeyDown={handleKeyDown}
+                onCopy={handleCopy}
+                onCut={handleCut}
+                onPaste={handlePaste}
                 data-placeholder={placeholder}
             />
+            <div
+                ref={menuRef}
+                className={`rich-token-menu${menuOpen && tokenMatches.length > 0 ? " is-open" : ""}`}
+                style={menuStyle}
+            >
+                <div className="rich-token-menu__title">
+                    <span>{slashQuery.trim() ? `Token: /${slashQuery}` : "Choose or create a token"}</span>
+                    <kbd>Space</kbd>
+                </div>
+                <div className="rich-token-menu__list">
+                    {tokenMatches.map((item, index) => (
+                        <button
+                            key={item.id || item.token}
+                            type="button"
+                            className={`${index === activeIndex ? "is-active" : ""}${item.createLabel ? " create-token" : ""}`.trim()}
+                            onMouseEnter={() => setActiveIndex(index)}
+                            onMouseDown={(event) => {
+                                event.preventDefault();
+                                insertToken(item);
+                            }}
+                        >
+                            <span>{item.label || tokenName(item.token)}</span>
+                            <small>{item.token}</small>
+                        </button>
+                    ))}
+                </div>
+            </div>
         </div>
     );
 }

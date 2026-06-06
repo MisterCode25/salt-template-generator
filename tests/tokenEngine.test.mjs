@@ -1,5 +1,10 @@
 import assert from "node:assert/strict";
-import { applyTokens, generateFinalText } from "../src/core/tokenEngine.js";
+import {
+  applyTokens,
+  generateFinalText,
+  getTemplateTextByLang,
+  getTemplateTextResult
+} from "../src/core/tokenEngine.js";
 
 const sampleModel = {
   text_fr: "Bonjour {customer}",
@@ -31,6 +36,21 @@ const sampleModel = {
   assert.equal(en, "Hello Alice");
   const fr = generateFinalText(sampleModel, "fr", values);
   assert.equal(fr, "Bonjour Alice");
+}
+
+{
+  const frOnlyModel = {
+    text_fr: "Bonjour {customer}",
+    text_en: "",
+    text_de: "",
+    text_it: ""
+  };
+  const result = getTemplateTextResult(frOnlyModel, "en");
+  assert.equal(result.text, "Bonjour {customer}");
+  assert.equal(result.lang, "fr");
+  assert.equal(result.isFallback, true);
+  assert.equal(getTemplateTextByLang(frOnlyModel, "en"), "Bonjour {customer}");
+  assert.equal(generateFinalText(frOnlyModel, "en", { "{customer}": "Alice" }), "Bonjour Alice");
 }
 
 console.log("tokenEngine tests passed");

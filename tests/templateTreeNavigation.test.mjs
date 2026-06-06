@@ -1,0 +1,48 @@
+import assert from "node:assert/strict";
+
+const {
+  getAvailableTemplateChannels,
+  getNodePath,
+  getTemplatePath,
+  resolveChannelModel,
+  searchTemplateTree
+} = await import("../src/utils/templateTreeNavigation.js");
+
+const nodes = [
+  { id: "root", parentId: null, title: "No signal", description: "", icon: "", order: 1 },
+  { id: "child", parentId: "root", title: "Request OTO photo", description: "", icon: "", order: 1 }
+];
+
+const treeTemplate = {
+  id: "leaf",
+  parentNodeId: "child",
+  title: "Customer unreachable",
+  description: "Call failed",
+  channels: ["email", "sms"],
+  contentByChannel: {
+    email: {
+      id: "email-content",
+      type: "email",
+      title: "Customer unreachable"
+    },
+    sms: {
+      id: "sms-content",
+      type: "sms",
+      title: "Customer unreachable"
+    }
+  }
+};
+
+assert.deepEqual(getNodePath(nodes, "child").map((node) => node.id), ["root", "child"]);
+assert.deepEqual(getTemplatePath(nodes, treeTemplate).map((node) => node.id), ["root", "child"]);
+
+assert.equal(resolveChannelModel(treeTemplate, "sms").id, "sms-content");
+assert.equal(resolveChannelModel(treeTemplate, "email").id, "email-content");
+assert.equal(resolveChannelModel(treeTemplate, "other"), null);
+assert.deepEqual(getAvailableTemplateChannels(treeTemplate), ["email", "sms"]);
+
+const searchResults = searchTemplateTree(nodes, [treeTemplate], "oto");
+assert.deepEqual(searchResults.nodes.map((node) => node.id), ["child"]);
+assert.deepEqual(searchTemplateTree(nodes, [treeTemplate], "sms").templates.map((template) => template.id), ["leaf"]);
+
+console.log("templateTreeNavigation tests passed");
