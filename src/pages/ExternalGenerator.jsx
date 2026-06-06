@@ -804,6 +804,10 @@ export default function ExternalGenerator({ embedded = false, onClose, clientPay
         return meta;
     };
 
+    const launchCompletionFlow = async () => {
+        await runPostVtiCompletionFlow(fieldsRef.current, inferMetaFromFields(fieldsRef.current));
+    };
+
     // When the user modifies a branching field via field click, clear the fields that
     // logically come after it in the wizard so the flow re-asks for them.
     const WIZARD_DOWNSTREAM_FIELDS = {
@@ -942,20 +946,29 @@ export default function ExternalGenerator({ embedded = false, onClose, clientPay
                                 <p className="hint external-generator-active-client-status">
                                     Customer data is loaded automatically from the active customer.
                                 </p>
-                                <button
-                                    type="button"
-                                    className="secondary-btn"
-                                    onClick={() => applyActiveClientData({ runFlow: false, notify: true })}
-                                >
-                                    Refresh customer data
-                                </button>
-                                <button
-                                    type="button"
-                                    className="secondary-btn"
-                                    onClick={clearAllFields}
-                                >
-                                    Clear All
-                                </button>
+                                <div className="external-generator-subtle-actions">
+                                    <button
+                                        type="button"
+                                        className="secondary-btn external-generator-build-btn"
+                                        onClick={launchCompletionFlow}
+                                    >
+                                        Build
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="secondary-btn"
+                                        onClick={() => applyActiveClientData({ runFlow: false, notify: true })}
+                                    >
+                                        Refresh
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="secondary-btn"
+                                        onClick={clearAllFields}
+                                    >
+                                        Clear
+                                    </button>
+                                </div>
                             </div>
                         </section>
 
