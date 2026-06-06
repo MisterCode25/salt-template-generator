@@ -458,30 +458,30 @@ function ClientInfoPanel({
                     </div>
                 </div>
                 <div className="client-info-actions">
-                    <button
-                        type="button"
-                        className="secondary-btn client-info-read-btn"
-                        onClick={onReadClipboard}
-                        disabled={loading}
-                        title="Import customer data from clipboard"
-                    >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                            <rect x="9" y="9" width="13" height="13" rx="2" />
-                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                        </svg>
-                        {loading ? "Importing..." : "Import customer data"}
-                    </button>
-                    {status.type === "error" && (
+                    <div className="client-info-actions-main">
                         <button
                             type="button"
                             className="secondary-btn client-info-read-btn"
-                            onClick={onOpenPaste}
+                            onClick={onReadClipboard}
+                            disabled={loading}
+                            title="Import customer data from clipboard"
                         >
-                            Paste data
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <rect x="9" y="9" width="13" height="13" rx="2" />
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                            </svg>
+                            {loading ? "Importing..." : "Import customer data"}
                         </button>
-                    )}
-                    {hasInfo && (
-                        <>
+                        {status.type === "error" && (
+                            <button
+                                type="button"
+                                className="secondary-btn client-info-read-btn"
+                                onClick={onOpenPaste}
+                            >
+                                Paste data
+                            </button>
+                        )}
+                        {hasInfo && (
                             <button
                                 type="button"
                                 className="secondary-btn client-info-clear-btn"
@@ -489,6 +489,10 @@ function ClientInfoPanel({
                             >
                                 Clear
                             </button>
+                        )}
+                    </div>
+                    {hasInfo && (
+                        <div className="client-info-actions-end">
                             <button
                                 type="button"
                                 className="secondary-btn client-info-toggle-btn"
@@ -498,7 +502,7 @@ function ClientInfoPanel({
                                 {detailsExpanded ? "Hide details" : "Show details"}
                                 <span aria-hidden="true">{detailsExpanded ? "▴" : "▾"}</span>
                             </button>
-                        </>
+                        </div>
                     )}
                 </div>
             </div>
