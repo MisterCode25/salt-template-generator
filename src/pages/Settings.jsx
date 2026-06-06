@@ -3,8 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { loadTokens } from "../services/tokenService.js";
 import { loadTemplates, saveTemplates } from "../services/templateService.js";
 import { saveJSON } from "../services/storageService.js";
+import { clearAppIndexedDB } from "../services/indexedDbService.js";
 import { buildConfigPayload, validateImportedConfig } from "../services/configService.js";
 import { showToast } from "../services/clipboardService.js";
+import { getStorageInfo, requestPersistentStorage } from "../services/storageInfoService.js";
 import Modal from "../components/Modal.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
 
@@ -17,10 +19,25 @@ export default function Settings({ embedded = false, onClose = null }) {
     const [confirmReset, setConfirmReset] = useState(false);
     const [exportNameOpen, setExportNameOpen] = useState(false);
     const [exportNameValue, setExportNameValue] = useState("");
+    const [storageInfo, setStorageInfo] = useState(null);
     useEffect(() => {
         loadTokens().then(setTokens);
         loadTemplates().then(setModels);
+        getStorageInfo().then(setStorageInfo).catch(() => setStorageInfo(null));
     }, []);
+
+    const refreshStorageInfo = () => {
+        getStorageInfo().then(setStorageInfo).catch(() => setStorageInfo(null));
+    };
+
+    const requestPersist = async () => {
+        const persisted = await requestPersistentStorage();
+        refreshStorageInfo();
+        showToast(
+            persisted ? "Persistent browser storage enabled" : "Persistent storage was not granted",
+            persisted ? "success" : "warning"
+        );
+    };
 
     const startExport = () => {
         setExportNameValue(configName);
@@ -60,6 +77,7 @@ export default function Settings({ embedded = false, onClose = null }) {
             await saveTemplates(importedModels);
             setTokens(importedTokens);
             setModels(importedModels);
+            refreshStorageInfo();
             const name = importedName || "Imported configuration";
             localStorage.setItem("local_configName", name);
             setConfigName(name);
@@ -89,6 +107,7 @@ export default function Settings({ embedded = false, onClose = null }) {
             }
         }
         keysToDelete.forEach((key) => localStorage.removeItem(key));
+        await clearAppIndexedDB();
         showToast("Local data reset", "warning");
         window.location.href = "/";
     };
@@ -131,10 +150,29 @@ export default function Settings({ embedded = false, onClose = null }) {
 
                     <div className="popup-card">
                         <label>Storage</label>
-                        <p className="hint">Reset all local data stored in this browser.</p>
-                        <button className="reset-fields-btn settings-reset-btn" onClick={triggerReset}>
-                            Reset local data
-                        </button>
+                        <p className="hint">
+                            Local browser data. Templates are stored in IndexedDB.
+                        </p>
+                        <div className="storage-info-grid">
+                            <div>
+                                <span className="client-info-label">Used</span>
+                                <strong>{storageInfo?.usageLabel || "Unknown"}</strong>
+                            </div>
+                            <div>
+                                <span className="client-info-label">Quota</span>
+                                <strong>{storageInfo?.quotaLabel || "Unknown"}</strong>
+                            </div>
+                            <div>
+                                <span className="client-info-label">Persistent</span>
+                                <strong>{storageInfo?.persisted ? "Yes" : "No"}</strong>
+                            </div>
+                        </div>
+                        <div className="flex-row gap-sm flex-wrap mt-md">
+                            <button className="secondary-btn" onClick={requestPersist}>Protect storage</button>
+                            <button className="reset-fields-btn settings-reset-btn" onClick={triggerReset}>
+                                Reset local data
+                            </button>
+                        </div>
                     </div>
 
 

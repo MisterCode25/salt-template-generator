@@ -2,8 +2,7 @@ export function applyTokens(text, values) {
     if (!text) return "";
     let result = text;
     Object.keys(values || {}).forEach(token => {
-        const regex = new RegExp(token, "g");
-        result = result.replace(regex, values[token]);
+        result = result.split(token).join(values[token]);
     });
     return result;
 }

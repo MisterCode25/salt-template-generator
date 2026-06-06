@@ -14,6 +14,13 @@ const sampleModel = {
 }
 
 {
+  const output = applyTokens("<p>Hello <strong>{customer_name}</strong></p>", {
+    "{customer_name}": "Alice"
+  });
+  assert.equal(output, "<p>Hello <strong>Alice</strong></p>");
+}
+
+{
   const output = applyTokens("No tokens here", {});
   assert.equal(output, "No tokens here");
 }

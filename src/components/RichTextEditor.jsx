@@ -8,6 +8,8 @@ const TOOLBAR_ACTIONS = [
     { command: "insertOrderedList", label: "1.", title: "Ordered list" },
     { command: "insertUnorderedList", label: "•", title: "Unordered list" },
     { type: "sep" },
+    { command: "insertImageByUrl", label: "Img", title: "Insert image by URL" },
+    { type: "sep" },
     { command: "removeFormat", label: "✕", title: "Clear formatting" },
 ];
 
@@ -34,9 +36,27 @@ export default function RichTextEditor({ value, onChange, placeholder, className
         onChange?.(el.innerHTML);
     }, [onChange]);
 
+    const insertImageByUrl = () => {
+        editorRef.current?.focus();
+        const url = window.prompt("Image URL");
+        const trimmed = url?.trim();
+        if (!trimmed) return;
+        if (!/^https?:\/\//i.test(trimmed)) {
+            window.alert("Use an http:// or https:// image URL.");
+            return;
+        }
+        document.execCommand("insertImage", false, trimmed);
+        handleInput();
+    };
+
     const exec = (command) => {
         editorRef.current?.focus();
+        if (command === "insertImageByUrl") {
+            insertImageByUrl();
+            return;
+        }
         document.execCommand(command, false, null);
+        handleInput();
     };
 
     return (

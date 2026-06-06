@@ -1,6 +1,8 @@
 import { loadJSON, saveJSON } from "./storageService.js";
+import { loadIndexedJSON, saveIndexedJSON } from "./indexedDbService.js";
 
 const MODEL_KEY = "models";
+const MIGRATION_KEY = "templates_indexeddb_migrated";
 
 function normalizeVariant(v) {
     return {
@@ -22,12 +24,26 @@ function normalizeModel(m) {
 }
 
 export async function loadTemplates() {
-    const list = await loadJSON(MODEL_KEY, []);
-    return Array.isArray(list) ? list.map(normalizeModel) : [];
+    const indexedList = await loadIndexedJSON(MODEL_KEY, null);
+    if (Array.isArray(indexedList)) {
+        return indexedList.map(normalizeModel);
+    }
+
+    const legacyList = await loadJSON(MODEL_KEY, []);
+    const normalizedLegacy = Array.isArray(legacyList) ? legacyList.map(normalizeModel) : [];
+    if (normalizedLegacy.length > 0 && localStorage.getItem(`local_${MIGRATION_KEY}`) !== "1") {
+        const saved = await saveIndexedJSON(MODEL_KEY, normalizedLegacy);
+        if (saved) localStorage.setItem(`local_${MIGRATION_KEY}`, "1");
+    }
+    return normalizedLegacy;
 }
 
 export async function saveTemplates(models) {
-    await saveJSON(MODEL_KEY, models);
+    const normalizedModels = Array.isArray(models) ? models.map(normalizeModel) : [];
+    const saved = await saveIndexedJSON(MODEL_KEY, normalizedModels);
+    if (!saved) {
+        await saveJSON(MODEL_KEY, normalizedModels);
+    }
 }
 
 function replaceInText(text, fromToken, toToken) {
