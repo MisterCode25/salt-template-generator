@@ -2,15 +2,16 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Modal from "../components/Modal.jsx";
 import { copyText, showToast } from "../services/clipboardService.js";
+import { loadActiveClientPayload } from "../services/activeClientService.js";
 import { loadTokens, saveTokens } from "../services/tokenService.js";
 import {
     EXTERNAL_DEFAULT_FIELDS,
     EXTERNAL_GENERATOR_PARTNERS,
+    buildExternalFieldsFromClientPayload,
     buildExternalCode,
     formatDateForInput,
     mergeExternalFields,
-    parseExternalId,
-    parseVtiClipboard
+    parseExternalId
 } from "../utils/externalGenerator.js";
 
 // Stable key used to link a token to the soTicket field.
@@ -241,7 +242,7 @@ function isBlank(value) {
     return String(value ?? "").trim() === "";
 }
 
-export default function ExternalGenerator({ embedded = false, onClose }) {
+export default function ExternalGenerator({ embedded = false, onClose, clientPayload = null }) {
     const navigate = useNavigate();
     const [fields, setFields] = useState(() => ({
         ...EXTERNAL_DEFAULT_FIELDS,
@@ -251,7 +252,7 @@ export default function ExternalGenerator({ embedded = false, onClose }) {
     const [externalIdFieldValue, setExternalIdFieldValue] = useState("");
     const [externalIdEditing, setExternalIdEditing] = useState(false);
     const [vtiEmptyFieldErrors, setVtiEmptyFieldErrors] = useState({});
-    const [clipboardState, setClipboardState] = useState("unknown");
+    const [storedClientPayload, setStoredClientPayload] = useState(() => clientPayload || loadActiveClientPayload());
     const [promptState, setPromptState] = useState(null);
     const promptResolverRef = useRef(null);
     const hasMountedRef = useRef(false);
@@ -267,34 +268,8 @@ export default function ExternalGenerator({ embedded = false, onClose }) {
     }, []);
 
     useEffect(() => {
-        let cancelled = false;
-        const probeClipboard = async () => {
-            try {
-                const text = await navigator.clipboard.readText();
-                if (cancelled) return;
-                setClipboardState(text.trim() ? "ready" : "empty");
-            } catch {
-                if (cancelled) return;
-                setClipboardState("unknown");
-            }
-        };
-
-        probeClipboard();
-        const onFocus = () => probeClipboard();
-        const onVisibility = () => {
-            if (document.visibilityState === "visible") probeClipboard();
-        };
-        window.addEventListener("focus", onFocus);
-        document.addEventListener("visibilitychange", onVisibility);
-        const intervalId = window.setInterval(probeClipboard, 4000);
-
-        return () => {
-            cancelled = true;
-            window.removeEventListener("focus", onFocus);
-            document.removeEventListener("visibilitychange", onVisibility);
-            window.clearInterval(intervalId);
-        };
-    }, []);
+        setStoredClientPayload(clientPayload || loadActiveClientPayload());
+    }, [clientPayload]);
 
     const generatedCode = useMemo(() => buildExternalCode(fields), [fields]);
 
@@ -693,40 +668,31 @@ export default function ExternalGenerator({ embedded = false, onClose }) {
         return true;
     };
 
-    const parseClipboardVti = async () => {
-        try {
-            const raw = await navigator.clipboard.readText();
-            setClipboardState(raw.trim() ? "ready" : "empty");
-            const result = parseVtiClipboard(raw);
-            if (!result.ok) {
-                if (result.error === "EMPTY_VTI_CLIPBOARD") {
-                    showToast("Empty clipboard", "error");
-                } else {
-                    showToast("Invalid VTI format", "error");
-                }
-                return;
-            }
-            const computedNext = mergeExternalFields(fieldsRef.current, result.fields);
-            setFields(computedNext);
-            if (computedNext) {
-                const nextErrors = {};
-                Object.entries(computedNext).forEach(([key, value]) => {
-                    if (key === "data") return;
-                    const text = String(value ?? "").trim();
-                    if (!text) nextErrors[key] = true;
-                });
-                setVtiEmptyFieldErrors(nextErrors);
-                const completed = await runPostVtiCompletionFlow(computedNext);
-                if (completed) {
-                    setVtiEmptyFieldErrors({});
-                }
-            }
-            showToast("VTI data imported from clipboard", "info");
-        } catch (error) {
-            console.error(error);
-            setClipboardState("unknown");
-            showToast("Unable to read clipboard", "error");
+    const importActiveClientData = async () => {
+        const payload = clientPayload || storedClientPayload || loadActiveClientPayload();
+        const result = buildExternalFieldsFromClientPayload(payload);
+
+        if (!result.ok) {
+            showToast("No active customer data", "error");
+            return;
         }
+
+        const computedNext = mergeExternalFields(fieldsRef.current, result.fields);
+        setFields(computedNext);
+        if (computedNext) {
+            const nextErrors = {};
+            Object.entries(computedNext).forEach(([key, value]) => {
+                if (key === "data") return;
+                const text = String(value ?? "").trim();
+                if (!text) nextErrors[key] = true;
+            });
+            setVtiEmptyFieldErrors(nextErrors);
+            const completed = await runPostVtiCompletionFlow(computedNext);
+            if (completed) {
+                setVtiEmptyFieldErrors({});
+            }
+        }
+        showToast("Customer data imported", "info");
     };
 
     const copyCode = async () => {
@@ -964,11 +930,10 @@ export default function ExternalGenerator({ embedded = false, onClose }) {
                             <div className="external-generator-top-actions">
                                 <button
                                     type="button"
-                                    className={`primary-btn clipboard-parse-btn is-${clipboardState}`}
-                                    onClick={parseClipboardVti}
-                                    disabled={clipboardState !== "ready"}
+                                    className="primary-btn clipboard-parse-btn is-ready"
+                                    onClick={importActiveClientData}
                                 >
-                                    Paste & Parse VTI (Clipboard)
+                                    Import active customer
                                 </button>
                                 <button
                                     type="button"

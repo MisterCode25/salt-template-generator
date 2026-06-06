@@ -164,6 +164,72 @@ export function parseVtiClipboard(rawInput) {
     return { ok: true, fields: next };
 }
 
+function valueOf(...values) {
+    for (const value of values) {
+        const text = String(value ?? "").trim();
+        if (text) return text;
+    }
+    return "";
+}
+
+function boxTypeFromRouterSerial(serial = "") {
+    if (serial.startsWith("GFAB")) return "X6";
+    if (serial.startsWith("GFAC")) return "W7";
+    if (serial.startsWith("SFAA")) return "Arc";
+    return "";
+}
+
+function formatBokBof(breakoutCableId = "", fiberNumber = "") {
+    const parts = [];
+    const breakout = String(breakoutCableId ?? "").trim();
+    const fiber = String(fiberNumber ?? "").trim();
+
+    if (breakout) {
+        const split = breakout.split("/");
+        if (split.length > 1) {
+            parts.push(split[0], split[1]);
+        } else {
+            parts.push(breakout);
+        }
+    }
+    if (fiber) parts.push(fiber);
+
+    return parts.join("|");
+}
+
+export function buildExternalFieldsFromClientPayload(payload) {
+    if (!payload || typeof payload !== "object") {
+        return { ok: false, error: "NO_ACTIVE_CLIENT_DATA" };
+    }
+
+    const client = payload.client || {};
+    const healthcheck = payload.healthcheck || {};
+    const routerSerial = valueOf(healthcheck.routerSerialNumber, healthcheck.oldRouterSerialNumber);
+    const fields = {
+        customer: valueOf(client.contractorNumber, client.contractor, healthcheck.customerId),
+        boxType: boxTypeFromRouterSerial(routerSerial),
+        lexId: valueOf(healthcheck.lexId),
+        oltName: valueOf(healthcheck.oltName),
+        oltBoard: valueOf(healthcheck.oltBoard),
+        bokBof: formatBokBof(healthcheck.breakoutCableId, healthcheck.fiberNumber)
+    };
+
+    const hasUsefulData = Boolean(
+        fields.customer
+        || fields.boxType
+        || fields.lexId
+        || fields.oltName
+        || fields.oltBoard
+        || fields.bokBof
+    );
+
+    if (!hasUsefulData) {
+        return { ok: false, error: "INVALID_ACTIVE_CLIENT_DATA" };
+    }
+
+    return { ok: true, fields };
+}
+
 export function mergeExternalFields(current, patch) {
     return { ...current, ...patch };
 }

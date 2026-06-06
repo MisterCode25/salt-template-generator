@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {
+    buildExternalFieldsFromClientPayload,
     buildExternalCode,
     parseExternalId,
     parseVtiClipboard
@@ -36,6 +37,29 @@ import {
     assert.equal(parsed.fields.customer, "123");
     // Date must be correctly parsed even without flagging prefix
     assert.equal(parsed.fields.data, "2026-02-26");
+}
+
+{
+    const parsed = buildExternalFieldsFromClientPayload({
+        client: {
+            contractorNumber: "31447756"
+        },
+        healthcheck: {
+            routerSerialNumber: "GFAB11004892",
+            lexId: "69VEV",
+            oltName: "1",
+            oltBoard: "2",
+            breakoutCableId: "KP100314-C0036",
+            fiberNumber: "8"
+        }
+    });
+    assert.equal(parsed.ok, true);
+    assert.equal(parsed.fields.customer, "31447756");
+    assert.equal(parsed.fields.boxType, "X6");
+    assert.equal(parsed.fields.lexId, "69VEV");
+    assert.equal(parsed.fields.oltName, "1");
+    assert.equal(parsed.fields.oltBoard, "2");
+    assert.equal(parsed.fields.bokBof, "KP100314-C0036|8");
 }
 
 {

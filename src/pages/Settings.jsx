@@ -94,7 +94,7 @@ export default function Settings({ embedded = false, onClose = null }) {
     const resetStorage = async () => {
         setConfirmReset(false);
         const keysToDelete = [];
-        const appScopedLegacyKeys = new Set(["tokens", "models", "theme_pref"]);
+        const appScopedLegacyKeys = new Set(["tokens", "models", "theme_pref", "active_client_payload"]);
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
             if (!key) continue;

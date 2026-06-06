@@ -7,6 +7,7 @@ import { useNavigate } from "react-router-dom";
 import { applyTheme, getInitialTheme, getThemeToggleLabel } from "../utils/theme.js";
 import { PARTNER_COLUMNS } from "../data/partnersData.js";
 import { loadPartners } from "../services/partnersService.js";
+import { clearActiveClientPayload, loadActiveClientPayload, saveActiveClientPayload } from "../services/activeClientService.js";
 import { partnerMatchesQuery } from "../utils/partnerSearch.js";
 import {
     getClientInfoSections,
@@ -519,6 +520,11 @@ export default function Home() {
     useEffect(() => {
         loadTokens().then(setTokens);
         loadTemplates().then(setModels);
+        const storedClient = loadActiveClientPayload();
+        if (storedClient) {
+            setClientPayload(storedClient);
+            setClientImportStatus({ type: "success", message: "" });
+        }
     }, []);
 
     useEffect(() => {
@@ -561,6 +567,32 @@ export default function Home() {
         const hasTokens = tokens.length > 0;
         setEmpty(!hasTemplates && !hasTokens);
     }, [models, tokens]);
+
+    useEffect(() => {
+        if (!clientPayload || tokens.length === 0 || clientInternalTokens.length > 0) return;
+
+        const {
+            tokenDefs: internalTokenDefs,
+            values: internalValues,
+            matchedTokens: internalMatchedTokens
+        } = getClientInternalTokenData(clientPayload);
+        const availableTokens = [
+            ...tokens,
+            ...internalTokenDefs.filter((internalToken) =>
+                !tokens.some((tokenDef) => tokenDef.token === internalToken.token)
+            )
+        ];
+        const { values: matchedValues, matchedTokens } = matchClientDataToTokens(clientPayload, availableTokens);
+        const nextValues = { ...internalValues, ...matchedValues };
+        const tokensToClear = new Map();
+        [...internalMatchedTokens, ...matchedTokens].forEach((match) => {
+            tokensToClear.set(match.token, match);
+        });
+
+        setClientInternalTokens(internalTokenDefs);
+        setClientMatchedTokens(Array.from(tokensToClear.values()));
+        setValues((prev) => ({ ...prev, ...nextValues }));
+    }, [clientPayload, clientInternalTokens.length, tokens]);
 
     useEffect(() => {
         const handler = (e) => {
@@ -655,6 +687,7 @@ export default function Home() {
         setClientPayload(null);
         setClientMatchedTokens([]);
         setClientInternalTokens([]);
+        clearActiveClientPayload();
         setClientDetailsExpanded(false);
         setClientImportStatus({ type: "idle", message: "" });
         clearInputDecorations();
@@ -682,6 +715,7 @@ export default function Home() {
         });
 
         setClientPayload(payload);
+        saveActiveClientPayload(payload);
         setClientInternalTokens(internalTokenDefs);
         setClientMatchedTokens(Array.from(tokensToClear.values()));
         setClientDetailsExpanded(false);
@@ -1094,7 +1128,7 @@ export default function Home() {
                     dialogClassName={`popup-box external-generator-overlay-box${externalGeneratorClosing ? " is-closing" : ""}`}
                     ariaLabel="External Generator"
                 >
-                    <ExternalGenerator embedded onClose={closeExternalGenerator} />
+                    <ExternalGenerator embedded onClose={closeExternalGenerator} clientPayload={clientPayload} />
                 </Modal>
             )}
 
