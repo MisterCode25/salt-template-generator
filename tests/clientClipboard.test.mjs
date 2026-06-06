@@ -90,11 +90,13 @@ const sampleClientJSON = {
 {
   const summary = getClientSummaryFields(sampleClientJSON);
   assert.equal(summary.find((field) => field.label === "Name").value, "Mr. Peter manuel BILLIG");
-  assert.equal(summary.find((field) => field.label === "Sex").value, "Male");
-  assert.equal(summary.find((field) => field.label === "Language").value, "FR");
+  assert.equal(summary.find((field) => field.label === "Sex"), undefined);
+  assert.equal(summary.find((field) => field.label === "Language"), undefined);
   assert.equal(summary.find((field) => field.label === "Mobile").value, "078 912 56 85");
   assert.equal(summary.find((field) => field.label === "Contractor").value, "31447756");
   assert.equal(summary.find((field) => field.label === "Activation").value, "2026-06-20");
+  assert.equal(summary.find((field) => field.label === "OTO ID").value, "B.111.783.391.7");
+  assert.equal(summary.find((field) => field.label === "Port").value, "3");
   assert.equal(getClientLanguageCode(sampleClientJSON), "fr");
 }
 

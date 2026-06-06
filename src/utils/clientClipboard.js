@@ -336,14 +336,6 @@ export function getClientSummaryFields(payload) {
             value: fullName || firstValue([client.firstName, client.lastName])
         },
         {
-            label: "Sex",
-            value: firstValue([client.sex, client.gender])
-        },
-        {
-            label: "Language",
-            value: firstValue([client.communicationLanguage, contact.communicationLanguage])
-        },
-        {
             label: "Mobile",
             value: firstValue([client.mobile, client.mobileRaw, client.phone, client.telephone])
         },
@@ -360,6 +352,20 @@ export function getClientSummaryFields(payload) {
                 client.dateActivation,
                 contact.activationDate,
                 healthcheck.activationDate
+            ])
+        },
+        {
+            label: "OTO ID",
+            value: firstValue([healthcheck.otoId, healthcheck.oto_id, healthcheck.oto])
+        },
+        {
+            label: "Port",
+            value: firstValue([
+                healthcheck.otoPortId,
+                healthcheck.otoPort,
+                healthcheck.oto_port,
+                healthcheck.port,
+                healthcheck.crossConnexion?.Port
             ])
         }
     ].map((field) => ({
