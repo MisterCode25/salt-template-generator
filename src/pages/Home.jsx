@@ -135,15 +135,11 @@ function VariantModal({ model, onSelect, onClose }) {
 
 const CLIENT_CLIPBOARD_READ_TIMEOUT_MS = 3500;
 
-async function readClipboardText() {
-    if (!navigator.clipboard?.readText) {
-        throw new Error("Clipboard reading is not available in this browser.");
-    }
-
+async function withClipboardTimeout(readOperation) {
     let timeoutId;
     try {
         return await Promise.race([
-            navigator.clipboard.readText(),
+            readOperation(),
             new Promise((_, reject) => {
                 timeoutId = window.setTimeout(() => {
                     reject(new Error("Clipboard reading timed out. Click the page and try again."));
@@ -153,6 +149,45 @@ async function readClipboardText() {
     } finally {
         window.clearTimeout(timeoutId);
     }
+}
+
+async function readClipboardTextFromItems() {
+    if (!navigator.clipboard?.read) {
+        throw new Error("Clipboard item reading is not available in this browser.");
+    }
+
+    const items = await withClipboardTimeout(() => navigator.clipboard.read());
+    for (const item of items || []) {
+        if (!item.types?.includes("text/plain")) continue;
+        const blob = await item.getType("text/plain");
+        const text = await blob.text();
+        if (text) return text;
+    }
+    throw new Error("Clipboard does not contain text.");
+}
+
+async function readClipboardText() {
+    const errors = [];
+
+    if (navigator.clipboard?.readText) {
+        try {
+            const text = await withClipboardTimeout(() => navigator.clipboard.readText());
+            if (text) return text;
+            errors.push("Clipboard text is empty.");
+        } catch (error) {
+            errors.push(error?.message || "Clipboard text reading failed.");
+        }
+    } else {
+        errors.push("Clipboard text reading is not available in this browser.");
+    }
+
+    try {
+        return await readClipboardTextFromItems();
+    } catch (error) {
+        errors.push(error?.message || "Clipboard item reading failed.");
+    }
+
+    throw new Error(errors[errors.length - 1] || "Unable to read customer data from clipboard.");
 }
 
 function TokenPromptModal({ title, tokenDefs, values, missingTokens, onChange, onConfirm, onClose }) {
@@ -382,6 +417,7 @@ function ClientInfoPanel({
     loading,
     detailsExpanded,
     onReadClipboard,
+    onOpenPaste,
     onClearClient,
     onToggleDetails
 }) {
@@ -421,6 +457,15 @@ function ClientInfoPanel({
                         </svg>
                         {loading ? "Importing..." : "Import customer data"}
                     </button>
+                    {status.type === "error" && (
+                        <button
+                            type="button"
+                            className="secondary-btn client-info-read-btn"
+                            onClick={onOpenPaste}
+                        >
+                            Paste data
+                        </button>
+                    )}
                     {hasInfo && (
                         <>
                             <button
@@ -779,7 +824,6 @@ export default function Home() {
         try {
             window.focus();
             event?.currentTarget?.focus?.();
-            await new Promise((resolve) => window.setTimeout(resolve, 0));
             const clipboardText = await readClipboardText();
             loadClientFromText(clipboardText);
         } catch (error) {
@@ -787,7 +831,6 @@ export default function Home() {
             setClientImportStatus({ type: "error", message });
             showToast(message, "error");
             setClientPasteInitialError(message);
-            setClientPasteOpen(true);
         } finally {
             setClientImportLoading(false);
         }
@@ -1032,6 +1075,10 @@ export default function Home() {
                 loading={clientImportLoading}
                 detailsExpanded={clientDetailsExpanded}
                 onReadClipboard={readClientClipboard}
+                onOpenPaste={() => {
+                    setClientPasteInitialError(clientImportStatus.message || "");
+                    setClientPasteOpen(true);
+                }}
                 onClearClient={clearClientInfo}
                 onToggleDetails={() => setClientDetailsExpanded((expanded) => !expanded)}
             />
