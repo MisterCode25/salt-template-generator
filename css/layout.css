@@ -218,6 +218,25 @@
     overflow-wrap: anywhere;
 }
 
+.client-paste-modal {
+    width: min(92vw, 720px);
+}
+
+.client-paste-textarea {
+    width: 100%;
+    min-height: 260px;
+    margin-top: 12px;
+    padding: 12px;
+    resize: vertical;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-default);
+    background: rgba(10, 14, 24, 0.86);
+    color: var(--text-primary);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 13px;
+    line-height: 1.45;
+}
+
 .zone-box {
     background: rgba(18, 22, 33, 0.85);
     border: 1px solid var(--border-default);

@@ -486,6 +486,43 @@ function ClientInfoPanel({
     );
 }
 
+function ClientPasteModal({ onClose, onImport, initialError = "" }) {
+    const [text, setText] = useState("");
+    const [error, setError] = useState(initialError);
+
+    const submit = () => {
+        try {
+            onImport(text);
+        } catch (importError) {
+            setError(importError?.message || "Unable to import customer data.");
+        }
+    };
+
+    return (
+        <Modal onClose={onClose} dialogClassName="popup-box client-paste-modal" ariaLabel="Paste customer data">
+            <div className="popup-header">
+                <h2>Paste customer data</h2>
+            </div>
+            <p className="hint">Paste the VTI customer data here when clipboard access is blocked.</p>
+            {error && <p className="client-info-status client-info-status--error">{error}</p>}
+            <textarea
+                autoFocus
+                className="client-paste-textarea"
+                value={text}
+                onChange={(event) => {
+                    setText(event.target.value);
+                    if (error) setError("");
+                }}
+                placeholder='{"client": {...}, "contact": {...}, "healthcheck": {...}}'
+            />
+            <div className="popup-actions">
+                <button type="button" className="secondary-btn" onClick={onClose}>Cancel</button>
+                <button type="button" className="primary-btn" onClick={submit}>Import</button>
+            </div>
+        </Modal>
+    );
+}
+
 export default function Home() {
     const navigate = useNavigate();
     const [lang, setLang] = useState("en");
@@ -516,6 +553,8 @@ export default function Home() {
     const [clientInternalTokens, setClientInternalTokens] = useState([]);
     const [clientImportLoading, setClientImportLoading] = useState(false);
     const [clientDetailsExpanded, setClientDetailsExpanded] = useState(false);
+    const [clientPasteOpen, setClientPasteOpen] = useState(false);
+    const [clientPasteInitialError, setClientPasteInitialError] = useState("");
 
     useEffect(() => {
         loadTokens().then(setTokens);
@@ -747,9 +786,17 @@ export default function Home() {
             const message = error?.message || "Unable to read customer data from clipboard.";
             setClientImportStatus({ type: "error", message });
             showToast(message, "error");
+            setClientPasteInitialError(message);
+            setClientPasteOpen(true);
         } finally {
             setClientImportLoading(false);
         }
+    };
+
+    const importClientFromPaste = (text) => {
+        loadClientFromText(text);
+        setClientPasteOpen(false);
+        setClientPasteInitialError("");
     };
 
     const collectInputValues = (requiredTokens) => {
@@ -987,6 +1034,17 @@ export default function Home() {
                 onClearClient={clearClientInfo}
                 onToggleDetails={() => setClientDetailsExpanded((expanded) => !expanded)}
             />
+
+            {clientPasteOpen && (
+                <ClientPasteModal
+                    initialError={clientPasteInitialError}
+                    onClose={() => {
+                        setClientPasteOpen(false);
+                        setClientPasteInitialError("");
+                    }}
+                    onImport={importClientFromPaste}
+                />
+            )}
 
             {helpOpen && (
                 <Modal onClose={() => setHelpOpen(false)} dialogClassName="popup-box help-modal-box" ariaLabel="Quick guide">
