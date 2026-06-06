@@ -357,13 +357,13 @@ export function parseClientClipboardJSON(text) {
     }
 
     if (parsedInvalidObject) {
-        throw new Error("Client JSON must be an object.");
+        throw new Error("Customer data must be an object.");
     }
     if (parsedInvalidShape) {
-        throw new Error("Client JSON must contain client, contact, or healthcheck data.");
+        throw new Error("Customer data must contain client, contact, or healthcheck data.");
     }
 
-    throw new Error("Clipboard does not contain valid JSON.");
+    throw new Error("Clipboard does not contain valid VTI data.");
 }
 
 export function getClientInfoSections(payload) {

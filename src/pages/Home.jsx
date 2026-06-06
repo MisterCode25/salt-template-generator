@@ -131,6 +131,28 @@ function VariantModal({ model, onSelect, onClose }) {
     );
 }
 
+const CLIENT_CLIPBOARD_READ_TIMEOUT_MS = 3500;
+
+async function readClipboardText() {
+    if (!navigator.clipboard?.readText) {
+        throw new Error("Clipboard reading is not available in this browser.");
+    }
+
+    let timeoutId;
+    try {
+        return await Promise.race([
+            navigator.clipboard.readText(),
+            new Promise((_, reject) => {
+                timeoutId = window.setTimeout(() => {
+                    reject(new Error("Clipboard reading timed out. Click the page and try again."));
+                }, CLIENT_CLIPBOARD_READ_TIMEOUT_MS);
+            })
+        ]);
+    } finally {
+        window.clearTimeout(timeoutId);
+    }
+}
+
 function TokenPromptModal({ title, tokenDefs, values, missingTokens, onChange, onConfirm, onClose }) {
     const isMultiCol = tokenDefs.length > 2;
     return (
@@ -355,7 +377,6 @@ function ClientInfoPanel({
     sections,
     summaryFields,
     status,
-    matchedTokens,
     loading,
     detailsExpanded,
     onReadClipboard,
@@ -363,15 +384,26 @@ function ClientInfoPanel({
     onToggleDetails
 }) {
     const hasInfo = sections.length > 0;
-    const visibleMatches = matchedTokens.slice(0, 8);
-    const hiddenMatchCount = matchedTokens.length - visibleMatches.length;
+    const importComplete = hasInfo && status.type === "success";
 
     return (
         <section className="client-info-panel" aria-label="Client information">
             <div className="client-info-header">
                 <div>
-                    <p className="eyebrow">Client JSON</p>
-                    <h2>Client information</h2>
+                    <div className="client-info-title-row">
+                        <h2>Client information</h2>
+                        {importComplete && (
+                            <span
+                                className="client-info-success-icon"
+                                aria-label="Customer data imported"
+                                title="Customer data imported"
+                            >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                    <path d="M20 6 9 17l-5-5" />
+                                </svg>
+                            </span>
+                        )}
+                    </div>
                 </div>
                 <div className="client-info-actions">
                     <button
@@ -410,7 +442,7 @@ function ClientInfoPanel({
                 </div>
             </div>
 
-            {status.message && (
+            {status.type === "error" && status.message && (
                 <p className={`client-info-status client-info-status--${status.type}`} aria-live="polite">
                     {status.message}
                 </p>
@@ -446,23 +478,7 @@ function ClientInfoPanel({
                     )}
                 </>
             ) : (
-                <p className="client-info-empty">
-                    Put the customer JSON in the clipboard, then import it here before copying a template.
-                </p>
-            )}
-
-            {matchedTokens.length > 0 && (
-                <div className="client-info-matches" aria-label="Matched template tokens">
-                    <span className="client-info-match-label">Filled tokens</span>
-                    {visibleMatches.map((match) => (
-                        <span key={match.token} className="client-info-match-chip">
-                            {match.label}
-                        </span>
-                    ))}
-                    {hiddenMatchCount > 0 && (
-                        <span className="client-info-match-chip">+{hiddenMatchCount}</span>
-                    )}
-                </div>
+                <p className="client-info-empty">Put the data customer from VTI.</p>
             )}
         </section>
     );
@@ -636,14 +652,13 @@ export default function Home() {
         const payload = parseClientClipboardJSON(text);
         const { values: matchedValues, matchedTokens } = matchClientDataToTokens(payload, tokens);
         const nextLanguage = getClientLanguageCode(payload);
-        const matchCount = matchedTokens.length;
 
         setClientPayload(payload);
         setClientMatchedTokens(matchedTokens);
         setClientDetailsExpanded(false);
         if (nextLanguage) setLang(nextLanguage);
 
-        if (matchCount > 0) {
+        if (matchedTokens.length > 0) {
             setValues((prev) => {
                 const next = { ...prev, ...matchedValues };
                 Object.entries(matchedValues).forEach(([token, value]) => {
@@ -655,25 +670,19 @@ export default function Home() {
             clearInputDecorations();
         }
 
-        const message = matchCount === 0
-            ? "Client JSON loaded. No configured token matched automatically."
-            : `Client JSON loaded. ${matchCount} token${matchCount > 1 ? "s" : ""} filled.`;
-        const languageMessage = nextLanguage ? ` Language set to ${nextLanguage.toUpperCase()}.` : "";
-        const fullMessage = `${message}${languageMessage}`;
-        setClientImportStatus({ type: "success", message: fullMessage });
-        showToast(fullMessage, "info");
+        setClientImportStatus({ type: "success", message: "" });
     };
 
-    const readClientClipboard = async () => {
+    const readClientClipboard = async (event) => {
         setClientImportLoading(true);
         try {
-            if (!navigator.clipboard?.readText) {
-                throw new Error("Clipboard reading is not available in this browser.");
-            }
-            const clipboardText = await navigator.clipboard.readText();
+            window.focus();
+            event?.currentTarget?.focus?.();
+            await new Promise((resolve) => window.setTimeout(resolve, 0));
+            const clipboardText = await readClipboardText();
             loadClientFromText(clipboardText);
         } catch (error) {
-            const message = error?.message || "Unable to read client JSON from clipboard.";
+            const message = error?.message || "Unable to read customer data from clipboard.";
             setClientImportStatus({ type: "error", message });
             showToast(message, "error");
         } finally {
@@ -893,7 +902,6 @@ export default function Home() {
                 sections={clientInfoSections}
                 summaryFields={clientSummaryFields}
                 status={clientImportStatus}
-                matchedTokens={clientMatchedTokens}
                 loading={clientImportLoading}
                 detailsExpanded={clientDetailsExpanded}
                 onReadClipboard={readClientClipboard}

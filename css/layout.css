@@ -77,6 +77,24 @@
     font-size: var(--font-lg);
 }
 
+.client-info-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.client-info-success-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 999px;
+    background: rgba(10, 180, 110, 0.16);
+    border: 1px solid rgba(10, 180, 110, 0.35);
+    color: #61e7a0;
+}
+
 .client-info-actions {
     display: flex;
     align-items: center;
@@ -198,35 +216,6 @@
     font-size: 13px;
     line-height: 1.35;
     overflow-wrap: anywhere;
-}
-
-.client-info-matches {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin-top: 16px;
-}
-
-.client-info-match-label {
-    color: var(--text-muted);
-    font-size: var(--font-xs);
-    font-weight: 700;
-    text-transform: uppercase;
-}
-
-.client-info-match-chip {
-    max-width: 180px;
-    padding: 5px 8px;
-    border-radius: var(--radius-sm);
-    background: rgba(0, 170, 120, 0.15);
-    border: 1px solid rgba(0, 170, 120, 0.3);
-    color: #bdf7df;
-    font-size: var(--font-sm);
-    font-weight: 700;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
 .zone-box {
@@ -580,12 +569,6 @@
     color: #b4233c;
 }
 
-.light-theme .client-info-match-chip {
-    background: rgba(0, 120, 80, 0.12);
-    border-color: rgba(0, 120, 80, 0.25);
-    color: #07543a;
-}
-
 .light-theme .add-hero {
     background: linear-gradient(135deg, #eaf1ff, #d9e6ff);
     border: 1px solid rgba(30,60,120,0.15);
@@ -638,10 +621,4 @@
 
 .salt-theme .client-info-status--success {
     color: #4adf91;
-}
-
-.salt-theme .client-info-match-chip {
-    background: rgba(5, 135, 80, 0.2);
-    border-color: rgba(5, 135, 80, 0.45);
-    color: #c9f5de;
 }

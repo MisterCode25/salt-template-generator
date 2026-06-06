@@ -72,7 +72,7 @@ const sampleClientJSON = {
 {
   assert.throws(
     () => parseClientClipboardJSON("{bad"),
-    /valid JSON/
+    /valid VTI data/
   );
   assert.throws(
     () => parseClientClipboardJSON("[]"),
