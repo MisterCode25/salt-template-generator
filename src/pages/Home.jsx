@@ -10,6 +10,7 @@ import { loadPartners } from "../services/partnersService.js";
 import { partnerMatchesQuery } from "../utils/partnerSearch.js";
 import {
     getClientInfoSections,
+    getClientInternalTokenData,
     getClientLanguageCode,
     getClientSummaryFields,
     matchClientDataToTokens,
@@ -511,6 +512,7 @@ export default function Home() {
     const [clientPayload, setClientPayload] = useState(null);
     const [clientImportStatus, setClientImportStatus] = useState({ type: "idle", message: "" });
     const [clientMatchedTokens, setClientMatchedTokens] = useState([]);
+    const [clientInternalTokens, setClientInternalTokens] = useState([]);
     const [clientImportLoading, setClientImportLoading] = useState(false);
     const [clientDetailsExpanded, setClientDetailsExpanded] = useState(false);
 
@@ -542,6 +544,15 @@ export default function Home() {
     }, [tokens]);
 
     const grouped = useMemo(() => groupTemplates(models), [models]);
+    const templateTokens = useMemo(() => {
+        if (clientInternalTokens.length === 0) return tokens;
+
+        const configured = new Set(tokens.map((tokenDef) => tokenDef.token));
+        return [
+            ...tokens,
+            ...clientInternalTokens.filter((tokenDef) => !configured.has(tokenDef.token))
+        ];
+    }, [tokens, clientInternalTokens]);
     const clientInfoSections = useMemo(() => getClientInfoSections(clientPayload), [clientPayload]);
     const clientSummaryFields = useMemo(() => getClientSummaryFields(clientPayload), [clientPayload]);
 
@@ -643,6 +654,7 @@ export default function Home() {
         }
         setClientPayload(null);
         setClientMatchedTokens([]);
+        setClientInternalTokens([]);
         setClientDetailsExpanded(false);
         setClientImportStatus({ type: "idle", message: "" });
         clearInputDecorations();
@@ -650,25 +662,41 @@ export default function Home() {
 
     const loadClientFromText = (text) => {
         const payload = parseClientClipboardJSON(text);
-        const { values: matchedValues, matchedTokens } = matchClientDataToTokens(payload, tokens);
+        const {
+            tokenDefs: internalTokenDefs,
+            values: internalValues,
+            matchedTokens: internalMatchedTokens
+        } = getClientInternalTokenData(payload);
+        const availableTokens = [
+            ...tokens,
+            ...internalTokenDefs.filter((internalToken) =>
+                !tokens.some((tokenDef) => tokenDef.token === internalToken.token)
+            )
+        ];
+        const { values: matchedValues, matchedTokens } = matchClientDataToTokens(payload, availableTokens);
         const nextLanguage = getClientLanguageCode(payload);
+        const nextValues = { ...internalValues, ...matchedValues };
+        const tokensToClear = new Map();
+        [...internalMatchedTokens, ...matchedTokens].forEach((match) => {
+            tokensToClear.set(match.token, match);
+        });
 
         setClientPayload(payload);
-        setClientMatchedTokens(matchedTokens);
+        setClientInternalTokens(internalTokenDefs);
+        setClientMatchedTokens(Array.from(tokensToClear.values()));
         setClientDetailsExpanded(false);
         if (nextLanguage) setLang(nextLanguage);
 
-        if (matchedTokens.length > 0) {
-            setValues((prev) => {
-                const next = { ...prev, ...matchedValues };
-                Object.entries(matchedValues).forEach(([token, value]) => {
-                    localStorage.setItem("input_" + token, value);
-                });
-                return next;
+        setValues((prev) => {
+            const next = { ...prev };
+            clientMatchedTokens.forEach(({ token }) => {
+                delete next[token];
+                localStorage.removeItem("input_" + token);
             });
-            inputChangeVersion.current++;
-            clearInputDecorations();
-        }
+            return { ...next, ...nextValues };
+        });
+        inputChangeVersion.current++;
+        clearInputDecorations();
 
         setClientImportStatus({ type: "success", message: "" });
     };
@@ -695,7 +723,10 @@ export default function Home() {
         const missing = [];
         const set = new Set(requiredTokens || []);
         const nextErrors = {};
-        tokens.forEach(t => {
+        const knownTokens = new Set();
+
+        templateTokens.forEach(t => {
+            knownTokens.add(t.token);
             const stored = values[t.token] ?? t.default ?? "";
             if (set.size === 0 || set.has(t.token)) {
                 if (stored === "" || stored === null || stored === undefined) {
@@ -705,6 +736,13 @@ export default function Home() {
             }
             vals[t.token] = stored;
         });
+
+        set.forEach((tokenName) => {
+            if (knownTokens.has(tokenName)) return;
+            missing.push(tokenName);
+            nextErrors[tokenName] = true;
+        });
+
         setInputErrors(nextErrors);
         return { values: vals, missing };
     };
@@ -722,7 +760,12 @@ export default function Home() {
             return;
         }
 
-        const tokenMap = new Map(tokens.map((tokenDef) => [tokenDef.token, tokenDef]));
+        const tokenMap = new Map(templateTokens.map((tokenDef) => [tokenDef.token, tokenDef]));
+        const isTokenFilled = (tokenName) => {
+            const tokenDef = tokenMap.get(tokenName);
+            const stored = values[tokenName] ?? tokenDef?.default ?? "";
+            return stored !== "" && stored !== null && stored !== undefined;
+        };
 
         // Always verify visible tokens first, before showing any popup
         const visibleTokensNeeded = tokensNeeded.filter(
@@ -739,7 +782,9 @@ export default function Home() {
         // Then check on-demand tokens and show popup if needed
         if (!skipPopup) {
             const onDemandNeeded = tokensNeeded
-                .filter((tokenName) => tokenMap.get(tokenName)?.display_mode === "on_demand");
+                .filter((tokenName) =>
+                    tokenMap.get(tokenName)?.display_mode === "on_demand" && !isTokenFilled(tokenName)
+                );
             if (onDemandNeeded.length > 0) {
                 setPromptMissingTokens([]);
                 setTokenPrompt({
@@ -767,7 +812,7 @@ export default function Home() {
         if (warnSameSection && tokensNeeded.length > 0) {
             const nextWarnings = {};
             tokensNeeded.forEach((tokenValue) => {
-                const def = tokens.find(t => t.token === tokenValue);
+                const def = templateTokens.find(t => t.token === tokenValue);
                 if (!def || def.default === undefined) {
                     nextWarnings[tokenValue] = true;
                 }

@@ -2,6 +2,7 @@ import { loadJSON, saveJSON } from "./storageService.js";
 
 const TOKEN_PATH = "tokens";
 const TOKEN_PATTERN = /\{[^{}]+\}/g;
+const INTERNAL_TOKEN_PREFIX_PATTERN = /^\{(?:client|contact|healthcheck)_/i;
 
 export async function loadTokens() {
     const tokens = await loadJSON(TOKEN_PATH, []);
@@ -24,6 +25,7 @@ export async function ensureTokensFromTexts(texts = []) {
     const current = await loadTokens();
     let dirty = false;
     discovered.forEach(tokenValue => {
+        if (INTERNAL_TOKEN_PREFIX_PATTERN.test(tokenValue)) return;
         if (current.some(t => t.token === tokenValue)) return;
         const clean = tokenValue.slice(1, -1).replace(/[_-]+/g, " ").trim();
         const label = clean ? clean.charAt(0).toUpperCase() + clean.slice(1) : tokenValue;

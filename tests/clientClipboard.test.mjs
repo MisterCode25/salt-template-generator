@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {
+  getClientInternalTokenData,
   getClientLanguageCode,
   getClientInfoSections,
   getClientSummaryFields,
@@ -106,6 +107,18 @@ const sampleClientJSON = {
 }
 
 {
+  const { tokenDefs, values } = getClientInternalTokenData(sampleClientJSON);
+  const tokenMap = new Map(tokenDefs.map((tokenDef) => [tokenDef.token, tokenDef]));
+
+  assert.equal(values["{client_first_name}"], "Peter manuel");
+  assert.equal(values["{healthcheck_oto_id}"], "B.111.783.391.7");
+  assert.equal(values["{healthcheck_cross_connexion_port}"], "23");
+  assert.equal(values["{contact_error}"], "");
+  assert.equal(tokenMap.get("{client_first_name}").display_mode, "on_demand");
+  assert.equal(tokenMap.get("{healthcheck_cross_connexion_port}").internal, true);
+}
+
+{
   const { values, matchedTokens } = matchClientDataToTokens(sampleClientJSON, [
     { token: "{customer_name}", label: "Customer" },
     { token: "{first_name}", label: "First name" },
@@ -124,6 +137,10 @@ const sampleClientJSON = {
   assert.equal(values["{activation_date}"], "2026-06-20");
   assert.equal(values["{oto_id}"], "B.111.783.391.7");
   assert.equal(values["{cross_connection_port}"], "23");
+  assert.equal(matchClientDataToTokens(sampleClientJSON, [
+    { token: "{client_first_name}", label: "Internal first name" },
+    { token: "{healthcheck_router_serial_number}", label: "Internal router" }
+  ]).values["{healthcheck_router_serial_number}"], "GFAB11004892");
   assert.equal(values["{unknown}"], undefined);
   assert.equal(matchedTokens.length, 7);
 }

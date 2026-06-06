@@ -256,6 +256,49 @@ function displayValue(value) {
     return "";
 }
 
+function humanizePathSegment(segment = "") {
+    return String(segment)
+        .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+        .replace(/[_-]+/g, " ")
+        .trim();
+}
+
+function tokenSegment(segment = "") {
+    return humanizePathSegment(segment)
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_+|_+$/g, "");
+}
+
+function formatPathToken(path) {
+    const name = path.map(tokenSegment).filter(Boolean).join("_");
+    return name ? `{${name}}` : "";
+}
+
+function formatPathLabel(path) {
+    return path.map(humanizePathSegment).filter(Boolean).join(" ");
+}
+
+function walkPayloadLeaves(value, path = [], leaves = []) {
+    if (Array.isArray(value)) {
+        value.forEach((item, index) => walkPayloadLeaves(item, [...path, String(index + 1)], leaves));
+        return leaves;
+    }
+
+    if (value && typeof value === "object") {
+        Object.entries(value).forEach(([key, item]) => walkPayloadLeaves(item, [...path, key], leaves));
+        return leaves;
+    }
+
+    leaves.push({
+        path,
+        value: displayValue(value)
+    });
+    return leaves;
+}
+
 function firstValue(values) {
     for (const value of values) {
         const formatted = displayValue(value);
@@ -456,6 +499,14 @@ function addIndexEntry(index, alias, value) {
 export function buildClientTokenIndex(payload) {
     const index = new Map();
 
+    walkPayloadLeaves(payload).forEach((leaf) => {
+        if (leaf.value === "") return;
+        const token = formatPathToken(leaf.path);
+        if (token) addIndexEntry(index, token, leaf.value);
+        addIndexEntry(index, leaf.path.join(" "), leaf.value);
+        addIndexEntry(index, leaf.path.join(""), leaf.value);
+    });
+
     CLIENT_FIELD_GROUPS.forEach((group) => {
         group.fields.forEach((field) => {
             const value = valueForField(payload, field);
@@ -476,6 +527,39 @@ export function buildClientTokenIndex(payload) {
     });
 
     return index;
+}
+
+export function getClientInternalTokenData(payload) {
+    const tokenDefs = [];
+    const values = {};
+    const matchedTokens = [];
+    const seen = new Set();
+
+    walkPayloadLeaves(payload).forEach((leaf) => {
+        const token = formatPathToken(leaf.path);
+        if (!token || seen.has(token)) return;
+        seen.add(token);
+
+        const label = formatPathLabel(leaf.path) || token;
+        tokenDefs.push({
+            id: `client-json:${leaf.path.join(".")}`,
+            token,
+            label,
+            key: leaf.path.join("."),
+            input_type: "text",
+            display_mode: "on_demand",
+            internal: true
+        });
+
+        values[token] = leaf.value;
+        matchedTokens.push({
+            token,
+            value: leaf.value,
+            label
+        });
+    });
+
+    return { tokenDefs, values, matchedTokens };
 }
 
 export function matchClientDataToTokens(payload, tokens = []) {
