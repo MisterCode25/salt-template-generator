@@ -359,6 +359,7 @@ function ClientInfoPanel({
     loading,
     detailsExpanded,
     onReadClipboard,
+    onClearClient,
     onToggleDetails
 }) {
     const hasInfo = sections.length > 0;
@@ -386,15 +387,24 @@ function ClientInfoPanel({
                         {loading ? "Reading..." : "Read clipboard"}
                     </button>
                     {hasInfo && (
-                        <button
-                            type="button"
-                            className="secondary-btn client-info-toggle-btn"
-                            aria-expanded={detailsExpanded}
-                            onClick={onToggleDetails}
-                        >
-                            {detailsExpanded ? "Hide details" : "Show details"}
-                            <span aria-hidden="true">{detailsExpanded ? "▴" : "▾"}</span>
-                        </button>
+                        <>
+                            <button
+                                type="button"
+                                className="secondary-btn client-info-clear-btn"
+                                onClick={onClearClient}
+                            >
+                                Clear
+                            </button>
+                            <button
+                                type="button"
+                                className="secondary-btn client-info-toggle-btn"
+                                aria-expanded={detailsExpanded}
+                                onClick={onToggleDetails}
+                            >
+                                {detailsExpanded ? "Hide details" : "Show details"}
+                                <span aria-hidden="true">{detailsExpanded ? "▴" : "▾"}</span>
+                            </button>
+                        </>
                     )}
                 </div>
             </div>
@@ -600,6 +610,25 @@ export default function Home() {
             delete next[token];
             return next;
         });
+    };
+
+    const clearClientInfo = () => {
+        const matchedTokenNames = clientMatchedTokens.map((match) => match.token);
+        if (matchedTokenNames.length > 0) {
+            setValues((prev) => {
+                const next = { ...prev };
+                matchedTokenNames.forEach((token) => {
+                    delete next[token];
+                    localStorage.removeItem("input_" + token);
+                });
+                return next;
+            });
+        }
+        setClientPayload(null);
+        setClientMatchedTokens([]);
+        setClientDetailsExpanded(false);
+        setClientImportStatus({ type: "idle", message: "" });
+        clearInputDecorations();
     };
 
     const readClientClipboard = async () => {
@@ -863,6 +892,7 @@ export default function Home() {
                 loading={clientImportLoading}
                 detailsExpanded={clientDetailsExpanded}
                 onReadClipboard={readClientClipboard}
+                onClearClient={clearClientInfo}
                 onToggleDetails={() => setClientDetailsExpanded((expanded) => !expanded)}
             />
 
