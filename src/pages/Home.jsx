@@ -491,19 +491,6 @@ function ClientInfoPanel({
                             </button>
                         )}
                     </div>
-                    {hasInfo && (
-                        <div className="client-info-actions-end">
-                            <button
-                                type="button"
-                                className="secondary-btn client-info-toggle-btn"
-                                aria-expanded={detailsExpanded}
-                                onClick={onToggleDetails}
-                            >
-                                {detailsExpanded ? "Hide details" : "Show details"}
-                                <span aria-hidden="true">{detailsExpanded ? "▴" : "▾"}</span>
-                            </button>
-                        </div>
-                    )}
                 </div>
             </div>
 
@@ -522,6 +509,17 @@ function ClientInfoPanel({
                                 <span className="client-info-summary-value">{field.value}</span>
                             </div>
                         ))}
+                        <div className="client-info-summary-action">
+                            <button
+                                type="button"
+                                className="secondary-btn client-info-toggle-btn"
+                                aria-expanded={detailsExpanded}
+                                onClick={onToggleDetails}
+                            >
+                                {detailsExpanded ? "Hide details" : "Show details"}
+                                <span aria-hidden="true">{detailsExpanded ? "▴" : "▾"}</span>
+                            </button>
+                        </div>
                     </div>
 
                     {detailsExpanded && (

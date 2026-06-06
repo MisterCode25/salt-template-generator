@@ -104,8 +104,7 @@
     min-width: 0;
 }
 
-.client-info-actions-main,
-.client-info-actions-end {
+.client-info-actions-main {
     display: flex;
     align-items: center;
     gap: 10px;
@@ -114,11 +113,6 @@
 
 .client-info-actions-main {
     min-width: 0;
-}
-
-.client-info-actions-end {
-    margin-left: auto;
-    justify-content: flex-end;
 }
 
 .client-info-read-btn {
@@ -168,6 +162,13 @@
 
 .client-info-summary-item--wide {
     grid-column: span 2;
+}
+
+.client-info-summary-action {
+    display: flex;
+    align-items: stretch;
+    justify-content: flex-end;
+    min-width: 0;
 }
 
 .client-info-summary-value {
@@ -466,8 +467,8 @@
         flex-wrap: wrap;
     }
 
-    .client-info-actions-end {
-        margin-left: 0;
+    .client-info-summary-action {
+        justify-content: stretch;
     }
 
     .client-info-summary {
