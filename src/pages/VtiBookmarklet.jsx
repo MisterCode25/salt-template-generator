@@ -40,7 +40,7 @@ export default function VtiBookmarklet() {
                         showToast("Drag this button to the bookmarks bar.", "info");
                     }}
                 >
-                    Salt HealthCheck JSON
+                    Capture VTI data
                 </a>
             </section>
 
@@ -64,24 +64,16 @@ export default function VtiBookmarklet() {
                 </div>
             </section>
 
-            <section className="vti-bookmarklet-panel">
-                <div className="vti-bookmarklet-code-header">
-                    <div>
-                        <h2>Manual install</h2>
-                        <p className="hint">
-                            If drag and drop is blocked, create a bookmark manually and paste this code as its URL.
-                        </p>
-                    </div>
-                    <button type="button" className="secondary-btn" onClick={copyBookmarklet}>
-                        Copy script
-                    </button>
+            <section className="vti-bookmarklet-panel vti-bookmarklet-support">
+                <div>
+                    <h2>Drag does not work?</h2>
+                    <p className="hint">
+                        Copy the shortcut, create a bookmark manually, then paste it as the bookmark URL.
+                    </p>
                 </div>
-                <textarea
-                    className="vti-bookmarklet-code"
-                    value={bookmarkletCode}
-                    readOnly
-                    aria-label="VTI bookmarklet script"
-                />
+                <button type="button" className="secondary-btn" onClick={copyBookmarklet}>
+                    Copy shortcut
+                </button>
             </section>
         </main>
     );
