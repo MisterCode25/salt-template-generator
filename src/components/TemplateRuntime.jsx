@@ -154,14 +154,14 @@ export function TokenPromptModal({ title, tokenDefs, values, missingTokens, mode
     );
 }
 
-export function VariantModal({ model, onSelect, onClose }) {
+export function VariantModal({ model, displayTitle, onSelect, onClose }) {
     const typeClass = model.type ? `template-type-${model.type}` : "";
     const mainVariantLabel = model.mainVariantName?.trim() || model.title || "Main text";
 
     return (
         <Modal onClose={onClose} dialogClassName="popup-box variant-picker" ariaLabel="Variant selection">
             <div className="popup-header">
-                <h2>{model.title}</h2>
+                <h2>{displayTitle || model.title}</h2>
             </div>
             <div className="variant-choice-grid">
                 <button className={`primary-btn variant-choice-btn ${typeClass}`} onClick={() => onSelect(null)}>

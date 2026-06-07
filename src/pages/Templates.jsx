@@ -261,7 +261,6 @@ function BusinessTemplateCard({ template, onOpen, selected }) {
             </span>
             <span className="templates-card-title-row">
                 <strong>{template.title || "Untitled template"}</strong>
-                <ChevronRight size={22} aria-hidden="true" />
             </span>
             {template.description && <small>{template.description}</small>}
             <ChannelPills channels={channels} />
@@ -269,19 +268,86 @@ function BusinessTemplateCard({ template, onOpen, selected }) {
     );
 }
 
-function EmptyDetail({ activeNode }) {
+function EmptyColumnState({ message }) {
     return (
-        <aside className="templates-detail-panel templates-detail-panel--empty" aria-label="Template detail">
-            <div className="templates-empty-visual">
-                <Folder size={58} strokeWidth={1.7} />
+        <div className="templates-column-empty">
+            <Folder size={30} strokeWidth={1.7} />
+            <span>{message}</span>
+        </div>
+    );
+}
+
+function PlaybookColumn({
+    title,
+    description,
+    nodes: columnNodes,
+    templates: columnTemplates,
+    allNodes,
+    allTemplates,
+    activeNodeId,
+    activeTemplateId,
+    onOpenNode,
+    onOpenTemplate,
+    emptyMessage
+}) {
+    const hasItems = columnNodes.length > 0 || columnTemplates.length > 0;
+
+    return (
+        <section className="templates-column" aria-label={title || "Playbook column"}>
+            <div className="templates-column-head">
+                <h2>{title || "Playbook"}</h2>
+                {description && <p>{description}</p>}
             </div>
-            <h2>{activeNode ? "Select a template" : "Select a node"}</h2>
-            <p>
-                {activeNode
-                    ? "Choose a template from this node to preview and copy it."
-                    : "Choose a node from the playbook to see its sub-nodes and templates."}
-            </p>
-        </aside>
+            <div className="templates-column-list">
+                {hasItems ? (
+                    <>
+                        {columnNodes.map((node) => {
+                            const summary = getNodeCardSummary(allNodes, allTemplates, node.id);
+                            const totalCount = summary.childCount + summary.templateCount;
+                            const Icon = iconForItem(node.icon, node.title);
+                            return (
+                                <button
+                                    key={node.id}
+                                    type="button"
+                                    className={`templates-column-row templates-column-row--node${activeNodeId === node.id ? " is-active" : ""}`}
+                                    onClick={() => onOpenNode(node.id)}
+                                >
+                                    <IconBadge Icon={Icon} tone={toneForValue(node.icon || node.title)} />
+                                    <span className="templates-column-copy">
+                                        <strong>{node.title || "Untitled node"}</strong>
+                                        {node.description && <small>{node.description}</small>}
+                                    </span>
+                                    {totalCount > 0 && <span className="templates-column-count">{totalCount}</span>}
+                                    <ChevronRight className="templates-column-chevron" size={19} aria-hidden="true" />
+                                </button>
+                            );
+                        })}
+                        {columnTemplates.map((template) => {
+                            const Icon = templateIcon(template);
+                            const availableChannels = getAvailableTemplateChannels(template);
+                            const channels = availableChannels.length > 0 ? availableChannels : template.channels;
+                            return (
+                                <button
+                                    key={template.id}
+                                    type="button"
+                                    className={`templates-column-row templates-column-row--template${activeTemplateId === template.id ? " is-active" : ""}`}
+                                    onClick={() => onOpenTemplate(template.id)}
+                                >
+                                    <IconBadge Icon={Icon} tone={toneForValue(template.title)} />
+                                    <span className="templates-column-copy">
+                                        <strong>{template.title || "Untitled template"}</strong>
+                                        {template.description && <small>{template.description}</small>}
+                                        <ChannelPills channels={channels} />
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </>
+                ) : (
+                    <EmptyColumnState message={emptyMessage || "No item here."} />
+                )}
+            </div>
+        </section>
     );
 }
 
@@ -502,17 +568,13 @@ export default function Templates() {
         [treeTemplates, activeTemplateId]
     );
     const rootNodes = useMemo(() => getChildNodes(nodes, null), [nodes]);
-    const childNodes = useMemo(
-        () => activeNode ? getChildNodes(nodes, activeNode.id) : rootNodes,
-        [activeNode, nodes, rootNodes]
-    );
-    const nodeTemplates = useMemo(
-        () => activeNode ? getTemplatesForNode(treeTemplates, activeNode.id) : [],
-        [activeNode, treeTemplates]
-    );
     const searchResults = useMemo(
         () => searchTemplateTree(nodes, treeTemplates, query),
         [nodes, treeTemplates, query]
+    );
+    const activeNodePath = useMemo(
+        () => activeNode ? getNodePath(nodes, activeNode.id) : [],
+        [nodes, activeNode]
     );
 
     useEffect(() => {
@@ -608,11 +670,43 @@ export default function Templates() {
     };
 
     const searchMode = query.trim().length > 0 && !activeTemplate;
-    const visibleNodes = searchMode ? searchResults.nodes : childNodes;
-    const visibleTemplates = searchMode ? searchResults.templates : activeNode ? nodeTemplates : [];
     const panelTitle = activeNode ? activeNode.title : "Playbook";
     const panelDescription = activeNode?.description || "Navigate through nodes to find the right template";
-    const hasCards = visibleNodes.length > 0 || visibleTemplates.length > 0;
+    const navigationColumns = useMemo(() => {
+        if (searchMode) {
+            const count = searchResults.nodes.length + searchResults.templates.length;
+            return [{
+                id: "search",
+                title: "Search results",
+                description: `${count} result${count === 1 ? "" : "s"}`,
+                nodes: searchResults.nodes,
+                templates: searchResults.templates,
+                emptyMessage: "No result found."
+            }];
+        }
+
+        const columns = [{
+            id: "root",
+            title: "Playbook",
+            description: "Root nodes",
+            nodes: rootNodes,
+            templates: [],
+            emptyMessage: "No business nodes yet."
+        }];
+
+        activeNodePath.forEach((node) => {
+            columns.push({
+                id: node.id,
+                title: node.title || "Untitled node",
+                description: node.description,
+                nodes: getChildNodes(nodes, node.id),
+                templates: getTemplatesForNode(treeTemplates, node.id),
+                emptyMessage: "No sub-node or template in this node."
+            });
+        });
+
+        return columns;
+    }, [activeNodePath, nodes, rootNodes, searchMode, searchResults, treeTemplates]);
 
     return (
         <main className="page-container page-container--home templates-page">
@@ -684,7 +778,7 @@ export default function Templates() {
                 onToggleDetails={() => runtime.setClientDetailsExpanded((expanded) => !expanded)}
             />
 
-            <section className="templates-workbench">
+            <section className="templates-workbench templates-workbench--columns">
                 <section className="templates-playbook-panel" aria-label="Playbook">
                     <div className="templates-playbook-head">
                         <div className="templates-playbook-title">
@@ -723,41 +817,24 @@ export default function Templates() {
                         </label>
                     </div>
 
-                    {hasCards ? (
-                        <div className="templates-card-grid">
-                            {visibleNodes.map((node) => (
-                                <NodeCard
-                                    key={node.id}
-                                    node={node}
-                                    nodes={nodes}
-                                    templates={treeTemplates}
-                                    onOpen={openNode}
-                                    selected={activeNodeId === node.id}
-                                />
-                            ))}
-                            {visibleTemplates.map((template) => (
-                                <BusinessTemplateCard
-                                    key={template.id}
-                                    template={template}
-                                    onOpen={openTemplate}
-                                    selected={activeTemplateId === template.id}
-                                />
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="templates-empty-list">
-                            <EmptyState
-                                message={searchMode
-                                    ? "No result found."
-                                    : activeNode
-                                        ? "No sub-node or template in this node."
-                                        : "No business nodes yet."}
-                                action={!searchMode && !activeNode ? (
-                                    <button type="button" className="secondary-btn" onClick={() => navigate("/nodes")}>Manage playbook</button>
-                                ) : null}
+                    <div className="templates-columns" aria-label="Playbook columns">
+                        {navigationColumns.map((column) => (
+                            <PlaybookColumn
+                                key={column.id}
+                                title={column.title}
+                                description={column.description}
+                                nodes={column.nodes}
+                                templates={column.templates}
+                                allNodes={nodes}
+                                allTemplates={treeTemplates}
+                                activeNodeId={activeNodeId}
+                                activeTemplateId={activeTemplateId}
+                                onOpenNode={openNode}
+                                onOpenTemplate={openTemplate}
+                                emptyMessage={column.emptyMessage}
                             />
-                        </div>
-                    )}
+                        ))}
+                    </div>
 
                     {!activeNode && !activeTemplate && !searchMode && (
                         <div className="templates-bottom-trail">
@@ -771,8 +848,19 @@ export default function Templates() {
                         </div>
                     )}
                 </section>
+            </section>
 
-                {activeTemplate ? (
+            {activeTemplate && (
+                <Modal
+                    onClose={() => setActiveTemplateId(null)}
+                    dialogClassName="popup-box templates-template-modal"
+                    ariaLabel="Template preview"
+                >
+                    <div className="templates-template-modal-bar">
+                        <button type="button" className="secondary-btn" onClick={() => setActiveTemplateId(null)}>
+                            Close
+                        </button>
+                    </div>
                     <TemplateDetail
                         template={activeTemplate}
                         activeChannel={activeChannel}
@@ -780,14 +868,17 @@ export default function Templates() {
                         runtime={runtime}
                         onManage={() => navigate("/nodes")}
                     />
-                ) : (
-                    <EmptyDetail activeNode={activeNode} />
-                )}
-            </section>
+                </Modal>
+            )}
 
             {runtime.variantPicker && (
                 <VariantModal
                     model={runtime.variantPicker.model}
+                    displayTitle={formatResultPreviewText(
+                        runtime.variantPicker.model?.title || "",
+                        runtime.tokens,
+                        runtime.values
+                    )}
                     onClose={() => runtime.setVariantPicker(null)}
                     onSelect={(variant) => {
                         if (variant) {
