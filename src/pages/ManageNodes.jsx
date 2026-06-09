@@ -16,11 +16,12 @@ import {
     getChildNodes,
     getDescendantNodeIds,
     getTemplatesForNode,
+    linkTemplateToNode,
     moveNode,
-    moveTemplateToNode,
     removeNodeCascade,
     removeTemplate,
     reorderNode,
+    unlinkTemplateFromNode,
     updateNode,
     updateTemplate
 } from "../utils/templateTreeOperations.js";
@@ -403,6 +404,107 @@ function NodeFormModal({ mode, initial, parentTitle, onClose, onSave }) {
     );
 }
 
+function TemplateCreatePickerModal({ onClose, onCreateNew, onLinkExisting }) {
+    return (
+        <Modal onClose={onClose} ariaLabel="Add template">
+            <div className="node-picker-modal">
+                <div className="popup-header">
+                    <h2>Add template</h2>
+                </div>
+                <div className="node-picker-choice">
+                    <button type="button" className="node-picker-choice-btn" onClick={onCreateNew}>
+                        <strong>New template</strong>
+                        <small>Create a brand new template for this node</small>
+                    </button>
+                    <button type="button" className="node-picker-choice-btn" onClick={onLinkExisting}>
+                        <strong>Link existing</strong>
+                        <small>Add an existing template to this node</small>
+                    </button>
+                </div>
+                <div className="popup-actions">
+                    <button type="button" className="secondary-btn" onClick={onClose}>Cancel</button>
+                </div>
+            </div>
+        </Modal>
+    );
+}
+
+function ExistingTemplatePickerModal({ currentNodeId, allTemplates, nodes, onClose, onLink }) {
+    const [query, setQuery] = useState("");
+
+    const alreadyLinked = new Set(
+        allTemplates
+            .filter((t) => (t.nodeIds || []).includes(currentNodeId))
+            .map((t) => t.id)
+    );
+
+    const filtered = allTemplates.filter((t) => {
+        if (alreadyLinked.has(t.id)) return false;
+        const q = query.trim().toLowerCase();
+        if (!q) return true;
+        return (
+            (t.title || "").toLowerCase().includes(q)
+            || (t.description || "").toLowerCase().includes(q)
+        );
+    });
+
+    return (
+        <Modal onClose={onClose} ariaLabel="Link existing template">
+            <div className="node-picker-modal">
+                <div className="popup-header">
+                    <h2>Link existing template</h2>
+                </div>
+                <div className="node-form">
+                    <div className="form-field">
+                        <label>Search</label>
+                        <input
+                            autoFocus
+                            value={query}
+                            onChange={(event) => setQuery(event.target.value)}
+                            placeholder="Search templates..."
+                        />
+                    </div>
+                    <div className="node-picker-list">
+                        {filtered.length === 0 ? (
+                            <p className="node-picker-empty">
+                                {allTemplates.length === alreadyLinked.size
+                                    ? "All templates are already linked to this node."
+                                    : "No matching templates."}
+                            </p>
+                        ) : (
+                            filtered.map((template) => {
+                                const nodeNames = (template.nodeIds || [])
+                                    .map((id) => nodes.find((n) => n.id === id)?.title || "?")
+                                    .join(", ");
+                                return (
+                                    <div key={template.id} className="node-picker-row">
+                                        <div className="node-picker-copy">
+                                            <strong>{template.title || "Untitled template"}</strong>
+                                            {template.description && <small>{template.description}</small>}
+                                            {nodeNames && <span className="node-picker-nodes">In: {nodeNames}</span>}
+                                            <div className="node-channel-pills">
+                                                {template.channels.map((channel) => (
+                                                    <span key={channel} className="variant-pill">{CHANNEL_LABELS[channel] || channel}</span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <button type="button" className="primary-btn" onClick={() => onLink(template.id)}>
+                                            Link
+                                        </button>
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
+                </div>
+                <div className="popup-actions">
+                    <button type="button" className="secondary-btn" onClick={onClose}>Cancel</button>
+                </div>
+            </div>
+        </Modal>
+    );
+}
+
 function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
     const isEdit = Boolean(initial);
     const [title, setTitle] = useState(initial?.title || "");
@@ -684,9 +786,11 @@ export default function ManageNodes() {
     const [selectedNodeId, setSelectedNodeId] = useState(null);
     const [nodeModal, setNodeModal] = useState(null);
     const [templateModal, setTemplateModal] = useState(null);
+    const [templatePickerModal, setTemplatePickerModal] = useState(null);
+    const [existingPickerModal, setExistingPickerModal] = useState(null);
     const [confirmNodeDelete, setConfirmNodeDelete] = useState(null);
     const [confirmTemplateDelete, setConfirmTemplateDelete] = useState(null);
-    const [templateMoveTargets, setTemplateMoveTargets] = useState({});
+    const [templateLinkTargets, setTemplateLinkTargets] = useState({});
 
     useEffect(() => {
         let active = true;
@@ -819,25 +923,48 @@ export default function ManageNodes() {
         showToast("Template duplicated", "info");
     };
 
-    const moveTemplate = async (templateId) => {
-        const template = templates.find((candidate) => candidate.id === templateId);
-        if (!template) return;
-        const targetNodeId = templateMoveTargets[templateId] || template.parentNodeId;
-        if (!targetNodeId || targetNodeId === template.parentNodeId) return;
+    const openTemplateCreationPicker = (nodeId = selectedNodeId) => {
+        if (!nodeId) return;
+        setTemplatePickerModal({ nodeId });
+    };
 
+    const linkTemplateToCurrentNode = async (templateId) => {
+        if (!existingPickerModal?.nodeId) return;
         try {
-            const nextTemplates = moveTemplateToNode(templates, templateId, targetNodeId, nodes);
+            const nextTemplates = linkTemplateToNode(templates, templateId, existingPickerModal.nodeId, nodes);
             await persist(nodes, nextTemplates);
-            setTemplateMoveTargets((current) => {
+            setExistingPickerModal(null);
+            showToast("Template linked", "info");
+        } catch (error) {
+            console.error(error);
+            showToast("Template cannot be linked there", "error");
+        }
+    };
+
+    const linkTemplate = async (templateId) => {
+        const targetNodeId = templateLinkTargets[templateId];
+        if (!targetNodeId) return;
+        try {
+            const nextTemplates = linkTemplateToNode(templates, templateId, targetNodeId, nodes);
+            await persist(nodes, nextTemplates);
+            setTemplateLinkTargets((current) => {
                 const next = { ...current };
                 delete next[templateId];
                 return next;
             });
-            showToast("Template moved", "info");
+            showToast("Template linked to node", "info");
         } catch (error) {
             console.error(error);
-            showToast("Template cannot be moved there", "error");
+            showToast("Template cannot be linked there", "error");
         }
+    };
+
+    const unlinkFromNode = async (templateId, nodeId) => {
+        const template = templates.find((t) => t.id === templateId);
+        if (!template || (template.nodeIds || []).length <= 1) return;
+        const nextTemplates = unlinkTemplateFromNode(templates, templateId, nodeId);
+        await persist(nodes, nextTemplates);
+        showToast("Template unlinked from node", "info");
     };
 
     const parentSelectValue = selectedNode?.parentId || ROOT_PARENT_VALUE;
@@ -860,7 +987,7 @@ export default function ManageNodes() {
                         <button
                             type="button"
                             className="secondary-btn"
-                            onClick={() => selectedNode && setTemplateModal({ mode: "create", parentNodeId: selectedNode.id })}
+                            onClick={() => openTemplateCreationPicker()}
                             disabled={!selectedNode}
                         >
                             + Template
@@ -954,7 +1081,7 @@ export default function ManageNodes() {
                                         <button
                                             type="button"
                                             className="primary-btn"
-                                            onClick={() => setTemplateModal({ mode: "create", parentNodeId: selectedNode.id })}
+                                            onClick={() => openTemplateCreationPicker(selectedNode.id)}
                                         >
                                             + Template
                                         </button>
@@ -963,14 +1090,18 @@ export default function ManageNodes() {
                                         <button
                                             type="button"
                                             className="node-empty-tile"
-                                            onClick={() => setTemplateModal({ mode: "create", parentNodeId: selectedNode.id })}
+                                            onClick={() => openTemplateCreationPicker(selectedNode.id)}
                                         >
                                             + Template
                                         </button>
                                     ) : (
                                         <div className="node-template-grid">
                                             {selectedTemplates.map((template) => {
-                                                const targetValue = templateMoveTargets[template.id] || template.parentNodeId;
+                                                const linkTarget = templateLinkTargets[template.id] || "";
+                                                const otherNodes = (template.nodeIds || [])
+                                                    .filter((nid) => nid !== selectedNode.id)
+                                                    .map((nid) => nodes.find((n) => n.id === nid))
+                                                    .filter(Boolean);
                                                 return (
                                                     <article key={template.id} className="node-template-card">
                                                         <div className="node-template-copy">
@@ -981,6 +1112,14 @@ export default function ManageNodes() {
                                                                     <span key={channel} className="variant-pill">{CHANNEL_LABELS[channel] || channel}</span>
                                                                 ))}
                                                             </div>
+                                                            {otherNodes.length > 0 && (
+                                                                <div className="node-template-nodes">
+                                                                    <span className="node-template-nodes-label">Also in:</span>
+                                                                    {otherNodes.map((n) => (
+                                                                        <span key={n.id} className="node-template-node-pill">{n.title}</span>
+                                                                    ))}
+                                                                </div>
+                                                            )}
                                                         </div>
                                                         <div className="node-template-toolbar">
                                                             <button
@@ -991,31 +1130,44 @@ export default function ManageNodes() {
                                                                 Edit
                                                             </button>
                                                             <button type="button" className="secondary-btn" onClick={() => duplicateSelectedTemplate(template.id)}>Duplicate</button>
+                                                            {(template.nodeIds || []).length > 1 && (
+                                                                <button
+                                                                    type="button"
+                                                                    className="secondary-btn"
+                                                                    onClick={() => unlinkFromNode(template.id, selectedNode.id)}
+                                                                    title="Remove this template from this node only"
+                                                                >
+                                                                    Unlink
+                                                                </button>
+                                                            )}
                                                             <button type="button" className="icon-btn delete-btn" onClick={() => setConfirmTemplateDelete(template.id)} aria-label={`Delete ${template.title}`}>
                                                                 <span className="icon-trash" aria-hidden="true"></span>
                                                             </button>
                                                         </div>
                                                         <div className="node-template-move">
                                                             <select
-                                                                value={targetValue}
-                                                                onChange={(event) => setTemplateMoveTargets((current) => ({
+                                                                value={linkTarget}
+                                                                onChange={(event) => setTemplateLinkTargets((current) => ({
                                                                     ...current,
                                                                     [template.id]: event.target.value
                                                                 }))}
                                                             >
-                                                                {nodeOptions.map(({ node, depth }) => (
-                                                                    <option key={node.id} value={node.id}>
-                                                                        {`${"  ".repeat(depth)}${node.title || "Untitled node"}`}
-                                                                    </option>
-                                                                ))}
+                                                                <option value="">Link to node…</option>
+                                                                {nodeOptions
+                                                                    .filter(({ node }) => !(template.nodeIds || []).includes(node.id))
+                                                                    .map(({ node, depth }) => (
+                                                                        <option key={node.id} value={node.id}>
+                                                                            {`${"  ".repeat(depth)}${node.title || "Untitled node"}`}
+                                                                        </option>
+                                                                    ))}
                                                             </select>
                                                             <button
                                                                 type="button"
                                                                 className="secondary-btn"
-                                                                onClick={() => moveTemplate(template.id)}
-                                                                disabled={targetValue === template.parentNodeId}
+                                                                onClick={() => linkTemplate(template.id)}
+                                                                disabled={!linkTarget}
                                                             >
-                                                                Move
+                                                                Link
                                                             </button>
                                                         </div>
                                                     </article>
@@ -1097,6 +1249,30 @@ export default function ManageNodes() {
                         parentTitle={nodes.find((node) => node.id === templateModal.parentNodeId)?.title || "Selected node"}
                         onClose={() => setTemplateModal(null)}
                         onSave={saveTemplate}
+                    />
+                )}
+
+                {templatePickerModal && (
+                    <TemplateCreatePickerModal
+                        onClose={() => setTemplatePickerModal(null)}
+                        onCreateNew={() => {
+                            setTemplatePickerModal(null);
+                            setTemplateModal({ mode: "create", parentNodeId: templatePickerModal.nodeId });
+                        }}
+                        onLinkExisting={() => {
+                            setTemplatePickerModal(null);
+                            setExistingPickerModal({ nodeId: templatePickerModal.nodeId });
+                        }}
+                    />
+                )}
+
+                {existingPickerModal && (
+                    <ExistingTemplatePickerModal
+                        currentNodeId={existingPickerModal.nodeId}
+                        allTemplates={templates}
+                        nodes={nodes}
+                        onClose={() => setExistingPickerModal(null)}
+                        onLink={linkTemplateToCurrentNode}
                     />
                 )}
 

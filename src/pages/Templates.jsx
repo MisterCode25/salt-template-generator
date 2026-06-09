@@ -14,6 +14,7 @@ import {
     Search,
     Settings,
     Smartphone,
+    Star,
     Truck,
     Upload,
     Users,
@@ -30,9 +31,9 @@ import {
     VariantModal
 } from "../components/TemplateRuntime.jsx";
 import { getTemplateTextResult } from "../core/tokenEngine.js";
-import { loadTemplateTreeData } from "../services/templateTreeService.js";
+import { loadTemplateTreeData, saveTemplateTreeData } from "../services/templateTreeService.js";
 import { Channel } from "../models/templateTreeModel.js";
-import { getChildNodes, getTemplatesForNode } from "../utils/templateTreeOperations.js";
+import { getChildNodes, getTemplatesForNode, updateTemplate } from "../utils/templateTreeOperations.js";
 import {
     getAvailableTemplateChannels,
     getNodeCardSummary,
@@ -384,7 +385,7 @@ function formatResultPreviewHTML(value = "", tokens = [], values = {}) {
     return formatTokenPreviewHTML(hydrated, tokens);
 }
 
-function TemplateDetail({ template, activeChannel, setActiveChannel, runtime, onManage }) {
+function TemplateDetail({ template, activeChannel, setActiveChannel, runtime, onManage, onToggleFavorite }) {
     const availableChannels = getAvailableTemplateChannels(template);
     const visibleChannels = (availableChannels.length > 0 ? availableChannels : template.channels)
         .filter((channel, index, list) => list.indexOf(channel) === index);
@@ -440,10 +441,21 @@ function TemplateDetail({ template, activeChannel, setActiveChannel, runtime, on
                             <h2>{template.title || "Untitled template"}</h2>
                         </div>
                     </div>
-                    <button type="button" className="secondary-btn templates-manage-btn" onClick={onManage}>
-                        <Settings size={17} aria-hidden="true" />
-                        Manage playbook
-                    </button>
+                    <div className="templates-detail-head-actions">
+                        <button
+                            type="button"
+                            className={`templates-favorite-btn${template.favorite ? " is-favorite" : ""}`}
+                            onClick={() => onToggleFavorite(template.id)}
+                            aria-label={template.favorite ? "Remove from favorites" : "Add to favorites"}
+                            title={template.favorite ? "Remove from favorites" : "Add to favorites"}
+                        >
+                            <Star size={18} fill={template.favorite ? "currentColor" : "none"} />
+                        </button>
+                        <button type="button" className="secondary-btn templates-manage-btn" onClick={onManage}>
+                            <Settings size={17} aria-hidden="true" />
+                            Manage playbook
+                        </button>
+                    </div>
                 </div>
 
                 {model ? (
@@ -558,6 +570,19 @@ export default function Templates() {
         document.addEventListener("click", handler);
         return () => document.removeEventListener("click", handler);
     }, []);
+
+    const favoriteTemplates = useMemo(
+        () => treeTemplates.filter((t) => t.favorite),
+        [treeTemplates]
+    );
+
+    const toggleFavorite = async (templateId) => {
+        const template = treeTemplates.find((t) => t.id === templateId);
+        if (!template) return;
+        const nextTemplates = updateTemplate(treeTemplates, templateId, { favorite: !template.favorite });
+        setTreeTemplates(nextTemplates);
+        await saveTemplateTreeData({ nodes, templates: nextTemplates });
+    };
 
     const activeNode = useMemo(
         () => nodes.find((node) => node.id === activeNodeId) || null,
@@ -817,6 +842,31 @@ export default function Templates() {
                         </label>
                     </div>
 
+                    {favoriteTemplates.length > 0 && (
+                        <div className="templates-favorites">
+                            <div className="templates-favorites-head">
+                                <Star size={14} fill="currentColor" aria-hidden="true" />
+                                <span>Favorites</span>
+                            </div>
+                            <div className="templates-favorites-list">
+                                {favoriteTemplates.map((template) => {
+                                    const FavIcon = templateIcon(template);
+                                    return (
+                                        <button
+                                            key={template.id}
+                                            type="button"
+                                            className={`templates-favorites-item${activeTemplateId === template.id ? " is-active" : ""}`}
+                                            onClick={() => openTemplate(template.id)}
+                                        >
+                                            <IconBadge Icon={FavIcon} tone={toneForValue(template.title)} className="templates-favorites-icon" />
+                                            <span>{template.title || "Untitled"}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
                     <div className="templates-columns" aria-label="Playbook columns">
                         {navigationColumns.map((column) => (
                             <PlaybookColumn
@@ -867,6 +917,7 @@ export default function Templates() {
                         setActiveChannel={setActiveChannel}
                         runtime={runtime}
                         onManage={() => navigate("/nodes")}
+                        onToggleFavorite={toggleFavorite}
                     />
                 </Modal>
             )}

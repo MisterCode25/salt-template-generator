@@ -114,25 +114,29 @@ export function reorderNode(nodes = [], nodeId, direction) {
 
 export function removeNodeCascade(nodes = [], templates = [], nodeId) {
     const removedNodeIds = new Set([nodeId, ...getDescendantNodeIds(nodes, nodeId)]);
+    const nextTemplates = templates
+        .map((template) => {
+            const nextNodeIds = (template.nodeIds || []).filter((id) => !removedNodeIds.has(id));
+            return normalizeTemplate({ ...template, nodeIds: nextNodeIds });
+        })
+        .filter((template) => template.nodeIds.length > 0);
     return {
         nodes: nodes.filter((node) => !removedNodeIds.has(node.id)).map(normalizeNode),
-        templates: templates
-            .filter((template) => !removedNodeIds.has(template.parentNodeId))
-            .map(normalizeTemplate)
+        templates: nextTemplates
     };
 }
 
 export function getTemplatesForNode(templates = [], nodeId) {
     return templates
-        .filter((template) => template.parentNodeId === nodeId)
+        .filter((template) => Array.isArray(template.nodeIds) && template.nodeIds.includes(nodeId))
         .map(normalizeTemplate)
         .sort(sortByTitle);
 }
 
-export function createTemplateForNode(parentNodeId, fields = {}) {
+export function createTemplateForNode(nodeId, fields = {}) {
     return createTemplate({
         ...fields,
-        parentNodeId
+        nodeIds: [nodeId]
     });
 }
 
@@ -144,14 +148,34 @@ export function updateTemplate(templates = [], templateId, fields = {}) {
     ));
 }
 
-export function moveTemplateToNode(templates = [], templateId, parentNodeId, nodes = []) {
-    if (!nodes.some((node) => node.id === parentNodeId)) {
+export function moveTemplateToNode(templates = [], templateId, targetNodeId, nodes = []) {
+    if (!nodes.some((node) => node.id === targetNodeId)) {
         throw new Error("Template target node does not exist");
     }
 
     return templates.map((template) => (
         template.id === templateId
-            ? normalizeTemplate({ ...template, parentNodeId })
+            ? normalizeTemplate({ ...template, nodeIds: [targetNodeId, ...(template.nodeIds || []).filter((id) => id !== template.nodeIds[0])] })
+            : normalizeTemplate(template)
+    ));
+}
+
+export function linkTemplateToNode(templates = [], templateId, nodeId, nodes = []) {
+    if (!nodes.some((node) => node.id === nodeId)) {
+        throw new Error("Template target node does not exist");
+    }
+
+    return templates.map((template) => (
+        template.id === templateId
+            ? normalizeTemplate({ ...template, nodeIds: [...new Set([...(template.nodeIds || []), nodeId])] })
+            : normalizeTemplate(template)
+    ));
+}
+
+export function unlinkTemplateFromNode(templates = [], templateId, nodeId) {
+    return templates.map((template) => (
+        template.id === templateId
+            ? normalizeTemplate({ ...template, nodeIds: (template.nodeIds || []).filter((id) => id !== nodeId) })
             : normalizeTemplate(template)
     ));
 }
@@ -176,7 +200,7 @@ export function duplicateTemplate(templates = [], templateId) {
     );
 
     const copy = createTemplate({
-        parentNodeId: template.parentNodeId,
+        nodeIds: template.nodeIds || [],
         title,
         description: template.description,
         channels: template.channels,

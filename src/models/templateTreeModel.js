@@ -152,14 +152,26 @@ export function normalizeTemplate(template = {}) {
         }
     });
 
+    // Migrate from legacy parentNodeId to nodeIds array
+    let nodeIds;
+    if (Array.isArray(template.nodeIds) && template.nodeIds.length > 0) {
+        nodeIds = [...new Set(template.nodeIds.filter((id) => typeof id === "string" && id.length > 0))];
+    } else if (typeof template.parentNodeId === "string" && template.parentNodeId.length > 0) {
+        nodeIds = [template.parentNodeId];
+    } else {
+        nodeIds = [];
+    }
+
     return {
         id: normalizeText(template.id) || createId(),
-        parentNodeId: normalizeNullableId(template.parentNodeId),
+        nodeIds,
+        parentNodeId: nodeIds[0] || null,
         title: normalizeText(template.title),
         description: normalizeText(template.description),
         channels,
         order: normalizeOrder(template.order),
         sourceModelId: normalizeText(template.sourceModelId),
-        contentByChannel
+        contentByChannel,
+        favorite: Boolean(template.favorite)
     };
 }
