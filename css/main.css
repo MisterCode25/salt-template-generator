@@ -1,59 +1,59 @@
 :root {
-  /* Colors - Primary */
-  --color-primary: #1d4fff;
-  --color-primary-light: #4a8dff;
-  --color-primary-lighter: #46c0ff;
+  /* Colors - Primary (Sapphire Blue) */
+  --color-primary: #3d6bff;
+  --color-primary-light: #6488ff;
+  --color-primary-lighter: #98b4ff;
 
   /* Colors - Background */
-  --bg-body: #0f141e;
-  --bg-surface: rgba(20, 27, 40, 0.92);
-  --bg-surface-elevated: rgba(28, 36, 51, 0.94);
-  --bg-overlay: rgba(3, 7, 15, 0.55);
+  --bg-body: #07090e;
+  --bg-surface: rgba(10, 14, 22, 0.96);
+  --bg-surface-elevated: rgba(15, 21, 34, 0.97);
+  --bg-overlay: rgba(2, 4, 10, 0.6);
 
   /* Colors - Text */
-  --text-primary: #e3ecff;
-  --text-secondary: #b8c6dc;
-  --text-muted: #7f90aa;
+  --text-primary: #eaf0ff;
+  --text-secondary: #8ea8cc;
+  --text-muted: #516480;
 
   /* Colors - Border */
-  --border-default: rgba(143, 161, 190, 0.24);
-  --border-focus: rgba(55, 125, 255, 0.58);
+  --border-default: rgba(75, 110, 190, 0.16);
+  --border-focus: rgba(61, 107, 255, 0.55);
 
   /* Colors - UI roles */
-  --control-bg: #202b3d;
-  --control-bg-hover: #263449;
-  --control-text: #f2f7ff;
-  --control-placeholder: #9aa9bd;
-  --control-border: #516986;
-  --control-border-hover: #7f97b5;
-  --control-focus: #5f8dff;
-  --control-focus-ring: rgba(95, 141, 255, 0.22);
-  --read-bg: #131c2a;
-  --read-bg-strong: #0d1420;
-  --read-text: #edf4ff;
-  --read-muted: #a8b6cc;
-  --read-border: rgba(142, 162, 190, 0.28);
-  --button-primary-bg: #2f6df3;
-  --button-primary-bg-hover: #2459cf;
+  --control-bg: #101828;
+  --control-bg-hover: #182038;
+  --control-text: #eaf0ff;
+  --control-placeholder: #8090ac;
+  --control-border: #3a506e;
+  --control-border-hover: #5a78a0;
+  --control-focus: #3d6bff;
+  --control-focus-ring: rgba(61, 107, 255, 0.2);
+  --read-bg: #0b1018;
+  --read-bg-strong: #070c12;
+  --read-text: #eaf0ff;
+  --read-muted: #8aa0bc;
+  --read-border: rgba(80, 110, 170, 0.22);
+  --button-primary-bg: #2d55e0;
+  --button-primary-bg-hover: #2448c8;
   --button-primary-text: #ffffff;
-  --button-primary-border: #6f94e8;
-  --button-secondary-bg: #222d3f;
-  --button-secondary-bg-hover: #2d3a4e;
-  --button-secondary-text: #f4f7fb;
-  --button-secondary-border: #657a96;
-  --button-danger-bg: #dc2626;
-  --button-danger-bg-hover: #b91c1c;
+  --button-primary-border: #5a80f0;
+  --button-secondary-bg: #111a28;
+  --button-secondary-bg-hover: #1a2638;
+  --button-secondary-text: #e0ecff;
+  --button-secondary-border: #2e4466;
+  --button-danger-bg: #d42020;
+  --button-danger-bg-hover: #b21818;
   --button-danger-text: #ffffff;
 
   /* Colors - Semantic */
-  --color-error: #ff4d6a;
-  --color-warning: #ffb84d;
-  --color-success: #00c853;
+  --color-error: #ff3d5a;
+  --color-warning: #ffa020;
+  --color-success: #00d878;
 
   /* Colors - Template types */
-  --color-email: #1d3674;
-  --color-sms: #5823ad;
-  --color-other: #00785f;
+  --color-email: #1a2e78;
+  --color-sms: #4a18a0;
+  --color-other: #006e52;
 
   /* Spacing */
   --space-xs: 4px;
@@ -69,9 +69,9 @@
   --radius-lg: 16px;
 
   /* Shadows */
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
-  --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 14px 36px rgba(0, 0, 0, 0.6);
 
   /* Transitions */
   --transition-fast: 0.15s ease;
@@ -101,7 +101,7 @@ body {
     font-family: Arial, sans-serif;
     background: var(--bg-body);
     color: var(--text-primary);
-    scrollbar-color: #3d4f82 #0f1320;
+    scrollbar-color: #3d5296 #080c18;
     scrollbar-width: thin;
 }
 
@@ -111,19 +111,19 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-    background: #0f1320;
+    background: #080c18;
     border-left: 1px solid var(--border-default);
 }
 
 ::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, #30406b, #3f5ca3);
+    background: linear-gradient(180deg, #2a3e78, #3a56b0);
     border-radius: 999px;
-    border: 2px solid #0f1320;
+    border: 2px solid #080c18;
     box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(180deg, #3a5084, #5174c8);
+    background: linear-gradient(180deg, #3a52a0, #4e6fd0);
 }
 
 .app-header {
@@ -183,7 +183,7 @@ h1, h2, h3 {
 }
 
 .salt-theme body {
-    scrollbar-color: #058750 #000000;
+    scrollbar-color: #00d878 #000000;
 }
 
 .light-theme .app-header {
@@ -194,10 +194,10 @@ h1, h2, h3 {
 }
 
 .salt-theme .app-header {
-    background: rgba(0, 0, 0, 0.92);
-    color: #ffffff;
-    border-bottom: 1px solid rgba(5, 135, 80, 0.45);
-    box-shadow: 0 4px 18px rgba(0,0,0,0.8);
+    background: rgba(0, 4, 2, 0.96);
+    color: #f0fff8;
+    border-bottom: 1px solid rgba(0, 216, 120, 0.32);
+    box-shadow: 0 4px 18px rgba(0,0,0,0.85);
 }
 
 .light-theme .app-title {
@@ -205,7 +205,7 @@ h1, h2, h3 {
 }
 
 .salt-theme .app-title {
-    color: #ffffff;
+    color: #f0fff8;
 }
 
 .light-theme .top-menu a {
@@ -218,12 +218,12 @@ h1, h2, h3 {
 }
 
 .salt-theme .top-menu a {
-    color: #c9f5de;
+    color: #6dffc4;
 }
 
 .salt-theme .top-menu a:hover {
-    color: #ffffff;
-    text-shadow: 0 0 6px rgba(5,135,80,0.6);
+    color: #f0fff8;
+    text-shadow: 0 0 8px rgba(0,216,120,0.7);
 }
 
 .light-theme ::-webkit-scrollbar-track {
@@ -243,17 +243,17 @@ h1, h2, h3 {
 
 .salt-theme ::-webkit-scrollbar-track {
     background: #000000;
-    border-left: 1px solid rgba(5,135,80,0.3);
+    border-left: 1px solid rgba(0,216,120,0.18);
 }
 
 .salt-theme ::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, #058750, #125b3d);
+    background: linear-gradient(180deg, #00d878, #009a54);
     border: 2px solid #000000;
     box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05);
 }
 
 .salt-theme ::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(180deg, #0a9a5d, #0f6b47);
+    background: linear-gradient(180deg, #00f08a, #00b862);
 }
 
 @media (max-width: 768px) {
@@ -270,77 +270,79 @@ h1, h2, h3 {
 
 /* ---------- THEME VARIABLE OVERRIDES ---------- */
 .light-theme {
-  --bg-body: #f4f6fb;
-  --bg-surface: rgba(255, 255, 255, 0.94);
-  --bg-surface-elevated: rgba(248, 250, 252, 0.98);
-  --bg-overlay: rgba(0, 0, 0, 0.35);
-  --text-primary: #0b1a33;
-  --text-secondary: #3a4a6b;
-  --text-muted: #7a8aab;
-  --border-default: rgba(0, 20, 60, 0.15);
-  --border-focus: rgba(0, 20, 60, 0.30);
-  --color-primary: #0f3ad9;
+  /* Arctic — clean off-white, vivid cobalt blue */
+  --bg-body: #f2f4f8;
+  --bg-surface: rgba(255, 255, 255, 0.96);
+  --bg-surface-elevated: rgba(246, 248, 252, 0.99);
+  --bg-overlay: rgba(0, 0, 0, 0.38);
+  --text-primary: #0c1525;
+  --text-secondary: #2e3f62;
+  --text-muted: #6a7a9b;
+  --border-default: rgba(0, 18, 60, 0.13);
+  --border-focus: rgba(33, 72, 232, 0.32);
+  --color-primary: #2148e8;
   --control-bg: #ffffff;
-  --control-bg-hover: #f8fbff;
-  --control-text: #0b1a33;
-  --control-placeholder: #62708a;
-  --control-border: #8fa4c5;
-  --control-border-hover: #526784;
-  --control-focus: #1d5cff;
-  --control-focus-ring: rgba(29, 92, 255, 0.18);
-  --read-bg: #eef3f9;
-  --read-bg-strong: #e4ebf5;
-  --read-text: #152033;
-  --read-muted: #526070;
-  --read-border: rgba(67, 87, 115, 0.25);
-  --button-primary-bg: #1d5cff;
-  --button-primary-bg-hover: #174acc;
+  --control-bg-hover: #f4f7ff;
+  --control-text: #0c1525;
+  --control-placeholder: #5a6a88;
+  --control-border: #8fa4c8;
+  --control-border-hover: #4d6490;
+  --control-focus: #2148e8;
+  --control-focus-ring: rgba(33, 72, 232, 0.16);
+  --read-bg: #edf1f7;
+  --read-bg-strong: #e2e8f2;
+  --read-text: #0e1a30;
+  --read-muted: #4a5a72;
+  --read-border: rgba(60, 80, 120, 0.22);
+  --button-primary-bg: #2148e8;
+  --button-primary-bg-hover: #1a3bc4;
   --button-primary-text: #ffffff;
-  --button-primary-border: #6c95ff;
-  --button-secondary-bg: #eef2f7;
-  --button-secondary-bg-hover: #dde6f0;
-  --button-secondary-text: #132035;
-  --button-secondary-border: #8aa0bc;
+  --button-primary-border: #6a90f8;
+  --button-secondary-bg: #edf0f7;
+  --button-secondary-bg-hover: #dbe2ef;
+  --button-secondary-text: #0c1525;
+  --button-secondary-border: #8aa0c0;
   --button-danger-bg: #d92d20;
   --button-danger-bg-hover: #b42318;
   --button-danger-text: #ffffff;
 }
 
 .salt-theme {
-  --bg-body: #000000;
-  --bg-surface: rgba(6, 12, 9, 0.92);
-  --bg-surface-elevated: rgba(12, 18, 15, 0.96);
-  --bg-overlay: rgba(0, 0, 0, 0.6);
-  --text-primary: #ffffff;
-  --text-secondary: #c2d6ca;
-  --text-muted: #7fa08d;
-  --border-default: rgba(129, 154, 139, 0.28);
-  --border-focus: rgba(30, 215, 100, 0.58);
-  --color-primary: #058750;
+  /* Neon Verde — near-black, vivid emerald */
+  --bg-body: #02040a;
+  --bg-surface: rgba(4, 10, 8, 0.94);
+  --bg-surface-elevated: rgba(8, 16, 12, 0.97);
+  --bg-overlay: rgba(0, 0, 0, 0.65);
+  --text-primary: #f0fff8;
+  --text-secondary: #a8d4bc;
+  --text-muted: #6a9a7e;
+  --border-default: rgba(0, 216, 120, 0.18);
+  --border-focus: rgba(0, 216, 120, 0.55);
+  --color-primary: #00d878;
   --color-email: #0a4a6b;
   --color-sms: #4a1a8a;
-  --color-other: #058750;
-  --control-bg: #122018;
-  --control-bg-hover: #18281f;
-  --control-text: #f4fff8;
-  --control-placeholder: #8faf9b;
-  --control-border: #436c54;
-  --control-border-hover: #73a883;
-  --control-focus: #14b96a;
-  --control-focus-ring: rgba(20, 185, 106, 0.22);
-  --read-bg: #0a100d;
-  --read-bg-strong: #050806;
-  --read-text: #f4fff8;
-  --read-muted: #b5c8bb;
-  --read-border: rgba(129, 154, 139, 0.28);
-  --button-primary-bg: #058750;
-  --button-primary-bg-hover: #0a6f45;
-  --button-primary-text: #ffffff;
-  --button-primary-border: #35d486;
-  --button-secondary-bg: #172018;
-  --button-secondary-bg-hover: #223026;
-  --button-secondary-text: #f4fff8;
-  --button-secondary-border: #6f8b78;
+  --color-other: #00d878;
+  --control-bg: #0c1a10;
+  --control-bg-hover: #122018;
+  --control-text: #f0fff8;
+  --control-placeholder: #7ab890;
+  --control-border: #2a5e3a;
+  --control-border-hover: #3d8a56;
+  --control-focus: #00d878;
+  --control-focus-ring: rgba(0, 216, 120, 0.22);
+  --read-bg: #060e08;
+  --read-bg-strong: #030604;
+  --read-text: #f0fff8;
+  --read-muted: #a0c4b0;
+  --read-border: rgba(0, 216, 120, 0.2);
+  --button-primary-bg: #00c46c;
+  --button-primary-bg-hover: #00a85c;
+  --button-primary-text: #001a0e;
+  --button-primary-border: #00d878;
+  --button-secondary-bg: #0e1c12;
+  --button-secondary-bg-hover: #162618;
+  --button-secondary-text: #f0fff8;
+  --button-secondary-border: #2a5e3a;
   --button-danger-bg: #d92d20;
   --button-danger-bg-hover: #b42318;
   --button-danger-text: #ffffff;
