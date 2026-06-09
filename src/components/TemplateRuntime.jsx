@@ -186,95 +186,110 @@ export function ClientInfoPanel({
     status,
     loading,
     detailsExpanded,
+    lang,
+    onChangeLang,
     onReadClipboard,
     onOpenPaste,
     onClearClient,
     onToggleDetails
 }) {
     const hasInfo = sections.length > 0;
-    const importComplete = hasInfo && status.type === "success";
+    const isError = status.type === "error";
 
     return (
         <section className="client-info-panel" aria-label="Client information">
-            <div className="client-info-header">
-                <div className="client-info-title-row">
-                    <h2>Client information</h2>
-                    {importComplete && <span className="client-info-success-icon" aria-label="Customer data imported" title="Customer data imported">✓</span>}
+            <div className="client-info-bar">
+                <div className="client-info-bar-main">
+                    {!hasInfo ? (
+                        <div className="client-info-bar-empty">
+                            <span className="client-info-bar-hint">No client loaded</span>
+                            <button
+                                type="button"
+                                className="client-info-import-btn"
+                                onClick={onReadClipboard}
+                                disabled={loading}
+                            >
+                                {loading ? "Importing…" : "Import from clipboard"}
+                            </button>
+                            {(isError) && (
+                                <button type="button" className="client-info-paste-btn" onClick={onOpenPaste}>
+                                    Paste manually
+                                </button>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="client-info-bar-loaded">
+                            <span className="client-info-bar-check" aria-label="Client loaded">✓</span>
+                            <div className="client-info-bar-fields">
+                                {summaryFields.map((field) => (
+                                    <div key={field.label} className="client-info-bar-field">
+                                        <span className="client-info-bar-field-key">{field.label}</span>
+                                        <span className="client-info-bar-field-val">{field.value}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
-                <div className="client-info-actions">
-                    <div className="client-info-actions-main">
-                        <button
-                            type="button"
-                            className="secondary-btn client-info-read-btn"
-                            onClick={onReadClipboard}
-                            disabled={loading}
-                            title="Import customer data from clipboard"
+
+                <div className="client-info-bar-controls">
+                    <div className="client-lang-picker" title="Change language">
+                        <select
+                            value={lang}
+                            onChange={(e) => onChangeLang(e.target.value)}
+                            aria-label="Language"
                         >
-                            {loading ? "Importing..." : "Import customer data"}
-                        </button>
-                        {status.type === "error" && (
-                            <button type="button" className="secondary-btn client-info-read-btn" onClick={onOpenPaste}>
-                                Paste data
-                            </button>
-                        )}
-                        {hasInfo && (
-                            <button type="button" className="secondary-btn client-info-clear-btn" onClick={onClearClient}>
-                                Clear
-                            </button>
-                        )}
+                            <option value="fr">FR</option>
+                            <option value="en">EN</option>
+                            <option value="de">DE</option>
+                            <option value="it">IT</option>
+                        </select>
                     </div>
+                    {hasInfo && (
+                        <>
+                            <button
+                                type="button"
+                                className={`client-info-toggle-btn${detailsExpanded ? " is-active" : ""}`}
+                                onClick={onToggleDetails}
+                                aria-expanded={detailsExpanded}
+                                title={detailsExpanded ? "Hide client details" : "Show client details"}
+                            >
+                                {detailsExpanded ? "Hide" : "Details"}
+                            </button>
+                            <button
+                                type="button"
+                                className="client-info-clear-btn"
+                                onClick={onClearClient}
+                                aria-label="Clear client data"
+                                title="Clear client"
+                            >
+                                ✕
+                            </button>
+                        </>
+                    )}
                 </div>
             </div>
 
-            {status.type === "error" && status.message && (
-                <p className={`client-info-status client-info-status--${status.type}`} aria-live="polite">
-                    {status.message}
-                </p>
+            {isError && status.message && (
+                <p className="client-info-bar-error" aria-live="polite">{status.message}</p>
             )}
 
-            {hasInfo ? (
-                <>
-                    <div className="client-info-summary">
-                        {summaryFields.map((field) => (
-                            <div key={field.label} className={`client-info-summary-item${field.label === "Name" ? " client-info-summary-item--wide" : ""}`}>
-                                <span className="client-info-label">{field.label}</span>
-                                <span className="client-info-summary-value">{field.value}</span>
-                            </div>
-                        ))}
-                        <div className="client-info-summary-action">
-                            <button
-                                type="button"
-                                className="secondary-btn client-info-toggle-btn"
-                                aria-expanded={detailsExpanded}
-                                aria-label={detailsExpanded ? "Hide client details" : "Show client details"}
-                                title={detailsExpanded ? "Hide details" : "Show details"}
-                                onClick={onToggleDetails}
-                            >
-                                {detailsExpanded ? "Hide" : "Show"}
-                            </button>
-                        </div>
-                    </div>
-
-                    {detailsExpanded && (
-                        <div className="client-info-grid">
-                            {sections.map((section) => (
-                                <div key={section.id} className="client-info-section">
-                                    <h3>{section.title}</h3>
-                                    <div className="client-info-fields">
-                                        {section.fields.map((field) => (
-                                            <div key={`${section.id}-${field.label}`} className="client-info-field">
-                                                <span className="client-info-label">{field.label}</span>
-                                                <span className="client-info-value">{field.value}</span>
-                                            </div>
-                                        ))}
+            {hasInfo && detailsExpanded && (
+                <div className="client-info-grid">
+                    {sections.map((section) => (
+                        <div key={section.id} className="client-info-section">
+                            <h3>{section.title}</h3>
+                            <div className="client-info-fields">
+                                {section.fields.map((field) => (
+                                    <div key={`${section.id}-${field.label}`} className="client-info-field">
+                                        <span className="client-info-label">{field.label}</span>
+                                        <span className="client-info-value">{field.value}</span>
                                     </div>
-                                </div>
-                            ))}
+                                ))}
+                            </div>
                         </div>
-                    )}
-                </>
-            ) : (
-                <p className="client-info-empty">Put the data customer from VTI.</p>
+                    ))}
+                </div>
             )}
         </section>
     );

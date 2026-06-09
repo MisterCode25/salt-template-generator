@@ -743,20 +743,6 @@ export default function Templates() {
                     )}
                 </div>
                 <nav className="top-menu">
-                    <div className="segmented-control">
-                        <div className="segment-group">
-                            {LANGUAGES.map(({ code, label }) => (
-                                <button
-                                    key={code}
-                                    type="button"
-                                    className={`segment ${runtime.lang === code ? "active" : ""}`}
-                                    onClick={() => changeLanguage(code)}
-                                >
-                                    {label}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
                     <button type="button" className="secondary-btn external-generator-open-btn" onClick={openExternalGenerator}>
                         External Generator
                     </button>
@@ -794,6 +780,8 @@ export default function Templates() {
                 status={runtime.clientImportStatus}
                 loading={runtime.clientImportLoading}
                 detailsExpanded={runtime.clientDetailsExpanded}
+                lang={runtime.lang}
+                onChangeLang={changeLanguage}
                 onReadClipboard={importClientFromClipboardAndResetCase}
                 onOpenPaste={() => {
                     runtime.setClientPasteInitialError(runtime.clientImportStatus.message || "");
