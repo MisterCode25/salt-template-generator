@@ -61,16 +61,17 @@ textarea:focus {
 }
 
 .primary-btn {
-    background: linear-gradient(140deg, #0d1c42, #1a3578, #2d56c0);
-    border: 1px solid rgba(61,107,255,0.35);
-    color: #f0f5ff;
-    padding: var(--space-md) 22px;
-    font-weight: 600;
-    border-radius: var(--radius-sm);
+    background: var(--button-primary-bg);
+    border: 1px solid var(--button-primary-border);
+    color: var(--button-primary-text);
+    padding: 8px 16px;
+    font-weight: 500;
+    font-size: 13px;
+    letter-spacing: -0.01em;
+    border-radius: 8px;
     cursor: pointer;
-    transition: transform var(--transition-base), box-shadow var(--transition-base), filter var(--transition-base);
-    box-shadow: 0 6px 20px rgba(20,52,140,0.5), inset 0 1px 0 rgba(255,255,255,0.08);
-    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.3);
+    transition: background var(--transition-fast), box-shadow var(--transition-fast);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.08);
 }
 
 .primary-btn:disabled {
@@ -92,9 +93,9 @@ textarea:focus {
 }
 
 .primary-btn:hover {
-    transform: translateY(-2px);
-    filter: brightness(1.06);
-    box-shadow: 0 8px 24px rgba(61,107,255,0.55), inset 0 1px 0 rgba(255,255,255,0.1);
+    background: var(--button-primary-bg-hover);
+    box-shadow: 0 4px 12px rgba(99,102,241,0.35), inset 0 1px 0 rgba(255,255,255,0.1);
+    transform: none; /* NO transform on hover for modern feel */
 }
 
 .primary-btn.template-type-email,
@@ -106,61 +107,46 @@ textarea:focus {
     gap: 10px;
 }
 
-.primary-btn.template-type-email {
-    background: linear-gradient(135deg, #10204f, #1d3674, #294d9d);
-    border: 1px solid rgba(60,95,185,0.48);
-    color: white;
-    padding: var(--space-md) 18px;
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    font-size: var(--font-md);
-    font-weight: 600;
-    box-shadow: var(--shadow-md);
-    transition: var(--transition-base);
+/* EMAIL — FLAT BLUE */
+.primary-btn.template-type-email, #email-container .primary-btn {
+    background: #2563eb;
+    border: 1px solid rgba(255,255,255,0.12);
+    color: #fff;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1);
+}
+.primary-btn.template-type-email:hover, #email-container .primary-btn:hover {
+    background: #1d4ed8;
+    box-shadow: 0 4px 12px rgba(37,99,235,0.4);
+    transform: none;
+    filter: none;
 }
 
-.primary-btn.template-type-email:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(44,120,255,0.6), inset 0 1px 0 rgba(255,255,255,0.12);
-    filter: brightness(1.07);
+/* SMS — FLAT PURPLE */
+.primary-btn.template-type-sms, #sms-container .primary-btn {
+    background: #7c3aed;
+    border: 1px solid rgba(255,255,255,0.12);
+    color: #fff;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1);
+}
+.primary-btn.template-type-sms:hover, #sms-container .primary-btn:hover {
+    background: #6d28d9;
+    box-shadow: 0 4px 12px rgba(124,58,237,0.4);
+    transform: none;
+    filter: none;
 }
 
-.primary-btn.template-type-sms {
-    background: linear-gradient(135deg, #3f177f, #5823ad, #763ad8);
-    border: 1px solid rgba(130,90,235,0.42);
-    color: white;
-    padding: var(--space-md) 18px;
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    font-size: var(--font-md);
-    font-weight: 600;
-    box-shadow: var(--shadow-md);
-    transition: var(--transition-base);
+/* OTHER — FLAT GREEN */
+.primary-btn.template-type-other, #other-container .primary-btn {
+    background: #059669;
+    border: 1px solid rgba(255,255,255,0.12);
+    color: #fff;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1);
 }
-
-.primary-btn.template-type-sms:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(130,80,235,0.62), inset 0 1px 0 rgba(255,255,255,0.12);
-    filter: brightness(1.07);
-}
-
-.primary-btn.template-type-other {
-    background: linear-gradient(135deg, #044e3d, #00785f, #009a78);
-    border: 1px solid rgba(0,160,135,0.48);
-    color: #ffffff;
-    padding: var(--space-md) 18px;
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    font-size: var(--font-md);
-    font-weight: 600;
-    box-shadow: var(--shadow-md);
-    transition: var(--transition-base);
-}
-
-.primary-btn.template-type-other:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(0,150,125,0.62), inset 0 1px 0 rgba(255,255,255,0.12);
-    filter: brightness(1.06);
+.primary-btn.template-type-other:hover, #other-container .primary-btn:hover {
+    background: #047857;
+    box-shadow: 0 4px 12px rgba(5,150,105,0.4);
+    transform: none;
+    filter: none;
 }
 
 .model-list button {
@@ -213,28 +199,27 @@ textarea:focus {
 }
 
 .segment.active {
-    background: linear-gradient(135deg, #1d4fff, #2596ff, #46c0ff);
+    background: var(--color-primary);
     color: white;
     border-color: transparent;
-    box-shadow: 0 4px 14px rgba(44,120,255,0.55);
+    box-shadow: 0 2px 8px rgba(99,102,241,0.4);
 }
 
 /* ----------- EMAIL & SMS SECTIONS LAYOUT ----------- */
 
 .model-section {
-    background: rgba(18, 22, 33, 0.85);
+    background: var(--bg-surface);
     border-radius: var(--radius-md);
     padding: var(--space-2xl);
-    margin-bottom: 20px;
-    box-shadow: var(--shadow-md);
+    margin-bottom: 16px;
     border: 1px solid var(--border-default);
-    backdrop-filter: blur(18px);
-    transition: transform var(--transition-base), box-shadow var(--transition-base);
+    transition: border-color var(--transition-fast);
 }
 
 .model-section:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-lg);
+    border-color: rgba(255,255,255,0.14);
+    transform: none;
+    box-shadow: none;
 }
 
 
@@ -270,18 +255,8 @@ textarea:focus {
     margin-top: 20px;
 }
 
-/* EMAIL — BLUE GLOSSY */
+/* EMAIL — FLAT BLUE (container-specific layout props) */
 #email-container .primary-btn {
-    background: linear-gradient(135deg, #10204f, #1d3674, #294d9d);
-    border: 1px solid rgba(60,95,185,0.48);
-    color: white;
-    padding: var(--space-md) 18px;
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    font-size: var(--font-md);
-    font-weight: 600;
-    box-shadow: var(--shadow-md);
-    transition: var(--transition-base);
     display: inline-flex;
     align-items: center;
     justify-content: space-between;
@@ -291,18 +266,8 @@ textarea:focus {
     flex: 0 0 auto;
 }
 
-/* SMS — PURPLE GLOSSY */
+/* SMS — FLAT PURPLE (container-specific layout props) */
 #sms-container .primary-btn {
-    background: linear-gradient(135deg, #3f177f, #5823ad, #763ad8);
-    border: 1px solid rgba(130,90,235,0.42);
-    color: white;
-    padding: var(--space-md) 18px;
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    font-size: var(--font-md);
-    font-weight: 600;
-    box-shadow: var(--shadow-md);
-    transition: var(--transition-base);
     display: inline-flex;
     align-items: center;
     justify-content: space-between;
@@ -312,18 +277,8 @@ textarea:focus {
     flex: 0 0 auto;
 }
 
-/* OTHER — GREEN / TURQUOISE GLOSSY */
+/* OTHER — FLAT GREEN (container-specific layout props) */
 #other-container .primary-btn {
-    background: linear-gradient(135deg, #044e3d, #00785f, #009a78);
-    border: 1px solid rgba(0,160,135,0.48);
-    color: #ffffff;
-    padding: var(--space-md) 18px;
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    font-size: var(--font-md);
-    font-weight: 600;
-    box-shadow: var(--shadow-md);
-    transition: var(--transition-base);
     display: inline-flex;
     align-items: center;
     justify-content: space-between;
@@ -331,45 +286,20 @@ textarea:focus {
     width: auto;
     min-width: 0;
     flex: 0 0 auto;
-}
-
-#email-container .primary-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(44,120,255,0.6), inset 0 1px 0 rgba(255,255,255,0.12);
-    filter: brightness(1.07);
-}
-
-#sms-container .primary-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(130,80,235,0.62), inset 0 1px 0 rgba(255,255,255,0.12);
-    filter: brightness(1.07);
-}
-
-#other-container .primary-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(0,150,125,0.62), inset 0 1px 0 rgba(255,255,255,0.12);
-    filter: brightness(1.06);
 }
 
 /*********** MANAGE MODELS — CARD LAYOUT ***********/
 
 .manage-card {
-    background: rgba(18, 22, 33, 0.85);
+    background: var(--bg-surface);
     border-radius: var(--radius-md);
     padding: var(--space-2xl);
     max-width: 800px;
     margin: 40px auto;
-    box-shadow: var(--shadow-md);
     border: 1px solid var(--border-default);
-    backdrop-filter: blur(18px);
-    color: #e6ecff;
-    transition: transform var(--transition-base), box-shadow var(--transition-base);
+    color: var(--text-primary);
 }
-
-.manage-card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-lg);
-}
+.manage-card:hover { transform: none; box-shadow: none; }
 
 /* Container spacing inside the card */
 .manage-card h1 {
@@ -416,35 +346,33 @@ textarea:focus {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: rgba(25, 32, 48, 0.85);
+    background: var(--bg-surface);
     border: 1px solid var(--border-default);
-    padding: 14px 18px;
+    padding: 12px 16px;
     border-radius: var(--radius-sm);
-    margin-bottom: var(--space-md);
-    font-size: 15px;
-    color: #e6ecff;
-    backdrop-filter: blur(12px);
-    transition: transform var(--transition-base), box-shadow var(--transition-base), border-color var(--transition-base), background var(--transition-base);
-    will-change: transform;
+    margin-bottom: 6px;
+    font-size: 14px;
+    color: var(--text-primary);
+    transition: border-color var(--transition-fast), background var(--transition-fast);
 }
 
 .model-row.dragging {
     opacity: 0.6;
     transform: scale(0.98);
-    background: rgba(32, 40, 60, 0.92);
+    background: var(--bg-surface-elevated);
     cursor: grabbing;
 }
 
 .model-row.drag-over {
-    border-color: rgba(120,160,255,0.7);
-    box-shadow: 0 10px 20px rgba(0,0,0,0.35);
-    transform: translateY(-2px) scale(1.01);
-    background: rgba(32, 40, 60, 0.95);
+    border-color: rgba(255,255,255,0.2);
+    background: var(--bg-surface-elevated);
 }
 
 .model-row:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 20px rgba(0,0,0,0.35);
+    border-color: rgba(255,255,255,0.14);
+    background: var(--bg-surface-elevated);
+    transform: none;
+    box-shadow: none;
 }
 
 .drag-handle {
@@ -475,15 +403,15 @@ textarea:focus {
 
 /*********** EDIT AND DELETE BUTTONS ***********/
 .icon-btn {
-    width: 36px;
-    height: 36px;
-    border-radius: var(--radius-sm);
-    border: 1px solid rgba(80,120,255,0.35);
-    background: rgba(25, 32, 48, 0.9);
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: 1px solid var(--border-default);
+    background: transparent;
     display: grid;
     place-items: center;
     cursor: pointer;
-    transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast), filter var(--transition-fast);
+    transition: background var(--transition-fast), border-color var(--transition-fast);
     padding: 0;
     position: relative;
 }
@@ -501,16 +429,16 @@ textarea:focus {
 }
 
 .icon-btn:hover {
-    transform: translateY(-1px);
-    border-color: rgba(120,160,255,0.6);
-    box-shadow: 0 8px 18px rgba(0,0,0,0.35);
-    filter: brightness(1.05);
+    background: rgba(255,255,255,0.07);
+    border-color: rgba(255,255,255,0.16);
+    transform: none;
+    box-shadow: none;
+    filter: none;
 }
 
 .light-theme .icon-btn {
-    background: #f5f7ff;
-    border: 1px solid rgba(40,75,150,0.2);
-    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+    background: transparent;
+    border: 1px solid rgba(0,0,0,0.1);
 }
 
 .light-theme .icon-btn:hover {
@@ -2203,14 +2131,16 @@ textarea:focus {
 }
 
 .light-theme .primary-btn {
-    background: linear-gradient(135deg, #2d5fcb, #4c7ade);
-    border: 1px solid rgba(50,90,180,0.35);
-    color: #f5f8ff;
-    box-shadow: 0 6px 14px rgba(0,0,0,0.12);
+    background: var(--button-primary-bg);
+    border: 1px solid var(--button-primary-border);
+    color: var(--button-primary-text);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
 }
 
 .light-theme .primary-btn:hover {
-    box-shadow: 0 8px 18px rgba(0,0,0,0.14), inset 0 1px 0 rgba(255,255,255,0.2);
+    background: var(--button-primary-bg-hover);
+    box-shadow: 0 4px 12px rgba(99,102,241,0.25);
+    transform: none;
 }
 
 .light-theme .secondary-btn {
@@ -2230,9 +2160,9 @@ textarea:focus {
 .light-theme .manage-token-card,
 .light-theme .zone-box {
     background: #ffffff;
-    color: #0f1a33;
-    border: 1px solid rgba(30,60,120,0.18);
-    box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+    color: #111118;
+    border: 1px solid rgba(0,0,0,0.08);
+    box-shadow: none;
 }
 
 .light-theme .reset-fields-btn {
@@ -2465,15 +2395,17 @@ textarea:focus {
 }
 
 .salt-theme .primary-btn {
-    background: linear-gradient(135deg, #058750, #0a9a5d);
-    border: 1px solid rgba(5,135,80,0.65);
-    color: #ffffff;
-    box-shadow: 0 6px 16px rgba(5,135,80,0.35);
+    background: var(--button-primary-bg);
+    border: 1px solid var(--button-primary-border);
+    color: var(--button-primary-text);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.3);
 }
 
 .salt-theme .primary-btn:hover {
-    box-shadow: 0 8px 20px rgba(5,135,80,0.5);
-    filter: brightness(1.04);
+    background: var(--button-primary-bg-hover);
+    box-shadow: 0 4px 12px rgba(0,232,120,0.3);
+    filter: none;
+    transform: none;
 }
 
 .salt-theme .primary-btn:disabled {
@@ -2515,10 +2447,10 @@ textarea:focus {
 .salt-theme .manage-card,
 .salt-theme .manage-token-card,
 .salt-theme .zone-box {
-    background: #0a0a0a;
-    color: #ffffff;
-    border: 1px solid rgba(255,255,255,0.14);
-    box-shadow: 0 6px 18px rgba(0,0,0,0.8);
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    border: 1px solid var(--border-default);
+    box-shadow: none;
 }
 
 .salt-theme .dropdown-title {
@@ -2706,34 +2638,23 @@ textarea:focus {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23ff6b6b' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6h16'/%3E%3Cpath d='M10 6h4'/%3E%3Cpath d='M10 6l.5-2h3l.5 2'/%3E%3Cpath d='M9 6v12a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2V6'/%3E%3C/svg%3E");
 }
 
-.salt-theme #email-container .primary-btn {
-    background: linear-gradient(135deg, #0b2b1e, #125b3d, #058750);
-    border: 1px solid rgba(5,135,80,0.65);
-    box-shadow: 0 6px 18px rgba(18,91,61,0.55), inset 0 1px 0 rgba(255,255,255,0.08);
-}
-
-.salt-theme #email-container .primary-btn:hover {
-    box-shadow: 0 8px 24px rgba(18,91,61,0.7), inset 0 1px 0 rgba(255,255,255,0.12);
-}
-
-.salt-theme #sms-container .primary-btn {
-    background: linear-gradient(135deg, #0b2b1e, #125b3d, #058750);
-    border: 1px solid rgba(5,135,80,0.65);
-    box-shadow: 0 6px 18px rgba(18,91,61,0.55), inset 0 1px 0 rgba(255,255,255,0.08);
-}
-
-.salt-theme #sms-container .primary-btn:hover {
-    box-shadow: 0 8px 24px rgba(18,91,61,0.7), inset 0 1px 0 rgba(255,255,255,0.12);
-}
-
+/* Salt theme: email/sms/other buttons use the salt primary color (#00e878) */
+.salt-theme #email-container .primary-btn,
+.salt-theme #sms-container .primary-btn,
 .salt-theme #other-container .primary-btn {
-    background: linear-gradient(135deg, #0b2b1e, #125b3d, #058750);
-    border: 1px solid rgba(5,135,80,0.65);
-    box-shadow: 0 6px 18px rgba(18,91,61,0.55), inset 0 1px 0 rgba(255,255,255,0.08);
+    background: #00e878;
+    border: 1px solid transparent;
+    color: #021208;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.3);
 }
 
+.salt-theme #email-container .primary-btn:hover,
+.salt-theme #sms-container .primary-btn:hover,
 .salt-theme #other-container .primary-btn:hover {
-    box-shadow: 0 8px 24px rgba(18,91,61,0.7), inset 0 1px 0 rgba(255,255,255,0.12);
+    background: #00cc6a;
+    box-shadow: 0 4px 12px rgba(0,232,120,0.35);
+    filter: none;
+    transform: none;
 }
 
 .light-theme .lang-fullscreen {
@@ -2864,25 +2785,38 @@ textarea:focus {
     border-color: rgba(40,75,150,0.3);
 }
 
+/* Light theme keeps same flat colors for email/sms/other buttons */
 .light-theme #email-container .primary-btn {
-    background: linear-gradient(135deg, #3c71d6, #5c8ae4);
-    color: #f6f8ff;
-    border: 1px solid rgba(60,100,190,0.35);
-    box-shadow: 0 6px 14px rgba(0,0,0,0.1);
+    background: #2563eb;
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.12);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+}
+.light-theme #email-container .primary-btn:hover {
+    background: #1d4ed8;
+    box-shadow: 0 4px 12px rgba(37,99,235,0.3);
 }
 
 .light-theme #sms-container .primary-btn {
-    background: linear-gradient(135deg, #7a5ed6, #9779e5);
-    color: #f9f7ff;
-    border: 1px solid rgba(110,80,180,0.35);
-    box-shadow: 0 6px 14px rgba(0,0,0,0.1);
+    background: #7c3aed;
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.12);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+}
+.light-theme #sms-container .primary-btn:hover {
+    background: #6d28d9;
+    box-shadow: 0 4px 12px rgba(124,58,237,0.3);
 }
 
 .light-theme #other-container .primary-btn {
-    background: linear-gradient(135deg, #1d9c82, #35b59b);
-    color: #f4fffd;
-    border: 1px solid rgba(40,150,130,0.35);
-    box-shadow: 0 6px 14px rgba(0,0,0,0.1);
+    background: #059669;
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.12);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+}
+.light-theme #other-container .primary-btn:hover {
+    background: #047857;
+    box-shadow: 0 4px 12px rgba(5,150,105,0.3);
 }
 
 .light-theme .reset-fields-btn {
@@ -5366,18 +5300,20 @@ textarea:focus {
     max-width: none;
     padding-bottom: 22px;
     overflow-x: hidden;
-    background:
-        linear-gradient(180deg, rgba(4, 8, 18, 0.99) 0%, rgba(6, 10, 22, 0.99) 52%, rgba(5, 8, 16, 1) 100%);
+    background: var(--bg-body);
 }
 
 .templates-app-header {
     width: 100%;
     box-sizing: border-box;
-    min-height: 72px;
-    padding: 0 18px;
-    border-bottom: 1px solid rgba(61, 107, 255, 0.22);
-    background: rgba(4, 8, 18, 0.97);
-    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.32);
+    height: 56px;
+    min-height: 56px;
+    padding: 0 20px;
+    border-bottom: 1px solid var(--border-default);
+    background: rgba(12, 12, 14, 0.88);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: none;
 }
 
 .templates-page .app-title {
@@ -5400,22 +5336,41 @@ textarea:focus {
 .templates-page .dropdown-btn,
 .templates-manage-btn,
 .templates-detail-actions .secondary-btn {
-    min-height: 39px;
+    min-height: 34px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    border: 1px solid rgba(61, 107, 255, 0.28);
+    gap: 7px;
+    border: 1px solid var(--border-default);
     border-radius: 7px;
-    background: rgba(10, 18, 36, 0.92);
-    color: #eaf0ff;
+    background: rgba(255,255,255,0.05);
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
     box-shadow: none;
     text-shadow: none;
+    transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+.templates-page .external-generator-open-btn:hover,
+.templates-page .dropdown-btn:hover,
+.templates-manage-btn:hover,
+.templates-detail-actions .secondary-btn:hover {
+    background: rgba(255,255,255,0.08);
+    border-color: rgba(255,255,255,0.16);
+    color: var(--text-primary);
 }
 
 .templates-page .dropdown-btn {
-    background: linear-gradient(135deg, #0d1c42, #1a3578);
-    padding: 0 18px;
+    background: var(--button-primary-bg);
+    border-color: transparent;
+    color: var(--button-primary-text);
+    padding: 0 16px;
+}
+.templates-page .dropdown-btn:hover {
+    background: var(--button-primary-bg-hover);
+    color: #fff;
+    border-color: transparent;
 }
 
 .templates-page .client-info-panel {
@@ -5425,17 +5380,17 @@ textarea:focus {
 }
 
 .templates-page .client-info-bar {
-    padding: 10px 18px;
-    border-color: rgba(61, 107, 255, 0.22);
-    border-radius: 8px;
-    background: linear-gradient(180deg, rgba(8, 16, 34, 0.92), rgba(6, 12, 24, 0.96));
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 8px 24px rgba(0, 0, 0, 0.22);
+    padding: 10px 16px;
+    border-color: var(--border-default);
+    border-radius: 10px;
+    background: var(--bg-surface);
+    box-shadow: none;
 }
 
 .templates-page .client-info-grid {
-    margin-top: 14px;
-    padding-top: 14px;
-    border-top: 1px solid rgba(61, 107, 255, 0.18);
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-default);
 }
 
 .templates-workbench {
@@ -5451,10 +5406,10 @@ textarea:focus {
 .templates-playbook-panel,
 .templates-detail-panel {
     min-width: 0;
-    border: 1px solid rgba(61, 107, 255, 0.2);
-    border-radius: 8px;
-    background: linear-gradient(180deg, rgba(8, 15, 28, 0.94), rgba(6, 12, 22, 0.97));
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 18px 42px rgba(0, 0, 0, 0.24);
+    border: 1px solid var(--border-default);
+    border-radius: 10px;
+    background: var(--bg-surface);
+    box-shadow: none;
 }
 
 .templates-playbook-panel {
@@ -6268,9 +6223,8 @@ textarea:focus {
     }
 }
 
-.light-theme .templates-page {
-    background: #f2f5fb;
-}
+.light-theme .templates-page { background: var(--bg-body); }
+.light-theme .templates-app-header { background: rgba(244,244,248,0.88); border-bottom-color: rgba(0,0,0,0.08); }
 
 .light-theme .templates-playbook-panel,
 .light-theme .templates-detail-panel,
@@ -6280,7 +6234,7 @@ textarea:focus {
 .light-theme .templates-content-card,
 .light-theme .templates-variant-card {
     background: #ffffff;
-    border-color: rgba(38, 72, 130, 0.18);
+    border-color: rgba(0,0,0,0.08);
     color: #172033;
 }
 
@@ -6325,6 +6279,7 @@ textarea:focus {
     color: #172033;
 }
 
+.salt-theme .templates-app-header { background: rgba(2,2,8,0.9); border-bottom-color: rgba(0,255,120,0.1); }
 .salt-theme .templates-playbook-panel,
 .salt-theme .templates-detail-panel,
 .salt-theme .templates-card,
@@ -6332,8 +6287,10 @@ textarea:focus {
 .salt-theme .templates-consultation-preview,
 .salt-theme .templates-content-card,
 .salt-theme .templates-variant-card {
-    border-color: rgba(0, 216, 120, 0.2);
+    border-color: rgba(0,255,120,0.1);
 }
+.salt-theme .templates-page .dropdown-btn { background: #00e878; color: #021208; }
+.salt-theme .templates-page .dropdown-btn:hover { background: #00cc6a; }
 
 /* ---------- CONTRAST SYSTEM OVERRIDES ---------- */
 input[type="text"],
