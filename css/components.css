@@ -482,7 +482,7 @@ textarea:focus {
 }
 
 .popup-box {
-    background: rgba(15, 20, 35, 0.92);
+    background: var(--bg-surface-elevated);
     padding: var(--space-2xl);
     border-radius: var(--radius-lg);
     width: 72%;
@@ -494,7 +494,7 @@ textarea:focus {
     flex-direction: column;
     gap: 20px;
     overflow-y: auto;
-    border: 1px solid rgba(80,120,255,0.28);
+    border: 1px solid var(--border-default);
     backdrop-filter: blur(22px);
     z-index: var(--z-modal);
     transform-origin: bottom center;
@@ -597,11 +597,10 @@ textarea:focus {
 }
 
 .popup-card {
-    background: rgba(20,26,42,0.8);
+    background: var(--bg-surface);
     border: 1px solid var(--border-default);
     border-radius: var(--radius-md);
     padding: var(--space-md);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
 }
 
 .popup-card--variants {
@@ -627,7 +626,7 @@ textarea:focus {
 
 .popup-card-subtitle {
     font-size: var(--font-sm);
-    color: #8fa3d8;
+    color: var(--text-secondary);
     margin-bottom: 14px;
 }
 
@@ -637,7 +636,7 @@ textarea:focus {
 
 .popup-card label {
     font-size: 13px;
-    color: #c9d6ff;
+    color: var(--text-secondary);
 }
 
 .popup-card input[type="text"],
@@ -646,27 +645,27 @@ textarea:focus {
 .popup-card textarea {
     width: 100%;
     max-width: 450px;
-    background: var(--bg-surface-elevated);
-    border: 1px solid rgba(80, 120, 255, 0.35);
+    background: var(--control-bg);
+    border: 1px solid var(--control-border);
     box-shadow: none;
     box-sizing: border-box;
     padding: var(--space-md) var(--space-lg);
     border-radius: var(--radius-sm);
     font-size: var(--font-base);
-    color: #ffffff;
+    color: var(--control-text);
 }
 
 .popup-card input::placeholder,
 .popup-card textarea::placeholder {
-    color: #9fb4e6;
+    color: var(--control-placeholder);
 }
 
 .popup-card .field-line input,
 .popup-card .field-line select {
-    background: rgba(20, 26, 40, 0.9);
-    color: #e6ecff;
-    border: 1px solid rgba(80, 120, 255, 0.4);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+    background: var(--control-bg);
+    color: var(--control-text);
+    border: 1px solid var(--control-border);
+    box-shadow: none;
     width: 100%;
     max-width: 520px;
     padding: var(--space-md) 14px;
@@ -1015,9 +1014,9 @@ textarea:focus {
     height: 44px;
     flex-shrink: 0;
     border-radius: var(--radius-md);
-    background: rgba(80, 120, 255, 0.14);
-    border: 1px solid rgba(80, 120, 255, 0.28);
-    color: #a0b8ff;
+    background: rgba(99, 102, 241, 0.12);
+    border: 1px solid rgba(99, 102, 241, 0.25);
+    color: var(--color-primary-light, #818cf8);
 }
 
 .token-prompt-grid {
@@ -1038,26 +1037,26 @@ textarea:focus {
 
 .token-prompt-field label {
     font-size: 13px;
-    font-weight: 600;
-    color: #c9d6ff;
-    letter-spacing: 0.2px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    letter-spacing: -0.01em;
 }
 
 .token-prompt-field input {
     width: 100%;
     max-width: none;
-    background: rgba(20, 26, 42, 0.9);
-    border: 1px solid rgba(80, 120, 255, 0.32);
+    background: var(--control-bg);
+    border: 1px solid var(--control-border);
     border-radius: var(--radius-sm);
     padding: var(--space-md) var(--space-lg);
-    color: #ffffff;
+    color: var(--control-text);
     font-size: var(--font-base);
-    transition: var(--transition-base);
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .token-prompt-field input:focus {
-    border-color: rgba(120, 160, 255, 0.72);
-    box-shadow: 0 0 0 2px rgba(80, 120, 255, 0.18);
+    border-color: var(--control-focus);
+    box-shadow: 0 0 0 3px var(--control-focus-ring);
     outline: none;
 }
 
@@ -1073,7 +1072,7 @@ textarea:focus {
 
 .token-prompt-modal .popup-actions {
     margin-top: var(--space-lg);
-    border-top: 1px solid rgba(80, 120, 255, 0.15);
+    border-top: 1px solid var(--border-default);
     padding-top: var(--space-lg);
 }
 
@@ -1118,28 +1117,9 @@ textarea:focus {
 
 /* Salt theme overrides */
 .salt-theme .token-prompt-icon {
-    background: rgba(0, 200, 100, 0.10);
-    border-color: rgba(0, 216, 120, 0.25);
-    color: #00d878;
-}
-
-.salt-theme .token-prompt-field label {
-    color: #e0ffe8;
-}
-
-.salt-theme .token-prompt-field input {
-    background: #0f0f0f;
-    border-color: rgba(255, 255, 255, 0.18);
-    color: #ffffff;
-}
-
-.salt-theme .token-prompt-field input:focus {
-    border-color: rgba(0, 216, 120, 0.55);
-    box-shadow: 0 0 0 2px rgba(5, 170, 80, 0.15);
-}
-
-.salt-theme .token-prompt-modal .popup-actions {
-    border-top-color: rgba(255, 255, 255, 0.10);
+    background: rgba(0, 232, 120, 0.1);
+    border-color: rgba(0, 232, 120, 0.22);
+    color: #00e878;
 }
 
 .secondary-btn {
@@ -2208,10 +2188,10 @@ textarea:focus {
 }
 
 .light-theme .popup-box {
-    background: #ffffff;
-    border: 1px solid rgba(30,60,120,0.15);
+    background: var(--bg-surface-elevated);
+    border-color: var(--border-default);
     box-shadow: 0 12px 28px rgba(0,0,0,0.12);
-    color: #0f1a33;
+    color: var(--text-primary);
 }
 
 .light-theme .prompt-dialog {
@@ -2290,22 +2270,7 @@ textarea:focus {
     color: #0f1a33;
 }
 
-.light-theme .popup-card input[type="text"],
-.light-theme .popup-card input[type="number"],
-.light-theme .popup-card select,
-.light-theme .popup-card textarea,
-.light-theme .popup-card .field-line input,
-.light-theme .popup-card .field-line select {
-    background: #ffffff;
-    color: #0f1a33;
-    border: 1px solid rgba(30,60,120,0.2);
-    box-shadow: none;
-}
-
-.light-theme .popup-card input::placeholder,
-.light-theme .popup-card textarea::placeholder {
-    color: #5b6b90;
-}
+/* light-theme popup inputs handled by CSS variables */
 
 .light-theme .popup-lang-item textarea {
     background: #ffffff !important;
