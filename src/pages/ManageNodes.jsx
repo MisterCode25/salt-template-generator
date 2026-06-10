@@ -18,6 +18,8 @@ import {
     getTemplatesForNode,
     linkTemplateToNode,
     moveNode,
+    nodeHasChildren,
+    nodeHasTemplates,
     removeNodeCascade,
     removeTemplate,
     reorderNode,
@@ -751,7 +753,14 @@ function NodeTreeRows({
                         </span>
                     </button>
                     <div className="node-row-actions">
-                        <button type="button" className="node-mini-btn" onClick={() => onAddChild(node.id)} aria-label={`Add child to ${node.title}`}>+</button>
+                        <button
+                            type="button"
+                            className="node-mini-btn"
+                            onClick={() => onAddChild(node.id)}
+                            disabled={nodeHasTemplates(templates, node.id)}
+                            title={nodeHasTemplates(templates, node.id) ? "Has templates — remove them first" : undefined}
+                            aria-label={`Add child to ${node.title}`}
+                        >+</button>
                         <button type="button" className="node-mini-btn" onClick={() => onReorder(node.id, "up")} disabled={siblingIndex <= 0}>Up</button>
                         <button type="button" className="node-mini-btn" onClick={() => onReorder(node.id, "down")} disabled={siblingIndex === -1 || siblingIndex >= siblings.length - 1}>Dn</button>
                         <button type="button" className="icon-btn edit-btn" onClick={() => onEdit(node)} aria-label={`Rename ${node.title}`}>
@@ -833,6 +842,16 @@ export default function ManageNodes() {
         [nodes, selectedNode]
     );
 
+    // Leaf/branch rule: a node can hold sub-nodes OR templates, not both
+    const selectedNodeCanAddChild = useMemo(
+        () => selectedNode ? !nodeHasTemplates(templates, selectedNode.id) : false,
+        [nodes, templates, selectedNode]
+    );
+    const selectedNodeCanAddTemplate = useMemo(
+        () => selectedNode ? !nodeHasChildren(nodes, selectedNode.id) : false,
+        [nodes, selectedNode]
+    );
+
     const persist = async (nextNodes = nodes, nextTemplates = templates) => {
         setNodes(nextNodes);
         setTemplates(nextTemplates);
@@ -859,10 +878,15 @@ export default function ManageNodes() {
             await persist(nextNodes, templates);
             showToast("Node updated", "info");
         } else {
-            const nextNode = createNodeForParent(nodes, nodeModal.parentId, fields);
-            await persist([...nodes, nextNode], templates);
-            setSelectedNodeId(nextNode.id);
-            showToast("Node created", "info");
+            try {
+                const nextNode = createNodeForParent(nodes, nodeModal.parentId, fields, templates);
+                await persist([...nodes, nextNode], templates);
+                setSelectedNodeId(nextNode.id);
+                showToast("Node created", "info");
+            } catch (error) {
+                showToast(error.message, "error");
+                return;
+            }
         }
         setNodeModal(null);
     };
@@ -902,9 +926,14 @@ export default function ManageNodes() {
             await persist(nodes, nextTemplates);
             showToast("Template updated", "info");
         } else {
-            const nextTemplate = createTemplateForNode(templateModal.parentNodeId, fields);
-            await persist(nodes, [...templates, nextTemplate]);
-            showToast("Template created", "info");
+            try {
+                const nextTemplate = createTemplateForNode(templateModal.parentNodeId, fields, nodes, templates);
+                await persist(nodes, [...templates, nextTemplate]);
+                showToast("Template created", "info");
+            } catch (error) {
+                showToast(error.message, "error");
+                return;
+            }
         }
         setTemplateModal(null);
     };
@@ -983,12 +1012,21 @@ export default function ManageNodes() {
                     </div>
                     <div className="node-builder-actions">
                         <button type="button" className="primary-btn" onClick={openRootNodeModal}>+ Root</button>
-                        <button type="button" className="secondary-btn" onClick={() => openChildNodeModal()} disabled={!selectedNode}>+ Child</button>
+                        <button
+                            type="button"
+                            className="secondary-btn"
+                            onClick={() => openChildNodeModal()}
+                            disabled={!selectedNode || !selectedNodeCanAddChild}
+                            title={!selectedNodeCanAddChild && selectedNode ? "This node already has templates — only leaf nodes can have sub-nodes" : undefined}
+                        >
+                            + Child
+                        </button>
                         <button
                             type="button"
                             className="secondary-btn"
                             onClick={() => openTemplateCreationPicker()}
-                            disabled={!selectedNode}
+                            disabled={!selectedNode || !selectedNodeCanAddTemplate}
+                            title={!selectedNodeCanAddTemplate && selectedNode ? "This node already has sub-nodes — only leaf nodes can have templates" : undefined}
                         >
                             + Template
                         </button>
@@ -1043,9 +1081,19 @@ export default function ManageNodes() {
                                 <section className="node-board-section">
                                     <div className="node-board-head">
                                         <h3>Sub-nodes</h3>
-                                        <button type="button" className="secondary-btn" onClick={() => openChildNodeModal(selectedNode.id)}>+ Child</button>
+                                        <button
+                                            type="button"
+                                            className="secondary-btn"
+                                            onClick={() => openChildNodeModal(selectedNode.id)}
+                                            disabled={!selectedNodeCanAddChild}
+                                            title={!selectedNodeCanAddChild ? "This node already has templates — remove them first" : undefined}
+                                        >
+                                            + Child
+                                        </button>
                                     </div>
-                                    {selectedChildNodes.length === 0 ? (
+                                    {!selectedNodeCanAddChild && selectedChildNodes.length === 0 ? (
+                                        <p className="node-rule-hint">This node holds templates. To add sub-nodes, it must first have no templates.</p>
+                                    ) : selectedChildNodes.length === 0 ? (
                                         <button type="button" className="node-empty-tile" onClick={() => openChildNodeModal(selectedNode.id)}>
                                             + Child
                                         </button>
@@ -1066,7 +1114,14 @@ export default function ManageNodes() {
                                                         <div className="node-object-footer">
                                                             <span>{childCount}N</span>
                                                             <span>{templateCount}T</span>
-                                                            <button type="button" className="node-mini-btn" onClick={() => openChildNodeModal(node.id)} aria-label={`Add child to ${node.title}`}>+</button>
+                                                            <button
+                                                                type="button"
+                                                                className="node-mini-btn"
+                                                                onClick={() => openChildNodeModal(node.id)}
+                                                                disabled={templateCount > 0}
+                                                                title={templateCount > 0 ? "Has templates — remove them first" : undefined}
+                                                                aria-label={`Add child to ${node.title}`}
+                                                            >+</button>
                                                         </div>
                                                     </article>
                                                 );
@@ -1082,11 +1137,15 @@ export default function ManageNodes() {
                                             type="button"
                                             className="primary-btn"
                                             onClick={() => openTemplateCreationPicker(selectedNode.id)}
+                                            disabled={!selectedNodeCanAddTemplate}
+                                            title={!selectedNodeCanAddTemplate ? "This node already has sub-nodes — only leaf nodes can have templates" : undefined}
                                         >
                                             + Template
                                         </button>
                                     </div>
-                                    {selectedTemplates.length === 0 ? (
+                                    {!selectedNodeCanAddTemplate && selectedTemplates.length === 0 ? (
+                                        <p className="node-rule-hint">This node has sub-nodes. Templates can only be added to leaf nodes (nodes with no children).</p>
+                                    ) : selectedTemplates.length === 0 ? (
                                         <button
                                             type="button"
                                             className="node-empty-tile"
@@ -1152,9 +1211,12 @@ export default function ManageNodes() {
                                                                     [template.id]: event.target.value
                                                                 }))}
                                                             >
-                                                                <option value="">Link to node…</option>
+                                                                <option value="">Link to leaf node…</option>
                                                                 {nodeOptions
-                                                                    .filter(({ node }) => !(template.nodeIds || []).includes(node.id))
+                                                                    .filter(({ node }) =>
+                                                                        !(template.nodeIds || []).includes(node.id)
+                                                                        && !nodeHasChildren(nodes, node.id)
+                                                                    )
                                                                     .map(({ node, depth }) => (
                                                                         <option key={node.id} value={node.id}>
                                                                             {`${"  ".repeat(depth)}${node.title || "Untitled node"}`}

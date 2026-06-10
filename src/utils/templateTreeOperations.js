@@ -58,8 +58,11 @@ export function canMoveNode(nodes = [], nodeId, parentId = null) {
     return !getDescendantNodeIds(nodes, nodeId).includes(normalizedParentId);
 }
 
-export function createNodeForParent(nodes = [], parentId = null, fields = {}) {
+export function createNodeForParent(nodes = [], parentId = null, fields = {}, templates = []) {
     const normalizedParentId = normalizeParentId(parentId);
+    if (normalizedParentId && nodeHasTemplates(templates, normalizedParentId)) {
+        throw new Error("This node already has templates — a node can hold either sub-nodes or templates, not both.");
+    }
     return createNode({
         ...fields,
         parentId: normalizedParentId,
@@ -126,6 +129,14 @@ export function removeNodeCascade(nodes = [], templates = [], nodeId) {
     };
 }
 
+export function nodeHasChildren(nodes = [], nodeId) {
+    return nodes.some((node) => normalizeParentId(node.parentId) === nodeId);
+}
+
+export function nodeHasTemplates(templates = [], nodeId) {
+    return templates.some((template) => Array.isArray(template.nodeIds) && template.nodeIds.includes(nodeId));
+}
+
 export function getTemplatesForNode(templates = [], nodeId) {
     return templates
         .filter((template) => Array.isArray(template.nodeIds) && template.nodeIds.includes(nodeId))
@@ -133,7 +144,10 @@ export function getTemplatesForNode(templates = [], nodeId) {
         .sort(sortByTitle);
 }
 
-export function createTemplateForNode(nodeId, fields = {}) {
+export function createTemplateForNode(nodeId, fields = {}, nodes = [], templates = []) {
+    if (nodeHasChildren(nodes, nodeId)) {
+        throw new Error("This node has sub-nodes — only leaf nodes can hold templates.");
+    }
     return createTemplate({
         ...fields,
         nodeIds: [nodeId]
@@ -163,6 +177,9 @@ export function moveTemplateToNode(templates = [], templateId, targetNodeId, nod
 export function linkTemplateToNode(templates = [], templateId, nodeId, nodes = []) {
     if (!nodes.some((node) => node.id === nodeId)) {
         throw new Error("Template target node does not exist");
+    }
+    if (nodeHasChildren(nodes, nodeId)) {
+        throw new Error("This node has sub-nodes — only leaf nodes can hold templates.");
     }
 
     return templates.map((template) => (
