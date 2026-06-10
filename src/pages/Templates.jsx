@@ -45,6 +45,7 @@ import {
 import { formatTokenPreviewHTML } from "../utils/richTextTokens.js";
 import { applyTheme, getInitialTheme } from "../utils/theme.js";
 import ExternalGenerator from "./ExternalGenerator.jsx";
+import ToolsBar from "../components/ToolsBar.jsx";
 
 const CHANNEL_LABELS = {
     [Channel.EMAIL]: "Email",
@@ -743,9 +744,6 @@ export default function Templates() {
                     )}
                 </div>
                 <nav className="top-menu">
-                    <button type="button" className="secondary-btn external-generator-open-btn" onClick={openExternalGenerator}>
-                        External Generator
-                    </button>
                     <div className="dropdown options-dropdown">
                         <button type="button" className="dropdown-btn" aria-haspopup="menu" aria-expanded={dropdownOpen} onClick={() => setDropdownOpen((open) => !open)}>
                             Options ▾
@@ -760,6 +758,7 @@ export default function Templates() {
                                 </div>
                                 <div className="dropdown-section">
                                     <div className="dropdown-title">Tools</div>
+                                    <button type="button" role="menuitem" onClick={() => { navigate("/tools"); setDropdownOpen(false); }} className="dropdown-reset">Manage tools</button>
                                     <button type="button" role="menuitem" onClick={() => { navigate("/vti-bookmarklet"); setDropdownOpen(false); }} className="dropdown-reset">VTI shortcut</button>
                                 </div>
                                 <div className="dropdown-section">
@@ -790,6 +789,8 @@ export default function Templates() {
                 onClearClient={clearClientAndResetCase}
                 onToggleDetails={() => runtime.setClientDetailsExpanded((expanded) => !expanded)}
             />
+
+            <ToolsBar values={runtime.values} onOpenExternalGenerator={openExternalGenerator} />
 
             <section className="templates-workbench templates-workbench--columns">
                 <section className="templates-playbook-panel" aria-label="Playbook">

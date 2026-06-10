@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Routes, Route } from "react-router-dom";
 import ManageNodes from "./pages/ManageNodes.jsx";
 import ManageTokens from "./pages/ManageTokens.jsx";
+import ManageTools from "./pages/ManageTools.jsx";
 import Templates from "./pages/Templates.jsx";
 import Settings from "./pages/Settings.jsx";
 import ExternalGenerator from "./pages/ExternalGenerator.jsx";
@@ -40,6 +41,15 @@ function VtiBookmarkletPage() {
     );
 }
 
+function ManageToolsPage() {
+    return (
+        <>
+            <PageHeader title="Manage Tools" />
+            <ManageTools />
+        </>
+    );
+}
+
 export default function App() {
     useEffect(() => {
         applyTheme(getInitialTheme());
@@ -54,6 +64,7 @@ export default function App() {
             <Route path="/settings" element={<Settings />} />
             <Route path="/external-generator" element={<ExternalGeneratorPage />} />
             <Route path="/vti-bookmarklet" element={<VtiBookmarkletPage />} />
+            <Route path="/tools" element={<ManageToolsPage />} />
         </Routes>
     );
 }
