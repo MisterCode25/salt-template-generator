@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { generateFinalText, getTemplateTextByLang } from "../core/tokenEngine.js";
 import {
     CLIENT_INPUT_VALUES_UPDATED_EVENT,
@@ -234,7 +234,7 @@ export function TemplateResultModal({ result, onCopy, onClose }) {
     );
 }
 
-export function ClientInfoPanel({
+export const ClientInfoPanel = memo(function ClientInfoPanel({
     sections,
     summaryFields,
     status,
@@ -347,7 +347,7 @@ export function ClientInfoPanel({
             )}
         </section>
     );
-}
+});
 
 export function ClientPasteModal({ onClose, onImport, initialError = "" }) {
     const [text, setText] = useState("");

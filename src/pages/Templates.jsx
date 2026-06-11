@@ -735,31 +735,41 @@ export default function Templates() {
         resetSearchQuery();
     }, [resetSearchQuery]);
 
-    const resetCaseNavigation = () => {
+    const resetCaseNavigation = useCallback(() => {
         setActiveNodeId(null);
         setActiveTemplateId(null);
         setActiveChannel(Channel.EMAIL);
         resetSearchQuery();
-    };
+    }, [resetSearchQuery]);
 
-    const clearClientAndResetCase = () => {
-        runtime.clearClientInfo();
+    const clearClientAndResetCase = useCallback(() => {
+        runtimeRef.current.clearClientInfo();
         resetCaseNavigation();
-    };
+    }, [resetCaseNavigation]);
 
-    const importClientFromClipboardAndResetCase = async (event) => {
-        const imported = await runtime.readClientClipboard(event);
+    const importClientFromClipboardAndResetCase = useCallback(async (event) => {
+        const imported = await runtimeRef.current.readClientClipboard(event);
         if (imported) resetCaseNavigation();
-    };
+    }, [resetCaseNavigation]);
 
-    const importClientFromPasteAndResetCase = (text) => {
-        runtime.importClientFromPaste(text);
+    const importClientFromPasteAndResetCase = useCallback((text) => {
+        runtimeRef.current.importClientFromPaste(text);
         resetCaseNavigation();
-    };
+    }, [resetCaseNavigation]);
 
-    const changeLanguage = (code) => {
-        runtime.setLang(code);
-    };
+    const changeLanguage = useCallback((code) => {
+        runtimeRef.current.setLang(code);
+    }, []);
+
+    const openClientPasteModal = useCallback(() => {
+        const runtimeApi = runtimeRef.current;
+        runtimeApi.setClientPasteInitialError(runtimeApi.clientImportStatus.message || "");
+        runtimeApi.setClientPasteOpen(true);
+    }, []);
+
+    const toggleClientDetails = useCallback(() => {
+        runtimeRef.current.setClientDetailsExpanded((expanded) => !expanded);
+    }, []);
 
     const requestFirstTemplateWorkflow = useCallback((template, preferredChannel) => {
         if (!template) return false;
@@ -937,12 +947,9 @@ export default function Templates() {
                 lang={runtime.lang}
                 onChangeLang={changeLanguage}
                 onReadClipboard={importClientFromClipboardAndResetCase}
-                onOpenPaste={() => {
-                    runtime.setClientPasteInitialError(runtime.clientImportStatus.message || "");
-                    runtime.setClientPasteOpen(true);
-                }}
+                onOpenPaste={openClientPasteModal}
                 onClearClient={clearClientAndResetCase}
-                onToggleDetails={() => runtime.setClientDetailsExpanded((expanded) => !expanded)}
+                onToggleDetails={toggleClientDetails}
             />
 
             <ToolsBar
