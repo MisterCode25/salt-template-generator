@@ -1108,7 +1108,7 @@ const NodeTemplateRow = memo(function NodeTemplateRow({
     selectedNodeId,
     linkTarget,
     nodeLookup,
-    finalNodeOptions,
+    linkOptions,
     onEdit,
     onDuplicate,
     onUnlink,
@@ -1122,10 +1122,6 @@ const NodeTemplateRow = memo(function NodeTemplateRow({
             .map((nodeId) => nodeLookup.get(nodeId))
             .filter(Boolean)
     ), [nodeLookup, selectedNodeId, template.nodeIds]);
-
-    const linkOptions = useMemo(() => (
-        finalNodeOptions.filter(({ node }) => !(template.nodeIds || []).includes(node.id))
-    ), [finalNodeOptions, template.nodeIds]);
 
     const handleEdit = useCallback(() => {
         onEdit(template);
@@ -1282,6 +1278,17 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
         () => nodeOptions.filter(({ node }) => (nodeSummaryById.get(node.id)?.childCount || 0) === 0),
         [nodeOptions, nodeSummaryById]
     );
+    const linkOptionsByTemplateId = useMemo(() => {
+        const optionsByTemplateId = new Map();
+        selectedTemplates.forEach((template) => {
+            const linkedNodeIds = new Set(template.nodeIds || []);
+            optionsByTemplateId.set(
+                template.id,
+                finalNodeOptions.filter(({ node }) => !linkedNodeIds.has(node.id))
+            );
+        });
+        return optionsByTemplateId;
+    }, [finalNodeOptions, selectedTemplates]);
     const selectedDescendantIds = useMemo(
         () => selectedNode ? getDescendantNodeIds(nodes, selectedNode.id) : [],
         [nodes, selectedNode]
@@ -1588,7 +1595,7 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
                                                 selectedNodeId={selectedNode.id}
                                                 linkTarget={templateLinkTargets[template.id] || ""}
                                                 nodeLookup={nodeLookup}
-                                                finalNodeOptions={finalNodeOptions}
+                                                linkOptions={linkOptionsByTemplateId.get(template.id) || []}
                                                 onEdit={openTemplateEditModal}
                                                 onDuplicate={duplicateSelectedTemplate}
                                                 onUnlink={unlinkFromNode}
