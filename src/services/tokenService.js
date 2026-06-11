@@ -67,31 +67,40 @@ export async function saveTokens(tokens) {
 
 export async function ensureTokensFromTexts(texts = []) {
     const discovered = new Set();
-    texts.filter(Boolean).forEach(text => {
-        const matches = text.match(TOKEN_PATTERN);
-        if (!matches) return;
-        matches.forEach((match) => discovered.add(canonicalizeInputTokenValue(match.trim())));
-    });
+    for (const text of texts) {
+        if (!text) continue;
+        TOKEN_PATTERN.lastIndex = 0;
+        let match;
+        while ((match = TOKEN_PATTERN.exec(String(text))) !== null) {
+            discovered.add(canonicalizeInputTokenValue(match[0].trim()));
+        }
+    }
     if (discovered.size === 0) return;
 
     const current = await loadTokens();
+    const currentTokenSet = new Set();
+    for (const tokenDef of current) {
+        if (tokenDef?.token) currentTokenSet.add(tokenDef.token);
+    }
     let dirty = false;
-    discovered.forEach(tokenValue => {
-        if (INTERNAL_TOKEN_PREFIX_PATTERN.test(tokenValue)) return;
-        if (current.some(t => t.token === tokenValue)) return;
+    for (const tokenValue of discovered) {
+        if (INTERNAL_TOKEN_PREFIX_PATTERN.test(tokenValue)) continue;
+        if (currentTokenSet.has(tokenValue)) continue;
         const clean = tokenValue.slice(1, -1).replace(/[_-]+/g, " ").trim();
         const label = tokenValue === SO_TICKET_NUM_TOKEN
             ? "SO ticket number"
             : clean ? clean.charAt(0).toUpperCase() + clean.slice(1) : tokenValue;
-        current.push({
+        const nextToken = {
             id: crypto.randomUUID(),
             token: tokenValue,
             label,
             input_type: "text",
             display_mode: "on_demand"
-        });
+        };
+        current.push(nextToken);
+        currentTokenSet.add(tokenValue);
         dirty = true;
-    });
+    }
     if (dirty) {
         await saveTokens(current);
     }
