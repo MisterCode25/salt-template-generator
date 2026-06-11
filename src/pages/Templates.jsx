@@ -298,6 +298,7 @@ const PlaybookColumn = memo(function PlaybookColumn({
 });
 
 const TEMPLATE_TOKEN_PATTERN = /\{[^{}]+\}/g;
+const EMPTY_TOKEN_MAP = new Map();
 
 function escapePreviewHTML(value = "") {
     return String(value)
@@ -314,15 +315,17 @@ function resolvePreviewTokenValue(tokenName, tokenMap, values = {}) {
     return value === "" || value === null || value === undefined ? null : String(value);
 }
 
-function formatResultPreviewText(value = "", tokens = [], values = {}) {
-    const tokenMap = new Map(tokens.map((tokenDef) => [tokenDef.token, tokenDef]));
+function buildPreviewTokenMap(tokens = []) {
+    return new Map(tokens.map((tokenDef) => [tokenDef.token, tokenDef]));
+}
+
+function formatResultPreviewText(value = "", tokenMap = EMPTY_TOKEN_MAP, values = {}) {
     return String(value || "").replace(TEMPLATE_TOKEN_PATTERN, (tokenName) =>
         resolvePreviewTokenValue(tokenName, tokenMap, values) ?? tokenName
     );
 }
 
-function formatResultPreviewHTML(value = "", tokens = [], values = {}) {
-    const tokenMap = new Map(tokens.map((tokenDef) => [tokenDef.token, tokenDef]));
+function formatResultPreviewHTML(value = "", tokenMap = EMPTY_TOKEN_MAP, tokens = [], values = {}) {
     const hydrated = String(value || "").replace(TEMPLATE_TOKEN_PATTERN, (tokenName) => {
         const resolved = resolvePreviewTokenValue(tokenName, tokenMap, values);
         return resolved === null ? tokenName : escapePreviewHTML(resolved);
@@ -331,25 +334,39 @@ function formatResultPreviewHTML(value = "", tokens = [], values = {}) {
 }
 
 function TemplateDetail({ template, activeChannel, setActiveChannel, runtime, onManage, onToggleFavorite }) {
-    const availableChannels = getAvailableTemplateChannels(template);
-    const visibleChannels = (availableChannels.length > 0 ? availableChannels : template.channels)
-        .filter((channel, index, list) => list.indexOf(channel) === index);
-    const channelPreviews = visibleChannels.map((channel) => {
+    const {
+        lang,
+        requestCopy,
+        requestTemplateResult,
+        setVariantPicker,
+        tokens,
+        values
+    } = runtime;
+    const previewTokenMap = useMemo(() => buildPreviewTokenMap(tokens), [tokens]);
+    const visibleChannels = useMemo(() => {
+        const availableChannels = getAvailableTemplateChannels(template);
+        return (availableChannels.length > 0 ? availableChannels : template.channels)
+            .filter((channel, index, list) => list.indexOf(channel) === index);
+    }, [template]);
+    const channelPreviews = useMemo(() => visibleChannels.map((channel) => {
         const channelModel = resolveChannelModel(template, channel);
-        const textResult = getTemplateTextResult(channelModel, runtime.lang);
+        const textResult = getTemplateTextResult(channelModel, lang);
         const subject = channelModel?.title || template.title || "Untitled template";
         return {
             channel,
             model: channelModel,
             langLabel: textResult.isFallback
-                ? `${(textResult.lang || runtime.lang).toUpperCase()} fallback`
-                : (textResult.lang || runtime.lang).toUpperCase(),
-            subject: formatResultPreviewText(subject, runtime.tokens, runtime.values),
-            html: formatResultPreviewHTML(textResult.text, runtime.tokens, runtime.values),
+                ? `${(textResult.lang || lang).toUpperCase()} fallback`
+                : (textResult.lang || lang).toUpperCase(),
+            subject: formatResultPreviewText(subject, previewTokenMap, values),
+            html: formatResultPreviewHTML(textResult.text, previewTokenMap, tokens, values),
             meta: CHANNEL_META[channel] || CHANNEL_META[Channel.OTHER]
         };
-    });
-    const activePreview = channelPreviews.find((preview) => preview.channel === activeChannel) || channelPreviews[0] || null;
+    }), [lang, previewTokenMap, template, tokens, values, visibleChannels]);
+    const activePreview = useMemo(
+        () => channelPreviews.find((preview) => preview.channel === activeChannel) || channelPreviews[0] || null,
+        [activeChannel, channelPreviews]
+    );
     const model = activePreview?.model || null;
     const hasVariants = Boolean(model?.variants?.length);
     const copyKey = `tree_${template.id}_${activePreview?.channel || activeChannel}`;
@@ -358,13 +375,13 @@ function TemplateDetail({ template, activeChannel, setActiveChannel, runtime, on
 
     const copyTemplate = () => {
         if (!model) return;
-        runtime.requestCopy(model, copyKey);
+        requestCopy(model, copyKey);
     };
 
     const openVariantResult = (variant) => {
         if (!model) return;
         const sectionKey = variant ? `${copyKey}_${variant.id}` : `${copyKey}_main`;
-        runtime.requestTemplateResult(variant || model, sectionKey, variant ? model : null);
+        requestTemplateResult(variant || model, sectionKey, variant ? model : null);
     };
 
     const selectChannel = (channel) => {
@@ -373,9 +390,9 @@ function TemplateDetail({ template, activeChannel, setActiveChannel, runtime, on
         if (nextModel) {
             const sectionKey = `tree_${template.id}_${channel}`;
             if (nextModel.variants?.length) {
-                runtime.setVariantPicker({ model: nextModel, sectionKey });
+                setVariantPicker({ model: nextModel, sectionKey });
             } else {
-                runtime.requestTemplateResult(nextModel, sectionKey);
+                requestTemplateResult(nextModel, sectionKey);
             }
         }
     };
@@ -759,6 +776,7 @@ export default function Templates() {
     }, [activeNodePath, childrenByParent, rootNodes, searchMode, searchResults, templatesByNode]);
 
     const workflowModalOpen = Boolean(runtime.variantPicker || runtime.tokenPrompt || runtime.copyPreview);
+    const runtimeTokenMap = useMemo(() => buildPreviewTokenMap(runtime.tokens), [runtime.tokens]);
 
     return (
         <main className="page-container page-container--home templates-page">
@@ -917,7 +935,7 @@ export default function Templates() {
                     model={runtime.variantPicker.model}
                     displayTitle={formatResultPreviewText(
                         runtime.variantPicker.model?.title || "",
-                        runtime.tokens,
+                        runtimeTokenMap,
                         runtime.values
                     )}
                     onClose={closeTemplateWorkflow}
