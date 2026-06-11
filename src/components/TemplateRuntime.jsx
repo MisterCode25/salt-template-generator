@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { generateFinalText, getTemplateTextByLang } from "../core/tokenEngine.js";
-import { clearActiveClientPayload, loadActiveClientPayload, saveActiveClientPayload } from "../services/activeClientService.js";
+import {
+    clearActiveClientPayload,
+    clearStoredInputValues,
+    loadActiveClientPayload,
+    saveActiveClientPayload
+} from "../services/activeClientService.js";
 import { copyHtml, showToast } from "../services/clipboardService.js";
 import { loadTokens } from "../services/tokenService.js";
 import {
@@ -393,26 +398,20 @@ export function useTemplateRuntime() {
     }, [clientPayload, clientInternalTokens.length, tokens]);
 
     const clearClientInfo = () => {
-        const matchedTokenNames = clientMatchedTokens.map((match) => match.token);
-        if (matchedTokenNames.length > 0) {
-            setValues((prev) => {
-                const next = { ...prev };
-                matchedTokenNames.forEach((token) => {
-                    delete next[token];
-                    localStorage.removeItem("input_" + token);
-                });
-                return next;
-            });
-        }
+        setValues({});
+        clearStoredInputValues();
         setClientPayload(null);
         setClientMatchedTokens([]);
         setClientInternalTokens([]);
         clearActiveClientPayload();
         setClientDetailsExpanded(false);
+        setClientPasteOpen(false);
+        setClientPasteInitialError("");
         setTokenPrompt(null);
         setPromptMissingTokens([]);
         setVariantPicker(null);
         setClientImportStatus({ type: "idle", message: "" });
+        lastSectionClickVersion.current = {};
         inputChangeVersion.current++;
     };
 
