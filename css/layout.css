@@ -104,6 +104,36 @@
     gap: 12px;
 }
 
+.client-info-external-id {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    min-width: 0;
+    margin-top: 6px;
+    padding: 6px 10px;
+    border: 1px solid rgba(88, 130, 220, 0.22);
+    border-radius: var(--radius-sm);
+    background: rgba(88, 130, 220, 0.08);
+}
+
+.client-info-external-id-label {
+    flex-shrink: 0;
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.client-info-external-id-value {
+    min-width: 0;
+    color: var(--text-primary);
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
 .client-info-bar-empty {
     display: flex;
     align-items: center;
@@ -159,6 +189,11 @@
 .client-info-paste-btn:hover {
     background: var(--bg-surface-elevated);
     color: var(--text-primary);
+}
+
+.client-info-paste-btn:disabled {
+    opacity: 0.5;
+    cursor: wait;
 }
 
 .client-info-bar-loaded {
@@ -409,7 +444,7 @@
     min-height: 210px;
     padding: 28px;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr);
     align-items: center;
     gap: 24px;
 }
@@ -457,6 +492,18 @@
 
 .vti-bookmarklet-panel {
     padding: 20px;
+}
+
+.vti-bookmarklet-shortcut-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+}
+
+.vti-bookmarklet-shortcut-card .hint {
+    margin-top: 6px;
+    line-height: 1.55;
 }
 
 .vti-bookmarklet-panel h2 {

@@ -21,7 +21,7 @@ const ToolButton = memo(function ToolButton({ tool, onOpenTool }) {
     );
 });
 
-function ToolsBar({ values = {}, valuesRef: externalValuesRef = null, onOpenExternalGenerator, onManageTools }) {
+function ToolsBar({ values = {}, valuesRef: externalValuesRef = null, onOpenExternalGenerator, onImportSuperOffice, onManageTools }) {
     const navigate = useNavigate();
     const [tools, setTools] = useState([]);
     const internalValuesRef = useRef(values);
@@ -50,7 +50,7 @@ function ToolsBar({ values = {}, valuesRef: externalValuesRef = null, onOpenExte
         navigate("/tools");
     }, [navigate, onManageTools]);
 
-    if (tools.length === 0 && !onOpenExternalGenerator) return null;
+    if (tools.length === 0 && !onOpenExternalGenerator && !onImportSuperOffice) return null;
 
     return (
         <div className="tools-bar">
@@ -63,6 +63,16 @@ function ToolsBar({ values = {}, valuesRef: externalValuesRef = null, onOpenExte
                         title="Open External Generator"
                     >
                         External Generator
+                    </button>
+                )}
+                {onImportSuperOffice && (
+                    <button
+                        type="button"
+                        className="tools-bar-btn"
+                        onClick={onImportSuperOffice}
+                        title="Import SuperOffice ticket data from clipboard"
+                    >
+                        Import data from SO
                     </button>
                 )}
                 {tools.map((tool) => (
@@ -94,5 +104,6 @@ export default memo(ToolsBar, (prevProps, nextProps) => {
 
     return valuesEqual
         && prevProps.onOpenExternalGenerator === nextProps.onOpenExternalGenerator
+        && prevProps.onImportSuperOffice === nextProps.onImportSuperOffice
         && prevProps.onManageTools === nextProps.onManageTools;
 });

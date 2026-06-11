@@ -757,6 +757,11 @@ export default function Templates() {
         if (imported) resetCaseNavigation();
     }, [resetCaseNavigation]);
 
+    const importSuperOfficeFromClipboardAndResetCase = useCallback(async (event) => {
+        const imported = await runtimeRef.current.readSuperOfficeClipboard(event);
+        if (imported) resetCaseNavigation();
+    }, [resetCaseNavigation]);
+
     const importClientFromPasteAndResetCase = useCallback((text) => {
         runtimeRef.current.importClientFromPaste(text);
         resetCaseNavigation();
@@ -992,6 +997,7 @@ export default function Templates() {
                                     <div className="dropdown-title">Tools</div>
                                     <button type="button" role="menuitem" onClick={() => openWorkspace("tools")} className="dropdown-reset">Manage tools</button>
                                     <button type="button" role="menuitem" onClick={() => openWorkspace("vti")} className="dropdown-reset">VTI shortcut</button>
+                                    <button type="button" role="menuitem" onClick={() => openWorkspace("vti")} className="dropdown-reset">SO shortcut</button>
                                 </div>
                                 <div className="dropdown-section">
                                     <div className="dropdown-title">Theme</div>
@@ -1008,12 +1014,14 @@ export default function Templates() {
             <ClientInfoPanel
                 sections={runtime.clientInfoSections}
                 summaryFields={runtime.clientSummaryFields}
+                externalId={runtime.clientExternalId}
                 status={runtime.clientImportStatus}
                 loading={runtime.clientImportLoading}
                 detailsExpanded={runtime.clientDetailsExpanded}
                 lang={runtime.lang}
                 onChangeLang={changeLanguage}
                 onReadClipboard={importClientFromClipboardAndResetCase}
+                onReadSuperOffice={importSuperOfficeFromClipboardAndResetCase}
                 onOpenPaste={openClientPasteModal}
                 onClearClient={clearClientAndResetCase}
                 onToggleDetails={toggleClientDetails}
@@ -1022,6 +1030,7 @@ export default function Templates() {
             <ToolsBar
                 valuesRef={toolValuesRef}
                 onOpenExternalGenerator={openExternalGenerator}
+                onImportSuperOffice={importSuperOfficeFromClipboardAndResetCase}
                 onManageTools={openToolsWorkspace}
             />
 

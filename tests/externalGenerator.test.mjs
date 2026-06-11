@@ -3,6 +3,7 @@ import {
     EXTERNAL_SYSTEM_TOKENS,
     buildExternalFieldsFromClientPayload,
     buildExternalCode,
+    readExternalFieldsFromStoredTokens,
     buildExternalTokenValues,
     parseExternalId,
     parseVtiClipboard
@@ -27,6 +28,18 @@ import {
     assert.equal(values["{external_partner}"], "EWB");
     assert.equal(values["{external_partner_ticket_number}"], "ABC");
     assert.equal(values["{external_comment}"], undefined);
+
+    const storage = new Map(Object.entries({
+        "input_{external_date}": "26.02.2026",
+        "input_{external_partner_ticket_number}": "ABC",
+        "input_{external_comment}": "ignored"
+    }));
+    const fields = readExternalFieldsFromStoredTokens({
+        getItem: (key) => storage.has(key) ? storage.get(key) : null
+    });
+    assert.equal(fields.data, "2026-02-26");
+    assert.equal(fields.partnerTicketNumber, "ABC");
+    assert.equal(fields.comment, undefined);
 }
 
 {

@@ -13,7 +13,8 @@ import {
     buildExternalTokenValues,
     formatDateForInput,
     mergeExternalFields,
-    parseExternalId
+    parseExternalId,
+    readExternalFieldsFromStoredTokens
 } from "../utils/externalGenerator.js";
 
 // Stable key used to link the canonical SO ticket token to the soTicket field.
@@ -337,9 +338,16 @@ export default function ExternalGenerator({ embedded = false, onClose, clientPay
             }
 
             const stored = localStorage.getItem("input_" + SO_TICKET_NUM_TOKEN);
+            const storedExternalFields = readExternalFieldsFromStoredTokens();
             externalTokenSyncReadyRef.current = true;
-            if (stored !== null && stored.trim() !== "") {
-                setFields(prev => ({ ...prev, soTicket: stored.trim() }));
+            if (Object.keys(storedExternalFields).length > 0 || (stored !== null && stored.trim() !== "")) {
+                setFields(prev => ({
+                    ...prev,
+                    ...storedExternalFields,
+                    soTicket: stored !== null && stored.trim() !== ""
+                        ? stored.trim()
+                        : storedExternalFields.soTicket || prev.soTicket
+                }));
             } else {
                 syncExternalTokenValues(fieldsRef.current);
             }

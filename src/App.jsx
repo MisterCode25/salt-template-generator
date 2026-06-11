@@ -36,7 +36,7 @@ function ExternalGeneratorPage() {
 function VtiBookmarkletPage() {
     return (
         <>
-            <PageHeader title="VTI Shortcut" />
+            <PageHeader title="Data Shortcuts" />
             <VtiBookmarklet />
         </>
     );

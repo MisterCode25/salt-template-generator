@@ -2,11 +2,13 @@ import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { generateFinalText, getTemplateTextByLang } from "../core/tokenEngine.js";
 import {
     CLIENT_INPUT_VALUES_UPDATED_EVENT,
+    MANUAL_CLIENT_INPUTS_KEY,
     clearActiveClientPayload,
     clearStoredInputValues,
     loadActiveClientPayload,
     migrateStoredClientInputValues,
     saveClientInputValue,
+    saveClientInputValues,
     saveActiveClientPayload
 } from "../services/activeClientService.js";
 import { copyHtml, formatClipboardHtmlBody, showToast } from "../services/clipboardService.js";
@@ -29,6 +31,12 @@ import {
 } from "../utils/clientClipboard.js";
 import { formatTokenPreviewHTML } from "../utils/richTextTokens.js";
 import { canonicalizeInputTokenValue } from "../utils/tokenCanonicalization.js";
+import {
+    EXTERNAL_SYSTEM_TOKEN_FIELDS,
+    buildExternalCode,
+    buildExternalFieldsFromTokenValues
+} from "../utils/externalGenerator.js";
+import { parseSuperOfficeInfoPayload } from "../utils/superOfficeImport.js";
 import Modal from "./Modal.jsx";
 
 const CLIENT_CLIPBOARD_READ_TIMEOUT_MS = 3500;
@@ -125,6 +133,22 @@ function getTemplateDisplayTitle(model) {
     if (model?.name) return `${title} · ${model.name}`;
     if (model?.mainVariantName) return `${title} · ${model.mainVariantName}`;
     return title;
+}
+
+function getExternalIdFromClientPayload(payload) {
+    const manualInputs = payload?.[MANUAL_CLIENT_INPUTS_KEY];
+    if (!manualInputs || typeof manualInputs !== "object" || Array.isArray(manualInputs)) return "";
+
+    const valuesByToken = {};
+    EXTERNAL_SYSTEM_TOKEN_FIELDS.forEach(({ token }) => {
+        const inputName = token.replace(/^\{|\}$/g, "");
+        if (!Object.prototype.hasOwnProperty.call(manualInputs, inputName)) return;
+        valuesByToken[token] = manualInputs[inputName];
+    });
+
+    const fields = buildExternalFieldsFromTokenValues(valuesByToken);
+    const hasExternalIdFields = Object.keys(fields).some((field) => field !== "soTicket");
+    return hasExternalIdFields ? buildExternalCode(fields) : "";
 }
 
 const TokenPromptField = memo(function TokenPromptField({
@@ -256,12 +280,14 @@ export const TemplateResultModal = memo(function TemplateResultModal({ result, o
 export const ClientInfoPanel = memo(function ClientInfoPanel({
     sections,
     summaryFields,
+    externalId,
     status,
     loading,
     detailsExpanded,
     lang,
     onChangeLang,
     onReadClipboard,
+    onReadSuperOffice,
     onOpenPaste,
     onClearClient,
     onToggleDetails
@@ -283,6 +309,14 @@ export const ClientInfoPanel = memo(function ClientInfoPanel({
                                 disabled={loading}
                             >
                                 {loading ? "Importing…" : "Import from clipboard"}
+                            </button>
+                            <button
+                                type="button"
+                                className="client-info-paste-btn"
+                                onClick={onReadSuperOffice}
+                                disabled={loading}
+                            >
+                                Import data from SO
                             </button>
                             {(isError) && (
                                 <button type="button" className="client-info-paste-btn" onClick={onOpenPaste}>
@@ -306,6 +340,16 @@ export const ClientInfoPanel = memo(function ClientInfoPanel({
                 </div>
 
                 <div className="client-info-bar-controls">
+                    {hasInfo && (
+                        <button
+                            type="button"
+                            className="client-info-paste-btn"
+                            onClick={onReadSuperOffice}
+                            disabled={loading}
+                        >
+                            Import data from SO
+                        </button>
+                    )}
                     <div className="client-lang-picker" title="Change language">
                         <select
                             value={lang}
@@ -342,6 +386,13 @@ export const ClientInfoPanel = memo(function ClientInfoPanel({
                     )}
                 </div>
             </div>
+
+            {hasInfo && externalId && (
+                <div className="client-info-external-id" aria-label="Imported external ID">
+                    <span className="client-info-external-id-label">External ID</span>
+                    <span className="client-info-external-id-value">{externalId}</span>
+                </div>
+            )}
 
             {isError && status.message && (
                 <p className="client-info-bar-error" aria-live="polite">{status.message}</p>
@@ -467,6 +518,7 @@ export function useTemplateRuntime() {
 
     const clientInfoSections = useMemo(() => getClientInfoSections(clientPayload), [clientPayload]);
     const clientSummaryFields = useMemo(() => getClientSummaryFields(clientPayload), [clientPayload]);
+    const clientExternalId = useMemo(() => getExternalIdFromClientPayload(clientPayload), [clientPayload]);
 
     const readStoredInputValue = (token) => {
         try {
@@ -602,6 +654,38 @@ export function useTemplateRuntime() {
             setClientImportStatus({ type: "error", message });
             showToast(message, "error");
             setClientPasteInitialError(message);
+            return false;
+        } finally {
+            setClientImportLoading(false);
+        }
+    };
+
+    const readSuperOfficeClipboard = async (event) => {
+        setClientImportLoading(true);
+        try {
+            window.focus();
+            event?.currentTarget?.focus?.();
+            const clipboardText = await readClipboardText();
+            const result = parseSuperOfficeInfoPayload(clipboardText);
+            if (!result.ok) {
+                throw new Error("Clipboard does not contain SuperOffice data.");
+            }
+
+            const saved = saveClientInputValues(result.tokenValues);
+            if (saved.payload) setClientPayload(saved.payload);
+            setValues((prev) => ({ ...prev, ...result.tokenValues }));
+            inputChangeVersion.current++;
+
+            const message = result.ignoredExternalId
+                ? "SO ticket imported. External ID ignored because its format is invalid."
+                : "SuperOffice data imported.";
+            setClientImportStatus({ type: "success", message: "" });
+            showToast(message, result.ignoredExternalId ? "warning" : "success");
+            return true;
+        } catch (error) {
+            const message = error?.message || "Unable to import SuperOffice data.";
+            setClientImportStatus({ type: "error", message });
+            showToast(message, "error");
             return false;
         } finally {
             setClientImportLoading(false);
@@ -851,12 +935,14 @@ export function useTemplateRuntime() {
         setValues,
         clientInfoSections,
         clientSummaryFields,
+        clientExternalId,
         clientPayload,
         clientImportStatus,
         clientImportLoading,
         clientDetailsExpanded,
         setClientDetailsExpanded,
         readClientClipboard,
+        readSuperOfficeClipboard,
         clearClientInfo,
         clientPasteOpen,
         setClientPasteOpen,

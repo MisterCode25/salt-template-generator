@@ -103,6 +103,16 @@ function formatTokenFieldValue(field, value) {
     return value === null || value === undefined ? "" : String(value);
 }
 
+function parseTokenFieldValue(field, value) {
+    const text = String(value ?? "").trim();
+    if (!text) return "";
+    if (field === "data") {
+        const dateMatch = text.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+        if (dateMatch) return `${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}`;
+    }
+    return text;
+}
+
 export function buildExternalTokenValues(fields = {}) {
     return Object.fromEntries(
         EXTERNAL_SYSTEM_TOKEN_FIELDS.map(({ field, token }) => [
@@ -110,6 +120,29 @@ export function buildExternalTokenValues(fields = {}) {
             formatTokenFieldValue(field, fields[field])
         ])
     );
+}
+
+export function buildExternalFieldsFromTokenValues(valuesByToken = {}) {
+    const fields = {};
+
+    EXTERNAL_SYSTEM_TOKEN_FIELDS.forEach(({ field, token }) => {
+        if (!Object.prototype.hasOwnProperty.call(valuesByToken, token)) return;
+        const value = parseTokenFieldValue(field, valuesByToken[token]);
+        if (value) fields[field] = value;
+    });
+
+    return fields;
+}
+
+export function readExternalFieldsFromStoredTokens(storage = globalThis.localStorage) {
+    if (!storage) return {};
+
+    const valuesByToken = {};
+    EXTERNAL_SYSTEM_TOKEN_FIELDS.forEach(({ token }) => {
+        const value = storage.getItem(`input_${token}`);
+        if (value !== null) valuesByToken[token] = value;
+    });
+    return buildExternalFieldsFromTokenValues(valuesByToken);
 }
 
 export function parseExternalId(externalId) {

@@ -1,67 +1,105 @@
+import superOfficeBookmarklet from "../data/superOfficeBookmarklet.txt?raw";
 import vtiHealthcheckBookmarklet from "../data/vtiHealthcheckBookmarklet.txt?raw";
 import { showToast } from "../services/clipboardService.js";
 
-const bookmarkletCode = vtiHealthcheckBookmarklet.trim();
+const shortcuts = [
+    {
+        id: "vti",
+        eyebrow: "VTI customer data",
+        title: "Capture VTI data",
+        buttonLabel: "Capture VTI data",
+        bookmarklet: vtiHealthcheckBookmarklet.trim(),
+        description: "Extracts Billing, Contact Details and Healthcheck data, then copies the customer JSON used by Salt Templater.",
+        steps: [
+            "Open the customer in VTI on Billing Account information.",
+            "Click the saved bookmarklet in the bookmarks bar.",
+            "Wait until it copies the JSON, then import customer data from the main screen."
+        ]
+    },
+    {
+        id: "so",
+        eyebrow: "SuperOffice ticket data",
+        title: "Capture SO info",
+        buttonLabel: "Capture SO info",
+        bookmarklet: superOfficeBookmarklet.trim(),
+        description: "Extracts the SuperOffice ticket number and External ticket ID, then copies the JSON used by Import data from SO.",
+        steps: [
+            "Open the ticket in SuperOffice.",
+            "Click the saved bookmarklet in the bookmarks bar.",
+            "Come back to Salt Templater and click Import data from SO."
+        ]
+    }
+];
 
-export default function VtiBookmarklet({ embedded = false, onClose = null }) {
+function copyTextFallback(value) {
+    const textarea = document.createElement("textarea");
+    textarea.value = value;
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand("copy");
+    document.body.removeChild(textarea);
+}
+
+function ShortcutCard({ shortcut }) {
     const copyBookmarklet = async () => {
         try {
-            await navigator.clipboard.writeText(bookmarkletCode);
+            await navigator.clipboard.writeText(shortcut.bookmarklet);
         } catch {
-            const textarea = document.createElement("textarea");
-            textarea.value = bookmarkletCode;
-            textarea.style.position = "fixed";
-            textarea.style.opacity = "0";
-            document.body.appendChild(textarea);
-            textarea.select();
-            document.execCommand("copy");
-            document.body.removeChild(textarea);
+            copyTextFallback(shortcut.bookmarklet);
         }
-        showToast("Bookmarklet copied", "success");
+        showToast(`${shortcut.buttonLabel} shortcut copied`, "success");
     };
 
+    return (
+        <article className="vti-bookmarklet-panel vti-bookmarklet-shortcut-card">
+            <div>
+                <p className="eyebrow">{shortcut.eyebrow}</p>
+                <h2>{shortcut.title}</h2>
+                <p className="hint">{shortcut.description}</p>
+            </div>
+            <a
+                className={`vti-bookmarklet-button vti-bookmarklet-button--${shortcut.id}`}
+                href={shortcut.bookmarklet}
+                draggable="true"
+                onClick={(event) => {
+                    event.preventDefault();
+                    showToast("Drag this button to the bookmarks bar.", "info");
+                }}
+            >
+                {shortcut.buttonLabel}
+            </a>
+            <ol className="vti-bookmarklet-steps">
+                {shortcut.steps.map((step) => (
+                    <li key={step}>{step}</li>
+                ))}
+            </ol>
+            <button type="button" className="secondary-btn" onClick={copyBookmarklet}>
+                Copy shortcut
+            </button>
+        </article>
+    );
+}
+
+export default function VtiBookmarklet({ embedded = false }) {
     return (
         <main className={embedded ? "management-embedded-page vti-bookmarklet-page" : "page-container vti-bookmarklet-page"}>
             <section className="vti-bookmarklet-hero">
                 <div>
-                    <p className="eyebrow">VTI customer data</p>
-                    <h1>Install the VTI shortcut</h1>
+                    <p className="eyebrow">Browser shortcuts</p>
+                    <h1>Install data capture shortcuts</h1>
                     <p className="vti-bookmarklet-lead">
-                        This shortcut runs inside VTI, extracts Billing, Contact Details and Healthcheck data,
-                        then copies the customer JSON used by Salt Templater.
+                        Drag the buttons into the bookmarks bar. VTI imports full customer data;
+                        SuperOffice imports the SO ticket number and a valid External ID when present.
                     </p>
                 </div>
-                <a
-                    className="vti-bookmarklet-button"
-                    href={bookmarkletCode}
-                    draggable="true"
-                    onClick={(event) => {
-                        event.preventDefault();
-                        showToast("Drag this button to the bookmarks bar.", "info");
-                    }}
-                >
-                    Capture VTI data
-                </a>
             </section>
 
             <section className="vti-bookmarklet-grid">
-                <div className="vti-bookmarklet-panel">
-                    <h2>Install</h2>
-                    <ol className="vti-bookmarklet-steps">
-                        <li>Show your browser bookmarks bar.</li>
-                        <li>Drag the blue button above into the bookmarks bar.</li>
-                        <li>Keep the shortcut there. It is the script used to generate customer JSON from VTI.</li>
-                    </ol>
-                </div>
-
-                <div className="vti-bookmarklet-panel">
-                    <h2>Use in VTI</h2>
-                    <ol className="vti-bookmarklet-steps">
-                        <li>Open the customer in VTI on Billing Account information.</li>
-                        <li>Click the saved bookmarklet in the bookmarks bar.</li>
-                        <li>Wait until it copies the JSON, then come back here and import customer data.</li>
-                    </ol>
-                </div>
+                {shortcuts.map((shortcut) => (
+                    <ShortcutCard key={shortcut.id} shortcut={shortcut} />
+                ))}
             </section>
 
             <section className="vti-bookmarklet-panel vti-bookmarklet-support">
@@ -71,9 +109,6 @@ export default function VtiBookmarklet({ embedded = false, onClose = null }) {
                         Copy the shortcut, create a bookmark manually, then paste it as the bookmark URL.
                     </p>
                 </div>
-                <button type="button" className="secondary-btn" onClick={copyBookmarklet}>
-                    Copy shortcut
-                </button>
             </section>
         </main>
     );
