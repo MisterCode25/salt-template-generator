@@ -14,9 +14,15 @@ const SO_TICKET_NAME_ALIASES = new Set([
     "so_ticket_number",
     "so_ticket_no"
 ]);
+const NORMALIZED_TOKEN_NAME_CACHE_LIMIT = 2048;
+const normalizedTokenNameCache = new Map();
 
 export function normalizeTokenName(name = "") {
-    return String(name)
+    const raw = String(name);
+    const cached = normalizedTokenNameCache.get(raw);
+    if (cached !== undefined) return cached;
+
+    const normalized = raw
         .replace(/[{}]/g, "")
         .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
         .normalize("NFD")
@@ -25,6 +31,12 @@ export function normalizeTokenName(name = "") {
         .replace(/&/g, "and")
         .replace(/[^a-z0-9]+/g, "_")
         .replace(/^_+|_+$/g, "");
+
+    if (normalizedTokenNameCache.size >= NORMALIZED_TOKEN_NAME_CACHE_LIMIT) {
+        normalizedTokenNameCache.clear();
+    }
+    normalizedTokenNameCache.set(raw, normalized);
+    return normalized;
 }
 
 function formatTokenName(name = "") {
@@ -54,12 +66,12 @@ export function canonicalizeTemplateTokensInText(text = "") {
 export function canonicalizeTokenDefinition(tokenDef = {}) {
     if (!tokenDef || typeof tokenDef !== "object") return tokenDef;
 
-    const shouldUseSoTicketToken = [
-        tokenDef.token,
-        tokenDef.key,
-        tokenDef.label,
-        tokenDef.name
-    ].some((candidate) => candidate && isSoTicketTokenName(candidate));
+    const shouldUseSoTicketToken = Boolean(
+        (tokenDef.token && isSoTicketTokenName(tokenDef.token))
+        || (tokenDef.key && isSoTicketTokenName(tokenDef.key))
+        || (tokenDef.label && isSoTicketTokenName(tokenDef.label))
+        || (tokenDef.name && isSoTicketTokenName(tokenDef.name))
+    );
 
     return {
         ...tokenDef,
@@ -87,13 +99,13 @@ function mergeTokenDefinitions(existing, incoming) {
 export function canonicalizeTokenDefinitions(tokens = []) {
     const byToken = new Map();
 
-    tokens.forEach((tokenDef) => {
+    for (const tokenDef of tokens) {
         const canonical = canonicalizeTokenDefinition(tokenDef);
-        if (!canonical?.token) return;
+        if (!canonical?.token) continue;
 
         const previous = byToken.get(canonical.token);
         byToken.set(canonical.token, previous ? mergeTokenDefinitions(previous, canonical) : canonical);
-    });
+    }
 
     return Array.from(byToken.values());
 }
