@@ -8,6 +8,7 @@ export const TEMPLATE_NODE_KEY = "template_nodes";
 export const NODE_TEMPLATE_KEY = "node_templates";
 export const LEGACY_MODEL_KEY = "models";
 export const LEGACY_TEMPLATE_MIGRATION_KEY = "template_tree_legacy_migration";
+const TEMPLATE_TEXT_FIELDS = Object.freeze(["text_fr", "text_en", "text_de", "text_it"]);
 
 async function loadList(key, normalize) {
     const indexedList = await loadIndexedJSON(key, null);
@@ -63,30 +64,59 @@ export async function saveTemplateTreeData({ nodes = [], templates = [] } = {}) 
     ]);
 }
 
-function canonicalizeChannelContentTokens(content) {
+function transformTextFields(source = {}, transformText) {
+    let dirty = false;
+    let nextFields = null;
+
+    TEMPLATE_TEXT_FIELDS.forEach((field) => {
+        const current = source[field];
+        const next = transformText(current || "");
+        if (current === next) return;
+        dirty = true;
+        nextFields = nextFields || {};
+        nextFields[field] = next;
+    });
+
+    return {
+        value: dirty ? { ...source, ...nextFields } : source,
+        dirty
+    };
+}
+
+function transformChannelContentText(content, transformText) {
     if (!content) return { content, dirty: false };
 
-    const variants = (content.variants || []).map((variant) => ({
-        ...variant,
-        text_fr: canonicalizeTemplateTokensInText(variant.text_fr || ""),
-        text_en: canonicalizeTemplateTokensInText(variant.text_en || ""),
-        text_de: canonicalizeTemplateTokensInText(variant.text_de || ""),
-        text_it: canonicalizeTemplateTokensInText(variant.text_it || "")
-    }));
+    const contentResult = transformTextFields(content, transformText);
+    const hasVariantList = Array.isArray(content.variants);
+    const originalVariants = hasVariantList ? content.variants : [];
+    let variants = hasVariantList ? originalVariants : [];
+    let dirty = contentResult.dirty || !hasVariantList;
+
+    originalVariants.forEach((variant, index) => {
+        const variantResult = transformTextFields(variant, transformText);
+        if (!variantResult.dirty) return;
+        if (variants === originalVariants) variants = originalVariants.slice();
+        variants[index] = variantResult.value;
+        dirty = true;
+    });
+
+    if (!dirty) {
+        return { content, dirty: false };
+    }
 
     const nextContent = {
-        ...content,
-        text_fr: canonicalizeTemplateTokensInText(content.text_fr || ""),
-        text_en: canonicalizeTemplateTokensInText(content.text_en || ""),
-        text_de: canonicalizeTemplateTokensInText(content.text_de || ""),
-        text_it: canonicalizeTemplateTokensInText(content.text_it || ""),
+        ...contentResult.value,
         variants
     };
 
     return {
         content: nextContent,
-        dirty: JSON.stringify(nextContent) !== JSON.stringify(content)
+        dirty: true
     };
+}
+
+function canonicalizeChannelContentTokens(content) {
+    return transformChannelContentText(content, canonicalizeTemplateTokensInText);
 }
 
 function canonicalizeTemplateTokens(template) {
@@ -164,29 +194,7 @@ function replaceInText(text, fromToken, toToken) {
 }
 
 function replaceTokenInChannelContent(content, fromToken, toToken) {
-    if (!content) return { content, dirty: false };
-
-    const variants = (content.variants || []).map((variant) => ({
-        ...variant,
-        text_fr: replaceInText(variant.text_fr || "", fromToken, toToken),
-        text_en: replaceInText(variant.text_en || "", fromToken, toToken),
-        text_de: replaceInText(variant.text_de || "", fromToken, toToken),
-        text_it: replaceInText(variant.text_it || "", fromToken, toToken)
-    }));
-
-    const nextContent = {
-        ...content,
-        text_fr: replaceInText(content.text_fr || "", fromToken, toToken),
-        text_en: replaceInText(content.text_en || "", fromToken, toToken),
-        text_de: replaceInText(content.text_de || "", fromToken, toToken),
-        text_it: replaceInText(content.text_it || "", fromToken, toToken),
-        variants
-    };
-
-    return {
-        content: nextContent,
-        dirty: JSON.stringify(nextContent) !== JSON.stringify(content)
-    };
+    return transformChannelContentText(content, (text) => replaceInText(text, fromToken, toToken));
 }
 
 export async function renameTokenInTemplateTree(fromToken, toToken) {
