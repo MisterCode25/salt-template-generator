@@ -39,20 +39,35 @@ export const AGENT_PROFILE_TOKENS = Object.freeze(AGENT_PROFILE_FIELDS.map((fiel
     internal: true,
     system: true
 })));
+const AGENT_PROFILE_TOKEN_SET = new Set(AGENT_PROFILE_FIELDS.map((field) => field.token));
+const AGENT_PROFILE_FIELD_BY_TOKEN = new Map(AGENT_PROFILE_FIELDS.map((field) => [field.token, field]));
 
 function normalizeAgentProfile(profile = {}) {
-    return AGENT_PROFILE_FIELDS.reduce((next, field) => ({
-        ...next,
-        [field.key]: typeof profile?.[field.key] === "string" ? profile[field.key] : ""
-    }), {});
+    const normalized = {};
+    AGENT_PROFILE_FIELDS.forEach((field) => {
+        normalized[field.key] = typeof profile?.[field.key] === "string" ? profile[field.key] : "";
+    });
+    return normalized;
+}
+
+function writeStorageValue(storage, key, value) {
+    if (storage.getItem(key) === value) return false;
+    storage.setItem(key, value);
+    return true;
+}
+
+function removeStorageValue(storage, key) {
+    if (storage.getItem(key) === null) return false;
+    storage.removeItem(key);
+    return true;
 }
 
 export function isAgentProfileToken(token = "") {
-    return AGENT_PROFILE_FIELDS.some((field) => field.token === token);
+    return AGENT_PROFILE_TOKEN_SET.has(token);
 }
 
 function fieldForToken(token = "") {
-    return AGENT_PROFILE_FIELDS.find((field) => field.token === token) || null;
+    return AGENT_PROFILE_FIELD_BY_TOKEN.get(token) || null;
 }
 
 export function loadAgentProfile(storage = globalThis.localStorage) {
@@ -69,24 +84,27 @@ export function loadAgentProfile(storage = globalThis.localStorage) {
 
 export function getAgentProfileTokenValues(profile = loadAgentProfile()) {
     const normalized = normalizeAgentProfile(profile);
-    return AGENT_PROFILE_FIELDS.reduce((values, field) => ({
-        ...values,
-        [field.token]: normalized[field.key]
-    }), {});
+    const values = {};
+    AGENT_PROFILE_FIELDS.forEach((field) => {
+        values[field.token] = normalized[field.key];
+    });
+    return values;
 }
 
 export function syncAgentProfileInputValues(profile = loadAgentProfile(), storage = globalThis.localStorage) {
-    if (!storage) return;
+    if (!storage) return false;
 
+    let changed = false;
     const values = getAgentProfileTokenValues(profile);
     Object.entries(values).forEach(([token, value]) => {
         const key = `input_${token}`;
         if (value === "") {
-            storage.removeItem(key);
+            changed = removeStorageValue(storage, key) || changed;
         } else {
-            storage.setItem(key, value);
+            changed = writeStorageValue(storage, key, value) || changed;
         }
     });
+    return changed;
 }
 
 export function saveAgentProfile(profile, storage = globalThis.localStorage) {
@@ -95,10 +113,12 @@ export function saveAgentProfile(profile, storage = globalThis.localStorage) {
 
     try {
         const serialized = JSON.stringify(normalized);
-        storage.setItem(`local_${AGENT_PROFILE_KEY}`, serialized);
-        storage.setItem(AGENT_PROFILE_KEY, serialized);
-        syncAgentProfileInputValues(normalized, storage);
-        if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
+        const profileChanged = [
+            writeStorageValue(storage, `local_${AGENT_PROFILE_KEY}`, serialized),
+            writeStorageValue(storage, AGENT_PROFILE_KEY, serialized)
+        ].some(Boolean);
+        const inputChanged = syncAgentProfileInputValues(normalized, storage);
+        if ((profileChanged || inputChanged) && typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
             window.dispatchEvent(new CustomEvent(AGENT_PROFILE_UPDATED_EVENT, { detail: { profile: normalized } }));
         }
     } catch (error) {
