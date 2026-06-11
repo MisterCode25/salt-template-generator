@@ -526,6 +526,8 @@ export default function Templates() {
     const runtime = useTemplateRuntime();
     const runtimeRef = useRef(runtime);
     runtimeRef.current = runtime;
+    const toolValuesRef = useRef(runtime.values);
+    toolValuesRef.current = runtime.values;
     const [nodes, setNodes] = useState([]);
     const [treeTemplates, setTreeTemplates] = useState([]);
     const [activeNodeId, setActiveNodeId] = useState(null);
@@ -858,7 +860,7 @@ export default function Templates() {
             />
 
             <ToolsBar
-                values={runtime.values}
+                valuesRef={toolValuesRef}
                 onOpenExternalGenerator={openExternalGenerator}
                 onManageTools={openToolsWorkspace}
             />

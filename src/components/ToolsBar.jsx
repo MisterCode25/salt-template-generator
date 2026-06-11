@@ -21,11 +21,12 @@ const ToolButton = memo(function ToolButton({ tool, onOpenTool }) {
     );
 });
 
-function ToolsBar({ values = {}, onOpenExternalGenerator, onManageTools }) {
+function ToolsBar({ values = {}, valuesRef: externalValuesRef = null, onOpenExternalGenerator, onManageTools }) {
     const navigate = useNavigate();
     const [tools, setTools] = useState([]);
-    const valuesRef = useRef(values);
-    valuesRef.current = values;
+    const internalValuesRef = useRef(values);
+    internalValuesRef.current = values;
+    const valuesRef = externalValuesRef || internalValuesRef;
 
     const reload = useCallback(() => loadTools().then(setTools), []);
 
@@ -39,7 +40,7 @@ function ToolsBar({ values = {}, onOpenExternalGenerator, onManageTools }) {
     const openTool = useCallback((tool) => {
         const url = resolveToolUrl(tool.url, valuesRef.current);
         window.open(url, "_blank", "noopener,noreferrer");
-    }, []);
+    }, [valuesRef]);
 
     const handleManageTools = useCallback(() => {
         if (onManageTools) {
@@ -85,4 +86,13 @@ function ToolsBar({ values = {}, onOpenExternalGenerator, onManageTools }) {
     );
 }
 
-export default memo(ToolsBar);
+export default memo(ToolsBar, (prevProps, nextProps) => {
+    const refBackedValues = prevProps.valuesRef || nextProps.valuesRef;
+    const valuesEqual = refBackedValues
+        ? prevProps.valuesRef === nextProps.valuesRef
+        : prevProps.values === nextProps.values;
+
+    return valuesEqual
+        && prevProps.onOpenExternalGenerator === nextProps.onOpenExternalGenerator
+        && prevProps.onManageTools === nextProps.onManageTools;
+});
