@@ -33,11 +33,16 @@ import {
 import { getTemplateTextResult } from "../core/tokenEngine.js";
 import { loadTemplateTreeData, saveTemplateTreeData } from "../services/templateTreeService.js";
 import { Channel } from "../models/templateTreeModel.js";
-import { getChildNodes, getTemplatesForNode, updateTemplate } from "../utils/templateTreeOperations.js";
+import {
+    buildNodeChildrenIndex,
+    buildNodeLookup,
+    buildTemplateNodeIndex,
+    getIndexedChildNodes,
+    getIndexedTemplatesForNode,
+    updateTemplate
+} from "../utils/templateTreeOperations.js";
 import {
     getAvailableTemplateChannels,
-    getNodeCardSummary,
-    getNodePath,
     resolveChannelModel,
     searchTemplateTree
 } from "../utils/templateTreeNavigation.js";
@@ -181,58 +186,6 @@ function ChannelPills({ channels }) {
     );
 }
 
-function NodeCard({ node, nodes, templates, onOpen, selected }) {
-    const summary = getNodeCardSummary(nodes, templates, node.id);
-    const totalCount = summary.childCount + summary.templateCount;
-    const Icon = iconForItem(node.icon, node.title);
-    const tone = toneForValue(node.icon || node.title);
-
-    return (
-        <button
-            type="button"
-            className={`templates-card templates-card--node${selected ? " is-selected" : ""}`}
-            onClick={() => onOpen(node.id)}
-        >
-            <span className="templates-card-topline">
-                <IconBadge Icon={Icon} tone={tone} />
-                {totalCount > 0 && (
-                    <span className="templates-count-pill">
-                        <Folder size={13} aria-hidden="true" />
-                        {totalCount}
-                    </span>
-                )}
-            </span>
-            <span className="templates-card-title-row">
-                <strong>{node.title || "Untitled section"}</strong>
-                <ChevronRight size={22} aria-hidden="true" />
-            </span>
-        </button>
-    );
-}
-
-function BusinessTemplateCard({ template, onOpen, selected }) {
-    const availableChannels = getAvailableTemplateChannels(template);
-    const channels = availableChannels.length > 0 ? availableChannels : template.channels;
-    const Icon = templateIcon(template);
-    const tone = toneForValue(template.title);
-
-    return (
-        <button
-            type="button"
-            className={`templates-card templates-card--template${selected ? " is-selected" : ""}`}
-            onClick={() => onOpen(template.id)}
-        >
-            <span className="templates-card-topline">
-                <IconBadge Icon={Icon} tone={tone} />
-            </span>
-            <span className="templates-card-title-row">
-                <strong>{template.title || "Untitled template"}</strong>
-            </span>
-            <ChannelPills channels={channels} />
-        </button>
-    );
-}
-
 function EmptyColumnState({ message }) {
     return (
         <div className="templates-column-empty">
@@ -246,8 +199,7 @@ function PlaybookColumn({
     title,
     nodes: columnNodes,
     templates: columnTemplates,
-    allNodes,
-    allTemplates,
+    nodeSummaryById,
     activeNodeId,
     activeTemplateId,
     onOpenNode,
@@ -262,7 +214,7 @@ function PlaybookColumn({
                 {hasItems ? (
                     <>
                         {columnNodes.map((node) => {
-                            const summary = getNodeCardSummary(allNodes, allTemplates, node.id);
+                            const summary = nodeSummaryById.get(node.id) || { childCount: 0, templateCount: 0 };
                             const totalCount = summary.childCount + summary.templateCount;
                             const Icon = iconForItem(node.icon, node.title);
                             return (
@@ -543,13 +495,31 @@ export default function Templates() {
         return () => document.removeEventListener("click", handler);
     }, []);
 
+    const nodeLookup = useMemo(() => buildNodeLookup(nodes), [nodes]);
+    const childrenByParent = useMemo(() => buildNodeChildrenIndex(nodes), [nodes]);
+    const templatesByNode = useMemo(() => buildTemplateNodeIndex(treeTemplates), [treeTemplates]);
+    const templateLookup = useMemo(
+        () => new Map(treeTemplates.map((template) => [template.id, template])),
+        [treeTemplates]
+    );
+    const nodeSummaryById = useMemo(() => {
+        const summaries = new Map();
+        nodes.forEach((node) => {
+            summaries.set(node.id, {
+                childCount: getIndexedChildNodes(childrenByParent, node.id).length,
+                templateCount: getIndexedTemplatesForNode(templatesByNode, node.id).length
+            });
+        });
+        return summaries;
+    }, [childrenByParent, nodes, templatesByNode]);
+
     const favoriteTemplates = useMemo(
         () => treeTemplates.filter((t) => t.favorite),
         [treeTemplates]
     );
 
     const toggleFavorite = async (templateId) => {
-        const template = treeTemplates.find((t) => t.id === templateId);
+        const template = templateLookup.get(templateId);
         if (!template) return;
         const nextTemplates = updateTemplate(treeTemplates, templateId, { favorite: !template.favorite });
         setTreeTemplates(nextTemplates);
@@ -557,22 +527,31 @@ export default function Templates() {
     };
 
     const activeNode = useMemo(
-        () => nodes.find((node) => node.id === activeNodeId) || null,
-        [nodes, activeNodeId]
+        () => nodeLookup.get(activeNodeId) || null,
+        [activeNodeId, nodeLookup]
     );
     const activeTemplate = useMemo(
-        () => treeTemplates.find((template) => template.id === activeTemplateId) || null,
-        [treeTemplates, activeTemplateId]
+        () => templateLookup.get(activeTemplateId) || null,
+        [activeTemplateId, templateLookup]
     );
-    const rootNodes = useMemo(() => getChildNodes(nodes, null), [nodes]);
+    const rootNodes = useMemo(() => getIndexedChildNodes(childrenByParent, null), [childrenByParent]);
     const searchResults = useMemo(
         () => searchTemplateTree(nodes, treeTemplates, query),
         [nodes, treeTemplates, query]
     );
-    const activeNodePath = useMemo(
-        () => activeNode ? getNodePath(nodes, activeNode.id) : [],
-        [nodes, activeNode]
-    );
+    const activeNodePath = useMemo(() => {
+        const path = [];
+        const seen = new Set();
+        let current = activeNode;
+
+        while (current && !seen.has(current.id)) {
+            path.unshift(current);
+            seen.add(current.id);
+            current = current.parentId ? nodeLookup.get(current.parentId) : null;
+        }
+
+        return path;
+    }, [activeNode, nodeLookup]);
 
     useEffect(() => {
         if (!activeTemplate) return;
@@ -643,7 +622,7 @@ export default function Templates() {
     };
 
     const openTemplate = (templateId) => {
-        const template = treeTemplates.find((candidate) => candidate.id === templateId);
+        const template = templateLookup.get(templateId);
         setActiveTemplateId(templateId);
         if (template?.parentNodeId) setActiveNodeId(template.parentNodeId);
         const channels = template ? getAvailableTemplateChannels(template) : [];
@@ -726,14 +705,14 @@ export default function Templates() {
             columns.push({
                 id: node.id,
                 title: node.title || "Untitled section",
-                nodes: getChildNodes(nodes, node.id),
-                templates: getTemplatesForNode(treeTemplates, node.id),
+                nodes: getIndexedChildNodes(childrenByParent, node.id),
+                templates: getIndexedTemplatesForNode(templatesByNode, node.id),
                 emptyMessage: "No section or template here."
             });
         });
 
         return columns;
-    }, [activeNodePath, nodes, rootNodes, searchMode, searchResults, treeTemplates]);
+    }, [activeNodePath, childrenByParent, rootNodes, searchMode, searchResults, templatesByNode]);
 
     const workflowModalOpen = Boolean(runtime.variantPicker || runtime.tokenPrompt || runtime.copyPreview);
 
@@ -847,8 +826,7 @@ export default function Templates() {
                                 title={column.title}
                                 nodes={column.nodes}
                                 templates={column.templates}
-                                allNodes={nodes}
-                                allTemplates={treeTemplates}
+                                nodeSummaryById={nodeSummaryById}
                                 activeNodeId={activeNodeId}
                                 activeTemplateId={activeTemplateId}
                                 onOpenNode={openNode}

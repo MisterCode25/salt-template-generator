@@ -23,6 +23,31 @@ export function getChildNodes(nodes = [], parentId = null) {
         .sort(sortByOrderThenTitle);
 }
 
+export function buildNodeLookup(nodes = []) {
+    return new Map(nodes.map((node) => [node.id, node]));
+}
+
+export function buildNodeChildrenIndex(nodes = []) {
+    const childrenByParent = new Map();
+
+    nodes.forEach((node) => {
+        const normalizedParentId = normalizeParentId(node.parentId);
+        const children = childrenByParent.get(normalizedParentId) || [];
+        children.push(node);
+        childrenByParent.set(normalizedParentId, children);
+    });
+
+    childrenByParent.forEach((children) => {
+        children.sort(sortByOrderThenTitle);
+    });
+
+    return childrenByParent;
+}
+
+export function getIndexedChildNodes(childrenByParent, parentId = null) {
+    return childrenByParent?.get(normalizeParentId(parentId)) || [];
+}
+
 export function getNextNodeOrder(nodes = [], parentId = null) {
     const siblings = getChildNodes(nodes, parentId);
     if (siblings.length === 0) return 1;
@@ -142,6 +167,29 @@ export function getTemplatesForNode(templates = [], nodeId) {
         .filter((template) => Array.isArray(template.nodeIds) && template.nodeIds.includes(nodeId))
         .map(normalizeTemplate)
         .sort(sortByTitle);
+}
+
+export function buildTemplateNodeIndex(templates = []) {
+    const templatesByNode = new Map();
+
+    templates.forEach((template) => {
+        const normalizedTemplate = normalizeTemplate(template);
+        normalizedTemplate.nodeIds.forEach((nodeId) => {
+            const nodeTemplates = templatesByNode.get(nodeId) || [];
+            nodeTemplates.push(normalizedTemplate);
+            templatesByNode.set(nodeId, nodeTemplates);
+        });
+    });
+
+    templatesByNode.forEach((nodeTemplates) => {
+        nodeTemplates.sort(sortByTitle);
+    });
+
+    return templatesByNode;
+}
+
+export function getIndexedTemplatesForNode(templatesByNode, nodeId) {
+    return templatesByNode?.get(nodeId) || [];
 }
 
 export function createTemplateForNode(nodeId, fields = {}, nodes = [], templates = []) {

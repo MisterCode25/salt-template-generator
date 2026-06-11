@@ -9,17 +9,18 @@ import { loadTemplateTreeData, saveTemplateTreeData } from "../services/template
 import { loadTokens, saveTokens } from "../services/tokenService.js";
 import { Channel, CHANNEL_VALUES } from "../models/templateTreeModel.js";
 import {
+    buildNodeChildrenIndex,
+    buildNodeLookup,
+    buildTemplateNodeIndex,
     canMoveNode,
     createNodeForParent,
     createTemplateForNode,
     duplicateTemplate,
-    getChildNodes,
     getDescendantNodeIds,
-    getTemplatesForNode,
+    getIndexedChildNodes,
+    getIndexedTemplatesForNode,
     linkTemplateToNode,
     moveNode,
-    nodeHasChildren,
-    nodeHasTemplates,
     removeNodeCascade,
     removeTemplate,
     reorderNode,
@@ -286,10 +287,10 @@ function hasRichTextContent(value = "") {
     return textOnly.length > 0;
 }
 
-function buildNodeOptions(nodes, parentId = null, depth = 0) {
-    return getChildNodes(nodes, parentId).flatMap((node) => [
+function buildNodeOptions(childrenByParent, parentId = null, depth = 0) {
+    return getIndexedChildNodes(childrenByParent, parentId).flatMap((node) => [
         { node, depth },
-        ...buildNodeOptions(nodes, node.id, depth + 1)
+        ...buildNodeOptions(childrenByParent, node.id, depth + 1)
     ]);
 }
 
@@ -449,7 +450,7 @@ function NodeFormModal({ mode, initial, parentTitle, onClose, onSave }) {
     );
 }
 
-function ExistingTemplatePickerModal({ currentNodeId, allTemplates, nodes, onClose, onLink }) {
+function ExistingTemplatePickerModal({ currentNodeId, allTemplates, nodeLookup, onClose, onLink }) {
     const [query, setQuery] = useState("");
 
     const alreadyLinked = new Set(
@@ -493,7 +494,7 @@ function ExistingTemplatePickerModal({ currentNodeId, allTemplates, nodes, onClo
                         ) : (
                             filtered.map((template) => {
                                 const nodeNames = (template.nodeIds || [])
-                                    .map((id) => nodes.find((n) => n.id === id)?.title || "?")
+                                    .map((id) => nodeLookup.get(id)?.title || "?")
                                     .join(", ");
                                 return (
                                     <div key={template.id} className="node-picker-row">
@@ -976,16 +977,16 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
 }
 
 function NodeTreeRows({
-    nodes,
-    templates,
+    childrenByParent,
+    templatesByNode,
     parentId,
     selectedNodeId,
     onSelect
 }) {
-    const children = getChildNodes(nodes, parentId);
+    const children = getIndexedChildNodes(childrenByParent, parentId);
     return children.map((node) => {
-        const childCount = getChildNodes(nodes, node.id).length;
-        const templateCount = getTemplatesForNode(templates, node.id).length;
+        const childCount = getIndexedChildNodes(childrenByParent, node.id).length;
+        const templateCount = getIndexedTemplatesForNode(templatesByNode, node.id).length;
         const selected = selectedNodeId === node.id;
 
         return (
@@ -1050,19 +1051,22 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
         }
     }, [nodes, selectedNodeId]);
 
+    const nodeLookup = useMemo(() => buildNodeLookup(nodes), [nodes]);
+    const childrenByParent = useMemo(() => buildNodeChildrenIndex(nodes), [nodes]);
+    const templatesByNode = useMemo(() => buildTemplateNodeIndex(templates), [templates]);
     const selectedNode = useMemo(
-        () => nodes.find((node) => node.id === selectedNodeId) || null,
-        [nodes, selectedNodeId]
+        () => nodeLookup.get(selectedNodeId) || null,
+        [nodeLookup, selectedNodeId]
     );
     const selectedTemplates = useMemo(
-        () => selectedNode ? getTemplatesForNode(templates, selectedNode.id) : [],
-        [templates, selectedNode]
+        () => selectedNode ? getIndexedTemplatesForNode(templatesByNode, selectedNode.id) : [],
+        [selectedNode, templatesByNode]
     );
     const selectedChildNodes = useMemo(
-        () => selectedNode ? getChildNodes(nodes, selectedNode.id) : [],
-        [nodes, selectedNode]
+        () => selectedNode ? getIndexedChildNodes(childrenByParent, selectedNode.id) : [],
+        [childrenByParent, selectedNode]
     );
-    const nodeOptions = useMemo(() => buildNodeOptions(nodes), [nodes]);
+    const nodeOptions = useMemo(() => buildNodeOptions(childrenByParent), [childrenByParent]);
     const selectedDescendantIds = useMemo(
         () => selectedNode ? getDescendantNodeIds(nodes, selectedNode.id) : [],
         [nodes, selectedNode]
@@ -1070,12 +1074,12 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
 
     // Leaf/branch rule: a section can hold subsections OR templates, not both.
     const selectedNodeCanAddChild = useMemo(
-        () => selectedNode ? !nodeHasTemplates(templates, selectedNode.id) : false,
-        [nodes, templates, selectedNode]
+        () => selectedNode ? selectedTemplates.length === 0 : false,
+        [selectedNode, selectedTemplates]
     );
     const selectedNodeCanAddTemplate = useMemo(
-        () => selectedNode ? !nodeHasChildren(nodes, selectedNode.id) : false,
-        [nodes, selectedNode]
+        () => selectedNode ? selectedChildNodes.length === 0 : false,
+        [selectedChildNodes, selectedNode]
     );
 
     const persist = async (nextNodes = nodes, nextTemplates = templates) => {
@@ -1224,7 +1228,7 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
 
     const parentSelectValue = selectedNode?.parentId || ROOT_PARENT_VALUE;
     const selectedParentTitle = selectedNode?.parentId
-        ? nodes.find((node) => node.id === selectedNode.parentId)?.title || ""
+        ? nodeLookup.get(selectedNode.parentId)?.title || ""
         : "";
     const goBackOneLevel = () => {
         setSelectedNodeId(selectedNode?.parentId || null);
@@ -1265,8 +1269,8 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
                                     />
                                 ) : (
                                     <NodeTreeRows
-                                        nodes={nodes}
-                                        templates={templates}
+                                        childrenByParent={childrenByParent}
+                                        templatesByNode={templatesByNode}
                                         parentId={null}
                                         selectedNodeId={selectedNodeId}
                                         onSelect={setSelectedNodeId}
@@ -1313,8 +1317,8 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
                                 ) : (
                                     <div className="node-tree-list node-tree-list--level">
                                         <NodeTreeRows
-                                            nodes={nodes}
-                                            templates={templates}
+                                            childrenByParent={childrenByParent}
+                                            templatesByNode={templatesByNode}
                                             parentId={selectedNode.id}
                                             selectedNodeId={selectedNodeId}
                                             onSelect={setSelectedNodeId}
@@ -1352,7 +1356,7 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
                                             const linkTarget = templateLinkTargets[template.id] || "";
                                             const otherNodes = (template.nodeIds || [])
                                                 .filter((nid) => nid !== selectedNode.id)
-                                                .map((nid) => nodes.find((n) => n.id === nid))
+                                                .map((nid) => nodeLookup.get(nid))
                                                 .filter(Boolean);
                                             return (
                                                 <article key={template.id} className="node-template-row">
@@ -1412,7 +1416,7 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
                                                             {nodeOptions
                                                                 .filter(({ node }) =>
                                                                     !(template.nodeIds || []).includes(node.id)
-                                                                    && !nodeHasChildren(nodes, node.id)
+                                                                    && getIndexedChildNodes(childrenByParent, node.id).length === 0
                                                                 )
                                                                 .map(({ node, depth }) => (
                                                                     <option key={node.id} value={node.id}>
@@ -1477,7 +1481,7 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
                     <NodeFormModal
                         mode={nodeModal.mode}
                         initial={nodeModal.node}
-                        parentTitle={nodeModal.parentId ? nodes.find((node) => node.id === nodeModal.parentId)?.title : ""}
+                        parentTitle={nodeModal.parentId ? nodeLookup.get(nodeModal.parentId)?.title : ""}
                         onClose={() => setNodeModal(null)}
                         onSave={saveNode}
                     />
@@ -1486,7 +1490,7 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
                 {templateModal && (
                     <TemplateFormModal
                         initial={templateModal.template}
-                        parentTitle={nodes.find((node) => node.id === templateModal.parentNodeId)?.title || "Selected section"}
+                        parentTitle={nodeLookup.get(templateModal.parentNodeId)?.title || "Selected section"}
                         onClose={() => setTemplateModal(null)}
                         onSave={saveTemplate}
                     />
@@ -1496,7 +1500,7 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
                     <ExistingTemplatePickerModal
                         currentNodeId={existingPickerModal.nodeId}
                         allTemplates={templates}
-                        nodes={nodes}
+                        nodeLookup={nodeLookup}
                         onClose={() => setExistingPickerModal(null)}
                         onLink={linkTemplateToCurrentNode}
                     />

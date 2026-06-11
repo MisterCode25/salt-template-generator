@@ -1,12 +1,17 @@
 import assert from "node:assert/strict";
 
 const {
+  buildNodeChildrenIndex,
+  buildNodeLookup,
+  buildTemplateNodeIndex,
   canMoveNode,
   createNodeForParent,
   createTemplateForNode,
   duplicateTemplate,
   getChildNodes,
   getDescendantNodeIds,
+  getIndexedChildNodes,
+  getIndexedTemplatesForNode,
   getTemplatesForNode,
   moveNode,
   moveTemplateToNode,
@@ -28,6 +33,8 @@ const grandChildA = createNodeForParent(nodes, "child-a", { id: "grand-child-a",
 nodes = [...nodes, grandChildA];
 
 assert.deepEqual(getChildNodes(nodes, null).map((node) => node.id), ["root-a", "root-b"]);
+assert.deepEqual([...buildNodeLookup(nodes).keys()], ["root-a", "root-b", "child-a", "grand-child-a"]);
+assert.deepEqual(getIndexedChildNodes(buildNodeChildrenIndex(nodes), null).map((node) => node.id), ["root-a", "root-b"]);
 assert.deepEqual(getDescendantNodeIds(nodes, "root-a").sort(), ["child-a", "grand-child-a"]);
 assert.equal(canMoveNode(nodes, "root-a", "grand-child-a"), false);
 assert.equal(canMoveNode(nodes, "child-a", null), true);
@@ -70,6 +77,7 @@ let templates = [
 ];
 
 assert.deepEqual(getTemplatesForNode(templates, "child-a").map((template) => template.id), ["tpl-a"]);
+assert.deepEqual(getIndexedTemplatesForNode(buildTemplateNodeIndex(templates), "child-a").map((template) => template.id), ["tpl-a"]);
 
 templates = updateTemplate(templates, "tpl-a", { title: "Customer unreachable updated", channels: ["email"] });
 assert.equal(templates.find((template) => template.id === "tpl-a").title, "Customer unreachable updated");
