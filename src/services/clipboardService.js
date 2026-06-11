@@ -1,4 +1,5 @@
 function decodeHtmlEntities(str) {
+    if (!String(str || "").includes("&")) return str;
     return str
         .replace(/&nbsp;/g, " ")
         .replace(/&amp;/g, "&")
@@ -8,23 +9,40 @@ function decodeHtmlEntities(str) {
         .replace(/&#39;/g, "'");
 }
 
+const HTML_TAG_PATTERN = /<[a-z][\s\S]*>/i;
+const HTML_BREAK_PATTERN = /<br\s*\/?>/gi;
+const HTML_PARAGRAPH_END_PATTERN = /<\/p>/gi;
+const HTML_TAG_STRIP_PATTERN = /<[^>]+>/g;
+const EXCESS_NEWLINE_PATTERN = /\n{3,}/g;
+
+function normalizePlainText(value = "") {
+    return decodeHtmlEntities(String(value || "")
+        .replace(EXCESS_NEWLINE_PATTERN, "\n\n")
+        .trim());
+}
+
+function stripHtmlToPlainText(value = "") {
+    const text = String(value || "");
+    if (!text.includes("<")) return normalizePlainText(text);
+
+    return normalizePlainText(
+        text
+            .replace(HTML_BREAK_PATTERN, "\n")
+            .replace(HTML_PARAGRAPH_END_PATTERN, "\n\n")
+            .replace(HTML_TAG_STRIP_PATTERN, "")
+    );
+}
+
 export function formatClipboardHtmlBody(html) {
     if (!html) return "";
-    const isHtml = /<[a-z][\s\S]*>/i.test(html);
+    const isHtml = HTML_TAG_PATTERN.test(html);
     return isHtml
         ? html
         : html.split(/\n\n+/).map(p => `<p>${p.replace(/\n/g, "<br />\n")}</p>`).join("\n");
 }
 
 export function formatClipboardPlainText(html) {
-    return decodeHtmlEntities(
-        formatClipboardHtmlBody(html)
-            .replace(/<br\s*\/?>/gi, "\n")
-            .replace(/<\/p>/gi, "\n\n")
-            .replace(/<[^>]+>/g, "")
-            .replace(/\n{3,}/g, "\n\n")
-            .trim()
-    );
+    return stripHtmlToPlainText(formatClipboardHtmlBody(html));
 }
 
 export async function copyText(text, opts = {}) {
@@ -33,14 +51,7 @@ export async function copyText(text, opts = {}) {
         message = "Content copied!",
         variant = "info"
     } = opts;
-    const plainText = decodeHtmlEntities(
-        text
-            .replace(/<br\s*\/?>/gi, "\n")
-            .replace(/<\/p>/gi, "\n\n")
-            .replace(/<[^>]+>/g, "")
-            .replace(/\n{3,}/g, "\n\n")
-            .trim()
-    );
+    const plainText = stripHtmlToPlainText(text);
 
     try {
         await navigator.clipboard.writeText(plainText);

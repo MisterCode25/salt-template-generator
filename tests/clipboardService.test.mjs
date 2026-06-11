@@ -17,4 +17,8 @@ import {
   assert.equal(formatClipboardPlainText(html), "Hello\nWorld");
 }
 
+{
+  assert.equal(formatClipboardPlainText("  A\n\n\nB &amp; C  "), "A\n\nB & C");
+}
+
 console.log("clipboardService tests passed");
