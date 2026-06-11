@@ -16,6 +16,7 @@ import {
     matchClientDataToTokens,
     parseClientClipboardJSON
 } from "../utils/clientClipboard.js";
+import { formatTokenPreviewHTML } from "../utils/richTextTokens.js";
 import Modal from "./Modal.jsx";
 
 const CLIENT_CLIPBOARD_READ_TIMEOUT_MS = 3500;
@@ -107,9 +108,17 @@ function resolveVariantModel(base, variant) {
     };
 }
 
+function getTemplateDisplayTitle(model) {
+    const title = model?.title || "Template";
+    if (model?.name) return `${title} · ${model.name}`;
+    if (model?.mainVariantName) return `${title} · ${model.mainVariantName}`;
+    return title;
+}
+
 export function TokenPromptModal({ title, tokenDefs, values, missingTokens, mode = "copy", onChange, onConfirm, onClose }) {
     const isMultiCol = tokenDefs.length > 2;
     const isFillMode = mode === "fill";
+    const isResultMode = mode === "result";
     return (
         <Modal onClose={onClose} dialogClassName="popup-box token-prompt-modal" ariaLabel="Template tokens">
             <div className="popup-header token-prompt-header">
@@ -120,6 +129,10 @@ export function TokenPromptModal({ title, tokenDefs, values, missingTokens, mode
                             ? tokenDefs.length === 1
                                 ? "Fill in the required field to preview the final result."
                                 : `Fill in ${tokenDefs.length} required fields to preview the final result.`
+                            : isResultMode
+                                ? tokenDefs.length === 1
+                                    ? "Fill in the required field before opening the final text."
+                                    : `Fill in ${tokenDefs.length} required fields before opening the final text.`
                             : tokenDefs.length === 1
                                 ? "Fill in the required field before copying."
                                 : `Fill in ${tokenDefs.length} required fields before copying.`}
@@ -152,7 +165,7 @@ export function TokenPromptModal({ title, tokenDefs, values, missingTokens, mode
                 })}
             </div>
             <div className="popup-actions">
-                <button className="primary-btn" onClick={onConfirm}>{isFillMode ? "Apply" : "Copy text"}</button>
+                <button className="primary-btn" onClick={onConfirm}>{isFillMode ? "Apply" : isResultMode ? "Continue" : "Copy text"}</button>
             </div>
         </Modal>
     );
@@ -176,6 +189,34 @@ export function VariantModal({ model, displayTitle, onSelect, onClose }) {
                         {variant.name || "Variant"}
                     </button>
                 ))}
+            </div>
+        </Modal>
+    );
+}
+
+export function TemplateResultModal({ result, onCopy, onClose }) {
+    if (!result) return null;
+
+    return (
+        <Modal onClose={onClose} dialogClassName="popup-box template-result-modal" ariaLabel="Generated template">
+            <div className="popup-header template-result-header">
+                <div>
+                    <p className="template-result-kicker">Final text</p>
+                    <h2>{result.title || "Template"}</h2>
+                </div>
+                <span className={`template-result-copy-state${result.copied ? " is-copied" : ""}`} aria-live="polite">
+                    {result.copied ? "✓ Already copied" : "Copying..."}
+                </span>
+            </div>
+            <div
+                className="rich-preview template-result-preview"
+                data-placeholder="No content."
+                dangerouslySetInnerHTML={{ __html: formatTokenPreviewHTML(result.html || "") }}
+            />
+            <div className="popup-actions">
+                <button type="button" className="primary-btn" onClick={onCopy}>
+                    Copy again
+                </button>
             </div>
         </Modal>
     );
@@ -338,9 +379,11 @@ export function useTemplateRuntime() {
     const [values, setValues] = useState({});
     const [variantPicker, setVariantPicker] = useState(null);
     const [tokenPrompt, setTokenPrompt] = useState(null);
+    const [copyPreview, setCopyPreview] = useState(null);
     const [promptMissingTokens, setPromptMissingTokens] = useState([]);
     const lastSectionClickVersion = useRef({});
     const inputChangeVersion = useRef(0);
+    const copyPreviewId = useRef(0);
     const [clientPayload, setClientPayload] = useState(null);
     const [clientImportStatus, setClientImportStatus] = useState({ type: "idle", message: "" });
     const [clientMatchedTokens, setClientMatchedTokens] = useState([]);
@@ -408,6 +451,7 @@ export function useTemplateRuntime() {
         setClientPasteOpen(false);
         setClientPasteInitialError("");
         setTokenPrompt(null);
+        setCopyPreview(null);
         setPromptMissingTokens([]);
         setVariantPicker(null);
         setClientImportStatus({ type: "idle", message: "" });
@@ -442,6 +486,7 @@ export function useTemplateRuntime() {
         setClientMatchedTokens(Array.from(tokensToClear.values()));
         setClientDetailsExpanded(false);
         setTokenPrompt(null);
+        setCopyPreview(null);
         setPromptMissingTokens([]);
         setVariantPicker(null);
         if (nextLanguage) setLang(nextLanguage);
@@ -523,7 +568,7 @@ export function useTemplateRuntime() {
 
         return {
             mode,
-            title: effectiveModel.title,
+            title: getTemplateDisplayTitle(effectiveModel),
             tokenDefs: missingTokensNeeded.map((tokenName) => tokenMap.get(tokenName) || {
                 token: tokenName,
                 label: tokenName,
@@ -542,6 +587,58 @@ export function useTemplateRuntime() {
         setPromptMissingTokens([]);
         setTokenPrompt(prompt);
         return true;
+    };
+
+    const setCopyPreviewCopied = (id) => {
+        setCopyPreview((prev) => prev?.id === id ? { ...prev, copied: true } : prev);
+    };
+
+    const copyPreviewHtml = async (html, id) => {
+        await copyHtml(html, { message: "Text copied", variant: "success" });
+        setCopyPreviewCopied(id);
+    };
+
+    const openTemplateResult = async (effectiveModel, sectionKey) => {
+        const tokensNeeded = Array.from(new Set((getTemplateTextByLang(effectiveModel, lang) || "").match(/\{[^{}]+\}/g) || []));
+        const { values: filled, missing } = tokensNeeded.length > 0
+            ? collectInputValues(tokensNeeded)
+            : { values: {}, missing: [] };
+        if (missing.length > 0) {
+            setPromptMissingTokens(missing);
+            showToast("Missing data for: " + missing.join(", "), "error");
+            return false;
+        }
+
+        const finalText = generateFinalText(effectiveModel, lang, filled);
+        const id = copyPreviewId.current + 1;
+        copyPreviewId.current = id;
+        setCopyPreview({
+            id,
+            title: getTemplateDisplayTitle(effectiveModel),
+            html: finalText,
+            copied: false
+        });
+        lastSectionClickVersion.current[sectionKey] = inputChangeVersion.current;
+        await copyPreviewHtml(finalText, id);
+        return true;
+    };
+
+    const requestTemplateResult = async (model, section, baseModel = null) => {
+        const sectionKey = section || model?.type || "global";
+        const effectiveModel = baseModel ? resolveVariantModel(baseModel, model) : model;
+        const prompt = buildTokenPrompt(effectiveModel, sectionKey, "result");
+        if (prompt) {
+            setPromptMissingTokens([]);
+            setTokenPrompt(prompt);
+            return false;
+        }
+        return openTemplateResult(effectiveModel, sectionKey);
+    };
+
+    const copyTemplateResultAgain = async () => {
+        if (!copyPreview?.html) return;
+        setCopyPreview((prev) => prev ? { ...prev, copied: false } : prev);
+        await copyPreviewHtml(copyPreview.html, copyPreview.id);
     };
 
     const copyModel = async (model, section, baseModel = null, skipPopup = false) => {
@@ -619,6 +716,11 @@ export function useTemplateRuntime() {
         setTokenPrompt(null);
         setPromptMissingTokens([]);
         if (tokenPrompt.mode === "fill") return;
+        if (tokenPrompt.mode === "result") {
+            await openTemplateResult(effectiveModel, sectionKey);
+            clearOnDemandValues(tokenDefs);
+            return;
+        }
         await copyModel(effectiveModel, sectionKey, null, true);
         clearOnDemandValues(tokenDefs);
     };
@@ -643,6 +745,9 @@ export function useTemplateRuntime() {
         clientPasteInitialError,
         setClientPasteInitialError,
         importClientFromPaste,
+        copyPreview,
+        setCopyPreview,
+        copyTemplateResultAgain,
         variantPicker,
         setVariantPicker,
         tokenPrompt,
@@ -652,6 +757,7 @@ export function useTemplateRuntime() {
         inputChangeVersion,
         requestCopy,
         copyModel,
+        requestTemplateResult,
         requestTokenInputs,
         confirmTokenPrompt,
         clearOnDemandValues

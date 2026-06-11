@@ -25,6 +25,7 @@ import Modal from "../components/Modal.jsx";
 import {
     ClientInfoPanel,
     ClientPasteModal,
+    TemplateResultModal,
     TokenPromptModal,
     useTemplateRuntime,
     VariantModal
@@ -372,11 +373,22 @@ function TemplateDetail({ template, activeChannel, setActiveChannel, runtime, on
         runtime.requestCopy(model, copyKey);
     };
 
+    const openVariantResult = (variant) => {
+        if (!model) return;
+        const sectionKey = variant ? `${copyKey}_${variant.id}` : `${copyKey}_main`;
+        runtime.requestTemplateResult(variant || model, sectionKey, variant ? model : null);
+    };
+
     const selectChannel = (channel) => {
         setActiveChannel(channel);
         const nextModel = resolveChannelModel(template, channel);
         if (nextModel) {
-            runtime.requestTokenInputs(nextModel, `tree_${template.id}_${channel}`);
+            const sectionKey = `tree_${template.id}_${channel}`;
+            if (nextModel.variants?.length) {
+                runtime.setVariantPicker({ model: nextModel, sectionKey });
+            } else {
+                runtime.requestTokenInputs(nextModel, sectionKey);
+            }
         }
     };
 
@@ -458,19 +470,19 @@ function TemplateDetail({ template, activeChannel, setActiveChannel, runtime, on
 
                         {hasVariants && (
                             <div className="templates-variant-grid">
-                                <button type="button" className="templates-variant-card" onClick={() => runtime.copyModel(model, `${copyKey}_main`)}>
+                                <button type="button" className="templates-variant-card" onClick={() => openVariantResult(null)}>
                                     <strong>{model.mainVariantName?.trim() || model.title || "Main text"}</strong>
-                                    <span>Copy main version</span>
+                                    <span>Open main version</span>
                                 </button>
                                 {model.variants.map((variant) => (
                                     <button
                                         key={variant.id}
                                         type="button"
                                         className="templates-variant-card"
-                                        onClick={() => runtime.copyModel(variant, `${copyKey}_${variant.id}`, model)}
+                                        onClick={() => openVariantResult(variant)}
                                     >
                                         <strong>{variant.name || "Variant"}</strong>
-                                        <span>Copy variant</span>
+                                        <span>Open variant</span>
                                     </button>
                                 ))}
                             </div>
@@ -624,6 +636,28 @@ export default function Templates() {
         return false;
     };
 
+    const requestFirstVariantPicker = (template, preferredChannel) => {
+        if (!template) return false;
+        const available = getAvailableTemplateChannels(template);
+        const channels = (available.length > 0 ? available : template.channels)
+            .filter((channel, index, list) => list.indexOf(channel) === index);
+        const orderedChannels = [
+            preferredChannel,
+            ...channels.filter((channel) => channel !== preferredChannel)
+        ].filter(Boolean);
+
+        for (const channel of orderedChannels) {
+            const model = resolveChannelModel(template, channel);
+            if (model?.variants?.length) {
+                setActiveChannel(channel);
+                runtime.setVariantPicker({ model, sectionKey: `tree_${template.id}_${channel}` });
+                return true;
+            }
+        }
+
+        return false;
+    };
+
     const openTemplate = (templateId) => {
         const template = treeTemplates.find((candidate) => candidate.id === templateId);
         setActiveTemplateId(templateId);
@@ -631,7 +665,9 @@ export default function Templates() {
         const channels = template ? getAvailableTemplateChannels(template) : [];
         const nextChannel = channels[0] || template?.channels?.[0] || Channel.EMAIL;
         setActiveChannel(nextChannel);
-        requestFirstMissingChannelInputs(template, nextChannel);
+        if (!requestFirstVariantPicker(template, nextChannel)) {
+            requestFirstMissingChannelInputs(template, nextChannel);
+        }
         setQuery("");
     };
 
@@ -870,16 +906,19 @@ export default function Templates() {
                     )}
                     onClose={() => runtime.setVariantPicker(null)}
                     onSelect={(variant) => {
+                        const picker = runtime.variantPicker;
+                        const baseKey = picker.sectionKey || `variant_${picker.model.id}`;
+                        const sectionKey = variant ? `${baseKey}_${variant.id}` : `${baseKey}_main`;
+                        runtime.setVariantPicker(null);
                         if (variant) {
-                            runtime.copyModel(
+                            runtime.requestTemplateResult(
                                 variant,
-                                `variant_${runtime.variantPicker.model.id}_${variant.id}`,
-                                runtime.variantPicker.model
+                                sectionKey,
+                                picker.model
                             );
                         } else {
-                            runtime.copyModel(runtime.variantPicker.model, runtime.variantPicker.sectionKey || `main_${runtime.variantPicker.model.id}`);
+                            runtime.requestTemplateResult(picker.model, sectionKey);
                         }
-                        runtime.setVariantPicker(null);
                     }}
                 />
             )}
@@ -907,6 +946,14 @@ export default function Templates() {
                         runtime.setTokenPrompt(null);
                         runtime.clearOnDemandValues(defs);
                     }}
+                />
+            )}
+
+            {runtime.copyPreview && (
+                <TemplateResultModal
+                    result={runtime.copyPreview}
+                    onCopy={runtime.copyTemplateResultAgain}
+                    onClose={() => runtime.setCopyPreview(null)}
                 />
             )}
 
