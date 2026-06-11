@@ -68,7 +68,35 @@ export function isChannel(value) {
 
 export function normalizeChannels(channels = []) {
     const list = Array.isArray(channels) ? channels : [channels];
-    return [...new Set(list.filter(isChannel))];
+    const seen = new Set();
+    const normalizedChannels = [];
+
+    for (const channel of list) {
+        if (!isChannel(channel) || seen.has(channel)) continue;
+        seen.add(channel);
+        normalizedChannels.push(channel);
+    }
+
+    return normalizedChannels;
+}
+
+function normalizeNodeIds(template = {}) {
+    if (!Array.isArray(template.nodeIds)) {
+        return typeof template.parentNodeId === "string" && template.parentNodeId.length > 0
+            ? [template.parentNodeId]
+            : [];
+    }
+
+    const seen = new Set();
+    const nodeIds = [];
+
+    for (const id of template.nodeIds) {
+        if (typeof id !== "string" || id.length === 0 || seen.has(id)) continue;
+        seen.add(id);
+        nodeIds.push(id);
+    }
+
+    return nodeIds;
 }
 
 export function createNode(fields = {}) {
@@ -140,33 +168,27 @@ export function createEmptyChannelContent(channel, title = "") {
 }
 
 export function normalizeTemplate(template = {}) {
+    const templateTitle = normalizeText(template.title);
     const channels = normalizeChannels(template.channels);
+    const channelSet = new Set(channels);
     const contentByChannel = {};
     const rawContent = template.contentByChannel || {};
 
-    CHANNEL_VALUES.forEach((channel) => {
+    for (const channel of CHANNEL_VALUES) {
         if (rawContent[channel] && typeof rawContent[channel] === "object") {
-            contentByChannel[channel] = normalizeChannelContent(rawContent[channel], channel, normalizeText(template.title));
-        } else if (channels.includes(channel)) {
-            contentByChannel[channel] = createEmptyChannelContent(channel, normalizeText(template.title));
+            contentByChannel[channel] = normalizeChannelContent(rawContent[channel], channel, templateTitle);
+        } else if (channelSet.has(channel)) {
+            contentByChannel[channel] = createEmptyChannelContent(channel, templateTitle);
         }
-    });
-
-    // Migrate from legacy parentNodeId to nodeIds array
-    let nodeIds;
-    if (Array.isArray(template.nodeIds)) {
-        nodeIds = [...new Set(template.nodeIds.filter((id) => typeof id === "string" && id.length > 0))];
-    } else if (typeof template.parentNodeId === "string" && template.parentNodeId.length > 0) {
-        nodeIds = [template.parentNodeId];
-    } else {
-        nodeIds = [];
     }
+
+    const nodeIds = normalizeNodeIds(template);
 
     return {
         id: normalizeText(template.id) || createId(),
         nodeIds,
         parentNodeId: nodeIds[0] || null,
-        title: normalizeText(template.title),
+        title: templateTitle,
         description: normalizeText(template.description),
         channels,
         order: normalizeOrder(template.order),
