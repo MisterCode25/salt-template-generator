@@ -137,10 +137,14 @@ export function normalizePastedRichTextHTML(value = "", tokens = []) {
     if (typeof document === "undefined") return value || "";
     const template = document.createElement("template");
     template.innerHTML = value || "";
-    template.content.querySelectorAll("script, style, link, meta").forEach((node) => node.remove());
-    template.content.querySelectorAll(".rich-token-chip").forEach((chip) => {
-        chip.replaceWith(document.createTextNode(chip.dataset.token || chip.textContent || ""));
-    });
+    if (/(<script|<style|<link|<meta)/i.test(value)) {
+        template.content.querySelectorAll("script, style, link, meta").forEach((node) => node.remove());
+    }
+    if (value.includes("rich-token-chip")) {
+        template.content.querySelectorAll(".rich-token-chip").forEach((chip) => {
+            chip.replaceWith(document.createTextNode(chip.dataset.token || chip.textContent || ""));
+        });
+    }
     return formatRichTextForEditor(template.innerHTML, tokens);
 }
 
