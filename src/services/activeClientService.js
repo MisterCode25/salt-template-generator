@@ -100,35 +100,50 @@ function saveClientInputEntries(entries, storage = globalThis.localStorage) {
         valuesByToken[entry.token] = entry.value;
     });
 
+    const changedValuesByToken = {};
     if (storage) {
         Object.entries(valuesByToken).forEach(([token, value]) => {
-            storage.setItem(`${STORED_INPUT_PREFIX}${token}`, value);
+            const storageKey = `${STORED_INPUT_PREFIX}${token}`;
+            if (storage.getItem(storageKey) === value) return;
+            storage.setItem(storageKey, value);
+            changedValuesByToken[token] = value;
         });
+    } else {
+        Object.assign(changedValuesByToken, valuesByToken);
     }
 
     const payload = loadActiveClientPayload();
     if (!payload) {
-        dispatchClientInputValuesUpdated(valuesByToken);
+        dispatchClientInputValuesUpdated(changedValuesByToken);
         return { inputTokens: Object.keys(valuesByToken), payload: null, values: valuesByToken };
     }
 
     const previousInputs = payload[MANUAL_CLIENT_INPUTS_KEY];
-    const { manualInputs } = normalizeManualInputs(previousInputs);
+    const { manualInputs, dirty: normalizedInputsDirty } = normalizeManualInputs(previousInputs);
+    let payloadDirty = normalizedInputsDirty;
     normalizedEntries.forEach((entry) => {
         if (!entry.name) return;
         if (entry.value === "") {
+            if (!Object.prototype.hasOwnProperty.call(manualInputs, entry.name)) return;
             delete manualInputs[entry.name];
-        } else {
-            manualInputs[entry.name] = entry.value;
+            changedValuesByToken[entry.token] = entry.value;
+            payloadDirty = true;
+            return;
         }
+        if (manualInputs[entry.name] === entry.value) return;
+        manualInputs[entry.name] = entry.value;
+        changedValuesByToken[entry.token] = entry.value;
+        payloadDirty = true;
     });
 
-    const nextPayload = {
-        ...payload,
-        [MANUAL_CLIENT_INPUTS_KEY]: manualInputs
-    };
-    saveActiveClientPayload(nextPayload);
-    dispatchClientInputValuesUpdated(valuesByToken);
+    const nextPayload = payloadDirty
+        ? {
+            ...payload,
+            [MANUAL_CLIENT_INPUTS_KEY]: manualInputs
+        }
+        : payload;
+    if (payloadDirty) saveActiveClientPayload(nextPayload);
+    dispatchClientInputValuesUpdated(changedValuesByToken);
     return { inputTokens: Object.keys(valuesByToken), payload: nextPayload, values: valuesByToken };
 }
 
