@@ -561,7 +561,12 @@ textarea:focus {
 }
 
 .workspace-modal--nodes {
-    width: min(1040px, 100%);
+    width: min(880px, 100%);
+}
+
+.workspace-modal--nodes .node-builder-layout--list,
+.workspace-modal--nodes .node-builder-layout--detail {
+    width: 100%;
 }
 
 .workspace-modal--tools,
