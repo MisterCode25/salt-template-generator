@@ -484,6 +484,7 @@ textarea:focus {
 
 .popup-box {
     --popup-padding: clamp(18px, 2.2vw, var(--space-2xl));
+    position: relative;
     background: var(--bg-surface-elevated);
     box-sizing: border-box;
     padding: var(--popup-padding);
@@ -504,8 +505,44 @@ textarea:focus {
     animation: modalSheetIn 0.30s cubic-bezier(0.22, 0.9, 0.2, 1);
 }
 
+.popup > [role="dialog"] {
+    position: relative;
+}
+
 .popup-box > * {
     min-width: 0;
+}
+
+.modal-close-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 34px;
+    height: 34px;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(129, 153, 214, 0.22);
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-secondary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 24px;
+    line-height: 1;
+    z-index: calc(var(--z-modal) + 1);
+    transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+}
+
+.modal-close-btn:hover,
+.modal-close-btn:focus-visible {
+    background: rgba(129, 153, 214, 0.16);
+    border-color: rgba(129, 153, 214, 0.42);
+    color: var(--text-primary);
+    outline: none;
+}
+
+.popup-header {
+    padding-right: 42px;
 }
 
 .popup-box--wide {
@@ -608,6 +645,10 @@ textarea:focus {
     justify-content: space-between;
     gap: 12px;
     min-height: 24px;
+}
+
+.prompt-dialog__header {
+    padding-right: 42px;
 }
 
 .popup-header h2 {
@@ -1056,8 +1097,10 @@ textarea:focus {
 .popup-actions {
     display: flex;
     justify-content: flex-end;
+    align-items: center;
     flex-wrap: wrap;
     gap: 10px;
+    width: 100%;
 }
 
 .popup-actions > button {

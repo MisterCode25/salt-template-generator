@@ -839,11 +839,6 @@ export default function Templates() {
                     dialogClassName="popup-box templates-template-modal"
                     ariaLabel="Template preview"
                 >
-                    <div className="templates-template-modal-bar">
-                        <button type="button" className="secondary-btn" onClick={() => setActiveTemplateId(null)}>
-                            Close
-                        </button>
-                    </div>
                     <TemplateDetail
                         template={activeTemplate}
                         activeChannel={activeChannel}
@@ -860,7 +855,6 @@ export default function Templates() {
                     onClose={closeWorkspace}
                     dialogClassName={`popup-box workspace-modal workspace-modal--${activeWorkspace}`}
                     ariaLabel="Workspace"
-                    closeOnOverlay={false}
                 >
                     {renderWorkspace()}
                 </Modal>

@@ -95,6 +95,15 @@ export default function Modal({
                 onMouseDown={(event) => event.stopPropagation()}
             >
                 {children}
+                <button
+                    type="button"
+                    className="modal-close-btn"
+                    onClick={onClose}
+                    aria-label="Close dialog"
+                    title="Close"
+                >
+                    ×
+                </button>
             </div>
         </div>
     );
