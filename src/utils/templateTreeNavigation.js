@@ -1,6 +1,8 @@
 import { CHANNEL_VALUES } from "../models/templateTreeModel.js";
 import { getChildNodes, getTemplatesForNode } from "./templateTreeOperations.js";
 
+const nodeLookupCache = typeof WeakMap !== "undefined" ? new WeakMap() : null;
+
 function normalizeNeedle(value) {
     return String(value || "").trim().toLowerCase();
 }
@@ -13,7 +15,11 @@ function buildSearchText(values = []) {
 }
 
 export function getNodePath(nodes = [], nodeId) {
-    const byId = new Map(nodes.map((node) => [node.id, node]));
+    let byId = nodeLookupCache?.get(nodes);
+    if (!byId) {
+        byId = new Map(nodes.map((node) => [node.id, node]));
+        nodeLookupCache?.set(nodes, byId);
+    }
     const path = [];
     const seen = new Set();
     let current = byId.get(nodeId);
@@ -28,8 +34,9 @@ export function getNodePath(nodes = [], nodeId) {
 }
 
 export function getTemplatePath(nodes = [], template) {
-    if (!template?.parentNodeId) return [];
-    return getNodePath(nodes, template.parentNodeId);
+    const nodeId = template?.parentNodeId || template?.nodeIds?.[0];
+    if (!nodeId) return [];
+    return getNodePath(nodes, nodeId);
 }
 
 export function resolveChannelModel(treeTemplate, channel) {
