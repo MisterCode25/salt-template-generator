@@ -454,15 +454,20 @@ const TemplateChannelPreviewCard = memo(function TemplateChannelPreviewCard({
     );
 });
 
-function TemplateDetail({ template, activeChannel, setActiveChannel, visibleChannels, runtime, onManage, onToggleFavorite }) {
-    const {
-        lang,
-        requestCopy,
-        requestTemplateResult,
-        setVariantPicker,
-        tokens,
-        values
-    } = runtime;
+const TemplateDetail = memo(function TemplateDetail({
+    template,
+    activeChannel,
+    setActiveChannel,
+    visibleChannels,
+    lang,
+    tokens,
+    values,
+    onRequestCopy,
+    onRequestTemplateResult,
+    onSetVariantPicker,
+    onManage,
+    onToggleFavorite
+}) {
     const previewTokenMap = useMemo(() => buildPreviewTokenMap(tokens), [tokens]);
     const uniqueVisibleChannels = useMemo(
         () => visibleChannels.filter((channel, index, list) => list.indexOf(channel) === index),
@@ -495,14 +500,14 @@ function TemplateDetail({ template, activeChannel, setActiveChannel, visibleChan
 
     const copyTemplate = useCallback(() => {
         if (!model) return;
-        requestCopy(model, copyKey);
-    }, [copyKey, model, requestCopy]);
+        onRequestCopy(model, copyKey);
+    }, [copyKey, model, onRequestCopy]);
 
     const openVariantResult = useCallback((variant) => {
         if (!model) return;
         const sectionKey = variant ? `${copyKey}_${variant.id}` : `${copyKey}_main`;
-        requestTemplateResult(variant || model, sectionKey, variant ? model : null);
-    }, [copyKey, model, requestTemplateResult]);
+        onRequestTemplateResult(variant || model, sectionKey, variant ? model : null);
+    }, [copyKey, model, onRequestTemplateResult]);
 
     const selectChannel = useCallback((channel) => {
         setActiveChannel(channel);
@@ -510,12 +515,12 @@ function TemplateDetail({ template, activeChannel, setActiveChannel, visibleChan
         if (nextModel) {
             const sectionKey = `tree_${template.id}_${channel}`;
             if (nextModel.variants?.length) {
-                setVariantPicker({ model: nextModel, sectionKey });
+                onSetVariantPicker({ model: nextModel, sectionKey });
             } else {
-                requestTemplateResult(nextModel, sectionKey);
+                onRequestTemplateResult(nextModel, sectionKey);
             }
         }
-    }, [requestTemplateResult, setActiveChannel, setVariantPicker, template]);
+    }, [onRequestTemplateResult, onSetVariantPicker, setActiveChannel, template]);
 
     return (
         <>
@@ -597,7 +602,7 @@ function TemplateDetail({ template, activeChannel, setActiveChannel, visibleChan
             </aside>
         </>
     );
-}
+});
 
 export default function Templates() {
     const runtime = useTemplateRuntime();
@@ -809,13 +814,30 @@ export default function Templates() {
         resetSearchQuery();
     }, [getIndexedTemplateChannels, requestFirstTemplateWorkflow, resetSearchQuery, templateLookup]);
 
-    const closeTemplateWorkflow = () => {
+    const closeTemplateWorkflow = useCallback(() => {
         setActiveTemplateId(null);
-        runtime.setVariantPicker(null);
-        runtime.setTokenPrompt(null);
-        runtime.setPromptMissingTokens([]);
-        runtime.setCopyPreview(null);
-    };
+        const runtimeApi = runtimeRef.current;
+        runtimeApi.setVariantPicker(null);
+        runtimeApi.setTokenPrompt(null);
+        runtimeApi.setPromptMissingTokens([]);
+        runtimeApi.setCopyPreview(null);
+    }, []);
+
+    const closeActiveTemplatePreview = useCallback(() => {
+        setActiveTemplateId(null);
+    }, []);
+
+    const requestDetailCopy = useCallback((model, sectionKey) => {
+        return runtimeRef.current.requestCopy(model, sectionKey);
+    }, []);
+
+    const requestDetailTemplateResult = useCallback((model, sectionKey, baseModel = null) => {
+        return runtimeRef.current.requestTemplateResult(model, sectionKey, baseModel);
+    }, []);
+
+    const setDetailVariantPicker = useCallback((picker) => {
+        runtimeRef.current.setVariantPicker(picker);
+    }, []);
 
     const openExternalGenerator = useCallback(() => {
         setExternalGeneratorClosing(false);
@@ -835,10 +857,14 @@ export default function Templates() {
         }, 220);
     };
 
-    const openWorkspace = (workspace) => {
+    const openWorkspace = useCallback((workspace) => {
         setActiveWorkspace(workspace);
         setDropdownOpen(false);
-    };
+    }, []);
+
+    const openNodesWorkspace = useCallback(() => {
+        openWorkspace("nodes");
+    }, [openWorkspace]);
 
     const closeWorkspace = () => {
         setActiveWorkspace(null);
@@ -1010,7 +1036,7 @@ export default function Templates() {
 
             {activeTemplate && !workflowModalOpen && (
                 <Modal
-                    onClose={() => setActiveTemplateId(null)}
+                    onClose={closeActiveTemplatePreview}
                     dialogClassName="popup-box templates-template-modal"
                     ariaLabel="Template preview"
                 >
@@ -1019,8 +1045,13 @@ export default function Templates() {
                         activeChannel={activeChannel}
                         setActiveChannel={setActiveChannel}
                         visibleChannels={templateChannelsById.get(activeTemplate.id) || activeTemplate.channels}
-                        runtime={runtime}
-                        onManage={() => openWorkspace("nodes")}
+                        lang={runtime.lang}
+                        tokens={runtime.tokens}
+                        values={runtime.values}
+                        onRequestCopy={requestDetailCopy}
+                        onRequestTemplateResult={requestDetailTemplateResult}
+                        onSetVariantPicker={setDetailVariantPicker}
+                        onManage={openNodesWorkspace}
                         onToggleFavorite={toggleFavorite}
                     />
                 </Modal>
