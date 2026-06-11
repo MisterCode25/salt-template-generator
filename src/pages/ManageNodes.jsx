@@ -271,6 +271,21 @@ function createVariantDraft(index = 1) {
     };
 }
 
+function hasRichTextContent(value = "") {
+    const raw = String(value || "");
+    if (/<(img|video|audio|iframe)\b/i.test(raw)) return true;
+
+    const textOnly = raw
+        .replace(/<br\s*\/?>/gi, "")
+        .replace(/<\/(p|div|li|h[1-6])>/gi, " ")
+        .replace(/<[^>]+>/g, "")
+        .replace(/&nbsp;|&#160;/gi, " ")
+        .replace(/\u200B/g, "")
+        .trim();
+
+    return textOnly.length > 0;
+}
+
 function buildNodeOptions(nodes, parentId = null, depth = 0) {
     return getChildNodes(nodes, parentId).flatMap((node) => [
         { node, depth },
@@ -683,6 +698,23 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
         : selectedVariants[0]?.id || "";
     const activeVariant = selectedVariants.find((variant) => variant.id === activeVariantId) || null;
     const activeVariantTextValue = activeVariant?.[activeLanguageDef.field] || "";
+    const languageCompletion = LANGUAGES.map((language) => {
+        const values = [
+            selectedContent?.[language.field] || "",
+            ...selectedVariants.map((variant) => variant?.[language.field] || "")
+        ];
+        const total = Math.max(values.length, 1);
+        const filled = values.filter(hasRichTextContent).length;
+        const status = filled === 0 ? "empty" : filled >= total ? "complete" : "partial";
+
+        return {
+            ...language,
+            filled,
+            total,
+            percent: Math.round((filled / total) * 100),
+            status
+        };
+    });
     const openMainPreview = () => {
         if (!selectedContentChannel) return;
         setPreviewRequest({
@@ -771,17 +803,26 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
                                             <label>{CHANNEL_LABELS[selectedContentChannel]}</label>
                                         </div>
                                         <div className="node-template-editor-actions">
-                                            <div className="node-language-tabs" role="tablist" aria-label="Template languages">
-                                                {LANGUAGES.map((language) => (
+                                            <div className="node-language-tabs node-language-tabs--progress" role="tablist" aria-label="Template languages">
+                                                {languageCompletion.map((language) => (
                                                     <button
                                                         key={language.code}
                                                         type="button"
                                                         role="tab"
                                                         aria-selected={activeLanguage === language.code}
-                                                        className={activeLanguage === language.code ? "is-active" : ""}
+                                                        aria-label={`${language.label}: ${language.filled} of ${language.total} filled`}
+                                                        className={`${activeLanguage === language.code ? "is-active " : ""}is-${language.status}`.trim()}
+                                                        style={{ "--language-fill": `${language.percent}%` }}
                                                         onClick={() => setActiveLanguage(language.code)}
+                                                        title={`${language.label}: ${language.filled}/${language.total} filled`}
                                                     >
-                                                        {language.label}
+                                                        <span className="node-language-label">{language.label}</span>
+                                                        <span className="node-language-fill" aria-hidden="true">
+                                                            <span />
+                                                        </span>
+                                                        <small className="node-language-count">
+                                                            {language.status === "complete" ? "✓" : `${language.filled}/${language.total}`}
+                                                        </small>
                                                     </button>
                                                 ))}
                                             </div>

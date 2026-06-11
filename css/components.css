@@ -5358,6 +5358,68 @@ textarea:focus {
     padding: 0 9px;
 }
 
+.node-language-tabs--progress {
+    align-items: stretch;
+}
+
+.node-language-tabs--progress button {
+    min-width: 48px;
+    height: auto;
+    min-height: 46px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 5px 8px;
+    line-height: 1;
+}
+
+.node-language-label {
+    font-size: 12px;
+}
+
+.node-language-fill {
+    width: 100%;
+    height: 3px;
+    display: block;
+    border-radius: 999px;
+    background: rgba(129, 153, 214, 0.2);
+    overflow: hidden;
+}
+
+.node-language-fill > span {
+    display: block;
+    width: var(--language-fill, 0%);
+    height: 100%;
+    border-radius: inherit;
+    background: #ef6b72;
+    transition: width 0.18s ease;
+}
+
+.node-language-tabs--progress button.is-partial .node-language-fill > span {
+    background: #eab252;
+}
+
+.node-language-tabs--progress button.is-complete .node-language-fill > span {
+    background: #50b496;
+}
+
+.node-language-count {
+    color: #9daace;
+    font-size: 10px;
+    font-weight: 900;
+    line-height: 1;
+}
+
+.node-language-tabs--progress button.is-partial .node-language-count {
+    color: #ffe3a7;
+}
+
+.node-language-tabs--progress button.is-complete .node-language-count {
+    color: #b9f7df;
+}
+
 .node-content-tabs button.is-active,
 .node-language-tabs button.is-active {
     border-color: rgba(234, 178, 82, 0.46);
@@ -5667,6 +5729,22 @@ textarea:focus {
 .light-theme .node-content-preview-head strong,
 .light-theme .node-content-preview-body {
     color: #17203a;
+}
+
+.light-theme .node-language-fill {
+    background: rgba(40, 75, 150, 0.16);
+}
+
+.light-theme .node-language-count {
+    color: #526078;
+}
+
+.light-theme .node-language-tabs--progress button.is-partial .node-language-count {
+    color: #7a4c00;
+}
+
+.light-theme .node-language-tabs--progress button.is-complete .node-language-count {
+    color: #08785c;
 }
 
 .light-theme .node-content-preview-body--modal {
