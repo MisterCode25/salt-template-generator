@@ -1,5 +1,6 @@
 const TOKEN_PATTERN = /\{[^{}]+\}/g;
 const CARET_BOUNDARY = "\u200B";
+const tokenLabelLookupCache = typeof WeakMap !== "undefined" ? new WeakMap() : null;
 
 function escapeHtml(value = "") {
     return String(value)
@@ -17,11 +18,18 @@ export function tokenName(token = "") {
 }
 
 function buildTokenLabelLookup(tokens = []) {
-    return new Map(
-        (tokens || [])
-            .filter((item) => item?.token)
-            .map((item) => [item.token, item.label])
-    );
+    if (tokens instanceof Map) return tokens;
+    if (Array.isArray(tokens)) {
+        const cached = tokenLabelLookupCache?.get(tokens);
+        if (cached) return cached;
+    }
+
+    const lookup = new Map();
+    (tokens || []).forEach((item) => {
+        if (item?.token) lookup.set(item.token, item.label);
+    });
+    if (Array.isArray(tokens)) tokenLabelLookupCache?.set(tokens, lookup);
+    return lookup;
 }
 
 function tokenLabel(token, tokenLabels = new Map()) {
@@ -78,6 +86,8 @@ function replaceTokensInTextNode(textNode, tokenLabels) {
 
 function decorateTokens(root, tokens = []) {
     const tokenLabels = buildTokenLabelLookup(tokens);
+    if (!root.textContent?.includes("{")) return;
+
     const walker = textNodeWalker(root);
     const nodes = [];
     while (walker.nextNode()) {
