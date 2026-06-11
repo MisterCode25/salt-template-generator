@@ -513,6 +513,7 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
     const [activeContentChannel, setActiveContentChannel] = useState(initial?.channels?.[0] || Channel.EMAIL);
     const [activeLanguage, setActiveLanguage] = useState("fr");
     const [activeVariantByChannel, setActiveVariantByChannel] = useState({});
+    const [previewRequest, setPreviewRequest] = useState(null);
     const [tokens, setTokens] = useState([]);
     const canSubmit = title.trim().length > 0 && channels.length > 0;
 
@@ -682,6 +683,22 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
         : selectedVariants[0]?.id || "";
     const activeVariant = selectedVariants.find((variant) => variant.id === activeVariantId) || null;
     const activeVariantTextValue = activeVariant?.[activeLanguageDef.field] || "";
+    const openMainPreview = () => {
+        if (!selectedContentChannel) return;
+        setPreviewRequest({
+            title: `${CHANNEL_LABELS[selectedContentChannel]} · ${activeLanguageDef.label}`,
+            label: selectedContent?.mainVariantName || selectedContent?.title || "Main text",
+            value: activeTextValue
+        });
+    };
+    const openVariantPreview = () => {
+        if (!selectedContentChannel || !activeVariant) return;
+        setPreviewRequest({
+            title: `${activeVariant.name || "Variant"} · ${activeLanguageDef.label}`,
+            label: CHANNEL_LABELS[selectedContentChannel],
+            value: activeVariantTextValue
+        });
+    };
     const hasAnyContent = channels.some((channel) =>
         LANGUAGES.some((language) => (contentByChannel[channel]?.[language.field] || "").trim().length > 0)
     );
@@ -802,19 +819,28 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
                                             <label>{CHANNEL_LABELS[selectedContentChannel]}</label>
                                             <strong>{activeLanguageDef.label}</strong>
                                         </div>
-                                        <div className="node-language-tabs" role="tablist" aria-label="Template languages">
-                                            {LANGUAGES.map((language) => (
-                                                <button
-                                                    key={language.code}
-                                                    type="button"
-                                                    role="tab"
-                                                    aria-selected={activeLanguage === language.code}
-                                                    className={activeLanguage === language.code ? "is-active" : ""}
-                                                    onClick={() => setActiveLanguage(language.code)}
-                                                >
-                                                    {language.label}
-                                                </button>
-                                            ))}
+                                        <div className="node-template-editor-actions">
+                                            <div className="node-language-tabs" role="tablist" aria-label="Template languages">
+                                                {LANGUAGES.map((language) => (
+                                                    <button
+                                                        key={language.code}
+                                                        type="button"
+                                                        role="tab"
+                                                        aria-selected={activeLanguage === language.code}
+                                                        className={activeLanguage === language.code ? "is-active" : ""}
+                                                        onClick={() => setActiveLanguage(language.code)}
+                                                    >
+                                                        {language.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <button
+                                                type="button"
+                                                className="secondary-btn node-preview-btn"
+                                                onClick={openMainPreview}
+                                            >
+                                                Preview
+                                            </button>
                                         </div>
                                     </div>
                                     <div className="node-content-main">
@@ -836,19 +862,6 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
                                                 onTokenCreate={createToken}
                                             />
                                         </div>
-                                        <aside className="node-content-preview-card" aria-label="Content preview">
-                                            <div className="node-content-preview-head">
-                                                <span>Preview</span>
-                                                <strong>{CHANNEL_LABELS[selectedContentChannel]} · {activeLanguageDef.label}</strong>
-                                            </div>
-                                            <div className="node-content-preview-body">
-                                                {activeTextValue.trim() ? (
-                                                    <div dangerouslySetInnerHTML={{ __html: activeTextValue }} />
-                                                ) : (
-                                                    <p>Preview appears here while you write.</p>
-                                                )}
-                                            </div>
-                                        </aside>
                                     </div>
                                     <div className="variant-editor">
                                         <div className="variant-editor-head">
@@ -893,13 +906,22 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
                                                                         placeholder="Variant name"
                                                                     />
                                                                 </div>
-                                                                <button
-                                                                    type="button"
-                                                                    className="reset-fields-btn"
-                                                                    onClick={() => removeVariant(selectedContentChannel, activeVariant.id)}
-                                                                >
-                                                                    Delete variant
-                                                                </button>
+                                                                <div className="node-template-editor-actions">
+                                                                    <button
+                                                                        type="button"
+                                                                        className="secondary-btn node-preview-btn"
+                                                                        onClick={openVariantPreview}
+                                                                    >
+                                                                        Preview
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="reset-fields-btn"
+                                                                        onClick={() => removeVariant(selectedContentChannel, activeVariant.id)}
+                                                                    >
+                                                                        Delete variant
+                                                                    </button>
+                                                                </div>
                                                             </div>
                                                             <div className="node-content-main">
                                                                 <div className="node-content-edit-pane">
@@ -912,19 +934,6 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
                                                                         onTokenCreate={createToken}
                                                                     />
                                                                 </div>
-                                                                <aside className="node-content-preview-card" aria-label="Variant preview">
-                                                                    <div className="node-content-preview-head">
-                                                                        <span>Preview</span>
-                                                                        <strong>{activeVariant.name || "Variant"} · {activeLanguageDef.label}</strong>
-                                                                    </div>
-                                                                    <div className="node-content-preview-body">
-                                                                        {activeVariantTextValue.trim() ? (
-                                                                            <div dangerouslySetInnerHTML={{ __html: activeVariantTextValue }} />
-                                                                        ) : (
-                                                                            <p>Variant preview appears here while you write.</p>
-                                                                        )}
-                                                                    </div>
-                                                                </aside>
                                                             </div>
                                                         </div>
                                                     ) : (
@@ -949,6 +958,28 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
                     <button type="submit" className="primary-btn" disabled={!canSubmit}>{isEdit ? "Save" : "Create"}</button>
                 </div>
             </form>
+            {previewRequest && (
+                <Modal
+                    onClose={() => setPreviewRequest(null)}
+                    ariaLabel="Template preview"
+                    dialogClassName="popup-box node-template-preview-modal"
+                >
+                    <div className="popup-header">
+                        <div>
+                            <p className="template-result-kicker">Preview</p>
+                            <h2>{previewRequest.title}</h2>
+                            {previewRequest.label && <p className="node-modal-subtitle">{previewRequest.label}</p>}
+                        </div>
+                    </div>
+                    <div className="node-content-preview-body node-content-preview-body--modal">
+                        {previewRequest.value.trim() ? (
+                            <div dangerouslySetInnerHTML={{ __html: previewRequest.value }} />
+                        ) : (
+                            <p>No content yet.</p>
+                        )}
+                    </div>
+                </Modal>
+            )}
         </Modal>
     );
 }
