@@ -149,6 +149,8 @@ const TITLE_ICON_RULES = [
     { pattern: /sms|message|general|chat/i, Icon: MessageSquare }
 ];
 
+const EMPTY_NODE_SUMMARY = Object.freeze({ childCount: 0, templateCount: 0 });
+
 function toneForValue(value = "") {
     const source = String(value || "template");
     const total = [...source].reduce((sum, char) => sum + char.charCodeAt(0), 0);
@@ -197,6 +199,55 @@ function EmptyColumnState({ message }) {
     );
 }
 
+const PlaybookNodeRow = memo(function PlaybookNodeRow({
+    node,
+    summary,
+    selected,
+    onOpenNode
+}) {
+    const totalCount = summary.childCount + summary.templateCount;
+    const Icon = iconForItem(node.icon, node.title);
+
+    return (
+        <button
+            type="button"
+            className={`templates-column-row templates-column-row--node${selected ? " is-active" : ""}`}
+            onClick={() => onOpenNode(node.id)}
+        >
+            <IconBadge Icon={Icon} tone={toneForValue(node.icon || node.title)} />
+            <span className="templates-column-copy">
+                <strong>{node.title || "Untitled section"}</strong>
+            </span>
+            {totalCount > 0 && <span className="templates-column-count">{totalCount}</span>}
+            <ChevronRight className="templates-column-chevron" size={19} aria-hidden="true" />
+        </button>
+    );
+});
+
+const PlaybookTemplateRow = memo(function PlaybookTemplateRow({
+    template,
+    selected,
+    onOpenTemplate
+}) {
+    const Icon = templateIcon(template);
+    const availableChannels = getAvailableTemplateChannels(template);
+    const channels = availableChannels.length > 0 ? availableChannels : template.channels;
+
+    return (
+        <button
+            type="button"
+            className={`templates-column-row templates-column-row--template${selected ? " is-active" : ""}`}
+            onClick={() => onOpenTemplate(template.id)}
+        >
+            <IconBadge Icon={Icon} tone={toneForValue(template.title)} />
+            <span className="templates-column-copy">
+                <strong>{template.title || "Untitled template"}</strong>
+                <ChannelPills channels={channels} />
+            </span>
+        </button>
+    );
+});
+
 const PlaybookColumn = memo(function PlaybookColumn({
     title,
     nodes: columnNodes,
@@ -216,42 +267,25 @@ const PlaybookColumn = memo(function PlaybookColumn({
                 {hasItems ? (
                     <>
                         {columnNodes.map((node) => {
-                            const summary = nodeSummaryById.get(node.id) || { childCount: 0, templateCount: 0 };
-                            const totalCount = summary.childCount + summary.templateCount;
-                            const Icon = iconForItem(node.icon, node.title);
+                            const summary = nodeSummaryById.get(node.id) || EMPTY_NODE_SUMMARY;
                             return (
-                                <button
+                                <PlaybookNodeRow
                                     key={node.id}
-                                    type="button"
-                                    className={`templates-column-row templates-column-row--node${activeNodeId === node.id ? " is-active" : ""}`}
-                                    onClick={() => onOpenNode(node.id)}
-                                >
-                                    <IconBadge Icon={Icon} tone={toneForValue(node.icon || node.title)} />
-                                    <span className="templates-column-copy">
-                                        <strong>{node.title || "Untitled section"}</strong>
-                                    </span>
-                                    {totalCount > 0 && <span className="templates-column-count">{totalCount}</span>}
-                                    <ChevronRight className="templates-column-chevron" size={19} aria-hidden="true" />
-                                </button>
+                                    node={node}
+                                    summary={summary}
+                                    selected={activeNodeId === node.id}
+                                    onOpenNode={onOpenNode}
+                                />
                             );
                         })}
                         {columnTemplates.map((template) => {
-                            const Icon = templateIcon(template);
-                            const availableChannels = getAvailableTemplateChannels(template);
-                            const channels = availableChannels.length > 0 ? availableChannels : template.channels;
                             return (
-                                <button
+                                <PlaybookTemplateRow
                                     key={template.id}
-                                    type="button"
-                                    className={`templates-column-row templates-column-row--template${activeTemplateId === template.id ? " is-active" : ""}`}
-                                    onClick={() => onOpenTemplate(template.id)}
-                                >
-                                    <IconBadge Icon={Icon} tone={toneForValue(template.title)} />
-                                    <span className="templates-column-copy">
-                                        <strong>{template.title || "Untitled template"}</strong>
-                                        <ChannelPills channels={channels} />
-                                    </span>
-                                </button>
+                                    template={template}
+                                    selected={activeTemplateId === template.id}
+                                    onOpenTemplate={onOpenTemplate}
+                                />
                             );
                         })}
                     </>
