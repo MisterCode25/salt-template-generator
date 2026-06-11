@@ -80,14 +80,17 @@ export function searchTemplateTreeIndex(index = {}, query = "") {
     const needle = normalizeNeedle(query);
     if (!needle) return { nodes: [], templates: [] };
 
-    return {
-        nodes: (index.nodes || [])
-            .filter((entry) => entry.searchText.includes(needle))
-            .map((entry) => entry.item),
-        templates: (index.templates || [])
-            .filter((entry) => entry.searchText.includes(needle))
-            .map((entry) => entry.item)
-    };
+    const nodes = [];
+    const templates = [];
+
+    (index.nodes || []).forEach((entry) => {
+        if (entry.searchText.includes(needle)) nodes.push(entry.item);
+    });
+    (index.templates || []).forEach((entry) => {
+        if (entry.searchText.includes(needle)) templates.push(entry.item);
+    });
+
+    return { nodes, templates };
 }
 
 export function searchTemplateTree(nodes = [], templates = [], query = "") {
