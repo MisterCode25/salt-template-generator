@@ -5,10 +5,16 @@ import {
     canonicalizeTokenDefinition,
     canonicalizeTokenDefinitions
 } from "../utils/tokenCanonicalization.js";
+import { AGENT_PROFILE_TOKENS } from "./agentProfileService.js";
 
 const TOKEN_PATH = "tokens";
 const TOKEN_PATTERN = /\{[^{}]+\}/g;
 const INTERNAL_TOKEN_PREFIX_PATTERN = /^\{(?:client|contact|healthcheck)_/i;
+const SYSTEM_TOKEN_SET = new Set(AGENT_PROFILE_TOKENS.map((tokenDef) => tokenDef.token));
+
+function isSystemToken(tokenDef) {
+    return SYSTEM_TOKEN_SET.has(tokenDef?.token);
+}
 
 function normalizeTokenDefinition(tokenDef) {
     if (!tokenDef || typeof tokenDef !== "object") return tokenDef;
@@ -20,18 +26,19 @@ function normalizeTokenDefinition(tokenDef) {
 
 export async function loadTokens() {
     const tokens = await loadJSON(TOKEN_PATH, []);
-    if (!Array.isArray(tokens)) return [];
+    const storedTokens = Array.isArray(tokens) ? tokens : [];
 
-    const normalized = canonicalizeTokenDefinitions(tokens.map(normalizeTokenDefinition));
-    if (JSON.stringify(normalized) !== JSON.stringify(tokens)) {
+    const normalized = canonicalizeTokenDefinitions(storedTokens.map(normalizeTokenDefinition))
+        .filter((tokenDef) => !isSystemToken(tokenDef));
+    if (JSON.stringify(normalized) !== JSON.stringify(storedTokens)) {
         await saveTokens(normalized);
     }
-    return normalized;
+    return canonicalizeTokenDefinitions([...AGENT_PROFILE_TOKENS, ...normalized]);
 }
 
 export async function saveTokens(tokens) {
     await saveJSON(TOKEN_PATH, Array.isArray(tokens)
-        ? canonicalizeTokenDefinitions(tokens.map(normalizeTokenDefinition))
+        ? canonicalizeTokenDefinitions(tokens.map(normalizeTokenDefinition)).filter((tokenDef) => !isSystemToken(tokenDef))
         : tokens);
 }
 

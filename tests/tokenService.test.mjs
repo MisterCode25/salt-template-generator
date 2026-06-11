@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { ensureTokensFromTexts, loadTokens } from "../src/services/tokenService.js";
+import { ensureTokensFromTexts, loadTokens, saveTokens } from "../src/services/tokenService.js";
 
 class LocalStorageMock {
   constructor() {
@@ -29,16 +29,27 @@ await ensureTokensFromTexts([
 const tokens = await loadTokens();
 const customerToken = tokens.find((tokenDef) => tokenDef.token === "{customer_name}");
 const soTicketToken = tokens.find((tokenDef) => tokenDef.token === "{so_ticket_num}");
+const agentFirstNameToken = tokens.find((tokenDef) => tokenDef.token === "{agent_firstName}");
+const agentEmailToken = tokens.find((tokenDef) => tokenDef.token === "{agent_email}");
 
 assert.ok(customerToken);
 assert.ok(soTicketToken);
+assert.ok(agentFirstNameToken);
+assert.ok(agentEmailToken);
 assert.equal(customerToken.display_mode, "on_demand");
 assert.equal(soTicketToken.label, "SO ticket number");
 assert.equal(soTicketToken.key, "soTicket");
+assert.equal(agentFirstNameToken.system, true);
+assert.equal(agentEmailToken.label, "Agent email");
 assert.equal(tokens.some((tokenDef) => tokenDef.token === "{client_first_name}"), false);
 assert.equal(tokens.some((tokenDef) => tokenDef.token === "{contact_error}"), false);
 assert.equal(tokens.some((tokenDef) => tokenDef.token === "{healthcheck_oto_id}"), false);
 assert.equal(tokens.some((tokenDef) => tokenDef.token === "{ticket_num}"), false);
 assert.equal(tokens.some((tokenDef) => tokenDef.token === "{so_number}"), false);
+
+await saveTokens(tokens);
+const persistedTokens = JSON.parse(localStorage.getItem("local_tokens"));
+assert.equal(persistedTokens.some((tokenDef) => tokenDef.token === "{agent_firstName}"), false);
+assert.equal(persistedTokens.some((tokenDef) => tokenDef.token === "{customer_name}"), true);
 
 console.log("tokenService tests passed");

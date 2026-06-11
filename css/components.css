@@ -1949,6 +1949,25 @@ textarea:focus {
     font-size: var(--font-sm);
 }
 
+.settings-agent-card {
+    grid-column: 1 / -1;
+}
+
+.settings-agent-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px 12px;
+    margin-top: 12px;
+}
+
+.settings-agent-grid .field-line {
+    margin: 0;
+}
+
+.settings-agent-grid .field-line input {
+    max-width: none;
+}
+
 .settings-modal {
     width: min(1040px, 100%);
     max-width: 100%;

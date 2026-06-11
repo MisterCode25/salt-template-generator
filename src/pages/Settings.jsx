@@ -6,6 +6,7 @@ import { clearAppIndexedDB } from "../services/indexedDbService.js";
 import { buildConfigPayload, validateImportedConfig } from "../services/configService.js";
 import { showToast } from "../services/clipboardService.js";
 import { getStorageInfo, requestPersistentStorage } from "../services/storageInfoService.js";
+import { AGENT_PROFILE_FIELDS, loadAgentProfile, saveAgentProfile } from "../services/agentProfileService.js";
 import Modal from "../components/Modal.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
 
@@ -19,6 +20,7 @@ export default function Settings({ embedded = false, onClose = null }) {
     const [exportNameOpen, setExportNameOpen] = useState(false);
     const [exportNameValue, setExportNameValue] = useState("");
     const [storageInfo, setStorageInfo] = useState(null);
+    const [agentProfile, setAgentProfile] = useState(() => loadAgentProfile());
     useEffect(() => {
         loadTokens().then(setTokens);
         loadTemplateTreeData().then(setTreeData);
@@ -48,7 +50,7 @@ export default function Settings({ embedded = false, onClose = null }) {
         setExportNameOpen(false);
         setConfigName(nextName);
         localStorage.setItem("local_configName", nextName);
-        const payload = buildConfigPayload(nextName, tokens, treeData);
+        const payload = buildConfigPayload(nextName, tokens.filter((tokenDef) => !tokenDef.system), treeData);
         const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -99,10 +101,20 @@ export default function Settings({ embedded = false, onClose = null }) {
 
     const triggerReset = () => setConfirmReset(true);
 
+    const updateAgentProfileField = (key, value) => {
+        setAgentProfile((prev) => ({ ...prev, [key]: value }));
+    };
+
+    const saveAgentSettings = () => {
+        const savedProfile = saveAgentProfile(agentProfile);
+        setAgentProfile(savedProfile);
+        showToast("Agent profile saved", "success");
+    };
+
     const resetStorage = async () => {
         setConfirmReset(false);
         const keysToDelete = [];
-        const appScopedLegacyKeys = new Set(["tokens", "models", "theme_pref", "active_client_payload"]);
+        const appScopedLegacyKeys = new Set(["tokens", "models", "theme_pref", "active_client_payload", "agent_profile"]);
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
             if (!key) continue;
@@ -143,6 +155,28 @@ export default function Settings({ embedded = false, onClose = null }) {
                 </div>
 
                 <div className="popup-grid mt-md">
+                    <div className="popup-card settings-agent-card">
+                        <label>Agent profile</label>
+                        <p className="hint">Used by the hard-coded agent tokens in templates and tool URLs.</p>
+                        <div className="settings-agent-grid">
+                            {AGENT_PROFILE_FIELDS.map((field) => (
+                                <div className="field-line" key={field.key}>
+                                    <label>{field.settingsLabel}</label>
+                                    <input
+                                        type={field.key === "email" ? "email" : field.key === "phoneNumber" ? "tel" : "text"}
+                                        value={agentProfile[field.key] || ""}
+                                        onChange={(event) => updateAgentProfileField(field.key, event.target.value)}
+                                        placeholder={field.token}
+                                    />
+                                    <span className="hint">{field.token}</span>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="flex-row gap-sm flex-wrap mt-md">
+                            <button className="primary-btn" onClick={saveAgentSettings}>Save agent profile</button>
+                        </div>
+                    </div>
+
                     <div className="popup-card">
                         <label>Configuration</label>
                         <p className="hint">Import or export your tokens and templates.</p>

@@ -11,6 +11,14 @@ import {
 import { copyHtml, formatClipboardHtmlBody, showToast } from "../services/clipboardService.js";
 import { loadTokens } from "../services/tokenService.js";
 import {
+    AGENT_PROFILE_UPDATED_EVENT,
+    getAgentProfileTokenValues,
+    isAgentProfileToken,
+    loadAgentProfile,
+    saveAgentProfileTokenValue,
+    syncAgentProfileInputValues
+} from "../services/agentProfileService.js";
+import {
     getClientInfoSections,
     getClientInternalTokenData,
     getClientLanguageCode,
@@ -399,11 +407,25 @@ export function useTemplateRuntime() {
     useEffect(() => {
         migrateStoredClientInputValues();
         loadTokens().then(setTokens);
+        const applyAgentProfile = (profile = loadAgentProfile()) => {
+            syncAgentProfileInputValues(profile);
+            setValues((prev) => ({ ...prev, ...getAgentProfileTokenValues(profile) }));
+            inputChangeVersion.current++;
+        };
+        applyAgentProfile();
+        const handleAgentProfileUpdated = (event) => {
+            applyAgentProfile(event.detail?.profile);
+        };
+        window.addEventListener(AGENT_PROFILE_UPDATED_EVENT, handleAgentProfileUpdated);
+
         const storedClient = loadActiveClientPayload();
         if (storedClient) {
             setClientPayload(storedClient);
             setClientImportStatus({ type: "success", message: "" });
         }
+        return () => {
+            window.removeEventListener(AGENT_PROFILE_UPDATED_EVENT, handleAgentProfileUpdated);
+        };
     }, []);
 
     const templateTokens = useMemo(() => {
@@ -475,8 +497,10 @@ export function useTemplateRuntime() {
     }, [clientPayload, clientInternalTokens.length, tokens]);
 
     const clearClientInfo = () => {
-        setValues({});
         clearStoredInputValues();
+        const agentValues = getAgentProfileTokenValues(loadAgentProfile());
+        syncAgentProfileInputValues();
+        setValues(agentValues);
         setClientPayload(null);
         setClientMatchedTokens([]);
         setClientInternalTokens([]);
@@ -515,6 +539,8 @@ export function useTemplateRuntime() {
         });
 
         clearStoredInputValues();
+        const agentValues = getAgentProfileTokenValues(loadAgentProfile());
+        syncAgentProfileInputValues();
         tokensToClear.forEach(({ token, value }) => {
             localStorage.setItem("input_" + token, value);
         });
@@ -530,7 +556,7 @@ export function useTemplateRuntime() {
         setVariantPicker(null);
         if (nextLanguage) setLang(nextLanguage);
 
-        setValues(nextValues);
+        setValues({ ...agentValues, ...nextValues });
         inputChangeVersion.current++;
         setClientImportStatus({ type: "success", message: "" });
     };
@@ -750,6 +776,12 @@ export function useTemplateRuntime() {
         const persistedValues = {};
         tokenDefs.forEach((tokenDef) => {
             const value = filledValues[tokenDef.token] ?? getTokenValue(tokenDef);
+            if (isAgentProfileToken(tokenDef.token)) {
+                const result = saveAgentProfileTokenValue(tokenDef.token, value);
+                persistedValues[result.token] = result.value;
+                return;
+            }
+
             const { inputTokens } = saveClientInputValue(tokenDef, value);
             inputTokens.forEach((token) => {
                 persistedValues[token] = value;

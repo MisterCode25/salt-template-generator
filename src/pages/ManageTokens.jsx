@@ -148,18 +148,25 @@ export default function ManageTokens({ embedded = false, onClose = null }) {
                         <div key={t.id} className="model-row">
                             <div>
                                 <strong>{t.label || t.token}</strong> <span className="hint">{t.token}</span>
+                                {t.system && (
+                                    <span className="variant-pill" style={{ marginLeft: "0.4rem" }}>system</span>
+                                )}
                                 {t.display_mode === "on_demand" && (
                                     <span className="variant-pill" style={{ marginLeft: "0.4rem" }}>on demand</span>
                                 )}
                                 {t.key && <div className="hint mt-sm">Key: {t.key}</div>}
                             </div>
                             <div className="flex-row gap-sm" style={{ marginLeft: "auto" }}>
-                                <button className="icon-btn edit-btn" onClick={() => setModalToken(t)}>
-                                    <span className="icon-pencil" aria-hidden="true"></span>
-                                </button>
-                                <button className="icon-btn delete-btn" onClick={() => onDelete(t.id)}>
-                                    <span className="icon-trash" aria-hidden="true"></span>
-                                </button>
+                                {!t.system && (
+                                    <>
+                                        <button className="icon-btn edit-btn" onClick={() => setModalToken(t)}>
+                                            <span className="icon-pencil" aria-hidden="true"></span>
+                                        </button>
+                                        <button className="icon-btn delete-btn" onClick={() => onDelete(t.id)}>
+                                            <span className="icon-trash" aria-hidden="true"></span>
+                                        </button>
+                                    </>
+                                )}
                             </div>
                         </div>
                     ))}
