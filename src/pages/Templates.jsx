@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, memo, Suspense, useCallback, useDeferredValue, useMemo, useRef, useEffect, useState } from "react";
 import {
     Cable,
     Camera,
@@ -196,7 +196,7 @@ function EmptyColumnState({ message }) {
     );
 }
 
-function PlaybookColumn({
+const PlaybookColumn = memo(function PlaybookColumn({
     title,
     nodes: columnNodes,
     templates: columnTemplates,
@@ -260,7 +260,7 @@ function PlaybookColumn({
             </div>
         </section>
     );
-}
+});
 
 const TEMPLATE_TOKEN_PATTERN = /\{[^{}]+\}/g;
 
@@ -460,6 +460,8 @@ function TemplateDetail({ template, activeChannel, setActiveChannel, runtime, on
 
 export default function Templates() {
     const runtime = useTemplateRuntime();
+    const runtimeRef = useRef(runtime);
+    runtimeRef.current = runtime;
     const [nodes, setNodes] = useState([]);
     const [treeTemplates, setTreeTemplates] = useState([]);
     const [activeNodeId, setActiveNodeId] = useState(null);
@@ -471,6 +473,7 @@ export default function Templates() {
     const [activeWorkspace, setActiveWorkspace] = useState(null);
     const [externalGeneratorOpen, setExternalGeneratorOpen] = useState(false);
     const [externalGeneratorClosing, setExternalGeneratorClosing] = useState(false);
+    const deferredQuery = useDeferredValue(query);
     const configName = localStorage.getItem("local_configName") || "No configuration";
 
     const refreshTreeData = () => {
@@ -519,13 +522,13 @@ export default function Templates() {
         [treeTemplates]
     );
 
-    const toggleFavorite = async (templateId) => {
+    const toggleFavorite = useCallback(async (templateId) => {
         const template = templateLookup.get(templateId);
         if (!template) return;
         const nextTemplates = updateTemplate(treeTemplates, templateId, { favorite: !template.favorite });
         setTreeTemplates(nextTemplates);
         await saveTemplateTreeData({ nodes, templates: nextTemplates });
-    };
+    }, [nodes, templateLookup, treeTemplates]);
 
     const activeNode = useMemo(
         () => nodeLookup.get(activeNodeId) || null,
@@ -537,8 +540,8 @@ export default function Templates() {
     );
     const rootNodes = useMemo(() => getIndexedChildNodes(childrenByParent, null), [childrenByParent]);
     const searchResults = useMemo(
-        () => searchTemplateTree(nodes, treeTemplates, query),
-        [nodes, treeTemplates, query]
+        () => searchTemplateTree(nodes, treeTemplates, deferredQuery),
+        [deferredQuery, nodes, treeTemplates]
     );
     const activeNodePath = useMemo(() => {
         const path = [];
@@ -563,11 +566,11 @@ export default function Templates() {
         }
     }, [activeTemplate, activeChannel]);
 
-    const openNode = (nodeId) => {
+    const openNode = useCallback((nodeId) => {
         setActiveNodeId(nodeId);
         setActiveTemplateId(null);
         setQuery("");
-    };
+    }, []);
 
     const resetCaseNavigation = () => {
         setActiveNodeId(null);
@@ -595,8 +598,9 @@ export default function Templates() {
         runtime.setLang(code);
     };
 
-    const requestFirstTemplateWorkflow = (template, preferredChannel) => {
+    const requestFirstTemplateWorkflow = useCallback((template, preferredChannel) => {
         if (!template) return false;
+        const runtimeApi = runtimeRef.current;
         const available = getAvailableTemplateChannels(template);
         const channels = (available.length > 0 ? available : template.channels)
             .filter((channel, index, list) => list.indexOf(channel) === index);
@@ -609,20 +613,20 @@ export default function Templates() {
             const model = resolveChannelModel(template, channel);
             if (model?.variants?.length) {
                 setActiveChannel(channel);
-                runtime.setVariantPicker({ model, sectionKey: `tree_${template.id}_${channel}` });
+                runtimeApi.setVariantPicker({ model, sectionKey: `tree_${template.id}_${channel}` });
                 return true;
             }
             if (model) {
                 setActiveChannel(channel);
-                runtime.requestTemplateResult(model, `tree_${template.id}_${channel}`);
+                runtimeApi.requestTemplateResult(model, `tree_${template.id}_${channel}`);
                 return true;
             }
         }
 
         return false;
-    };
+    }, []);
 
-    const openTemplate = (templateId) => {
+    const openTemplate = useCallback((templateId) => {
         const template = templateLookup.get(templateId);
         setActiveTemplateId(templateId);
         if (template?.parentNodeId) setActiveNodeId(template.parentNodeId);
@@ -631,7 +635,7 @@ export default function Templates() {
         setActiveChannel(nextChannel);
         requestFirstTemplateWorkflow(template, nextChannel);
         setQuery("");
-    };
+    }, [requestFirstTemplateWorkflow, templateLookup]);
 
     const closeTemplateWorkflow = () => {
         setActiveTemplateId(null);
@@ -681,7 +685,7 @@ export default function Templates() {
         }
     };
 
-    const searchMode = query.trim().length > 0 && !activeTemplate;
+    const searchMode = deferredQuery.trim().length > 0 && !activeTemplate;
     const navigationColumns = useMemo(() => {
         if (searchMode) {
             const count = searchResults.nodes.length + searchResults.templates.length;
