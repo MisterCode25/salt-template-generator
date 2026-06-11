@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { loadTools, saveTools } from "../services/toolsService.js";
 import { loadTokens } from "../services/tokenService.js";
 import { loadActiveClientPayload } from "../services/activeClientService.js";
@@ -69,6 +69,37 @@ async function loadToolTokens() {
         : [];
     return mergeUniqueTokens([...configuredTokens, ...clientTokens]);
 }
+
+const ToolTokenOption = memo(function ToolTokenOption({
+    token,
+    index,
+    selected,
+    context,
+    onHover,
+    onInsert
+}) {
+    const handleMouseEnter = useCallback(() => {
+        onHover(index);
+    }, [index, onHover]);
+
+    const handleMouseDown = useCallback((event) => {
+        event.preventDefault();
+        onInsert(token.token, context);
+    }, [context, onInsert, token.token]);
+
+    return (
+        <button
+            type="button"
+            className={`tools-token-option${selected ? " is-active" : ""}`}
+            onMouseEnter={handleMouseEnter}
+            onMouseDown={handleMouseDown}
+            title={token.label || token.token}
+        >
+            <span>{token.label || token.token}</span>
+            <small>{token.token}</small>
+        </button>
+    );
+});
 
 function ToolModal({ initial, onClose, onSave }) {
     const [title, setTitle] = useState(initial?.title || "");
@@ -165,6 +196,10 @@ function ToolModal({ initial, onClose, onSave }) {
         window.setTimeout(() => setTokenMenu(null), 120);
     }, []);
 
+    const handleTokenOptionHover = useCallback((index) => {
+        setActiveTokenIndex(index);
+    }, []);
+
     const handleSave = useCallback(() => {
         const t = title.trim();
         const u = url.trim();
@@ -207,20 +242,15 @@ function ToolModal({ initial, onClose, onSave }) {
                         {tokenMenu && (
                             <div className="tools-token-menu" role="listbox">
                                 {filteredTokens.length > 0 ? filteredTokens.map((tok, index) => (
-                                    <button
+                                    <ToolTokenOption
                                         key={tok.id}
-                                        type="button"
-                                        className={`tools-token-option${index === selectedTokenIndex ? " is-active" : ""}`}
-                                        onMouseEnter={() => setActiveTokenIndex(index)}
-                                        onMouseDown={(event) => {
-                                            event.preventDefault();
-                                            insertToken(tok.token, tokenMenu);
-                                        }}
-                                        title={tok.label || tok.token}
-                                    >
-                                        <span>{tok.label || tok.token}</span>
-                                        <small>{tok.token}</small>
-                                    </button>
+                                        token={tok}
+                                        index={index}
+                                        selected={index === selectedTokenIndex}
+                                        context={tokenMenu}
+                                        onHover={handleTokenOptionHover}
+                                        onInsert={insertToken}
+                                    />
                                 )) : (
                                     <div className="tools-token-menu__empty">No matching token</div>
                                 )}
