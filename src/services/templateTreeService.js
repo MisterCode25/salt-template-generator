@@ -47,10 +47,10 @@ export async function loadTemplateTreeData() {
         loadTemplateNodes(),
         loadNodeTemplates()
     ]);
-    if (nodes.length === 0 && templates.length === 0) {
-        const migrated = await migrateStoredLegacyTemplates();
-        if (migrated) return migrated;
-    }
+
+    const migrated = await migrateStoredLegacyTemplates({ nodes, templates });
+    if (migrated) return migrated;
+
     return { nodes, templates };
 }
 
@@ -61,21 +61,27 @@ export async function saveTemplateTreeData({ nodes = [], templates = [] } = {}) 
     ]);
 }
 
-async function migrateStoredLegacyTemplates() {
-    const migrationState = await loadJSON(LEGACY_TEMPLATE_MIGRATION_KEY, null);
-    if (migrationState?.completed) return null;
-
+async function loadStoredLegacyModels() {
     const [indexedModels, localModels] = await Promise.all([
         loadIndexedJSON(LEGACY_MODEL_KEY, null),
         loadJSON(LEGACY_MODEL_KEY, null)
     ]);
-    const legacyModels = Array.isArray(indexedModels)
-        ? indexedModels
-        : Array.isArray(localModels)
-            ? localModels
-            : [];
+    const indexedList = Array.isArray(indexedModels) ? indexedModels : [];
+    const localList = Array.isArray(localModels) ? localModels : [];
+
+    // The legacy app stored templates in localStorage. Prefer that non-empty
+    // source over an empty IndexedDB value that may have been created later.
+    return localList.length > 0 ? localList : indexedList;
+}
+
+async function migrateStoredLegacyTemplates({ nodes = [], templates = [] } = {}) {
+    const migrationState = await loadJSON(LEGACY_TEMPLATE_MIGRATION_KEY, null);
+    if (migrationState?.completed && templates.length > 0) return null;
+
+    const legacyModels = await loadStoredLegacyModels();
 
     if (legacyModels.length === 0) return null;
+    if (templates.length > 0 && !migrationState?.completed) return null;
 
     const migrated = migrateLegacyModelsToTemplateTree(legacyModels);
     if (migrated.nodes.length === 0 && migrated.templates.length === 0) return null;

@@ -101,6 +101,7 @@ const {
 } = await import("../src/models/templateTreeModel.js");
 
 const {
+  LEGACY_MODEL_KEY,
   LEGACY_TEMPLATE_MIGRATION_KEY,
   NODE_TEMPLATE_KEY,
   TEMPLATE_NODE_KEY,
@@ -206,9 +207,22 @@ localStorage.setItem("models", JSON.stringify([
     ]
   }
 ]));
+indexedDB.data.set(LEGACY_MODEL_KEY, []);
+indexedDB.data.set(TEMPLATE_NODE_KEY, [
+  {
+    id: "empty-new-root",
+    parentId: null,
+    title: "Empty new tree",
+    description: "",
+    icon: "",
+    order: 1
+  }
+]);
+indexedDB.data.set(NODE_TEMPLATE_KEY, []);
 
 const migratedFromLegacy = await loadTemplateTreeData();
 assert.deepEqual(migratedFromLegacy.nodes.filter((node) => node.parentId === null).map((node) => node.title), ["Email", "SMS", "Other"]);
+assert.equal(migratedFromLegacy.nodes.some((node) => node.id === "empty-new-root"), false);
 const legacyEmailNode = migratedFromLegacy.nodes.find((node) => node.title === "Legacy email");
 assert.equal(legacyEmailNode.parentId, "legacy-channel-email");
 assert.deepEqual(
