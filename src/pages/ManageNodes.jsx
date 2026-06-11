@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import EmptyState from "../components/EmptyState.jsx";
@@ -543,7 +543,7 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
         };
     }, []);
 
-    const createToken = async (tokenDef) => {
+    const createToken = useCallback(async (tokenDef) => {
         const currentTokens = await loadTokens();
         const existing = currentTokens.find((token) =>
             token.token === tokenDef.token
@@ -558,9 +558,9 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
         await saveTokens(nextTokens);
         setTokens(nextTokens);
         return tokenDef;
-    };
+    }, []);
 
-    const toggleChannel = (channel) => {
+    const toggleChannel = useCallback((channel) => {
         let nextChannels;
         if (channels.includes(channel)) {
             nextChannels = channels.filter((item) => item !== channel);
@@ -573,9 +573,9 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
         }
         setChannels(nextChannels);
         setActiveContentChannel(nextChannels.includes(channel) ? channel : nextChannels[0] || Channel.EMAIL);
-    };
+    }, [channels, title]);
 
-    const updateChannelContent = (channel, field, value) => {
+    const updateChannelContent = useCallback((channel, field, value) => {
         setContentByChannel((current) => ({
             ...current,
             [channel]: {
@@ -584,9 +584,9 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
                 [field]: value
             }
         }));
-    };
+    }, [title]);
 
-    const addVariant = (channel) => {
+    const addVariant = useCallback((channel) => {
         const currentVariants = Array.isArray(contentByChannel[channel]?.variants)
             ? contentByChannel[channel].variants
             : [];
@@ -610,9 +610,9 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
             ...current,
             [channel]: variant.id
         }));
-    };
+    }, [contentByChannel, title]);
 
-    const updateVariant = (channel, variantId, field, value) => {
+    const updateVariant = useCallback((channel, variantId, field, value) => {
         setContentByChannel((current) => {
             const content = {
                 ...createChannelContentDraft(channel, title.trim()),
@@ -629,9 +629,9 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
                 }
             };
         });
-    };
+    }, [title]);
 
-    const removeVariant = (channel, variantId) => {
+    const removeVariant = useCallback((channel, variantId) => {
         const variants = Array.isArray(contentByChannel[channel]?.variants)
             ? contentByChannel[channel].variants
             : [];
@@ -656,7 +656,7 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
             ...current,
             [channel]: nextActiveVariant?.id || ""
         }));
-    };
+    }, [contentByChannel, title]);
 
     const submit = (event) => {
         event.preventDefault();
@@ -686,12 +686,14 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
         ? activeContentChannel
         : channels[0] || null;
     const activeLanguageDef = LANGUAGES.find((language) => language.code === activeLanguage) || LANGUAGES[0];
-    const selectedContent = selectedContentChannel
-        ? {
-            ...createChannelContentDraft(selectedContentChannel, title.trim()),
-            ...(contentByChannel[selectedContentChannel] || {})
-        }
-        : null;
+    const selectedContent = useMemo(() => (
+        selectedContentChannel
+            ? {
+                ...createChannelContentDraft(selectedContentChannel, title.trim()),
+                ...(contentByChannel[selectedContentChannel] || {})
+            }
+            : null
+    ), [contentByChannel, selectedContentChannel, title]);
     const activeTextValue = selectedContent?.[activeLanguageDef.field] || "";
     const selectedVariants = Array.isArray(selectedContent?.variants) ? selectedContent.variants : [];
     const activeVariantId = selectedVariants.some((variant) => variant.id === activeVariantByChannel[selectedContentChannel])
@@ -699,7 +701,7 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
         : selectedVariants[0]?.id || "";
     const activeVariant = selectedVariants.find((variant) => variant.id === activeVariantId) || null;
     const activeVariantTextValue = activeVariant?.[activeLanguageDef.field] || "";
-    const languageCompletion = LANGUAGES.map((language) => {
+    const languageCompletion = useMemo(() => LANGUAGES.map((language) => {
         const values = [
             selectedContent?.[language.field] || "",
             ...selectedVariants.map((variant) => variant?.[language.field] || "")
@@ -715,23 +717,39 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
             percent: Math.round((filled / total) * 100),
             status
         };
-    });
-    const openMainPreview = () => {
+    }), [selectedContent, selectedVariants]);
+    const handleMainTextChange = useCallback((nextValue) => {
+        if (!selectedContentChannel) return;
+        updateChannelContent(selectedContentChannel, activeLanguageDef.field, nextValue);
+    }, [activeLanguageDef.field, selectedContentChannel, updateChannelContent]);
+    const handleMainVariantNameChange = useCallback((event) => {
+        if (!selectedContentChannel) return;
+        updateChannelContent(selectedContentChannel, "mainVariantName", event.target.value);
+    }, [selectedContentChannel, updateChannelContent]);
+    const handleVariantTextChange = useCallback((nextValue) => {
+        if (!selectedContentChannel || !activeVariant) return;
+        updateVariant(selectedContentChannel, activeVariant.id, activeLanguageDef.field, nextValue);
+    }, [activeLanguageDef.field, activeVariant, selectedContentChannel, updateVariant]);
+    const handleVariantNameChange = useCallback((event) => {
+        if (!selectedContentChannel || !activeVariant) return;
+        updateVariant(selectedContentChannel, activeVariant.id, "name", event.target.value);
+    }, [activeVariant, selectedContentChannel, updateVariant]);
+    const openMainPreview = useCallback(() => {
         if (!selectedContentChannel) return;
         setPreviewRequest({
             title: `${CHANNEL_LABELS[selectedContentChannel]} · ${activeLanguageDef.label}`,
             label: selectedContent?.mainVariantName || selectedContent?.title || "Main text",
             value: activeTextValue
         });
-    };
-    const openVariantPreview = () => {
+    }, [activeLanguageDef.label, activeTextValue, selectedContent, selectedContentChannel]);
+    const openVariantPreview = useCallback(() => {
         if (!selectedContentChannel || !activeVariant) return;
         setPreviewRequest({
             title: `${activeVariant.name || "Variant"} · ${activeLanguageDef.label}`,
             label: CHANNEL_LABELS[selectedContentChannel],
             value: activeVariantTextValue
         });
-    };
+    }, [activeLanguageDef.label, activeVariant, activeVariantTextValue, selectedContentChannel]);
     return (
         <Modal
             onClose={onClose}
@@ -842,14 +860,14 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
                                                 <label>Main variant label</label>
                                                 <input
                                                     value={selectedContent?.mainVariantName || ""}
-                                                    onChange={(event) => updateChannelContent(selectedContentChannel, "mainVariantName", event.target.value)}
+                                                    onChange={handleMainVariantNameChange}
                                                     placeholder="Main"
                                                 />
                                             </div>
                                             <RichTextEditor
                                                 className="node-content-rich-editor"
                                                 value={activeTextValue}
-                                                onChange={(nextValue) => updateChannelContent(selectedContentChannel, activeLanguageDef.field, nextValue)}
+                                                onChange={handleMainTextChange}
                                                 placeholder={`${activeLanguageDef.label} HTML`}
                                                 tokens={tokens}
                                                 onTokenCreate={createToken}
@@ -894,7 +912,7 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
                                                                     <label>Variant name</label>
                                                                     <input
                                                                         value={activeVariant.name || ""}
-                                                                        onChange={(event) => updateVariant(selectedContentChannel, activeVariant.id, "name", event.target.value)}
+                                                                        onChange={handleVariantNameChange}
                                                                         placeholder="Variant name"
                                                                     />
                                                                 </div>
@@ -920,7 +938,7 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
                                                                     <RichTextEditor
                                                                         className="node-content-rich-editor"
                                                                         value={activeVariantTextValue}
-                                                                        onChange={(nextValue) => updateVariant(selectedContentChannel, activeVariant.id, activeLanguageDef.field, nextValue)}
+                                                                        onChange={handleVariantTextChange}
                                                                         placeholder={`${activeLanguageDef.label} variant HTML`}
                                                                         tokens={tokens}
                                                                         onTokenCreate={createToken}

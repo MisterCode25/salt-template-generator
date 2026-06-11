@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback, useMemo, useState } from "react";
+import { memo, useRef, useEffect, useCallback, useMemo, useState } from "react";
 import {
     formatRichTextForEditor,
     getCompletedSlashContext,
@@ -52,7 +52,7 @@ function buildTokenMatches(queryValue, tokens = []) {
     return base;
 }
 
-export default function RichTextEditor({
+function RichTextEditor({
     value,
     onChange,
     placeholder,
@@ -69,7 +69,10 @@ export default function RichTextEditor({
     const [menuOpen, setMenuOpen] = useState(false);
     const [menuStyle, setMenuStyle] = useState({});
 
-    const tokenMatches = useMemo(() => buildTokenMatches(slashQuery, tokens), [slashQuery, tokens]);
+    const tokenMatches = useMemo(
+        () => menuOpen ? buildTokenMatches(slashQuery, tokens) : [],
+        [menuOpen, slashQuery, tokens]
+    );
 
     useEffect(() => {
         const el = editorRef.current;
@@ -398,3 +401,5 @@ export default function RichTextEditor({
         </div>
     );
 }
+
+export default memo(RichTextEditor);
