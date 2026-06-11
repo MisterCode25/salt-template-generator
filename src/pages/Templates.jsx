@@ -745,6 +745,8 @@ export default function Templates() {
         return columns;
     }, [activeNodePath, nodes, rootNodes, searchMode, searchResults, treeTemplates]);
 
+    const workflowModalOpen = Boolean(runtime.variantPicker || runtime.tokenPrompt || runtime.copyPreview);
+
     return (
         <main className="page-container page-container--home templates-page">
             <header className="app-header templates-app-header">
@@ -869,7 +871,7 @@ export default function Templates() {
                 </section>
             </section>
 
-            {activeTemplate && (
+            {activeTemplate && !workflowModalOpen && (
                 <Modal
                     onClose={() => setActiveTemplateId(null)}
                     dialogClassName="popup-box templates-template-modal"
