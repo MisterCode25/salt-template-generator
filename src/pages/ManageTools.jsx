@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { loadTools, saveTools } from "../services/toolsService.js";
 import { loadTokens } from "../services/tokenService.js";
 import { loadActiveClientPayload } from "../services/activeClientService.js";
@@ -24,12 +24,41 @@ function getUrlTokenContext(value, caret) {
     };
 }
 
-function tokenMatchesQuery(token, query = "") {
-    const normalizedQuery = query.trim().toLowerCase();
+function normalizeTokenSearchValue(value = "") {
+    return String(value || "").trim().toLowerCase();
+}
+
+function buildToolTokenSearchIndex(tokens = []) {
+    return tokens.map((token) => ({
+        token,
+        searchText: [token.label, token.token, token.key]
+            .map(normalizeTokenSearchValue)
+            .filter(Boolean)
+            .join(" ")
+    }));
+}
+
+function tokenEntryMatchesQuery(entry, query = "") {
+    const normalizedQuery = normalizeTokenSearchValue(query);
     if (!normalizedQuery) return true;
-    return [token.label, token.token, token.key]
+    return entry.searchText.includes(normalizedQuery);
+}
+
+function filterToolTokenEntries(tokenSearchIndex = [], query = "") {
+    return tokenSearchIndex
+        .filter((entry) => tokenEntryMatchesQuery(entry, query))
+        .map((entry) => entry.token);
+}
+
+function mergeUniqueTokens(tokenDefs = []) {
+    const byToken = new Map();
+    tokenDefs
         .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(normalizedQuery));
+        .forEach((tokenDef) => {
+            if (!tokenDef?.token || byToken.has(tokenDef.token)) return;
+            byToken.set(tokenDef.token, tokenDef);
+        });
+    return Array.from(byToken.values());
 }
 
 async function loadToolTokens() {
@@ -38,14 +67,7 @@ async function loadToolTokens() {
     const clientTokens = clientPayload
         ? getClientInternalTokenData(clientPayload).tokenDefs
         : [];
-    const byToken = new Map();
-
-    [...configuredTokens, ...clientTokens].forEach((tokenDef) => {
-        if (!tokenDef?.token || byToken.has(tokenDef.token)) return;
-        byToken.set(tokenDef.token, tokenDef);
-    });
-
-    return Array.from(byToken.values());
+    return mergeUniqueTokens([...configuredTokens, ...clientTokens]);
 }
 
 function ToolModal({ initial, onClose, onSave }) {
@@ -55,6 +77,7 @@ function ToolModal({ initial, onClose, onSave }) {
     const [tokenMenu, setTokenMenu] = useState(null);
     const [activeTokenIndex, setActiveTokenIndex] = useState(0);
     const urlRef = useRef(null);
+    const tokenSearchIndex = useMemo(() => buildToolTokenSearchIndex(tokens), [tokens]);
 
     useEffect(() => {
         let active = true;
@@ -66,18 +89,22 @@ function ToolModal({ initial, onClose, onSave }) {
         };
     }, []);
 
-    const filteredTokens = tokenMenu
-        ? tokens.filter((token) => tokenMatchesQuery(token, tokenMenu.query))
-        : [];
-    const selectedTokenIndex = Math.min(activeTokenIndex, Math.max(filteredTokens.length - 1, 0));
+    const filteredTokens = useMemo(
+        () => tokenMenu ? filterToolTokenEntries(tokenSearchIndex, tokenMenu.query) : [],
+        [tokenMenu, tokenSearchIndex]
+    );
+    const selectedTokenIndex = useMemo(
+        () => Math.min(activeTokenIndex, Math.max(filteredTokens.length - 1, 0)),
+        [activeTokenIndex, filteredTokens.length]
+    );
 
-    const updateTokenMenu = (nextUrl, caret) => {
+    const updateTokenMenu = useCallback((nextUrl, caret) => {
         const context = getUrlTokenContext(nextUrl, caret);
         setTokenMenu(context);
         setActiveTokenIndex(0);
-    };
+    }, []);
 
-    const insertToken = (token, context = tokenMenu) => {
+    const insertToken = useCallback((token, context = tokenMenu) => {
         const el = urlRef.current;
         if (!el) {
             setUrl((prev) => prev + token);
@@ -94,16 +121,16 @@ function ToolModal({ initial, onClose, onSave }) {
             el.focus();
             el.setSelectionRange(start + token.length, start + token.length);
         });
-    };
+    }, [tokenMenu, url]);
 
-    const handleUrlChange = (event) => {
+    const handleUrlChange = useCallback((event) => {
         const nextUrl = event.target.value;
         const caret = event.target.selectionStart ?? nextUrl.length;
         setUrl(nextUrl);
         updateTokenMenu(nextUrl, caret);
-    };
+    }, [updateTokenMenu]);
 
-    const handleUrlKeyDown = (event) => {
+    const handleUrlKeyDown = useCallback((event) => {
         if (!tokenMenu) return;
 
         if (event.key === "Escape") {
@@ -128,15 +155,23 @@ function ToolModal({ initial, onClose, onSave }) {
             event.preventDefault();
             insertToken(filteredTokens[selectedTokenIndex].token, tokenMenu);
         }
-    };
+    }, [filteredTokens, insertToken, selectedTokenIndex, tokenMenu]);
 
-    const handleSave = () => {
+    const handleTitleChange = useCallback((event) => {
+        setTitle(event.target.value);
+    }, []);
+
+    const closeTokenMenuSoon = useCallback(() => {
+        window.setTimeout(() => setTokenMenu(null), 120);
+    }, []);
+
+    const handleSave = useCallback(() => {
         const t = title.trim();
         const u = url.trim();
         if (!t) { showToast("Title is required.", "error"); return; }
         if (!u) { showToast("URL is required.", "error"); return; }
         onSave({ ...initial, title: t, url: u });
-    };
+    }, [initial, onSave, title, url]);
 
     return (
         <Modal onClose={onClose} ariaLabel="Tool editor">
@@ -150,7 +185,7 @@ function ToolModal({ initial, onClose, onSave }) {
                         <label>Button label</label>
                         <input
                             value={title}
-                            onChange={(e) => setTitle(e.target.value)}
+                            onChange={handleTitleChange}
                             placeholder="Ex: Axiros, NetCracker…"
                             autoFocus
                         />
@@ -165,7 +200,7 @@ function ToolModal({ initial, onClose, onSave }) {
                             onKeyDown={handleUrlKeyDown}
                             onSelect={(event) => updateTokenMenu(url, event.target.selectionStart ?? url.length)}
                             onFocus={(event) => updateTokenMenu(url, event.target.selectionStart ?? url.length)}
-                            onBlur={() => window.setTimeout(() => setTokenMenu(null), 120)}
+                            onBlur={closeTokenMenuSoon}
                             placeholder="https://example.com?id=@client"
                             className="tools-url-input"
                         />
