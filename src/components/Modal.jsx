@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 
 function getFocusableElements(container) {
     if (!container) return [];
@@ -21,17 +22,19 @@ export default function Modal({
 }) {
     const dialogRef = useRef(null);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         const previousActive = document.activeElement;
         const previousOverflow = document.body.style.overflow;
         document.body.style.overflow = "hidden";
 
         const focusables = getFocusableElements(dialogRef.current);
+        dialogRef.current?.scrollTo?.({ top: 0, left: 0 });
         if (focusables.length > 0) {
-            focusables[0].focus();
+            focusables[0].focus({ preventScroll: true });
         } else {
-            dialogRef.current?.focus();
+            dialogRef.current?.focus({ preventScroll: true });
         }
+        dialogRef.current?.scrollTo?.({ top: 0, left: 0 });
 
         const onKeyDown = (event) => {
             if (event.key === "Escape" && !disableEscapeClose) {
@@ -44,7 +47,7 @@ export default function Modal({
             const items = getFocusableElements(dialogRef.current);
             if (items.length === 0) {
                 event.preventDefault();
-                dialogRef.current?.focus();
+                dialogRef.current?.focus({ preventScroll: true });
                 return;
             }
 
@@ -66,12 +69,12 @@ export default function Modal({
             document.removeEventListener("keydown", onKeyDown);
             document.body.style.overflow = previousOverflow;
             if (previousActive && typeof previousActive.focus === "function") {
-                previousActive.focus();
+                previousActive.focus({ preventScroll: true });
             }
         };
     }, [onClose, disableEscapeClose]);
 
-    return (
+    const modal = (
         <div
             className={overlayClassName}
             onMouseDown={(event) => {
@@ -95,4 +98,6 @@ export default function Modal({
             </div>
         </div>
     );
+
+    return createPortal(modal, document.body);
 }
