@@ -1,20 +1,53 @@
-import { useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ExternalLink, Settings2 } from "lucide-react";
 import { loadTools, resolveToolUrl } from "../services/toolsService.js";
 
-export default function ToolsBar({ values = {}, onOpenExternalGenerator, onManageTools }) {
+const ToolButton = memo(function ToolButton({ tool, onOpenTool }) {
+    const handleClick = useCallback(() => {
+        onOpenTool(tool);
+    }, [onOpenTool, tool]);
+
+    return (
+        <button
+            type="button"
+            className="tools-bar-btn"
+            title={tool.url || tool.title}
+            onClick={handleClick}
+        >
+            {tool.title}
+            <ExternalLink size={11} strokeWidth={2} aria-hidden="true" />
+        </button>
+    );
+});
+
+function ToolsBar({ values = {}, onOpenExternalGenerator, onManageTools }) {
     const navigate = useNavigate();
     const [tools, setTools] = useState([]);
+    const valuesRef = useRef(values);
+    valuesRef.current = values;
 
-    const reload = () => loadTools().then(setTools);
+    const reload = useCallback(() => loadTools().then(setTools), []);
 
     useEffect(() => {
         reload();
         const handler = () => reload();
         window.addEventListener("tools-updated", handler);
         return () => window.removeEventListener("tools-updated", handler);
+    }, [reload]);
+
+    const openTool = useCallback((tool) => {
+        const url = resolveToolUrl(tool.url, valuesRef.current);
+        window.open(url, "_blank", "noopener,noreferrer");
     }, []);
+
+    const handleManageTools = useCallback(() => {
+        if (onManageTools) {
+            onManageTools();
+            return;
+        }
+        navigate("/tools");
+    }, [navigate, onManageTools]);
 
     if (tools.length === 0 && !onOpenExternalGenerator) return null;
 
@@ -32,31 +65,17 @@ export default function ToolsBar({ values = {}, onOpenExternalGenerator, onManag
                     </button>
                 )}
                 {tools.map((tool) => (
-                    <button
+                    <ToolButton
                         key={tool.id}
-                        type="button"
-                        className="tools-bar-btn"
-                        title={tool.url || tool.title}
-                        onClick={() => {
-                            const url = resolveToolUrl(tool.url, values);
-                            window.open(url, "_blank", "noopener,noreferrer");
-                        }}
-                    >
-                        {tool.title}
-                        <ExternalLink size={11} strokeWidth={2} aria-hidden="true" />
-                    </button>
+                        tool={tool}
+                        onOpenTool={openTool}
+                    />
                 ))}
             </div>
             <button
                 type="button"
                 className="tools-bar-manage-btn"
-                onClick={() => {
-                    if (onManageTools) {
-                        onManageTools();
-                        return;
-                    }
-                    navigate("/tools");
-                }}
+                onClick={handleManageTools}
                 title="Manage tools"
                 aria-label="Manage tools"
             >
@@ -65,3 +84,5 @@ export default function ToolsBar({ values = {}, onOpenExternalGenerator, onManag
         </div>
     );
 }
+
+export default memo(ToolsBar);

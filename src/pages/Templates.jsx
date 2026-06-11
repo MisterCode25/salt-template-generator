@@ -719,10 +719,15 @@ export default function Templates() {
         runtime.setCopyPreview(null);
     };
 
-    const openExternalGenerator = () => {
+    const openExternalGenerator = useCallback(() => {
         setExternalGeneratorClosing(false);
         setExternalGeneratorOpen(true);
-    };
+    }, []);
+
+    const openToolsWorkspace = useCallback(() => {
+        setActiveWorkspace("tools");
+        setDropdownOpen(false);
+    }, []);
 
     const closeExternalGenerator = () => {
         setExternalGeneratorClosing(true);
@@ -855,7 +860,7 @@ export default function Templates() {
             <ToolsBar
                 values={runtime.values}
                 onOpenExternalGenerator={openExternalGenerator}
-                onManageTools={() => openWorkspace("tools")}
+                onManageTools={openToolsWorkspace}
             />
 
             <section className="templates-workbench templates-workbench--columns">
