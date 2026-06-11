@@ -25,9 +25,9 @@ function buildTokenLabelLookup(tokens = []) {
     }
 
     const lookup = new Map();
-    (tokens || []).forEach((item) => {
+    for (const item of tokens || []) {
         if (item?.token) lookup.set(item.token, item.label);
-    });
+    }
     if (Array.isArray(tokens)) tokenLabelLookupCache?.set(tokens, lookup);
     return lookup;
 }
@@ -153,13 +153,6 @@ export function normalizePastedPlainText(value = "", tokens = []) {
     return formatRichTextForEditor(html, tokens);
 }
 
-function getTextNodes(root) {
-    const walker = textNodeWalker(root);
-    const nodes = [];
-    while (walker.nextNode()) nodes.push(walker.currentNode);
-    return nodes;
-}
-
 function getCaretTextOffset(root) {
     const selection = window.getSelection();
     if (!selection?.rangeCount || !root.contains(selection.anchorNode)) return null;
@@ -173,11 +166,12 @@ function getCaretTextOffset(root) {
 
 function rangeFromTextOffsets(root, startOffset, endOffset) {
     const range = root.ownerDocument.createRange();
-    const textNodes = getTextNodes(root);
+    const walker = textNodeWalker(root);
     let current = 0;
     let started = false;
 
-    for (const node of textNodes) {
+    while (walker.nextNode()) {
+        const node = walker.currentNode;
         const next = current + (node.nodeValue || "").length;
         if (!started && startOffset >= current && startOffset <= next) {
             range.setStart(node, startOffset - current);

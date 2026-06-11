@@ -30,37 +30,43 @@ function normalizeTokenSearchValue(value = "") {
 }
 
 function buildTokenSearchIndex(tokens = []) {
-    return (tokens || []).map((item) => ({
-        item,
-        labelSearch: normalizeTokenSearchValue(item.label),
-        tokenSearch: normalizeTokenSearchValue(item.token),
-        tokenNameSearch: normalizeTokenSearchValue(tokenName(item.token))
-    }));
+    const index = [];
+    for (const item of tokens || []) {
+        index.push({
+            item,
+            labelSearch: normalizeTokenSearchValue(item.label),
+            tokenSearch: normalizeTokenSearchValue(item.token),
+            tokenNameSearch: normalizeTokenSearchValue(tokenName(item.token))
+        });
+    }
+    return index;
 }
 
 function buildTokenMatches(queryValue, tokenSearchIndex = []) {
     const query = queryValue.trim().toLowerCase();
-    const base = tokenSearchIndex.filter(({ labelSearch, tokenSearch }) => {
-        if (!query) return true;
-        return labelSearch.includes(query) || tokenSearch.includes(query);
-    }).map(({ item }) => item);
+    const matches = [];
+    let hasExactMatch = false;
 
-    if (query) {
-        const exact = tokenSearchIndex.some(({ labelSearch, tokenNameSearch }) =>
-            labelSearch === query || tokenNameSearch === query
-        );
-        if (!exact) {
-            const label = queryValue.trim();
-            base.unshift({
-                id: `create:${label}`,
-                label: `+ Create and insert "${label}"`,
-                token: `{${slugifyTokenLabel(label)}}`,
-                createLabel: label
-            });
+    for (const { item, labelSearch, tokenSearch, tokenNameSearch } of tokenSearchIndex) {
+        if (!query || labelSearch.includes(query) || tokenSearch.includes(query)) {
+            matches.push(item);
+        }
+        if (query && (labelSearch === query || tokenNameSearch === query)) {
+            hasExactMatch = true;
         }
     }
 
-    return base;
+    if (query && !hasExactMatch) {
+        const label = queryValue.trim();
+        matches.unshift({
+            id: `create:${label}`,
+            label: `+ Create and insert "${label}"`,
+            token: `{${slugifyTokenLabel(label)}}`,
+            createLabel: label
+        });
+    }
+
+    return matches;
 }
 
 function RichTextEditor({
