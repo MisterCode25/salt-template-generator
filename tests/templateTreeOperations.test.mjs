@@ -91,15 +91,19 @@ templates = updateTemplate(templates, "tpl-a", { title: "Customer unreachable", 
 templates = moveTemplateToNode(templates, "tpl-a", "root-b", nodes);
 assert.equal(templates.find((template) => template.id === "tpl-a").parentNodeId, "root-b");
 
+const tplDeepBeforeDuplicate = templates.find((template) => template.id === "tpl-deep");
 templates = duplicateTemplate(templates, "tpl-a");
 const copies = templates.filter((template) => template.title === "Customer unreachable copy");
 assert.equal(copies.length, 1);
 assert.deepEqual(copies[0].channels, ["sms", "other"]);
 assert.equal(copies[0].contentByChannel.sms.text_en, "Hello");
 assert.equal(copies[0].contentByChannel.other.title, "Customer unreachable copy");
+assert.equal(templates.find((template) => template.id === "tpl-deep"), tplDeepBeforeDuplicate);
 
+const tplDeepBeforeRemove = templates.find((template) => template.id === "tpl-deep");
 templates = removeTemplate(templates, "tpl-a");
 assert.equal(templates.some((template) => template.id === "tpl-a"), false);
+assert.equal(templates.find((template) => template.id === "tpl-deep"), tplDeepBeforeRemove);
 
 const removed = removeNodeCascade(nodes, templates, "child-a");
 assert.equal(removed.nodes.some((node) => node.id === "child-a"), false);

@@ -154,12 +154,14 @@ export function removeNodeCascade(nodes = [], templates = [], nodeId) {
     removedNodeIds.add(nodeId);
     const nextTemplates = templates
         .map((template) => {
-            const nextNodeIds = (template.nodeIds || []).filter((id) => !removedNodeIds.has(id));
+            const currentNodeIds = template.nodeIds || [];
+            const nextNodeIds = currentNodeIds.filter((id) => !removedNodeIds.has(id));
+            if (nextNodeIds.length === currentNodeIds.length) return template;
             return normalizeTemplate({ ...template, nodeIds: nextNodeIds });
         })
-        .filter((template) => template.nodeIds.length > 0);
+        .filter((template) => Array.isArray(template.nodeIds) && template.nodeIds.length > 0);
     return {
-        nodes: nodes.filter((node) => !removedNodeIds.has(node.id)).map(normalizeNode),
+        nodes: nodes.filter((node) => !removedNodeIds.has(node.id)),
         templates: nextTemplates
     };
 }
@@ -282,11 +284,9 @@ export function duplicateTemplate(templates = [], templateId) {
         order: (template.order || 0) + 1,
         contentByChannel
     });
-    return [...templates.map(normalizeTemplate), copy];
+    return [...templates, copy];
 }
 
 export function removeTemplate(templates = [], templateId) {
-    return templates
-        .filter((template) => template.id !== templateId)
-        .map(normalizeTemplate);
+    return templates.filter((template) => template.id !== templateId);
 }
