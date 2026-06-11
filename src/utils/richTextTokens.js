@@ -16,9 +16,16 @@ export function tokenName(token = "") {
         .trim();
 }
 
-function tokenLabel(token, tokens = []) {
-    const match = tokens.find((item) => item.token === token);
-    return match?.label || tokenName(token) || token;
+function buildTokenLabelLookup(tokens = []) {
+    return new Map(
+        (tokens || [])
+            .filter((item) => item?.token)
+            .map((item) => [item.token, item.label])
+    );
+}
+
+function tokenLabel(token, tokenLabels = new Map()) {
+    return tokenLabels.get(token) || tokenName(token) || token;
 }
 
 export function slugifyTokenLabel(label = "") {
@@ -30,12 +37,15 @@ export function slugifyTokenLabel(label = "") {
         .replace(/^_+|_+$/g, "");
 }
 
-export function makeTokenChip(documentRef, token, tokens = []) {
+export function makeTokenChip(documentRef, token, tokensOrLabels = []) {
+    const tokenLabels = tokensOrLabels instanceof Map
+        ? tokensOrLabels
+        : buildTokenLabelLookup(tokensOrLabels);
     const chip = documentRef.createElement("span");
     chip.className = "rich-token-chip";
     chip.contentEditable = "false";
     chip.dataset.token = token;
-    chip.dataset.label = tokenLabel(token, tokens);
+    chip.dataset.label = tokenLabel(token, tokenLabels);
     chip.textContent = chip.dataset.label;
     return chip;
 }
@@ -45,7 +55,7 @@ function textNodeWalker(root) {
     return root.ownerDocument.createTreeWalker(root, showText);
 }
 
-function replaceTokensInTextNode(textNode, tokens = []) {
+function replaceTokensInTextNode(textNode, tokenLabels) {
     const text = textNode.nodeValue || "";
     TOKEN_PATTERN.lastIndex = 0;
     if (!TOKEN_PATTERN.test(text)) return;
@@ -57,7 +67,7 @@ function replaceTokensInTextNode(textNode, tokens = []) {
     while ((match = TOKEN_PATTERN.exec(text)) !== null) {
         const before = text.slice(cursor, match.index);
         if (before) fragment.appendChild(textNode.ownerDocument.createTextNode(before));
-        fragment.appendChild(makeTokenChip(textNode.ownerDocument, match[0], tokens));
+        fragment.appendChild(makeTokenChip(textNode.ownerDocument, match[0], tokenLabels));
         fragment.appendChild(textNode.ownerDocument.createTextNode(CARET_BOUNDARY));
         cursor = match.index + match[0].length;
     }
@@ -67,6 +77,7 @@ function replaceTokensInTextNode(textNode, tokens = []) {
 }
 
 function decorateTokens(root, tokens = []) {
+    const tokenLabels = buildTokenLabelLookup(tokens);
     const walker = textNodeWalker(root);
     const nodes = [];
     while (walker.nextNode()) {
@@ -74,7 +85,7 @@ function decorateTokens(root, tokens = []) {
         if (node.parentElement?.closest(".rich-token-chip")) continue;
         nodes.push(node);
     }
-    nodes.forEach((node) => replaceTokensInTextNode(node, tokens));
+    nodes.forEach((node) => replaceTokensInTextNode(node, tokenLabels));
 }
 
 export function formatRichTextForEditor(value = "", tokens = []) {

@@ -6,7 +6,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node tests/tokenEngine.test.mjs && node tests/tokenService.test.mjs && node tests/legacyTemplateMigration.test.mjs && node tests/templateTreeService.test.mjs && node tests/templateTreeOperations.test.mjs && node tests/templateTreeNavigation.test.mjs && node tests/partnerSearch.test.mjs && node tests/partnersData.test.mjs && node tests/externalGenerator.test.mjs && node tests/clientClipboard.test.mjs && node tests/activeClientService.test.mjs && node tests/agentProfileService.test.mjs && node tests/clipboardService.test.mjs"
+    "test": "node tests/tokenEngine.test.mjs && node tests/tokenService.test.mjs && node tests/legacyTemplateMigration.test.mjs && node tests/templateTreeService.test.mjs && node tests/templateTreeOperations.test.mjs && node tests/templateTreeNavigation.test.mjs && node tests/richTextTokens.test.mjs && node tests/partnerSearch.test.mjs && node tests/partnersData.test.mjs && node tests/externalGenerator.test.mjs && node tests/clientClipboard.test.mjs && node tests/activeClientService.test.mjs && node tests/agentProfileService.test.mjs && node tests/clipboardService.test.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.17.0",
