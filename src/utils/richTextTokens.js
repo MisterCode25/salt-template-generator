@@ -120,10 +120,16 @@ function cloneWithSerializedTokens(root) {
 }
 
 export function serializeRichText(root) {
+    if (!root.querySelector?.(".rich-token-chip")) {
+        return root.innerHTML.replaceAll(CARET_BOUNDARY, "");
+    }
     return cloneWithSerializedTokens(root).innerHTML.replaceAll(CARET_BOUNDARY, "");
 }
 
 export function serializeRichTextPlain(root) {
+    if (!root.querySelector?.(".rich-token-chip")) {
+        return root.textContent.replaceAll(CARET_BOUNDARY, "");
+    }
     return cloneWithSerializedTokens(root).textContent.replaceAll(CARET_BOUNDARY, "");
 }
 

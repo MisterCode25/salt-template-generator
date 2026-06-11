@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 
 const {
-  makeTokenChip
+  makeTokenChip,
+  serializeRichText,
+  serializeRichTextPlain
 } = await import("../src/utils/richTextTokens.js");
 
 function createFakeDocument() {
@@ -32,5 +34,22 @@ assert.equal(chipFromMap.dataset.label, "Agent email");
 
 const unknownChip = makeTokenChip(documentRef, "{unknown_token}", tokenDefs);
 assert.equal(unknownChip.dataset.label, "unknown token");
+
+{
+  let cloned = false;
+  const root = {
+    innerHTML: "<p>Hello</p>",
+    textContent: "Hello",
+    querySelector: () => null,
+    cloneNode: () => {
+      cloned = true;
+      throw new Error("should not clone without token chips");
+    }
+  };
+
+  assert.equal(serializeRichText(root), "<p>Hello</p>");
+  assert.equal(serializeRichTextPlain(root), "Hello");
+  assert.equal(cloned, false);
+}
 
 console.log("richTextTokens tests passed");
