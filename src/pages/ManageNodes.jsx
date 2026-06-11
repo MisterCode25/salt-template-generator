@@ -1,9 +1,8 @@
-import { memo, useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
+import { lazy, memo, Suspense, useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import Modal from "../components/Modal.jsx";
-import RichTextEditor from "../components/RichTextEditor.jsx";
 import { showToast } from "../services/clipboardService.js";
 import { loadTemplateTreeData, saveTemplateTreeData } from "../services/templateTreeService.js";
 import { loadTokens, saveTokens } from "../services/tokenService.js";
@@ -30,6 +29,7 @@ import {
 } from "../utils/templateTreeOperations.js";
 
 const ROOT_PARENT_VALUE = "__root__";
+const RichTextEditor = lazy(() => import("../components/RichTextEditor.jsx"));
 
 const CHANNEL_LABELS = {
     [Channel.EMAIL]: "Email",
@@ -49,6 +49,14 @@ const LANGUAGES = [
     { code: "de", label: "DE", field: "text_de" },
     { code: "it", label: "IT", field: "text_it" }
 ];
+
+const RichTextEditorFallback = memo(function RichTextEditorFallback() {
+    return (
+        <div className="node-content-rich-editor node-content-empty">
+            Loading editor...
+        </div>
+    );
+});
 
 const NODE_ICON_CATEGORIES = ["All", "Network", "Customer", "Messages", "Hardware", "Actions", "Status", "Business"];
 
@@ -908,14 +916,16 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
                                                     placeholder="Main"
                                                 />
                                             </div>
-                                            <RichTextEditor
-                                                className="node-content-rich-editor"
-                                                value={activeTextValue}
-                                                onChange={handleMainTextChange}
-                                                placeholder={`${activeLanguageDef.label} HTML`}
-                                                tokens={tokens}
-                                                onTokenCreate={createToken}
-                                            />
+                                            <Suspense fallback={<RichTextEditorFallback />}>
+                                                <RichTextEditor
+                                                    className="node-content-rich-editor"
+                                                    value={activeTextValue}
+                                                    onChange={handleMainTextChange}
+                                                    placeholder={`${activeLanguageDef.label} HTML`}
+                                                    tokens={tokens}
+                                                    onTokenCreate={createToken}
+                                                />
+                                            </Suspense>
                                         </div>
                                     </div>
                                     <div className="variant-editor">
@@ -979,14 +989,16 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
                                                             </div>
                                                             <div className="node-content-main">
                                                                 <div className="node-content-edit-pane">
-                                                                    <RichTextEditor
-                                                                        className="node-content-rich-editor"
-                                                                        value={activeVariantTextValue}
-                                                                        onChange={handleVariantTextChange}
-                                                                        placeholder={`${activeLanguageDef.label} variant HTML`}
-                                                                        tokens={tokens}
-                                                                        onTokenCreate={createToken}
-                                                                    />
+                                                                    <Suspense fallback={<RichTextEditorFallback />}>
+                                                                        <RichTextEditor
+                                                                            className="node-content-rich-editor"
+                                                                            value={activeVariantTextValue}
+                                                                            onChange={handleVariantTextChange}
+                                                                            placeholder={`${activeLanguageDef.label} variant HTML`}
+                                                                            tokens={tokens}
+                                                                            onTokenCreate={createToken}
+                                                                        />
+                                                                    </Suspense>
                                                                 </div>
                                                             </div>
                                                         </div>
