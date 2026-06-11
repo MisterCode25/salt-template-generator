@@ -127,10 +127,42 @@ function getTemplateDisplayTitle(model) {
     return title;
 }
 
-export function TokenPromptModal({ title, tokenDefs, values, missingTokens, mode = "copy", onChange, onConfirm, onClose }) {
+const TokenPromptField = memo(function TokenPromptField({
+    tokenDef,
+    value,
+    hasError,
+    autoFocus,
+    onChange
+}) {
+    const type = tokenDef.input_type === "number"
+        ? "number"
+        : tokenDef.input_type === "date"
+            ? "date"
+            : "text";
+
+    return (
+        <div className={`token-prompt-field${hasError ? " token-prompt-field--error" : ""}`}>
+            <label htmlFor={`tp-${tokenDef.token}`}>{tokenDef.label || tokenDef.token}</label>
+            <input
+                id={`tp-${tokenDef.token}`}
+                type={type}
+                autoFocus={autoFocus}
+                value={value}
+                className={hasError ? "input-error" : ""}
+                placeholder={tokenDef.token}
+                onChange={(event) => onChange(tokenDef.token, event.target.value)}
+            />
+            {hasError && <span className="token-prompt-field-error">This field is required</span>}
+        </div>
+    );
+});
+
+export const TokenPromptModal = memo(function TokenPromptModal({ title, tokenDefs, values, missingTokens, mode = "copy", onChange, onConfirm, onClose }) {
     const isMultiCol = tokenDefs.length > 2;
     const isFillMode = mode === "fill";
     const isResultMode = mode === "result";
+    const missingTokenSet = useMemo(() => new Set(missingTokens), [missingTokens]);
+
     return (
         <Modal onClose={onClose} dialogClassName="popup-box token-prompt-modal" ariaLabel="Template tokens">
             <div className="popup-header token-prompt-header">
@@ -152,38 +184,25 @@ export function TokenPromptModal({ title, tokenDefs, values, missingTokens, mode
                 </div>
             </div>
             <div className={`token-prompt-grid mt-md${isMultiCol ? " token-prompt-grid--multi" : ""}`}>
-                {tokenDefs.map((tokenDef, idx) => {
-                    const type = tokenDef.input_type === "number"
-                        ? "number"
-                        : tokenDef.input_type === "date"
-                            ? "date"
-                            : "text";
-                    const hasError = missingTokens.includes(tokenDef.token);
-                    return (
-                        <div key={tokenDef.token} className={`token-prompt-field${hasError ? " token-prompt-field--error" : ""}`}>
-                            <label htmlFor={`tp-${tokenDef.token}`}>{tokenDef.label || tokenDef.token}</label>
-                            <input
-                                id={`tp-${tokenDef.token}`}
-                                type={type}
-                                autoFocus={idx === 0}
-                                value={values[tokenDef.token] ?? tokenDef.default ?? ""}
-                                className={hasError ? "input-error" : ""}
-                                placeholder={tokenDef.token}
-                                onChange={(e) => onChange(tokenDef.token, e.target.value)}
-                            />
-                            {hasError && <span className="token-prompt-field-error">This field is required</span>}
-                        </div>
-                    );
-                })}
+                {tokenDefs.map((tokenDef, idx) => (
+                    <TokenPromptField
+                        key={tokenDef.token}
+                        tokenDef={tokenDef}
+                        value={values[tokenDef.token] ?? tokenDef.default ?? ""}
+                        hasError={missingTokenSet.has(tokenDef.token)}
+                        autoFocus={idx === 0}
+                        onChange={onChange}
+                    />
+                ))}
             </div>
             <div className="popup-actions">
                 <button className="primary-btn" onClick={onConfirm}>{isFillMode ? "Apply" : isResultMode ? "Continue" : "Copy text"}</button>
             </div>
         </Modal>
     );
-}
+});
 
-export function VariantModal({ model, displayTitle, onSelect, onClose }) {
+export const VariantModal = memo(function VariantModal({ model, displayTitle, onSelect, onClose }) {
     const typeClass = model.type ? `template-type-${model.type}` : "";
     const mainVariantLabel = model.mainVariantName?.trim() || model.title || "Main text";
 
@@ -204,9 +223,9 @@ export function VariantModal({ model, displayTitle, onSelect, onClose }) {
             </div>
         </Modal>
     );
-}
+});
 
-export function TemplateResultModal({ result, onCopy, onClose }) {
+export const TemplateResultModal = memo(function TemplateResultModal({ result, onCopy, onClose }) {
     if (!result) return null;
 
     return (
@@ -232,7 +251,7 @@ export function TemplateResultModal({ result, onCopy, onClose }) {
             </div>
         </Modal>
     );
-}
+});
 
 export const ClientInfoPanel = memo(function ClientInfoPanel({
     sections,

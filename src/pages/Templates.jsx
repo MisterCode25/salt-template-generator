@@ -839,6 +839,47 @@ export default function Templates() {
         runtimeRef.current.setVariantPicker(picker);
     }, []);
 
+    const selectRuntimeVariant = useCallback((variant) => {
+        const runtimeApi = runtimeRef.current;
+        const picker = runtimeApi.variantPicker;
+        if (!picker?.model) return;
+        const baseKey = picker.sectionKey || `variant_${picker.model.id}`;
+        const sectionKey = variant ? `${baseKey}_${variant.id}` : `${baseKey}_main`;
+        runtimeApi.setVariantPicker(null);
+        if (variant) {
+            runtimeApi.requestTemplateResult(variant, sectionKey, picker.model);
+        } else {
+            runtimeApi.requestTemplateResult(picker.model, sectionKey);
+        }
+    }, []);
+
+    const changeTokenPromptValue = useCallback((token, nextValue) => {
+        const runtimeApi = runtimeRef.current;
+        runtimeApi.setValues((prev) => ({ ...prev, [token]: nextValue }));
+        runtimeApi.setPromptMissingTokens((prev) => prev.filter((name) => name !== token));
+    }, []);
+
+    const confirmRuntimeTokenPrompt = useCallback(() => {
+        return runtimeRef.current.confirmTokenPrompt();
+    }, []);
+
+    const closeRuntimeTokenPrompt = useCallback(() => {
+        const runtimeApi = runtimeRef.current;
+        const defs = runtimeApi.tokenPrompt?.tokenDefs ?? [];
+        closeTemplateWorkflow();
+        runtimeApi.clearOnDemandValues(defs);
+    }, [closeTemplateWorkflow]);
+
+    const copyRuntimeTemplateResultAgain = useCallback(() => {
+        return runtimeRef.current.copyTemplateResultAgain();
+    }, []);
+
+    const closeClientPasteModal = useCallback(() => {
+        const runtimeApi = runtimeRef.current;
+        runtimeApi.setClientPasteOpen(false);
+        runtimeApi.setClientPasteInitialError("");
+    }, []);
+
     const openExternalGenerator = useCallback(() => {
         setExternalGeneratorClosing(false);
         setExternalGeneratorOpen(true);
@@ -1078,21 +1119,7 @@ export default function Templates() {
                         runtime.values
                     )}
                     onClose={closeTemplateWorkflow}
-                    onSelect={(variant) => {
-                        const picker = runtime.variantPicker;
-                        const baseKey = picker.sectionKey || `variant_${picker.model.id}`;
-                        const sectionKey = variant ? `${baseKey}_${variant.id}` : `${baseKey}_main`;
-                        runtime.setVariantPicker(null);
-                        if (variant) {
-                            runtime.requestTemplateResult(
-                                variant,
-                                sectionKey,
-                                picker.model
-                            );
-                        } else {
-                            runtime.requestTemplateResult(picker.model, sectionKey);
-                        }
-                    }}
+                    onSelect={selectRuntimeVariant}
                 />
             )}
 
@@ -1103,25 +1130,16 @@ export default function Templates() {
                     values={runtime.values}
                     missingTokens={runtime.promptMissingTokens}
                     mode={runtime.tokenPrompt.mode}
-                    onChange={(token, nextValue) => {
-                        runtime.setValues((prev) => {
-                            return { ...prev, [token]: nextValue };
-                        });
-                        runtime.setPromptMissingTokens((prev) => prev.filter((name) => name !== token));
-                    }}
-                    onConfirm={runtime.confirmTokenPrompt}
-                    onClose={() => {
-                        const defs = runtime.tokenPrompt?.tokenDefs ?? [];
-                        closeTemplateWorkflow();
-                        runtime.clearOnDemandValues(defs);
-                    }}
+                    onChange={changeTokenPromptValue}
+                    onConfirm={confirmRuntimeTokenPrompt}
+                    onClose={closeRuntimeTokenPrompt}
                 />
             )}
 
             {runtime.copyPreview && (
                 <TemplateResultModal
                     result={runtime.copyPreview}
-                    onCopy={runtime.copyTemplateResultAgain}
+                    onCopy={copyRuntimeTemplateResultAgain}
                     onClose={closeTemplateWorkflow}
                 />
             )}
@@ -1129,10 +1147,7 @@ export default function Templates() {
             {runtime.clientPasteOpen && (
                 <ClientPasteModal
                     initialError={runtime.clientPasteInitialError}
-                    onClose={() => {
-                        runtime.setClientPasteOpen(false);
-                        runtime.setClientPasteInitialError("");
-                    }}
+                    onClose={closeClientPasteModal}
                     onImport={importClientFromPasteAndResetCase}
                 />
             )}
