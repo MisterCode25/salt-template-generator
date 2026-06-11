@@ -24,18 +24,25 @@ export function getChildNodes(nodes = [], parentId = null) {
 }
 
 export function buildNodeLookup(nodes = []) {
-    return new Map(nodes.map((node) => [node.id, node]));
+    const lookup = new Map();
+    for (const node of nodes) {
+        lookup.set(node.id, node);
+    }
+    return lookup;
 }
 
 export function buildNodeChildrenIndex(nodes = []) {
     const childrenByParent = new Map();
 
-    nodes.forEach((node) => {
+    for (const node of nodes) {
         const normalizedParentId = normalizeParentId(node.parentId);
-        const children = childrenByParent.get(normalizedParentId) || [];
+        let children = childrenByParent.get(normalizedParentId);
+        if (!children) {
+            children = [];
+            childrenByParent.set(normalizedParentId, children);
+        }
         children.push(node);
-        childrenByParent.set(normalizedParentId, children);
-    });
+    }
 
     childrenByParent.forEach((children) => {
         children.sort(sortByOrderThenTitle);
@@ -49,12 +56,12 @@ export function getIndexedChildNodes(childrenByParent, parentId = null) {
 }
 
 export function getNextNodeOrder(nodes = [], parentId = null) {
-    const siblings = getChildNodes(nodes, parentId);
-    if (siblings.length === 0) return 1;
+    const normalizedParentId = normalizeParentId(parentId);
     let maxOrder = 0;
-    siblings.forEach((node) => {
-        maxOrder = Math.max(maxOrder, node.order || 0);
-    });
+    for (const node of nodes) {
+        if (normalizeParentId(node.parentId) !== normalizedParentId) continue;
+        if ((node.order || 0) > maxOrder) maxOrder = node.order || 0;
+    }
     return maxOrder + 1;
 }
 
@@ -62,13 +69,16 @@ function getDescendantNodeIdSet(nodes = [], nodeId) {
     if (!nodeId) return new Set();
 
     const childrenByParent = new Map();
-    nodes.forEach((node) => {
+    for (const node of nodes) {
         const parentId = normalizeParentId(node.parentId);
-        if (!parentId) return;
-        const children = childrenByParent.get(parentId) || [];
+        if (!parentId) continue;
+        let children = childrenByParent.get(parentId);
+        if (!children) {
+            children = [];
+            childrenByParent.set(parentId, children);
+        }
         children.push(node.id);
-        childrenByParent.set(parentId, children);
-    });
+    }
 
     const descendants = new Set();
     const stack = [...(childrenByParent.get(nodeId) || [])];
