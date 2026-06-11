@@ -259,6 +259,28 @@ const PlaybookTemplateRow = memo(function PlaybookTemplateRow({
     );
 });
 
+const FavoriteTemplateButton = memo(function FavoriteTemplateButton({
+    template,
+    selected,
+    onOpenTemplate
+}) {
+    const Icon = templateIcon(template);
+    const handleClick = useCallback(() => {
+        onOpenTemplate(template.id);
+    }, [onOpenTemplate, template.id]);
+
+    return (
+        <button
+            type="button"
+            className={`templates-favorites-item${selected ? " is-active" : ""}`}
+            onClick={handleClick}
+        >
+            <IconBadge Icon={Icon} tone={toneForValue(template.title)} className="templates-favorites-icon" />
+            <span>{template.title || "Untitled"}</span>
+        </button>
+    );
+});
+
 const PlaybookColumn = memo(function PlaybookColumn({
     title,
     nodes: columnNodes,
@@ -907,20 +929,14 @@ export default function Templates() {
                                 <span>Favorites</span>
                             </div>
                             <div className="templates-favorites-list">
-                                {favoriteTemplates.map((template) => {
-                                    const FavIcon = templateIcon(template);
-                                    return (
-                                        <button
-                                            key={template.id}
-                                            type="button"
-                                            className={`templates-favorites-item${activeTemplateId === template.id ? " is-active" : ""}`}
-                                            onClick={() => openTemplate(template.id)}
-                                        >
-                                            <IconBadge Icon={FavIcon} tone={toneForValue(template.title)} className="templates-favorites-icon" />
-                                            <span>{template.title || "Untitled"}</span>
-                                        </button>
-                                    );
-                                })}
+                                {favoriteTemplates.map((template) => (
+                                    <FavoriteTemplateButton
+                                        key={template.id}
+                                        template={template}
+                                        selected={activeTemplateId === template.id}
+                                        onOpenTemplate={openTemplate}
+                                    />
+                                ))}
                             </div>
                         </div>
                     )}
