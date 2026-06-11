@@ -1021,43 +1021,58 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
     );
 }
 
-function NodeTreeRows({
+const EMPTY_NODE_SUMMARY = { childCount: 0, templateCount: 0 };
+
+const NodeTreeRow = memo(function NodeTreeRow({
+    node,
+    summary,
+    selected,
+    onSelect
+}) {
+    const handleSelect = useCallback(() => {
+        onSelect(node.id);
+    }, [node.id, onSelect]);
+
+    return (
+        <div className="node-tree-item">
+            <div className={`node-tree-row${selected ? " is-selected" : ""}`}>
+                <button
+                    type="button"
+                    className="node-tree-main"
+                    onClick={handleSelect}
+                >
+                    <span className="node-tree-icon"><NodeIconGlyph icon={node.icon} /></span>
+                    <span className="node-tree-copy">
+                        <strong>{node.title || "Untitled section"}</strong>
+                    </span>
+                    <span className="node-tree-counts">
+                        {summary.childCount > 0 && <span>{summary.childCount} section{summary.childCount === 1 ? "" : "s"}</span>}
+                        {summary.templateCount > 0 && <span>{summary.templateCount} template{summary.templateCount === 1 ? "" : "s"}</span>}
+                    </span>
+                </button>
+            </div>
+        </div>
+    );
+});
+
+const NodeTreeRows = memo(function NodeTreeRows({
     childrenByParent,
-    templatesByNode,
+    nodeSummaryById,
     parentId,
     selectedNodeId,
     onSelect
 }) {
     const children = getIndexedChildNodes(childrenByParent, parentId);
-    return children.map((node) => {
-        const childCount = getIndexedChildNodes(childrenByParent, node.id).length;
-        const templateCount = getIndexedTemplatesForNode(templatesByNode, node.id).length;
-        const selected = selectedNodeId === node.id;
-
-        return (
-            <div key={node.id} className="node-tree-item">
-                <div
-                    className={`node-tree-row${selected ? " is-selected" : ""}`}
-                >
-                    <button
-                        type="button"
-                        className="node-tree-main"
-                        onClick={() => onSelect(node.id)}
-                    >
-                        <span className="node-tree-icon"><NodeIconGlyph icon={node.icon} /></span>
-                        <span className="node-tree-copy">
-                            <strong>{node.title || "Untitled section"}</strong>
-                        </span>
-                        <span className="node-tree-counts">
-                            {childCount > 0 && <span>{childCount} section{childCount === 1 ? "" : "s"}</span>}
-                            {templateCount > 0 && <span>{templateCount} template{templateCount === 1 ? "" : "s"}</span>}
-                        </span>
-                    </button>
-                </div>
-            </div>
-        );
-    });
-}
+    return children.map((node) => (
+        <NodeTreeRow
+            key={node.id}
+            node={node}
+            summary={nodeSummaryById.get(node.id) || EMPTY_NODE_SUMMARY}
+            selected={selectedNodeId === node.id}
+            onSelect={onSelect}
+        />
+    ));
+});
 
 export default function ManageNodes({ embedded = false, onClose = null }) {
     const navigate = useNavigate();
@@ -1099,6 +1114,16 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
     const nodeLookup = useMemo(() => buildNodeLookup(nodes), [nodes]);
     const childrenByParent = useMemo(() => buildNodeChildrenIndex(nodes), [nodes]);
     const templatesByNode = useMemo(() => buildTemplateNodeIndex(templates), [templates]);
+    const nodeSummaryById = useMemo(() => {
+        const summaries = new Map();
+        nodes.forEach((node) => {
+            summaries.set(node.id, {
+                childCount: getIndexedChildNodes(childrenByParent, node.id).length,
+                templateCount: getIndexedTemplatesForNode(templatesByNode, node.id).length
+            });
+        });
+        return summaries;
+    }, [childrenByParent, nodes, templatesByNode]);
     const selectedNode = useMemo(
         () => nodeLookup.get(selectedNodeId) || null,
         [nodeLookup, selectedNodeId]
@@ -1113,8 +1138,8 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
     );
     const nodeOptions = useMemo(() => buildNodeOptions(childrenByParent), [childrenByParent]);
     const finalNodeOptions = useMemo(
-        () => nodeOptions.filter(({ node }) => getIndexedChildNodes(childrenByParent, node.id).length === 0),
-        [childrenByParent, nodeOptions]
+        () => nodeOptions.filter(({ node }) => (nodeSummaryById.get(node.id)?.childCount || 0) === 0),
+        [nodeOptions, nodeSummaryById]
     );
     const selectedDescendantIds = useMemo(
         () => selectedNode ? getDescendantNodeIds(nodes, selectedNode.id) : [],
@@ -1319,7 +1344,7 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
                                 ) : (
                                     <NodeTreeRows
                                         childrenByParent={childrenByParent}
-                                        templatesByNode={templatesByNode}
+                                        nodeSummaryById={nodeSummaryById}
                                         parentId={null}
                                         selectedNodeId={selectedNodeId}
                                         onSelect={setSelectedNodeId}
@@ -1367,7 +1392,7 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
                                     <div className="node-tree-list node-tree-list--level">
                                         <NodeTreeRows
                                             childrenByParent={childrenByParent}
-                                            templatesByNode={templatesByNode}
+                                            nodeSummaryById={nodeSummaryById}
                                             parentId={selectedNode.id}
                                             selectedNodeId={selectedNodeId}
                                             onSelect={setSelectedNodeId}
