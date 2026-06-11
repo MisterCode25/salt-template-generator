@@ -561,7 +561,7 @@ textarea:focus {
 }
 
 .workspace-modal--nodes {
-    width: min(1360px, 100%);
+    width: min(1040px, 100%);
 }
 
 .workspace-modal--tools,
@@ -4255,6 +4255,11 @@ textarea:focus {
 
 .node-builder-page--embedded .node-builder-header h1 {
     font-size: clamp(1.35rem, 2vw, 1.8rem);
+}
+
+.node-builder-page--embedded .node-builder-layout--list,
+.node-builder-page--embedded .node-builder-layout--detail {
+    width: 100%;
 }
 
 .node-builder-header h1 {
