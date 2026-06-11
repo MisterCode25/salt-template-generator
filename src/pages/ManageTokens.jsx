@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useState } from "react";
 import { loadTokens, saveTokens } from "../services/tokenService.js";
 import { renameTokenInTemplateTree } from "../services/templateTreeService.js";
 import Modal from "../components/Modal.jsx";
@@ -6,14 +6,14 @@ import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import { showToast } from "../services/clipboardService.js";
 
-function TokenModal({ initial, tokens, onClose, onSave }) {
+const TokenModal = memo(function TokenModal({ initial, tokens, onClose, onSave }) {
     const [token, setToken] = useState(initial?.token || "");
     const [label, setLabel] = useState(initial?.label || "");
     const [key, setKey] = useState(initial?.key || "");
     const [type, setType] = useState(initial?.input_type || "text");
     const [def, setDef] = useState(initial?.default || "");
 
-    const handleSave = () => {
+    const handleSave = useCallback(() => {
         const normalizedToken = token.trim();
         const normalizedLabel = label.trim();
         const normalizedKey = key.trim();
@@ -39,7 +39,7 @@ function TokenModal({ initial, tokens, onClose, onSave }) {
             default: normalizedDefault !== "" ? normalizedDefault : undefined,
             display_mode: "on_demand"
         });
-    };
+    }, [def, initial, key, label, onSave, token, tokens, type]);
 
     return (
         <Modal onClose={onClose} ariaLabel="Token editor">
@@ -90,7 +90,44 @@ function TokenModal({ initial, tokens, onClose, onSave }) {
                 </div>
         </Modal>
     );
-}
+});
+
+const TokenRow = memo(function TokenRow({ token, onEdit, onDelete }) {
+    const handleEdit = useCallback(() => {
+        onEdit(token);
+    }, [onEdit, token]);
+
+    const handleDelete = useCallback(() => {
+        onDelete(token.id);
+    }, [onDelete, token.id]);
+
+    return (
+        <div className="model-row">
+            <div>
+                <strong>{token.label || token.token}</strong> <span className="hint">{token.token}</span>
+                {token.system && (
+                    <span className="variant-pill" style={{ marginLeft: "0.4rem" }}>system</span>
+                )}
+                {token.display_mode === "on_demand" && (
+                    <span className="variant-pill" style={{ marginLeft: "0.4rem" }}>on demand</span>
+                )}
+                {token.key && <div className="hint mt-sm">Key: {token.key}</div>}
+            </div>
+            <div className="flex-row gap-sm" style={{ marginLeft: "auto" }}>
+                {!token.system && (
+                    <>
+                        <button className="icon-btn edit-btn" onClick={handleEdit}>
+                            <span className="icon-pencil" aria-hidden="true"></span>
+                        </button>
+                        <button className="icon-btn delete-btn" onClick={handleDelete}>
+                            <span className="icon-trash" aria-hidden="true"></span>
+                        </button>
+                    </>
+                )}
+            </div>
+        </div>
+    );
+});
 
 export default function ManageTokens({ embedded = false, onClose = null }) {
     const [tokens, setTokens] = useState([]);
@@ -101,23 +138,23 @@ export default function ManageTokens({ embedded = false, onClose = null }) {
         loadTokens().then(setTokens);
     }, []);
 
-    const persist = async (next) => {
+    const persist = useCallback(async (next) => {
         setTokens(next);
         await saveTokens(next);
-    };
+    }, []);
 
-    const onDelete = (id) => {
+    const onDelete = useCallback((id) => {
         setConfirmDelete(id);
-    };
+    }, []);
 
-    const confirmDeleteToken = async () => {
+    const confirmDeleteToken = useCallback(async () => {
         if (!confirmDelete) return;
         const next = tokens.filter(t => t.id !== confirmDelete);
         await persist(next);
         setConfirmDelete(null);
-    };
+    }, [confirmDelete, persist, tokens]);
 
-    const onSave = async (token) => {
+    const onSave = useCallback(async (token) => {
         if (token.id) {
             const previous = tokens.find(t => t.id === token.id);
             const next = tokens.map(t => t.id === token.id ? token : t);
@@ -130,7 +167,23 @@ export default function ManageTokens({ embedded = false, onClose = null }) {
             await persist(next);
         }
         setModalToken(null);
-    };
+    }, [persist, tokens]);
+
+    const openTokenModal = useCallback((token) => {
+        setModalToken(token);
+    }, []);
+
+    const closeTokenModal = useCallback(() => {
+        setModalToken(null);
+    }, []);
+
+    const openNewTokenModal = useCallback(() => {
+        setModalToken({});
+    }, []);
+
+    const cancelDeleteToken = useCallback(() => {
+        setConfirmDelete(null);
+    }, []);
 
     return (
         <main className={embedded ? "management-embedded-page" : "page-container"}>
@@ -145,42 +198,24 @@ export default function ManageTokens({ embedded = false, onClose = null }) {
                 <div id="tokens-list" className="models-list">
                     {tokens.length === 0 && <EmptyState message="No tokens yet." />}
                     {tokens.map(t => (
-                        <div key={t.id} className="model-row">
-                            <div>
-                                <strong>{t.label || t.token}</strong> <span className="hint">{t.token}</span>
-                                {t.system && (
-                                    <span className="variant-pill" style={{ marginLeft: "0.4rem" }}>system</span>
-                                )}
-                                {t.display_mode === "on_demand" && (
-                                    <span className="variant-pill" style={{ marginLeft: "0.4rem" }}>on demand</span>
-                                )}
-                                {t.key && <div className="hint mt-sm">Key: {t.key}</div>}
-                            </div>
-                            <div className="flex-row gap-sm" style={{ marginLeft: "auto" }}>
-                                {!t.system && (
-                                    <>
-                                        <button className="icon-btn edit-btn" onClick={() => setModalToken(t)}>
-                                            <span className="icon-pencil" aria-hidden="true"></span>
-                                        </button>
-                                        <button className="icon-btn delete-btn" onClick={() => onDelete(t.id)}>
-                                            <span className="icon-trash" aria-hidden="true"></span>
-                                        </button>
-                                    </>
-                                )}
-                            </div>
-                        </div>
+                        <TokenRow
+                            key={t.id}
+                            token={t}
+                            onEdit={openTokenModal}
+                            onDelete={onDelete}
+                        />
                     ))}
                 </div>
 
                 <div className="add-btn-container">
-                    <button className="primary-btn" onClick={() => setModalToken({})}>+ Add Token</button>
+                    <button className="primary-btn" onClick={openNewTokenModal}>+ Add Token</button>
                 </div>
             </div>
             {modalToken !== null && (
                 <TokenModal
                     initial={modalToken.id ? modalToken : null}
                     tokens={tokens}
-                    onClose={() => setModalToken(null)}
+                    onClose={closeTokenModal}
                     onSave={onSave}
                 />
             )}
@@ -191,7 +226,7 @@ export default function ManageTokens({ embedded = false, onClose = null }) {
                     confirmLabel="Delete"
                     variant="danger"
                     onConfirm={confirmDeleteToken}
-                    onCancel={() => setConfirmDelete(null)}
+                    onCancel={cancelDeleteToken}
                 />
             )}
         </main>
