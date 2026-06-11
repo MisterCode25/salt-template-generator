@@ -151,6 +151,18 @@ const TITLE_ICON_RULES = [
 
 const EMPTY_NODE_SUMMARY = Object.freeze({ childCount: 0, templateCount: 0 });
 
+function getTemplateDisplayChannels(template) {
+    if (!template) return [];
+    const availableChannels = getAvailableTemplateChannels(template);
+    return availableChannels.length > 0 ? availableChannels : template.channels;
+}
+
+function buildTemplateDisplayChannelIndex(templates = []) {
+    return new Map(
+        templates.map((template) => [template.id, getTemplateDisplayChannels(template)])
+    );
+}
+
 function toneForValue(value = "") {
     const source = String(value || "template");
     const total = [...source].reduce((sum, char) => sum + char.charCodeAt(0), 0);
@@ -226,12 +238,11 @@ const PlaybookNodeRow = memo(function PlaybookNodeRow({
 
 const PlaybookTemplateRow = memo(function PlaybookTemplateRow({
     template,
+    channels,
     selected,
     onOpenTemplate
 }) {
     const Icon = templateIcon(template);
-    const availableChannels = getAvailableTemplateChannels(template);
-    const channels = availableChannels.length > 0 ? availableChannels : template.channels;
 
     return (
         <button
@@ -255,6 +266,7 @@ const PlaybookColumn = memo(function PlaybookColumn({
     nodeSummaryById,
     activeNodeId,
     activeTemplateId,
+    templateChannelsById,
     onOpenNode,
     onOpenTemplate,
     emptyMessage
@@ -283,6 +295,7 @@ const PlaybookColumn = memo(function PlaybookColumn({
                                 <PlaybookTemplateRow
                                     key={template.id}
                                     template={template}
+                                    channels={templateChannelsById.get(template.id) || template.channels}
                                     selected={activeTemplateId === template.id}
                                     onOpenTemplate={onOpenTemplate}
                                 />
@@ -333,7 +346,7 @@ function formatResultPreviewHTML(value = "", tokenMap = EMPTY_TOKEN_MAP, tokens 
     return formatTokenPreviewHTML(hydrated, tokens);
 }
 
-function TemplateDetail({ template, activeChannel, setActiveChannel, runtime, onManage, onToggleFavorite }) {
+function TemplateDetail({ template, activeChannel, setActiveChannel, visibleChannels, runtime, onManage, onToggleFavorite }) {
     const {
         lang,
         requestCopy,
@@ -343,12 +356,11 @@ function TemplateDetail({ template, activeChannel, setActiveChannel, runtime, on
         values
     } = runtime;
     const previewTokenMap = useMemo(() => buildPreviewTokenMap(tokens), [tokens]);
-    const visibleChannels = useMemo(() => {
-        const availableChannels = getAvailableTemplateChannels(template);
-        return (availableChannels.length > 0 ? availableChannels : template.channels)
-            .filter((channel, index, list) => list.indexOf(channel) === index);
-    }, [template]);
-    const channelPreviews = useMemo(() => visibleChannels.map((channel) => {
+    const uniqueVisibleChannels = useMemo(
+        () => visibleChannels.filter((channel, index, list) => list.indexOf(channel) === index),
+        [visibleChannels]
+    );
+    const channelPreviews = useMemo(() => uniqueVisibleChannels.map((channel) => {
         const channelModel = resolveChannelModel(template, channel);
         const textResult = getTemplateTextResult(channelModel, lang);
         const subject = channelModel?.title || template.title || "Untitled template";
@@ -362,7 +374,7 @@ function TemplateDetail({ template, activeChannel, setActiveChannel, runtime, on
             html: formatResultPreviewHTML(textResult.text, previewTokenMap, tokens, values),
             meta: CHANNEL_META[channel] || CHANNEL_META[Channel.OTHER]
         };
-    }), [lang, previewTokenMap, template, tokens, values, visibleChannels]);
+    }), [lang, previewTokenMap, template, tokens, uniqueVisibleChannels, values]);
     const activePreview = useMemo(
         () => channelPreviews.find((preview) => preview.channel === activeChannel) || channelPreviews[0] || null,
         [activeChannel, channelPreviews]
@@ -558,6 +570,13 @@ export default function Templates() {
         () => new Map(treeTemplates.map((template) => [template.id, template])),
         [treeTemplates]
     );
+    const templateChannelsById = useMemo(
+        () => buildTemplateDisplayChannelIndex(treeTemplates),
+        [treeTemplates]
+    );
+    const getIndexedTemplateChannels = useCallback((template) => (
+        template ? (templateChannelsById.get(template.id) || getTemplateDisplayChannels(template)) : []
+    ), [templateChannelsById]);
     const searchIndex = useMemo(
         () => buildTemplateTreeSearchIndex(nodes, treeTemplates),
         [nodes, treeTemplates]
@@ -615,12 +634,12 @@ export default function Templates() {
 
     useEffect(() => {
         if (!activeTemplate) return;
-        const available = getAvailableTemplateChannels(activeTemplate);
+        const available = getIndexedTemplateChannels(activeTemplate);
         const preferred = available[0] || activeTemplate.channels[0] || Channel.EMAIL;
         if (!available.includes(activeChannel) && !activeTemplate.channels.includes(activeChannel)) {
             setActiveChannel(preferred);
         }
-    }, [activeTemplate, activeChannel]);
+    }, [activeChannel, activeTemplate, getIndexedTemplateChannels]);
 
     const openNode = useCallback((nodeId) => {
         setActiveNodeId(nodeId);
@@ -657,8 +676,7 @@ export default function Templates() {
     const requestFirstTemplateWorkflow = useCallback((template, preferredChannel) => {
         if (!template) return false;
         const runtimeApi = runtimeRef.current;
-        const available = getAvailableTemplateChannels(template);
-        const channels = (available.length > 0 ? available : template.channels)
+        const channels = getIndexedTemplateChannels(template)
             .filter((channel, index, list) => list.indexOf(channel) === index);
         const orderedChannels = [
             preferredChannel,
@@ -680,18 +698,18 @@ export default function Templates() {
         }
 
         return false;
-    }, []);
+    }, [getIndexedTemplateChannels]);
 
     const openTemplate = useCallback((templateId) => {
         const template = templateLookup.get(templateId);
         setActiveTemplateId(templateId);
         if (template?.parentNodeId) setActiveNodeId(template.parentNodeId);
-        const channels = template ? getAvailableTemplateChannels(template) : [];
+        const channels = getIndexedTemplateChannels(template);
         const nextChannel = channels[0] || template?.channels?.[0] || Channel.EMAIL;
         setActiveChannel(nextChannel);
         requestFirstTemplateWorkflow(template, nextChannel);
         setQuery("");
-    }, [requestFirstTemplateWorkflow, templateLookup]);
+    }, [getIndexedTemplateChannels, requestFirstTemplateWorkflow, templateLookup]);
 
     const closeTemplateWorkflow = () => {
         setActiveTemplateId(null);
@@ -891,6 +909,7 @@ export default function Templates() {
                                 nodeSummaryById={nodeSummaryById}
                                 activeNodeId={activeNodeId}
                                 activeTemplateId={activeTemplateId}
+                                templateChannelsById={templateChannelsById}
                                 onOpenNode={openNode}
                                 onOpenTemplate={openTemplate}
                                 emptyMessage={column.emptyMessage}
@@ -911,6 +930,7 @@ export default function Templates() {
                         template={activeTemplate}
                         activeChannel={activeChannel}
                         setActiveChannel={setActiveChannel}
+                        visibleChannels={templateChannelsById.get(activeTemplate.id) || activeTemplate.channels}
                         runtime={runtime}
                         onManage={() => openWorkspace("nodes")}
                         onToggleFavorite={toggleFavorite}
