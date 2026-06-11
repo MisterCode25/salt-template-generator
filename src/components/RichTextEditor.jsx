@@ -25,18 +25,29 @@ const TOOLBAR_ACTIONS = [
     { command: "removeFormat", label: "✕", title: "Clear formatting" },
 ];
 
-function buildTokenMatches(queryValue, tokens = []) {
+function normalizeTokenSearchValue(value = "") {
+    return String(value || "").trim().toLowerCase();
+}
+
+function buildTokenSearchIndex(tokens = []) {
+    return (tokens || []).map((item) => ({
+        item,
+        labelSearch: normalizeTokenSearchValue(item.label),
+        tokenSearch: normalizeTokenSearchValue(item.token),
+        tokenNameSearch: normalizeTokenSearchValue(tokenName(item.token))
+    }));
+}
+
+function buildTokenMatches(queryValue, tokenSearchIndex = []) {
     const query = queryValue.trim().toLowerCase();
-    const base = (tokens || []).filter((item) => {
+    const base = tokenSearchIndex.filter(({ labelSearch, tokenSearch }) => {
         if (!query) return true;
-        return (item.label || "").toLowerCase().includes(query)
-            || (item.token || "").toLowerCase().includes(query);
-    });
+        return labelSearch.includes(query) || tokenSearch.includes(query);
+    }).map(({ item }) => item);
 
     if (query) {
-        const exact = base.some((item) =>
-            (item.label || "").toLowerCase() === query
-            || tokenName(item.token).toLowerCase() === query
+        const exact = tokenSearchIndex.some(({ labelSearch, tokenNameSearch }) =>
+            labelSearch === query || tokenNameSearch === query
         );
         if (!exact) {
             const label = queryValue.trim();
@@ -68,10 +79,11 @@ function RichTextEditor({
     const [activeIndex, setActiveIndex] = useState(0);
     const [menuOpen, setMenuOpen] = useState(false);
     const [menuStyle, setMenuStyle] = useState({});
+    const tokenSearchIndex = useMemo(() => buildTokenSearchIndex(tokens), [tokens]);
 
     const tokenMatches = useMemo(
-        () => menuOpen ? buildTokenMatches(slashQuery, tokens) : [],
-        [menuOpen, slashQuery, tokens]
+        () => menuOpen ? buildTokenMatches(slashQuery, tokenSearchIndex) : [],
+        [menuOpen, slashQuery, tokenSearchIndex]
     );
 
     useEffect(() => {
@@ -215,7 +227,7 @@ function RichTextEditor({
             setMenuOpen(true);
         } else if (completedSlashContext) {
             slashRange.current = completedSlashContext.range;
-            const selected = buildTokenMatches(completedSlashContext.query, tokens)[0];
+            const selected = buildTokenMatches(completedSlashContext.query, tokenSearchIndex)[0];
             if (selected) {
                 insertToken(selected);
                 return;
@@ -225,7 +237,7 @@ function RichTextEditor({
         }
 
         handleInput();
-    }, [closeMenu, handleInput, insertToken, tokens]);
+    }, [closeMenu, handleInput, insertToken, tokenSearchIndex]);
 
     const handleKeyDown = useCallback((event) => {
         if (event.key === " ") {
@@ -234,7 +246,7 @@ function RichTextEditor({
             if (context?.query.trim()) {
                 event.preventDefault();
                 slashRange.current = context.range;
-                const matches = buildTokenMatches(context.query, tokens);
+                const matches = buildTokenMatches(context.query, tokenSearchIndex);
                 const selected = matches[Math.min(activeIndex, Math.max(matches.length - 1, 0))];
                 if (selected) insertToken(selected);
                 return;
@@ -269,7 +281,7 @@ function RichTextEditor({
             event.preventDefault();
             closeMenu();
         }
-    }, [activeIndex, closeMenu, insertToken, menuOpen, slashQuery, tokenMatches, tokens]);
+    }, [activeIndex, closeMenu, insertToken, menuOpen, slashQuery, tokenMatches, tokenSearchIndex]);
 
     const writeSelectionToClipboard = useCallback((event) => {
         const editor = editorRef.current;
