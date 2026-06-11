@@ -3,7 +3,7 @@ import { showToast } from "../services/clipboardService.js";
 
 const bookmarkletCode = vtiHealthcheckBookmarklet.trim();
 
-export default function VtiBookmarklet() {
+export default function VtiBookmarklet({ embedded = false, onClose = null }) {
     const copyBookmarklet = async () => {
         try {
             await navigator.clipboard.writeText(bookmarkletCode);
@@ -21,7 +21,7 @@ export default function VtiBookmarklet() {
     };
 
     return (
-        <main className="page-container vti-bookmarklet-page">
+        <main className={embedded ? "management-embedded-page vti-bookmarklet-page" : "page-container vti-bookmarklet-page"}>
             <section className="vti-bookmarklet-hero">
                 <div>
                     <p className="eyebrow">VTI customer data</p>
@@ -42,6 +42,9 @@ export default function VtiBookmarklet() {
                 >
                     Capture VTI data
                 </a>
+                {embedded && (
+                    <button type="button" className="secondary-btn" onClick={onClose}>Close</button>
+                )}
             </section>
 
             <section className="vti-bookmarklet-grid">

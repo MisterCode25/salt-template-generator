@@ -374,7 +374,7 @@ export default function RichTextEditor({
                 style={menuStyle}
             >
                 <div className="rich-token-menu__title">
-                    <span>{slashQuery.trim() ? `Token: /${slashQuery}` : "Choose or create a token"}</span>
+                    <span>{slashQuery.trim() ? `Token: @${slashQuery}` : "Choose or create a token"}</span>
                     <kbd>Space</kbd>
                 </div>
                 <div className="rich-token-menu__list">

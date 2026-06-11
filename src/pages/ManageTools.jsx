@@ -6,30 +6,104 @@ import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import { showToast } from "../services/clipboardService.js";
 
+function getUrlTokenContext(value, caret) {
+    if (caret === null || caret === undefined) return null;
+    const beforeCaret = value.slice(0, caret);
+    const triggerIndex = beforeCaret.lastIndexOf("@");
+    if (triggerIndex === -1) return null;
+
+    const query = beforeCaret.slice(triggerIndex + 1);
+    if (!/^[a-zA-Z0-9_-]*$/.test(query)) return null;
+
+    return {
+        start: triggerIndex,
+        end: caret,
+        query
+    };
+}
+
+function tokenMatchesQuery(token, query = "") {
+    const normalizedQuery = query.trim().toLowerCase();
+    if (!normalizedQuery) return true;
+    return [token.label, token.token, token.key]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(normalizedQuery));
+}
+
 function ToolModal({ initial, onClose, onSave }) {
     const [title, setTitle] = useState(initial?.title || "");
     const [url, setUrl] = useState(initial?.url || "");
     const [tokens, setTokens] = useState([]);
+    const [tokenMenu, setTokenMenu] = useState(null);
+    const [activeTokenIndex, setActiveTokenIndex] = useState(0);
     const urlRef = useRef(null);
 
     useEffect(() => {
         loadTokens().then(setTokens);
     }, []);
 
-    const insertToken = (token) => {
+    const filteredTokens = tokenMenu
+        ? tokens.filter((token) => tokenMatchesQuery(token, tokenMenu.query))
+        : [];
+    const selectedTokenIndex = Math.min(activeTokenIndex, Math.max(filteredTokens.length - 1, 0));
+
+    const updateTokenMenu = (nextUrl, caret) => {
+        const context = getUrlTokenContext(nextUrl, caret);
+        setTokenMenu(context);
+        setActiveTokenIndex(0);
+    };
+
+    const insertToken = (token, context = tokenMenu) => {
         const el = urlRef.current;
         if (!el) {
             setUrl((prev) => prev + token);
+            setTokenMenu(null);
             return;
         }
-        const start = el.selectionStart ?? url.length;
-        const end = el.selectionEnd ?? url.length;
+        const start = context?.start ?? el.selectionStart ?? url.length;
+        const end = context?.end ?? el.selectionEnd ?? url.length;
         const next = url.slice(0, start) + token + url.slice(end);
         setUrl(next);
+        setTokenMenu(null);
+        setActiveTokenIndex(0);
         requestAnimationFrame(() => {
             el.focus();
             el.setSelectionRange(start + token.length, start + token.length);
         });
+    };
+
+    const handleUrlChange = (event) => {
+        const nextUrl = event.target.value;
+        const caret = event.target.selectionStart ?? nextUrl.length;
+        setUrl(nextUrl);
+        updateTokenMenu(nextUrl, caret);
+    };
+
+    const handleUrlKeyDown = (event) => {
+        if (!tokenMenu) return;
+
+        if (event.key === "Escape") {
+            event.preventDefault();
+            setTokenMenu(null);
+            return;
+        }
+
+        if (event.key === "ArrowDown") {
+            event.preventDefault();
+            setActiveTokenIndex((current) => Math.min(current + 1, Math.max(filteredTokens.length - 1, 0)));
+            return;
+        }
+
+        if (event.key === "ArrowUp") {
+            event.preventDefault();
+            setActiveTokenIndex((current) => Math.max(current - 1, 0));
+            return;
+        }
+
+        if ((event.key === "Enter" || event.key === "Tab") && filteredTokens.length > 0) {
+            event.preventDefault();
+            insertToken(filteredTokens[selectedTokenIndex].token, tokenMenu);
+        }
     };
 
     const handleSave = () => {
@@ -58,35 +132,42 @@ function ToolModal({ initial, onClose, onSave }) {
                         />
                     </div>
 
-                    <div className="field-line">
-                        <label>URL (use {"{token}"} for dynamic values)</label>
+                    <div className="field-line tools-url-field">
+                        <label>URL</label>
                         <input
                             ref={urlRef}
                             value={url}
-                            onChange={(e) => setUrl(e.target.value)}
-                            placeholder="https://example.com?id={client_id}"
+                            onChange={handleUrlChange}
+                            onKeyDown={handleUrlKeyDown}
+                            onSelect={(event) => updateTokenMenu(url, event.target.selectionStart ?? url.length)}
+                            onFocus={(event) => updateTokenMenu(url, event.target.selectionStart ?? url.length)}
+                            onBlur={() => window.setTimeout(() => setTokenMenu(null), 120)}
+                            placeholder="https://example.com?id=@client"
                             className="tools-url-input"
                         />
-                    </div>
-
-                    {tokens.length > 0 && (
-                        <div className="field-line">
-                            <label>Insert token</label>
-                            <div className="tools-token-chips">
-                                {tokens.map((tok) => (
+                        {tokenMenu && (
+                            <div className="tools-token-menu" role="listbox">
+                                {filteredTokens.length > 0 ? filteredTokens.map((tok, index) => (
                                     <button
                                         key={tok.id}
                                         type="button"
-                                        className="tools-token-chip"
-                                        onClick={() => insertToken(tok.token)}
+                                        className={`tools-token-option${index === selectedTokenIndex ? " is-active" : ""}`}
+                                        onMouseEnter={() => setActiveTokenIndex(index)}
+                                        onMouseDown={(event) => {
+                                            event.preventDefault();
+                                            insertToken(tok.token, tokenMenu);
+                                        }}
                                         title={tok.label || tok.token}
                                     >
-                                        {tok.token}
+                                        <span>{tok.label || tok.token}</span>
+                                        <small>{tok.token}</small>
                                     </button>
-                                ))}
+                                )) : (
+                                    <div className="tools-token-menu__empty">No matching token</div>
+                                )}
                             </div>
-                        </div>
-                    )}
+                        )}
+                    </div>
 
                     {url && (
                         <div className="field-line">
@@ -105,7 +186,7 @@ function ToolModal({ initial, onClose, onSave }) {
     );
 }
 
-export default function ManageTools() {
+export default function ManageTools({ embedded = false, onClose = null }) {
     const [tools, setTools] = useState([]);
     const [modalTool, setModalTool] = useState(null);
     const [confirmDelete, setConfirmDelete] = useState(null);
@@ -138,19 +219,17 @@ export default function ManageTools() {
     };
 
     return (
-        <main className="page-container">
+        <main className={embedded ? "management-embedded-page" : "page-container"}>
             <div className="manage-card">
                 <div className="variant-editor-head">
                     <div>
                         <p className="eyebrow">Quick tools</p>
                         <h2>Manage Tools</h2>
                     </div>
+                    {embedded && (
+                        <button type="button" className="secondary-btn" onClick={onClose}>Close</button>
+                    )}
                 </div>
-
-                <p className="manage-tools-desc">
-                    Add URL-based tools that appear in the tools bar on the main page.
-                    Use <code>{"{token}"}</code> placeholders in the URL to inject client data.
-                </p>
 
                 <div className="models-list">
                     {tools.length === 0 && <EmptyState message="No tools yet." />}

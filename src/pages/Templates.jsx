@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import {
     Cable,
     Camera,
@@ -38,7 +37,6 @@ import {
     getAvailableTemplateChannels,
     getNodeCardSummary,
     getNodePath,
-    getTemplatePath,
     resolveChannelModel,
     searchTemplateTree
 } from "../utils/templateTreeNavigation.js";
@@ -46,6 +44,11 @@ import { formatTokenPreviewHTML } from "../utils/richTextTokens.js";
 import { applyTheme, getInitialTheme } from "../utils/theme.js";
 import ExternalGenerator from "./ExternalGenerator.jsx";
 import ToolsBar from "../components/ToolsBar.jsx";
+import ManageNodes from "./ManageNodes.jsx";
+import ManageTokens from "./ManageTokens.jsx";
+import ManageTools from "./ManageTools.jsx";
+import SettingsPage from "./Settings.jsx";
+import VtiBookmarklet from "./VtiBookmarklet.jsx";
 
 const CHANNEL_LABELS = {
     [Channel.EMAIL]: "Email",
@@ -154,7 +157,7 @@ function iconForItem(iconValue = "", title = "") {
 }
 
 function templateIcon(template) {
-    const source = `${template?.title || ""} ${template?.description || ""}`;
+    const source = `${template?.title || ""}`;
     const rule = TITLE_ICON_RULES.find(({ pattern }) => pattern.test(source));
     return rule?.Icon || FileText;
 }
@@ -174,45 +177,6 @@ function ChannelPills({ channels }) {
                 <span key={channel} className="variant-pill">{CHANNEL_LABELS[channel] || channel}</span>
             ))}
         </div>
-    );
-}
-
-function Breadcrumb({ nodes, activeNode, activeTemplate, onRoot, onNode }) {
-    const path = activeTemplate
-        ? getTemplatePath(nodes, activeTemplate)
-        : activeNode
-            ? getNodePath(nodes, activeNode.id)
-            : [];
-
-    return (
-        <nav className="templates-breadcrumb" aria-label="Breadcrumb">
-            <button type="button" className="templates-breadcrumb-home" onClick={onRoot} aria-label="Playbook root">
-                <Home size={16} />
-            </button>
-            <ChevronRight size={15} aria-hidden="true" />
-            {path.length === 0 ? (
-                <span>Playbook</span>
-            ) : (
-                <>
-                    <button type="button" onClick={onRoot}>Playbook</button>
-                    {path.map((node, index) => {
-                        const isLast = index === path.length - 1;
-                        return (
-                            <span key={node.id} className="templates-breadcrumb-step">
-                                <ChevronRight size={15} aria-hidden="true" />
-                                {isLast ? (
-                                    <span>{node.title || "Untitled node"}</span>
-                                ) : (
-                                    <button type="button" onClick={() => onNode(node.id)}>
-                                        {node.title || "Untitled node"}
-                                    </button>
-                                )}
-                            </span>
-                        );
-                    })}
-                </>
-            )}
-        </nav>
     );
 }
 
@@ -238,10 +202,9 @@ function NodeCard({ node, nodes, templates, onOpen, selected }) {
                 )}
             </span>
             <span className="templates-card-title-row">
-                <strong>{node.title || "Untitled node"}</strong>
+                <strong>{node.title || "Untitled section"}</strong>
                 <ChevronRight size={22} aria-hidden="true" />
             </span>
-            {node.description && <small>{node.description}</small>}
         </button>
     );
 }
@@ -264,7 +227,6 @@ function BusinessTemplateCard({ template, onOpen, selected }) {
             <span className="templates-card-title-row">
                 <strong>{template.title || "Untitled template"}</strong>
             </span>
-            {template.description && <small>{template.description}</small>}
             <ChannelPills channels={channels} />
         </button>
     );
@@ -281,7 +243,6 @@ function EmptyColumnState({ message }) {
 
 function PlaybookColumn({
     title,
-    description,
     nodes: columnNodes,
     templates: columnTemplates,
     allNodes,
@@ -296,10 +257,6 @@ function PlaybookColumn({
 
     return (
         <section className="templates-column" aria-label={title || "Playbook column"}>
-            <div className="templates-column-head">
-                <h2>{title || "Playbook"}</h2>
-                {description && <p>{description}</p>}
-            </div>
             <div className="templates-column-list">
                 {hasItems ? (
                     <>
@@ -316,8 +273,7 @@ function PlaybookColumn({
                                 >
                                     <IconBadge Icon={Icon} tone={toneForValue(node.icon || node.title)} />
                                     <span className="templates-column-copy">
-                                        <strong>{node.title || "Untitled node"}</strong>
-                                        {node.description && <small>{node.description}</small>}
+                                        <strong>{node.title || "Untitled section"}</strong>
                                     </span>
                                     {totalCount > 0 && <span className="templates-column-count">{totalCount}</span>}
                                     <ChevronRight className="templates-column-chevron" size={19} aria-hidden="true" />
@@ -338,7 +294,6 @@ function PlaybookColumn({
                                     <IconBadge Icon={Icon} tone={toneForValue(template.title)} />
                                     <span className="templates-column-copy">
                                         <strong>{template.title || "Untitled template"}</strong>
-                                        {template.description && <small>{template.description}</small>}
                                         <ChannelPills channels={channels} />
                                     </span>
                                 </button>
@@ -539,7 +494,6 @@ function TemplateDetail({ template, activeChannel, setActiveChannel, runtime, on
 }
 
 export default function Templates() {
-    const navigate = useNavigate();
     const runtime = useTemplateRuntime();
     const [nodes, setNodes] = useState([]);
     const [treeTemplates, setTreeTemplates] = useState([]);
@@ -549,15 +503,20 @@ export default function Templates() {
     const [query, setQuery] = useState("");
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [theme, setTheme] = useState(() => getInitialTheme());
+    const [activeWorkspace, setActiveWorkspace] = useState(null);
     const [externalGeneratorOpen, setExternalGeneratorOpen] = useState(false);
     const [externalGeneratorClosing, setExternalGeneratorClosing] = useState(false);
     const configName = localStorage.getItem("local_configName") || "No configuration";
 
-    useEffect(() => {
-        loadTemplateTreeData().then((treeData) => {
+    const refreshTreeData = () => {
+        return loadTemplateTreeData().then((treeData) => {
             setNodes(treeData.nodes);
             setTreeTemplates(treeData.templates);
         });
+    };
+
+    useEffect(() => {
+        refreshTreeData();
     }, []);
 
     useEffect(() => {
@@ -614,12 +573,6 @@ export default function Templates() {
 
     const openNode = (nodeId) => {
         setActiveNodeId(nodeId);
-        setActiveTemplateId(null);
-        setQuery("");
-    };
-
-    const openRoot = () => {
-        setActiveNodeId(null);
         setActiveTemplateId(null);
         setQuery("");
     };
@@ -695,16 +648,40 @@ export default function Templates() {
         }, 220);
     };
 
+    const openWorkspace = (workspace) => {
+        setActiveWorkspace(workspace);
+        setDropdownOpen(false);
+    };
+
+    const closeWorkspace = () => {
+        setActiveWorkspace(null);
+        refreshTreeData();
+    };
+
+    const renderWorkspace = () => {
+        switch (activeWorkspace) {
+            case "nodes":
+                return <ManageNodes embedded onClose={closeWorkspace} />;
+            case "tokens":
+                return <ManageTokens embedded onClose={closeWorkspace} />;
+            case "tools":
+                return <ManageTools embedded onClose={closeWorkspace} />;
+            case "settings":
+                return <SettingsPage embedded onClose={closeWorkspace} />;
+            case "vti":
+                return <VtiBookmarklet embedded onClose={closeWorkspace} />;
+            default:
+                return null;
+        }
+    };
+
     const searchMode = query.trim().length > 0 && !activeTemplate;
-    const panelTitle = activeNode ? activeNode.title : "Playbook";
-    const panelDescription = activeNode?.description || "Navigate through nodes to find the right template";
     const navigationColumns = useMemo(() => {
         if (searchMode) {
             const count = searchResults.nodes.length + searchResults.templates.length;
             return [{
                 id: "search",
                 title: "Search results",
-                description: `${count} result${count === 1 ? "" : "s"}`,
                 nodes: searchResults.nodes,
                 templates: searchResults.templates,
                 emptyMessage: "No result found."
@@ -713,21 +690,19 @@ export default function Templates() {
 
         const columns = [{
             id: "root",
-            title: "Playbook",
-            description: "Root nodes",
+            title: "Sections",
             nodes: rootNodes,
             templates: [],
-            emptyMessage: "No business nodes yet."
+            emptyMessage: "No section yet."
         }];
 
         activeNodePath.forEach((node) => {
             columns.push({
                 id: node.id,
-                title: node.title || "Untitled node",
-                description: node.description,
+                title: node.title || "Untitled section",
                 nodes: getChildNodes(nodes, node.id),
                 templates: getTemplatesForNode(treeTemplates, node.id),
-                emptyMessage: "No sub-node or template in this node."
+                emptyMessage: "No section or template here."
             });
         });
 
@@ -752,14 +727,14 @@ export default function Templates() {
                             <div className="dropdown-menu is-open" role="menu">
                                 <div className="dropdown-section">
                                     <div className="dropdown-title">Management</div>
-                                    <button type="button" role="menuitem" onClick={() => { navigate("/nodes"); setDropdownOpen(false); }} className="dropdown-reset">Manage nodes</button>
-                                    <button type="button" role="menuitem" onClick={() => { navigate("/tokens"); setDropdownOpen(false); }} className="dropdown-reset">Manage tokens</button>
-                                    <button type="button" role="menuitem" onClick={() => { navigate("/settings"); setDropdownOpen(false); }} className="dropdown-reset">Settings</button>
+                                    <button type="button" role="menuitem" onClick={() => openWorkspace("nodes")} className="dropdown-reset">Manage playbook</button>
+                                    <button type="button" role="menuitem" onClick={() => openWorkspace("tokens")} className="dropdown-reset">Manage tokens</button>
+                                    <button type="button" role="menuitem" onClick={() => openWorkspace("settings")} className="dropdown-reset">Settings</button>
                                 </div>
                                 <div className="dropdown-section">
                                     <div className="dropdown-title">Tools</div>
-                                    <button type="button" role="menuitem" onClick={() => { navigate("/tools"); setDropdownOpen(false); }} className="dropdown-reset">Manage tools</button>
-                                    <button type="button" role="menuitem" onClick={() => { navigate("/vti-bookmarklet"); setDropdownOpen(false); }} className="dropdown-reset">VTI shortcut</button>
+                                    <button type="button" role="menuitem" onClick={() => openWorkspace("tools")} className="dropdown-reset">Manage tools</button>
+                                    <button type="button" role="menuitem" onClick={() => openWorkspace("vti")} className="dropdown-reset">VTI shortcut</button>
                                 </div>
                                 <div className="dropdown-section">
                                     <div className="dropdown-title">Theme</div>
@@ -790,37 +765,18 @@ export default function Templates() {
                 onToggleDetails={() => runtime.setClientDetailsExpanded((expanded) => !expanded)}
             />
 
-            <ToolsBar values={runtime.values} onOpenExternalGenerator={openExternalGenerator} />
+            <ToolsBar
+                values={runtime.values}
+                onOpenExternalGenerator={openExternalGenerator}
+                onManageTools={() => openWorkspace("tools")}
+            />
 
             <section className="templates-workbench templates-workbench--columns">
                 <section className="templates-playbook-panel" aria-label="Playbook">
                     <div className="templates-playbook-head">
-                        <div className="templates-playbook-title">
-                            <IconBadge Icon={activeNode ? iconForItem(activeNode.icon, activeNode.title) : Folder} tone={toneForValue(panelTitle)} className="templates-title-icon" />
-                            <div>
-                                <h1>{panelTitle || "Playbook"}</h1>
-                                <p>{searchMode ? "Search across nodes and templates" : panelDescription}</p>
-                            </div>
-                        </div>
-                        <button type="button" className="secondary-btn templates-manage-btn" onClick={() => navigate("/nodes")}>
-                            <Settings size={17} aria-hidden="true" />
-                            Manage playbook
-                        </button>
-                    </div>
-
-                    <div className="templates-playbook-controls">
-                        {(activeNode || activeTemplate || searchMode) && (
-                            <Breadcrumb
-                                nodes={nodes}
-                                activeNode={activeNode}
-                                activeTemplate={activeTemplate}
-                                onRoot={openRoot}
-                                onNode={openNode}
-                            />
-                        )}
                         <label className="templates-search-wrap">
                             <span className="sr-only">Search in playbook</span>
-                            <Search size={18} aria-hidden="true" />
+                            <Search size={17} aria-hidden="true" />
                             <input
                                 type="text"
                                 className="templates-search"
@@ -861,7 +817,6 @@ export default function Templates() {
                             <PlaybookColumn
                                 key={column.id}
                                 title={column.title}
-                                description={column.description}
                                 nodes={column.nodes}
                                 templates={column.templates}
                                 allNodes={nodes}
@@ -875,17 +830,6 @@ export default function Templates() {
                         ))}
                     </div>
 
-                    {!activeNode && !activeTemplate && !searchMode && (
-                        <div className="templates-bottom-trail">
-                            <Breadcrumb
-                                nodes={nodes}
-                                activeNode={activeNode}
-                                activeTemplate={activeTemplate}
-                                onRoot={openRoot}
-                                onNode={openNode}
-                            />
-                        </div>
-                    )}
                 </section>
             </section>
 
@@ -905,9 +849,20 @@ export default function Templates() {
                         activeChannel={activeChannel}
                         setActiveChannel={setActiveChannel}
                         runtime={runtime}
-                        onManage={() => navigate("/nodes")}
+                        onManage={() => openWorkspace("nodes")}
                         onToggleFavorite={toggleFavorite}
                     />
+                </Modal>
+            )}
+
+            {activeWorkspace && (
+                <Modal
+                    onClose={closeWorkspace}
+                    dialogClassName={`popup-box workspace-modal workspace-modal--${activeWorkspace}`}
+                    ariaLabel="Workspace"
+                    closeOnOverlay={false}
+                >
+                    {renderWorkspace()}
                 </Modal>
             )}
 

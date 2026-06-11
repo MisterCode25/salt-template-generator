@@ -1,9 +1,12 @@
 import { loadIndexedJSON, saveIndexedJSON } from "./indexedDbService.js";
 import { loadJSON, saveJSON } from "./storageService.js";
 import { CHANNEL_VALUES, normalizeNode, normalizeTemplate } from "../models/templateTreeModel.js";
+import { migrateLegacyModelsToTemplateTree } from "../utils/legacyTemplateMigration.js";
 
 export const TEMPLATE_NODE_KEY = "template_nodes";
 export const NODE_TEMPLATE_KEY = "node_templates";
+export const LEGACY_MODEL_KEY = "models";
+export const LEGACY_TEMPLATE_MIGRATION_KEY = "template_tree_legacy_migration";
 
 async function loadList(key, normalize) {
     const indexedList = await loadIndexedJSON(key, null);
@@ -44,6 +47,10 @@ export async function loadTemplateTreeData() {
         loadTemplateNodes(),
         loadNodeTemplates()
     ]);
+    if (nodes.length === 0 && templates.length === 0) {
+        const migrated = await migrateStoredLegacyTemplates();
+        if (migrated) return migrated;
+    }
     return { nodes, templates };
 }
 
@@ -52,6 +59,35 @@ export async function saveTemplateTreeData({ nodes = [], templates = [] } = {}) 
         saveTemplateNodes(nodes),
         saveNodeTemplates(templates)
     ]);
+}
+
+async function migrateStoredLegacyTemplates() {
+    const migrationState = await loadJSON(LEGACY_TEMPLATE_MIGRATION_KEY, null);
+    if (migrationState?.completed) return null;
+
+    const [indexedModels, localModels] = await Promise.all([
+        loadIndexedJSON(LEGACY_MODEL_KEY, null),
+        loadJSON(LEGACY_MODEL_KEY, null)
+    ]);
+    const legacyModels = Array.isArray(indexedModels)
+        ? indexedModels
+        : Array.isArray(localModels)
+            ? localModels
+            : [];
+
+    if (legacyModels.length === 0) return null;
+
+    const migrated = migrateLegacyModelsToTemplateTree(legacyModels);
+    if (migrated.nodes.length === 0 && migrated.templates.length === 0) return null;
+
+    await saveTemplateTreeData(migrated);
+    await saveJSON(LEGACY_TEMPLATE_MIGRATION_KEY, {
+        completed: true,
+        migratedAt: Date.now(),
+        modelCount: legacyModels.length
+    });
+
+    return migrated;
 }
 
 function replaceInText(text, fromToken, toToken) {

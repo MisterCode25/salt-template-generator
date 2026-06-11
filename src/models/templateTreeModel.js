@@ -154,7 +154,7 @@ export function normalizeTemplate(template = {}) {
 
     // Migrate from legacy parentNodeId to nodeIds array
     let nodeIds;
-    if (Array.isArray(template.nodeIds) && template.nodeIds.length > 0) {
+    if (Array.isArray(template.nodeIds)) {
         nodeIds = [...new Set(template.nodeIds.filter((id) => typeof id === "string" && id.length > 0))];
     } else if (typeof template.parentNodeId === "string" && template.parentNodeId.length > 0) {
         nodeIds = [template.parentNodeId];

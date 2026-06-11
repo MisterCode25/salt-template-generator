@@ -1,4 +1,5 @@
 import { normalizeNode, normalizeTemplate } from "../models/templateTreeModel.js";
+import { migrateLegacyModelsToTemplateTree } from "../utils/legacyTemplateMigration.js";
 
 const CONFIG_SCHEMA_VERSION = 2;
 
@@ -39,11 +40,11 @@ export function validateImportedConfig(raw = {}) {
     }
     const tokens = Array.isArray(raw.tokens) ? raw.tokens : [];
     const hasTreeData = Array.isArray(raw.nodes) || Array.isArray(raw.templates);
-    if (!hasTreeData && Array.isArray(raw.models)) {
-        throw new Error("Legacy template configs are not supported");
-    }
+    const hasLegacyModels = !hasTreeData && Array.isArray(raw.models);
 
-    const { nodes, templates } = normalizeTreeData(raw);
+    const { nodes, templates } = hasLegacyModels
+        ? migrateLegacyModelsToTemplateTree(raw.models)
+        : normalizeTreeData(raw);
     const meta = raw.meta || {};
     const configName = meta.configName || raw.configName || "Imported configuration";
 
@@ -57,7 +58,7 @@ export function validateImportedConfig(raw = {}) {
         nodes,
         templates
     });
-    if (meta.checksum !== undefined) {
+    if (!hasLegacyModels && meta.checksum !== undefined) {
         const computed = computeConfigChecksum(serialized);
         if (computed !== meta.checksum) {
             throw new Error("Checksum mismatch");

@@ -101,6 +101,7 @@ const {
 } = await import("../src/models/templateTreeModel.js");
 
 const {
+  LEGACY_TEMPLATE_MIGRATION_KEY,
   NODE_TEMPLATE_KEY,
   TEMPLATE_NODE_KEY,
   loadTemplateTreeData,
@@ -152,6 +153,7 @@ assert.equal(normalizedTemplate.contentByChannel.email.type, "email");
 assert.equal(normalizedTemplate.contentByChannel.email.text_fr, "");
 assert.equal(normalizedTemplate.contentByChannel.sms.title, "Request OTO photo");
 assert.equal(normalizedTemplate.contentByChannel.other, undefined);
+assert.deepEqual(normalizeTemplate({ parentNodeId: "legacy-node", nodeIds: [] }).nodeIds, []);
 
 const linkedTemplate = normalizeTemplate({
   id: "tpl-linked",
@@ -187,6 +189,45 @@ assert.equal(linkedTemplate.contentByChannel.sms.title, "Linked");
 
 assert.equal(createNode({ title: "Low prio" }).title, "Low prio");
 assert.equal(createTemplate({ channels: Channel.OTHER }).channels[0], "other");
+
+localStorage.setItem("models", JSON.stringify([
+  {
+    id: "legacy-email",
+    type: "email",
+    title: "Legacy email",
+    mainVariantName: "Base",
+    text_fr: "Bonjour legacy",
+    variants: [
+      {
+        id: "follow-up",
+        name: "Follow-up",
+        text_fr: "Relance legacy"
+      }
+    ]
+  }
+]));
+
+const migratedFromLegacy = await loadTemplateTreeData();
+assert.deepEqual(migratedFromLegacy.nodes.filter((node) => node.parentId === null).map((node) => node.title), ["Email", "SMS", "Other"]);
+const legacyEmailNode = migratedFromLegacy.nodes.find((node) => node.title === "Legacy email");
+assert.equal(legacyEmailNode.parentId, "legacy-channel-email");
+assert.deepEqual(
+  migratedFromLegacy.templates
+    .filter((template) => template.parentNodeId === legacyEmailNode.id)
+    .map((template) => template.title),
+  ["Legacy email"]
+);
+const migratedLegacyTemplate = migratedFromLegacy.templates.find((template) => template.parentNodeId === legacyEmailNode.id);
+assert.equal(migratedLegacyTemplate.contentByChannel.email.mainVariantName, "Base");
+assert.equal(migratedLegacyTemplate.contentByChannel.email.text_fr, "Bonjour legacy");
+assert.deepEqual(migratedLegacyTemplate.contentByChannel.email.variants.map((variant) => variant.name), ["Follow-up"]);
+assert.equal(migratedLegacyTemplate.contentByChannel.email.variants[0].text_fr, "Relance legacy");
+assert.equal(indexedDB.data.get(TEMPLATE_NODE_KEY).length, 4);
+assert.equal(indexedDB.data.get(NODE_TEMPLATE_KEY).length, 1);
+assert.equal(JSON.parse(localStorage.getItem(`local_${LEGACY_TEMPLATE_MIGRATION_KEY}`)).completed, true);
+
+localStorage.clear();
+indexedDB.data.clear();
 
 await saveTemplateTreeData({
   nodes: [

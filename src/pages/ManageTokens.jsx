@@ -93,7 +93,7 @@ function TokenModal({ initial, tokens, onClose, onSave }) {
     );
 }
 
-export default function ManageTokens() {
+export default function ManageTokens({ embedded = false, onClose = null }) {
     const [tokens, setTokens] = useState([]);
     const [modalToken, setModalToken] = useState(null);
     const [confirmDelete, setConfirmDelete] = useState(null);
@@ -134,13 +134,16 @@ export default function ManageTokens() {
     };
 
     return (
-        <main className="page-container">
+        <main className={embedded ? "management-embedded-page" : "page-container"}>
             <div className="manage-card">
                 <div className="variant-editor-head">
                     <div>
                         <p className="eyebrow">Data tokens</p>
                         <h2>Manage Tokens</h2>
                     </div>
+                    {embedded && (
+                        <button type="button" className="secondary-btn" onClick={onClose}>Close</button>
+                    )}
                 </div>
 
                 <div id="tokens-list" className="models-list">

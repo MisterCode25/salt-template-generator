@@ -167,7 +167,7 @@ export function getSlashContext(root) {
     if (offset === null) return null;
 
     const beforeCaret = root.textContent.slice(0, offset);
-    const slashMatch = beforeCaret.match(/\/([a-zA-Z0-9 _-]*)$/);
+    const slashMatch = beforeCaret.match(/@([a-zA-Z0-9 _-]*)$/);
     if (!slashMatch) return null;
 
     const raw = slashMatch[0];
@@ -185,7 +185,7 @@ export function getCompletedSlashContext(root) {
     if (offset === null) return null;
 
     const beforeCaret = root.textContent.slice(0, offset);
-    const slashMatch = beforeCaret.match(/\/([a-zA-Z0-9 _-]+)[\s\u00a0]$/);
+    const slashMatch = beforeCaret.match(/@([a-zA-Z0-9 _-]+)[\s\u00a0]$/);
     if (!slashMatch) return null;
 
     const raw = slashMatch[0];

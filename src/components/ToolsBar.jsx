@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ExternalLink, Settings2, Zap } from "lucide-react";
+import { ExternalLink, Settings2 } from "lucide-react";
 import { loadTools, resolveToolUrl } from "../services/toolsService.js";
 
-export default function ToolsBar({ values = {}, onOpenExternalGenerator }) {
+export default function ToolsBar({ values = {}, onOpenExternalGenerator, onManageTools }) {
     const navigate = useNavigate();
     const [tools, setTools] = useState([]);
 
@@ -21,10 +21,6 @@ export default function ToolsBar({ values = {}, onOpenExternalGenerator }) {
     return (
         <div className="tools-bar">
             <div className="tools-bar-inner">
-                <span className="tools-bar-label">
-                    <Zap size={13} strokeWidth={2.2} aria-hidden="true" />
-                    Tools
-                </span>
                 {onOpenExternalGenerator && (
                     <button
                         type="button"
@@ -54,7 +50,13 @@ export default function ToolsBar({ values = {}, onOpenExternalGenerator }) {
             <button
                 type="button"
                 className="tools-bar-manage-btn"
-                onClick={() => navigate("/tools")}
+                onClick={() => {
+                    if (onManageTools) {
+                        onManageTools();
+                        return;
+                    }
+                    navigate("/tools");
+                }}
                 title="Manage tools"
                 aria-label="Manage tools"
             >

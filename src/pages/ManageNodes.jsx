@@ -36,6 +36,12 @@ const CHANNEL_LABELS = {
     [Channel.OTHER]: "Other"
 };
 
+const CHANNEL_DESCRIPTIONS = {
+    [Channel.EMAIL]: "Full customer message",
+    [Channel.SMS]: "Short mobile message",
+    [Channel.OTHER]: "Custom response"
+};
+
 const LANGUAGES = [
     { code: "fr", label: "FR", field: "text_fr" },
     { code: "en", label: "EN", field: "text_en" },
@@ -247,6 +253,24 @@ function createChannelContentDraft(channel, title = "") {
     };
 }
 
+function createVariantId() {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+        return crypto.randomUUID();
+    }
+    return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function createVariantDraft(index = 1) {
+    return {
+        id: createVariantId(),
+        name: `Variant ${index}`,
+        text_fr: "",
+        text_en: "",
+        text_de: "",
+        text_it: ""
+    };
+}
+
 function buildNodeOptions(nodes, parentId = null, depth = 0) {
     return getChildNodes(nodes, parentId).flatMap((node) => [
         { node, depth },
@@ -257,7 +281,6 @@ function buildNodeOptions(nodes, parentId = null, depth = 0) {
 function NodeFormModal({ mode, initial, parentTitle, onClose, onSave }) {
     const isEdit = mode === "edit";
     const [title, setTitle] = useState(initial?.title || "");
-    const [description, setDescription] = useState(initial?.description || "");
     const [icon, setIcon] = useState(initial?.icon || "");
     const [iconMenuOpen, setIconMenuOpen] = useState(false);
     const [iconQuery, setIconQuery] = useState("");
@@ -284,16 +307,22 @@ function NodeFormModal({ mode, initial, parentTitle, onClose, onSave }) {
         if (!canSubmit) return;
         onSave({
             title: title.trim(),
-            description: description.trim(),
             icon: icon.trim()
         });
     };
 
     return (
-        <Modal onClose={onClose} ariaLabel={isEdit ? "Rename node" : "New node"}>
+        <Modal
+            onClose={onClose}
+            ariaLabel={isEdit ? "Rename section" : "New section"}
+            dialogClassName="popup-box node-section-dialog"
+        >
             <form onSubmit={submit} className="node-node-modal">
                 <div className="popup-header">
-                    <h2>{isEdit ? "Rename node" : parentTitle ? "New sub-node" : "New root node"}</h2>
+                    <div>
+                        <h2>{isEdit ? "Rename section" : parentTitle ? "New subsection" : "New section"}</h2>
+                        {parentTitle && !isEdit && <p className="node-modal-subtitle">Inside {parentTitle}</p>}
+                    </div>
                 </div>
                 <div className="node-form">
                     {parentTitle && !isEdit && (
@@ -305,95 +334,87 @@ function NodeFormModal({ mode, initial, parentTitle, onClose, onSave }) {
                     <div className="node-form-preview">
                         <span className="node-object-icon"><NodeIconGlyph icon={icon} /></span>
                         <span>
-                            <strong>{title || "Untitled node"}</strong>
-                            {description && <small>{description}</small>}
+                            <strong>{title || "Untitled section"}</strong>
                         </span>
                     </div>
-                    <div className="form-field">
-                        <label>Title</label>
-                        <input
-                            autoFocus
-                            value={title}
-                            onChange={(event) => setTitle(event.target.value)}
-                            placeholder="No signal"
-                        />
-                    </div>
-                    <div className="form-field">
-                        <label>Description</label>
-                        <textarea
-                            value={description}
-                            onChange={(event) => setDescription(event.target.value)}
-                            placeholder="Business context"
-                            rows={3}
-                        />
-                    </div>
-                    <div className="form-field">
-                        <label>Icon</label>
-                        <div className="node-icon-field">
-                            <button
-                                type="button"
-                                className="node-icon-current"
-                                onClick={() => setIconMenuOpen((open) => !open)}
-                                aria-expanded={iconMenuOpen}
-                            >
-                                <span className="node-icon-current-preview">
-                                    <NodeIconGlyph icon={icon} />
-                                </span>
-                                <span className="node-icon-current-copy">
-                                    <strong>{selectedIconPreset?.label || icon || "No icon"}</strong>
-                                    <small>{icon || "Choose a symbol"}</small>
-                                </span>
-                                <span className="node-icon-current-action">Choose</span>
-                            </button>
+                    <div className="node-section-form-grid">
+                        <div className="form-field">
+                            <label>Title</label>
+                            <input
+                                autoFocus
+                                value={title}
+                                onChange={(event) => setTitle(event.target.value)}
+                                placeholder="No signal"
+                            />
+                        </div>
+                        <div className="form-field">
+                            <label>Icon</label>
+                            <div className="node-icon-field">
+                                <button
+                                    type="button"
+                                    className="node-icon-current"
+                                    onClick={() => setIconMenuOpen((open) => !open)}
+                                    aria-expanded={iconMenuOpen}
+                                >
+                                    <span className="node-icon-current-preview">
+                                        <NodeIconGlyph icon={icon} />
+                                    </span>
+                                    <span className="node-icon-current-copy">
+                                        <strong>{selectedIconPreset?.label || icon || "No icon"}</strong>
+                                        <small>{icon || "Choose a symbol"}</small>
+                                    </span>
+                                    <span className="node-icon-current-action">Choose</span>
+                                </button>
 
-                            {iconMenuOpen && (
-                                <div className="node-symbol-menu">
-                                    <div className="node-symbol-menu-head">
-                                        <input
-                                            value={iconQuery}
-                                            onChange={(event) => setIconQuery(event.target.value)}
-                                            placeholder="Search symbols"
-                                        />
-                                        <button type="button" className="node-mini-btn" onClick={() => setIconMenuOpen(false)}>Close</button>
+                                {iconMenuOpen && (
+                                    <div className="node-symbol-menu">
+                                        <div className="node-symbol-menu-head">
+                                            <input
+                                                value={iconQuery}
+                                                onChange={(event) => setIconQuery(event.target.value)}
+                                                placeholder="Search symbols"
+                                            />
+                                            <button type="button" className="node-mini-btn" onClick={() => setIconMenuOpen(false)}>Close</button>
+                                        </div>
+                                        <div className="node-symbol-categories" aria-label="Symbol categories">
+                                            {NODE_ICON_CATEGORIES.map((category) => (
+                                                <button
+                                                    key={category}
+                                                    type="button"
+                                                    className={iconCategory === category ? "is-active" : ""}
+                                                    onClick={() => setIconCategory(category)}
+                                                >
+                                                    {category}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <div className="node-symbol-grid" aria-label="Symbols">
+                                            {filteredIconPresets.map((preset) => (
+                                                <button
+                                                    key={preset.value}
+                                                    type="button"
+                                                    className={icon === preset.value ? "is-selected" : ""}
+                                                    onClick={() => setIcon(preset.value)}
+                                                    title={preset.value}
+                                                >
+                                                    <span className="node-symbol-cell-icon">
+                                                        <NodeIconGlyph icon={preset.value} />
+                                                    </span>
+                                                    <small>{preset.label}</small>
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <div className="node-symbol-custom">
+                                            <label>Custom</label>
+                                            <input
+                                                value={icon}
+                                                onChange={(event) => setIcon(event.target.value)}
+                                                placeholder="custom-symbol"
+                                            />
+                                        </div>
                                     </div>
-                                    <div className="node-symbol-categories" aria-label="Symbol categories">
-                                        {NODE_ICON_CATEGORIES.map((category) => (
-                                            <button
-                                                key={category}
-                                                type="button"
-                                                className={iconCategory === category ? "is-active" : ""}
-                                                onClick={() => setIconCategory(category)}
-                                            >
-                                                {category}
-                                            </button>
-                                        ))}
-                                    </div>
-                                    <div className="node-symbol-grid" aria-label="Symbols">
-                                        {filteredIconPresets.map((preset) => (
-                                            <button
-                                                key={preset.value}
-                                                type="button"
-                                                className={icon === preset.value ? "is-selected" : ""}
-                                                onClick={() => setIcon(preset.value)}
-                                                title={preset.value}
-                                            >
-                                                <span className="node-symbol-cell-icon">
-                                                    <NodeIconGlyph icon={preset.value} />
-                                                </span>
-                                                <small>{preset.label}</small>
-                                            </button>
-                                        ))}
-                                    </div>
-                                    <div className="node-symbol-custom">
-                                        <label>Custom</label>
-                                        <input
-                                            value={icon}
-                                            onChange={(event) => setIcon(event.target.value)}
-                                            placeholder="custom-symbol"
-                                        />
-                                    </div>
-                                </div>
-                            )}
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -402,31 +423,6 @@ function NodeFormModal({ mode, initial, parentTitle, onClose, onSave }) {
                     <button type="submit" className="primary-btn" disabled={!canSubmit}>{isEdit ? "Save" : "Create"}</button>
                 </div>
             </form>
-        </Modal>
-    );
-}
-
-function TemplateCreatePickerModal({ onClose, onCreateNew, onLinkExisting }) {
-    return (
-        <Modal onClose={onClose} ariaLabel="Add template">
-            <div className="node-picker-modal">
-                <div className="popup-header">
-                    <h2>Add template</h2>
-                </div>
-                <div className="node-picker-choice">
-                    <button type="button" className="node-picker-choice-btn" onClick={onCreateNew}>
-                        <strong>New template</strong>
-                        <small>Create a brand new template for this node</small>
-                    </button>
-                    <button type="button" className="node-picker-choice-btn" onClick={onLinkExisting}>
-                        <strong>Link existing</strong>
-                        <small>Add an existing template to this node</small>
-                    </button>
-                </div>
-                <div className="popup-actions">
-                    <button type="button" className="secondary-btn" onClick={onClose}>Cancel</button>
-                </div>
-            </div>
         </Modal>
     );
 }
@@ -446,7 +442,6 @@ function ExistingTemplatePickerModal({ currentNodeId, allTemplates, nodes, onClo
         if (!q) return true;
         return (
             (t.title || "").toLowerCase().includes(q)
-            || (t.description || "").toLowerCase().includes(q)
         );
     });
 
@@ -470,7 +465,7 @@ function ExistingTemplatePickerModal({ currentNodeId, allTemplates, nodes, onClo
                         {filtered.length === 0 ? (
                             <p className="node-picker-empty">
                                 {allTemplates.length === alreadyLinked.size
-                                    ? "All templates are already linked to this node."
+                                    ? "All templates are already linked to this section."
                                     : "No matching templates."}
                             </p>
                         ) : (
@@ -482,7 +477,6 @@ function ExistingTemplatePickerModal({ currentNodeId, allTemplates, nodes, onClo
                                     <div key={template.id} className="node-picker-row">
                                         <div className="node-picker-copy">
                                             <strong>{template.title || "Untitled template"}</strong>
-                                            {template.description && <small>{template.description}</small>}
                                             {nodeNames && <span className="node-picker-nodes">In: {nodeNames}</span>}
                                             <div className="node-channel-pills">
                                                 {template.channels.map((channel) => (
@@ -510,11 +504,11 @@ function ExistingTemplatePickerModal({ currentNodeId, allTemplates, nodes, onClo
 function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
     const isEdit = Boolean(initial);
     const [title, setTitle] = useState(initial?.title || "");
-    const [description, setDescription] = useState(initial?.description || "");
     const [channels, setChannels] = useState(initial?.channels || []);
     const [contentByChannel, setContentByChannel] = useState(initial?.contentByChannel || {});
     const [activeContentChannel, setActiveContentChannel] = useState(initial?.channels?.[0] || Channel.EMAIL);
     const [activeLanguage, setActiveLanguage] = useState("fr");
+    const [activeVariantByChannel, setActiveVariantByChannel] = useState({});
     const [tokens, setTokens] = useState([]);
     const canSubmit = title.trim().length > 0 && channels.length > 0;
 
@@ -571,6 +565,78 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
         }));
     };
 
+    const addVariant = (channel) => {
+        const currentVariants = Array.isArray(contentByChannel[channel]?.variants)
+            ? contentByChannel[channel].variants
+            : [];
+        const variant = createVariantDraft(currentVariants.length + 1);
+
+        setContentByChannel((current) => {
+            const content = {
+                ...createChannelContentDraft(channel, title.trim()),
+                ...(current[channel] || {})
+            };
+            const variants = Array.isArray(content.variants) ? content.variants : [];
+            return {
+                ...current,
+                [channel]: {
+                    ...content,
+                    variants: [...variants, variant]
+                }
+            };
+        });
+        setActiveVariantByChannel((current) => ({
+            ...current,
+            [channel]: variant.id
+        }));
+    };
+
+    const updateVariant = (channel, variantId, field, value) => {
+        setContentByChannel((current) => {
+            const content = {
+                ...createChannelContentDraft(channel, title.trim()),
+                ...(current[channel] || {})
+            };
+            const variants = Array.isArray(content.variants) ? content.variants : [];
+            return {
+                ...current,
+                [channel]: {
+                    ...content,
+                    variants: variants.map((variant) => (
+                        variant.id === variantId ? { ...variant, [field]: value } : variant
+                    ))
+                }
+            };
+        });
+    };
+
+    const removeVariant = (channel, variantId) => {
+        const variants = Array.isArray(contentByChannel[channel]?.variants)
+            ? contentByChannel[channel].variants
+            : [];
+        const removedIndex = variants.findIndex((variant) => variant.id === variantId);
+        const nextActiveVariant = variants[removedIndex + 1] || variants[removedIndex - 1] || null;
+
+        setContentByChannel((current) => {
+            const content = {
+                ...createChannelContentDraft(channel, title.trim()),
+                ...(current[channel] || {})
+            };
+            const currentVariants = Array.isArray(content.variants) ? content.variants : [];
+            return {
+                ...current,
+                [channel]: {
+                    ...content,
+                    variants: currentVariants.filter((variant) => variant.id !== variantId)
+                }
+            };
+        });
+        setActiveVariantByChannel((current) => ({
+            ...current,
+            [channel]: nextActiveVariant?.id || ""
+        }));
+    };
+
     const submit = (event) => {
         event.preventDefault();
         if (!canSubmit) return;
@@ -578,7 +644,6 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
 
         onSave({
             title: normalizedTitle,
-            description: description.trim(),
             channels,
             contentByChannel: CHANNEL_VALUES.reduce((acc, channel) => {
                 if (!channels.includes(channel)) return acc;
@@ -600,107 +665,281 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
         ? activeContentChannel
         : channels[0] || null;
     const activeLanguageDef = LANGUAGES.find((language) => language.code === activeLanguage) || LANGUAGES[0];
+    const selectedContent = selectedContentChannel
+        ? {
+            ...createChannelContentDraft(selectedContentChannel, title.trim()),
+            ...(contentByChannel[selectedContentChannel] || {})
+        }
+        : null;
+    const activeTextValue = selectedContent?.[activeLanguageDef.field] || "";
+    const selectedVariants = Array.isArray(selectedContent?.variants) ? selectedContent.variants : [];
+    const activeVariantId = selectedVariants.some((variant) => variant.id === activeVariantByChannel[selectedContentChannel])
+        ? activeVariantByChannel[selectedContentChannel]
+        : selectedVariants[0]?.id || "";
+    const activeVariant = selectedVariants.find((variant) => variant.id === activeVariantId) || null;
+    const activeVariantTextValue = activeVariant?.[activeLanguageDef.field] || "";
+    const hasAnyContent = channels.some((channel) =>
+        LANGUAGES.some((language) => (contentByChannel[channel]?.[language.field] || "").trim().length > 0)
+    );
+    const workflowSteps = [
+        { label: "Details", complete: title.trim().length > 0 },
+        { label: "Channels", complete: channels.length > 0 },
+        { label: "Content", complete: hasAnyContent }
+    ];
 
     return (
-        <Modal onClose={onClose} ariaLabel={isEdit ? "Edit template" : "New template"}>
+        <Modal
+            onClose={onClose}
+            ariaLabel={isEdit ? "Edit template" : "New template"}
+            dialogClassName="popup-box node-template-dialog"
+        >
             <form onSubmit={submit} className="node-template-modal">
                 <div className="popup-header">
-                    <h2>{isEdit ? "Edit template" : "New template"}</h2>
+                    <div>
+                        <h2>{isEdit ? "Edit template" : "New template"}</h2>
+                        <p className="node-modal-subtitle">{parentTitle}</p>
+                    </div>
                 </div>
                 <div className="node-form">
-                    <div className="node-form-parent">
-                        <span className="client-info-label">Node</span>
-                        <strong>{parentTitle}</strong>
+                    <div className="node-template-workflow" aria-label="Template progress">
+                        {workflowSteps.map((step, index) => (
+                            <span
+                                key={step.label}
+                                className={`node-template-step${step.complete ? " is-complete" : ""}`}
+                            >
+                                <span>{index + 1}</span>
+                                {step.label}
+                            </span>
+                        ))}
                     </div>
-                    <div className="form-field">
-                        <label>Title</label>
-                        <input
-                            autoFocus
-                            value={title}
-                            onChange={(event) => setTitle(event.target.value)}
-                            placeholder="Request OTO photo"
-                        />
-                    </div>
-                    <div className="form-field">
-                        <label>Description</label>
-                        <textarea
-                            value={description}
-                            onChange={(event) => setDescription(event.target.value)}
-                            placeholder="Template purpose"
-                            rows={3}
-                        />
-                    </div>
-                    <div className="form-field">
-                        <label>Channels</label>
-                        <div className="node-channel-options">
-                            {CHANNEL_VALUES.map((channel) => (
-                                <button
-                                    key={channel}
-                                    type="button"
-                                    className={`node-channel-option${channels.includes(channel) ? " is-selected" : ""}`}
-                                    onClick={() => toggleChannel(channel)}
-                                    aria-pressed={channels.includes(channel)}
-                                >
-                                    <span>{CHANNEL_LABELS[channel]}</span>
-                                </button>
-                            ))}
+
+                    <section className="node-template-section">
+                        <div className="node-template-section-head">
+                            <span className="node-template-section-index">1</span>
+                            <div>
+                                <h3>Template details</h3>
+                                <p>Name it like the operator will search for it.</p>
+                            </div>
                         </div>
-                    </div>
-                    {selectedContentChannel && (
-                        <div className={`node-content-workbench${channels.length === 1 ? " is-single" : ""}`}>
-                            {channels.length > 1 && (
-                                <div className="node-content-tabs" role="tablist" aria-label="Template content channels">
-                                    {channels.map((channel) => (
-                                        <button
-                                            key={channel}
-                                            type="button"
-                                            role="tab"
-                                            aria-selected={selectedContentChannel === channel}
-                                            className={selectedContentChannel === channel ? "is-active" : ""}
-                                            onClick={() => setActiveContentChannel(channel)}
-                                        >
-                                            {CHANNEL_LABELS[channel]}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                            <div className="node-content-editor">
-                                <div className="node-content-editor-head">
-                                    <label>{CHANNEL_LABELS[selectedContentChannel]}</label>
-                                    <div className="node-language-tabs" role="tablist" aria-label="Template languages">
-                                        {LANGUAGES.map((language) => (
+                        <div className="node-template-detail-grid">
+                            <div className="form-field">
+                                <label>Title</label>
+                                <input
+                                    autoFocus
+                                    value={title}
+                                    onChange={(event) => setTitle(event.target.value)}
+                                    placeholder="Request OTO photo"
+                                />
+                            </div>
+                            <div className="node-form-parent node-template-section-card">
+                                <span className="client-info-label">Section</span>
+                                <strong>{parentTitle}</strong>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section className="node-template-section">
+                        <div className="node-template-section-head">
+                            <span className="node-template-section-index">2</span>
+                            <div>
+                                <h3>Channels</h3>
+                                <p>Choose where this template can be used.</p>
+                            </div>
+                        </div>
+                        <div className="node-channel-options">
+                            {CHANNEL_VALUES.map((channel) => {
+                                const selected = channels.includes(channel);
+                                return (
+                                    <button
+                                        key={channel}
+                                        type="button"
+                                        className={`node-channel-option${selected ? " is-selected" : ""}`}
+                                        onClick={() => toggleChannel(channel)}
+                                        aria-pressed={selected}
+                                    >
+                                        <span className="node-channel-check" aria-hidden="true">{selected ? "✓" : ""}</span>
+                                        <strong>{CHANNEL_LABELS[channel]}</strong>
+                                        <small>{CHANNEL_DESCRIPTIONS[channel]}</small>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </section>
+
+                    <section className="node-template-section node-template-section--content">
+                        <div className="node-template-section-head">
+                            <span className="node-template-section-index">3</span>
+                            <div>
+                                <h3>Content</h3>
+                                <p>Edit one channel and language at a time.</p>
+                            </div>
+                        </div>
+                        {selectedContentChannel ? (
+                            <div className={`node-content-workbench${channels.length === 1 ? " is-single" : ""}`}>
+                                {channels.length > 1 && (
+                                    <div className="node-content-tabs" role="tablist" aria-label="Template content channels">
+                                        {channels.map((channel) => (
                                             <button
-                                                key={language.code}
+                                                key={channel}
                                                 type="button"
                                                 role="tab"
-                                                aria-selected={activeLanguage === language.code}
-                                                className={activeLanguage === language.code ? "is-active" : ""}
-                                                onClick={() => setActiveLanguage(language.code)}
+                                                aria-selected={selectedContentChannel === channel}
+                                                className={selectedContentChannel === channel ? "is-active" : ""}
+                                                onClick={() => setActiveContentChannel(channel)}
                                             >
-                                                {language.label}
+                                                {CHANNEL_LABELS[channel]}
                                             </button>
                                         ))}
                                     </div>
+                                )}
+                                <div className="node-content-editor">
+                                    <div className="node-content-editor-head">
+                                        <div>
+                                            <label>{CHANNEL_LABELS[selectedContentChannel]}</label>
+                                            <strong>{activeLanguageDef.label}</strong>
+                                        </div>
+                                        <div className="node-language-tabs" role="tablist" aria-label="Template languages">
+                                            {LANGUAGES.map((language) => (
+                                                <button
+                                                    key={language.code}
+                                                    type="button"
+                                                    role="tab"
+                                                    aria-selected={activeLanguage === language.code}
+                                                    className={activeLanguage === language.code ? "is-active" : ""}
+                                                    onClick={() => setActiveLanguage(language.code)}
+                                                >
+                                                    {language.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div className="node-content-main">
+                                        <div className="node-content-edit-pane">
+                                            <div className="form-field">
+                                                <label>Main variant label</label>
+                                                <input
+                                                    value={selectedContent?.mainVariantName || ""}
+                                                    onChange={(event) => updateChannelContent(selectedContentChannel, "mainVariantName", event.target.value)}
+                                                    placeholder="Main"
+                                                />
+                                            </div>
+                                            <RichTextEditor
+                                                className="node-content-rich-editor"
+                                                value={activeTextValue}
+                                                onChange={(nextValue) => updateChannelContent(selectedContentChannel, activeLanguageDef.field, nextValue)}
+                                                placeholder={`${activeLanguageDef.label} HTML`}
+                                                tokens={tokens}
+                                                onTokenCreate={createToken}
+                                            />
+                                        </div>
+                                        <aside className="node-content-preview-card" aria-label="Content preview">
+                                            <div className="node-content-preview-head">
+                                                <span>Preview</span>
+                                                <strong>{CHANNEL_LABELS[selectedContentChannel]} · {activeLanguageDef.label}</strong>
+                                            </div>
+                                            <div className="node-content-preview-body">
+                                                {activeTextValue.trim() ? (
+                                                    <div dangerouslySetInnerHTML={{ __html: activeTextValue }} />
+                                                ) : (
+                                                    <p>Preview appears here while you write.</p>
+                                                )}
+                                            </div>
+                                        </aside>
+                                    </div>
+                                    <div className="variant-editor">
+                                        <div className="variant-editor-head">
+                                            <div>
+                                                <label>Variants</label>
+                                                <p className="hint">Optional alternate versions for the selected channel.</p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                className="secondary-btn"
+                                                onClick={() => addVariant(selectedContentChannel)}
+                                            >
+                                                + Variant
+                                            </button>
+                                        </div>
+                                        {selectedVariants.length > 0 ? (
+                                            <div className="variant-split">
+                                                <div className="variant-list" aria-label="Template variants">
+                                                    {selectedVariants.map((variant) => (
+                                                        <button
+                                                            key={variant.id}
+                                                            type="button"
+                                                            className={`variant-list-item${variant.id === activeVariantId ? " active" : ""}`}
+                                                            onClick={() => setActiveVariantByChannel((current) => ({
+                                                                ...current,
+                                                                [selectedContentChannel]: variant.id
+                                                            }))}
+                                                        >
+                                                            {variant.name || "Variant"}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                                <div className="variant-content">
+                                                    {activeVariant ? (
+                                                        <div className="variant-content-inner">
+                                                            <div className="variant-panel-header">
+                                                                <div className="variant-name-field">
+                                                                    <label>Variant name</label>
+                                                                    <input
+                                                                        value={activeVariant.name || ""}
+                                                                        onChange={(event) => updateVariant(selectedContentChannel, activeVariant.id, "name", event.target.value)}
+                                                                        placeholder="Variant name"
+                                                                    />
+                                                                </div>
+                                                                <button
+                                                                    type="button"
+                                                                    className="reset-fields-btn"
+                                                                    onClick={() => removeVariant(selectedContentChannel, activeVariant.id)}
+                                                                >
+                                                                    Delete variant
+                                                                </button>
+                                                            </div>
+                                                            <div className="node-content-main">
+                                                                <div className="node-content-edit-pane">
+                                                                    <RichTextEditor
+                                                                        className="node-content-rich-editor"
+                                                                        value={activeVariantTextValue}
+                                                                        onChange={(nextValue) => updateVariant(selectedContentChannel, activeVariant.id, activeLanguageDef.field, nextValue)}
+                                                                        placeholder={`${activeLanguageDef.label} variant HTML`}
+                                                                        tokens={tokens}
+                                                                        onTokenCreate={createToken}
+                                                                    />
+                                                                </div>
+                                                                <aside className="node-content-preview-card" aria-label="Variant preview">
+                                                                    <div className="node-content-preview-head">
+                                                                        <span>Preview</span>
+                                                                        <strong>{activeVariant.name || "Variant"} · {activeLanguageDef.label}</strong>
+                                                                    </div>
+                                                                    <div className="node-content-preview-body">
+                                                                        {activeVariantTextValue.trim() ? (
+                                                                            <div dangerouslySetInnerHTML={{ __html: activeVariantTextValue }} />
+                                                                        ) : (
+                                                                            <p>Variant preview appears here while you write.</p>
+                                                                        )}
+                                                                    </div>
+                                                                </aside>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="variant-empty">Select a variant to edit.</div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="variant-empty">No variants yet.</div>
+                                        )}
+                                    </div>
                                 </div>
-                                <div className="form-field">
-                                    <label>Main label</label>
-                                    <input
-                                        value={contentByChannel[selectedContentChannel]?.mainVariantName || ""}
-                                        onChange={(event) => updateChannelContent(selectedContentChannel, "mainVariantName", event.target.value)}
-                                        placeholder="Main"
-                                    />
-                                </div>
-                                <RichTextEditor
-                                    className="node-content-rich-editor"
-                                    value={contentByChannel[selectedContentChannel]?.[activeLanguageDef.field] || ""}
-                                    onChange={(nextValue) => updateChannelContent(selectedContentChannel, activeLanguageDef.field, nextValue)}
-                                    placeholder={`${activeLanguageDef.label} HTML`}
-                                    tokens={tokens}
-                                    onTokenCreate={createToken}
-                                />
                             </div>
-                        </div>
-                    )}
+                        ) : (
+                            <div className="node-content-empty">
+                                Select at least one channel to start writing.
+                            </div>
+                        )}
+                    </section>
                 </div>
                 <div className="popup-actions">
                     <button type="button" className="secondary-btn" onClick={onClose}>Cancel</button>
@@ -715,27 +954,19 @@ function NodeTreeRows({
     nodes,
     templates,
     parentId,
-    depth,
     selectedNodeId,
-    onSelect,
-    onAddChild,
-    onEdit,
-    onDelete,
-    onReorder
+    onSelect
 }) {
     const children = getChildNodes(nodes, parentId);
     return children.map((node) => {
         const childCount = getChildNodes(nodes, node.id).length;
         const templateCount = getTemplatesForNode(templates, node.id).length;
-        const siblings = getChildNodes(nodes, node.parentId);
-        const siblingIndex = siblings.findIndex((candidate) => candidate.id === node.id);
         const selected = selectedNodeId === node.id;
 
         return (
             <div key={node.id} className="node-tree-item">
                 <div
                     className={`node-tree-row${selected ? " is-selected" : ""}`}
-                    style={{ "--node-depth": depth }}
                 >
                     <button
                         type="button"
@@ -744,58 +975,26 @@ function NodeTreeRows({
                     >
                         <span className="node-tree-icon"><NodeIconGlyph icon={node.icon} /></span>
                         <span className="node-tree-copy">
-                            <strong>{node.title || "Untitled node"}</strong>
-                            {node.description && <small>{node.description}</small>}
+                            <strong>{node.title || "Untitled section"}</strong>
                         </span>
                         <span className="node-tree-counts">
-                            {childCount > 0 && <span>{childCount}N</span>}
-                            {templateCount > 0 && <span>{templateCount}T</span>}
+                            {childCount > 0 && <span>{childCount} section{childCount === 1 ? "" : "s"}</span>}
+                            {templateCount > 0 && <span>{templateCount} template{templateCount === 1 ? "" : "s"}</span>}
                         </span>
                     </button>
-                    <div className="node-row-actions">
-                        <button
-                            type="button"
-                            className="node-mini-btn"
-                            onClick={() => onAddChild(node.id)}
-                            disabled={nodeHasTemplates(templates, node.id)}
-                            title={nodeHasTemplates(templates, node.id) ? "Has templates — remove them first" : undefined}
-                            aria-label={`Add child to ${node.title}`}
-                        >+</button>
-                        <button type="button" className="node-mini-btn" onClick={() => onReorder(node.id, "up")} disabled={siblingIndex <= 0}>Up</button>
-                        <button type="button" className="node-mini-btn" onClick={() => onReorder(node.id, "down")} disabled={siblingIndex === -1 || siblingIndex >= siblings.length - 1}>Dn</button>
-                        <button type="button" className="icon-btn edit-btn" onClick={() => onEdit(node)} aria-label={`Rename ${node.title}`}>
-                            <span className="icon-pencil" aria-hidden="true"></span>
-                        </button>
-                        <button type="button" className="icon-btn delete-btn" onClick={() => onDelete(node.id)} aria-label={`Delete ${node.title}`}>
-                            <span className="icon-trash" aria-hidden="true"></span>
-                        </button>
-                    </div>
                 </div>
-                <NodeTreeRows
-                    nodes={nodes}
-                    templates={templates}
-                    parentId={node.id}
-                    depth={depth + 1}
-                    selectedNodeId={selectedNodeId}
-                    onSelect={onSelect}
-                    onAddChild={onAddChild}
-                    onEdit={onEdit}
-                    onDelete={onDelete}
-                    onReorder={onReorder}
-                />
             </div>
         );
     });
 }
 
-export default function ManageNodes() {
+export default function ManageNodes({ embedded = false, onClose = null }) {
     const navigate = useNavigate();
     const [nodes, setNodes] = useState([]);
     const [templates, setTemplates] = useState([]);
     const [selectedNodeId, setSelectedNodeId] = useState(null);
     const [nodeModal, setNodeModal] = useState(null);
     const [templateModal, setTemplateModal] = useState(null);
-    const [templatePickerModal, setTemplatePickerModal] = useState(null);
     const [existingPickerModal, setExistingPickerModal] = useState(null);
     const [confirmNodeDelete, setConfirmNodeDelete] = useState(null);
     const [confirmTemplateDelete, setConfirmTemplateDelete] = useState(null);
@@ -807,7 +1006,9 @@ export default function ManageNodes() {
             if (!active) return;
             setNodes(treeData.nodes);
             setTemplates(treeData.templates);
-            setSelectedNodeId((current) => current || getChildNodes(treeData.nodes, null)[0]?.id || treeData.nodes[0]?.id || null);
+            setSelectedNodeId((current) => (
+                current && treeData.nodes.some((node) => node.id === current) ? current : null
+            ));
         });
         return () => {
             active = false;
@@ -820,7 +1021,7 @@ export default function ManageNodes() {
             return;
         }
         if (!nodes.some((node) => node.id === selectedNodeId)) {
-            setSelectedNodeId(getChildNodes(nodes, null)[0]?.id || nodes[0]?.id || null);
+            setSelectedNodeId(null);
         }
     }, [nodes, selectedNodeId]);
 
@@ -842,7 +1043,7 @@ export default function ManageNodes() {
         [nodes, selectedNode]
     );
 
-    // Leaf/branch rule: a node can hold sub-nodes OR templates, not both
+    // Leaf/branch rule: a section can hold subsections OR templates, not both.
     const selectedNodeCanAddChild = useMemo(
         () => selectedNode ? !nodeHasTemplates(templates, selectedNode.id) : false,
         [nodes, templates, selectedNode]
@@ -876,13 +1077,13 @@ export default function ManageNodes() {
         if (nodeModal.mode === "edit") {
             const nextNodes = updateNode(nodes, nodeModal.node.id, fields);
             await persist(nextNodes, templates);
-            showToast("Node updated", "info");
+            showToast("Section updated", "info");
         } else {
             try {
                 const nextNode = createNodeForParent(nodes, nodeModal.parentId, fields, templates);
                 await persist([...nodes, nextNode], templates);
                 setSelectedNodeId(nextNode.id);
-                showToast("Node created", "info");
+                showToast("Section created", "info");
             } catch (error) {
                 showToast(error.message, "error");
                 return;
@@ -896,7 +1097,7 @@ export default function ManageNodes() {
         const next = removeNodeCascade(nodes, templates, confirmNodeDelete);
         await persist(next.nodes, next.templates);
         setConfirmNodeDelete(null);
-        showToast("Node deleted", "warning");
+        showToast("Section deleted", "warning");
     };
 
     const changeSelectedParent = async (value) => {
@@ -907,10 +1108,10 @@ export default function ManageNodes() {
         try {
             const nextNodes = moveNode(nodes, selectedNode.id, nextParentId);
             await persist(nextNodes, templates);
-            showToast("Node moved", "info");
+            showToast("Section moved", "info");
         } catch (error) {
             console.error(error);
-            showToast("Node cannot be moved there", "error");
+            showToast("Section cannot be moved there", "error");
         }
     };
 
@@ -954,7 +1155,7 @@ export default function ManageNodes() {
 
     const openTemplateCreationPicker = (nodeId = selectedNodeId) => {
         if (!nodeId) return;
-        setTemplatePickerModal({ nodeId });
+        setTemplateModal({ mode: "create", parentNodeId: nodeId });
     };
 
     const linkTemplateToCurrentNode = async (templateId) => {
@@ -981,7 +1182,7 @@ export default function ManageNodes() {
                 delete next[templateId];
                 return next;
             });
-            showToast("Template linked to node", "info");
+            showToast("Template linked to section", "info");
         } catch (error) {
             console.error(error);
             showToast("Template cannot be linked there", "error");
@@ -993,306 +1194,257 @@ export default function ManageNodes() {
         if (!template || (template.nodeIds || []).length <= 1) return;
         const nextTemplates = unlinkTemplateFromNode(templates, templateId, nodeId);
         await persist(nodes, nextTemplates);
-        showToast("Template unlinked from node", "info");
+        showToast("Template unlinked from section", "info");
     };
 
     const parentSelectValue = selectedNode?.parentId || ROOT_PARENT_VALUE;
     const selectedParentTitle = selectedNode?.parentId
         ? nodes.find((node) => node.id === selectedNode.parentId)?.title || ""
         : "";
+    const goBackOneLevel = () => {
+        setSelectedNodeId(selectedNode?.parentId || null);
+    };
 
     return (
-        <main className="page-container node-builder-page">
+        <main className={`page-container node-builder-page${embedded ? " node-builder-page--embedded" : ""}`}>
             <div className="node-builder-shell">
                 <header className="node-builder-header">
                     <div className="node-builder-title">
-                        <button type="button" className="node-back-btn" onClick={() => navigate("/")}>Back</button>
-                        <p className="eyebrow">Structure</p>
-                        <h1>Node Builder</h1>
-                    </div>
-                    <div className="node-builder-actions">
-                        <button type="button" className="primary-btn" onClick={openRootNodeModal}>+ Root</button>
                         <button
                             type="button"
-                            className="secondary-btn"
-                            onClick={() => openChildNodeModal()}
-                            disabled={!selectedNode || !selectedNodeCanAddChild}
-                            title={!selectedNodeCanAddChild && selectedNode ? "This node already has templates — only leaf nodes can have sub-nodes" : undefined}
+                            className="node-back-btn"
+                            onClick={() => {
+                                if (embedded && onClose) {
+                                    onClose();
+                                    return;
+                                }
+                                navigate("/");
+                            }}
                         >
-                            + Child
+                            {embedded ? "Close" : "Back"}
                         </button>
-                        <button
-                            type="button"
-                            className="secondary-btn"
-                            onClick={() => openTemplateCreationPicker()}
-                            disabled={!selectedNode || !selectedNodeCanAddTemplate}
-                            title={!selectedNodeCanAddTemplate && selectedNode ? "This node already has sub-nodes — only leaf nodes can have templates" : undefined}
-                        >
-                            + Template
-                        </button>
+                        <h1>Playbook</h1>
                     </div>
                 </header>
 
-                <div className="node-builder-layout">
-                    <aside className="node-tree-panel" aria-label="Node tree">
-                        <div className="node-panel-header">
-                            <h2>Tree</h2>
-                            <span>{nodes.length}</span>
-                        </div>
-                        <div className="node-tree-list">
-                            {nodes.length === 0 ? (
-                                <EmptyState
-                                    message="No nodes yet."
-                                    action={<button type="button" className="secondary-btn" onClick={openRootNodeModal}>Create root node</button>}
-                                />
-                            ) : (
-                                <NodeTreeRows
-                                    nodes={nodes}
-                                    templates={templates}
-                                    parentId={null}
-                                    depth={0}
-                                    selectedNodeId={selectedNodeId}
-                                    onSelect={setSelectedNodeId}
-                                    onAddChild={openChildNodeModal}
-                                    onEdit={openEditNodeModal}
-                                    onDelete={setConfirmNodeDelete}
-                                    onReorder={reorderSelectedNode}
-                                />
-                            )}
-                        </div>
-                    </aside>
-
-                    <section className="node-canvas-panel" aria-label="Selected node workspace">
-                        {selectedNode ? (
-                            <>
-                                <div className="node-canvas-hero">
-                                    <div className="node-hero-icon"><NodeIconGlyph icon={selectedNode.icon} /></div>
-                                    <div className="node-hero-copy">
-                                        <p className="eyebrow">Active node</p>
-                                        <h2>{selectedNode.title || "Untitled node"}</h2>
-                                        {selectedNode.description && <p>{selectedNode.description}</p>}
-                                    </div>
-                                    <div className="node-hero-meta">
-                                        <span>{selectedChildNodes.length} nodes</span>
-                                        <span>{selectedTemplates.length} templates</span>
-                                    </div>
+                <div className={`node-builder-layout${selectedNode ? " node-builder-layout--detail" : " node-builder-layout--list"}`}>
+                    {!selectedNode ? (
+                        <section className="node-tree-panel node-list-panel" aria-label="Sections">
+                            <div className="node-list-header">
+                                <div>
+                                    <h2>Sections</h2>
                                 </div>
-
-                                <section className="node-board-section">
-                                    <div className="node-board-head">
-                                        <h3>Sub-nodes</h3>
-                                        <button
-                                            type="button"
-                                            className="secondary-btn"
-                                            onClick={() => openChildNodeModal(selectedNode.id)}
-                                            disabled={!selectedNodeCanAddChild}
-                                            title={!selectedNodeCanAddChild ? "This node already has templates — remove them first" : undefined}
-                                        >
-                                            + Child
-                                        </button>
-                                    </div>
-                                    {!selectedNodeCanAddChild && selectedChildNodes.length === 0 ? (
-                                        <p className="node-rule-hint">This node holds templates. To add sub-nodes, it must first have no templates.</p>
-                                    ) : selectedChildNodes.length === 0 ? (
-                                        <button type="button" className="node-empty-tile" onClick={() => openChildNodeModal(selectedNode.id)}>
-                                            + Child
-                                        </button>
-                                    ) : (
-                                        <div className="node-object-grid">
-                                            {selectedChildNodes.map((node) => {
-                                                const childCount = getChildNodes(nodes, node.id).length;
-                                                const templateCount = getTemplatesForNode(templates, node.id).length;
-                                                return (
-                                                    <article key={node.id} className="node-object-card">
-                                                        <button type="button" className="node-object-main" onClick={() => setSelectedNodeId(node.id)}>
-                                                            <span className="node-object-icon"><NodeIconGlyph icon={node.icon} /></span>
-                                                            <span>
-                                                                <strong>{node.title || "Untitled node"}</strong>
-                                                                {node.description && <small>{node.description}</small>}
-                                                            </span>
-                                                        </button>
-                                                        <div className="node-object-footer">
-                                                            <span>{childCount}N</span>
-                                                            <span>{templateCount}T</span>
-                                                            <button
-                                                                type="button"
-                                                                className="node-mini-btn"
-                                                                onClick={() => openChildNodeModal(node.id)}
-                                                                disabled={templateCount > 0}
-                                                                title={templateCount > 0 ? "Has templates — remove them first" : undefined}
-                                                                aria-label={`Add child to ${node.title}`}
-                                                            >+</button>
-                                                        </div>
-                                                    </article>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
-                                </section>
-
-                                <section className="node-board-section">
-                                    <div className="node-board-head">
-                                        <h3>Templates</h3>
-                                        <button
-                                            type="button"
-                                            className="primary-btn"
-                                            onClick={() => openTemplateCreationPicker(selectedNode.id)}
-                                            disabled={!selectedNodeCanAddTemplate}
-                                            title={!selectedNodeCanAddTemplate ? "This node already has sub-nodes — only leaf nodes can have templates" : undefined}
-                                        >
-                                            + Template
-                                        </button>
-                                    </div>
-                                    {!selectedNodeCanAddTemplate && selectedTemplates.length === 0 ? (
-                                        <p className="node-rule-hint">This node has sub-nodes. Templates can only be added to leaf nodes (nodes with no children).</p>
-                                    ) : selectedTemplates.length === 0 ? (
-                                        <button
-                                            type="button"
-                                            className="node-empty-tile"
-                                            onClick={() => openTemplateCreationPicker(selectedNode.id)}
-                                        >
-                                            + Template
-                                        </button>
-                                    ) : (
-                                        <div className="node-template-grid">
-                                            {selectedTemplates.map((template) => {
-                                                const linkTarget = templateLinkTargets[template.id] || "";
-                                                const otherNodes = (template.nodeIds || [])
-                                                    .filter((nid) => nid !== selectedNode.id)
-                                                    .map((nid) => nodes.find((n) => n.id === nid))
-                                                    .filter(Boolean);
-                                                return (
-                                                    <article key={template.id} className="node-template-card">
-                                                        <div className="node-template-copy">
-                                                            <strong>{template.title || "Untitled template"}</strong>
-                                                            {template.description && <p>{template.description}</p>}
-                                                            <div className="node-channel-pills">
-                                                                {template.channels.map((channel) => (
-                                                                    <span key={channel} className="variant-pill">{CHANNEL_LABELS[channel] || channel}</span>
-                                                                ))}
-                                                            </div>
-                                                            {otherNodes.length > 0 && (
-                                                                <div className="node-template-nodes">
-                                                                    <span className="node-template-nodes-label">Also in:</span>
-                                                                    {otherNodes.map((n) => (
-                                                                        <span key={n.id} className="node-template-node-pill">{n.title}</span>
-                                                                    ))}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                        <div className="node-template-toolbar">
-                                                            <button
-                                                                type="button"
-                                                                className="secondary-btn"
-                                                                onClick={() => setTemplateModal({ mode: "edit", template, parentNodeId: template.parentNodeId })}
-                                                            >
-                                                                Edit
-                                                            </button>
-                                                            <button type="button" className="secondary-btn" onClick={() => duplicateSelectedTemplate(template.id)}>Duplicate</button>
-                                                            {(template.nodeIds || []).length > 1 && (
-                                                                <button
-                                                                    type="button"
-                                                                    className="secondary-btn"
-                                                                    onClick={() => unlinkFromNode(template.id, selectedNode.id)}
-                                                                    title="Remove this template from this node only"
-                                                                >
-                                                                    Unlink
-                                                                </button>
-                                                            )}
-                                                            <button type="button" className="icon-btn delete-btn" onClick={() => setConfirmTemplateDelete(template.id)} aria-label={`Delete ${template.title}`}>
-                                                                <span className="icon-trash" aria-hidden="true"></span>
-                                                            </button>
-                                                        </div>
-                                                        <div className="node-template-move">
-                                                            <select
-                                                                value={linkTarget}
-                                                                onChange={(event) => setTemplateLinkTargets((current) => ({
-                                                                    ...current,
-                                                                    [template.id]: event.target.value
-                                                                }))}
-                                                            >
-                                                                <option value="">Link to leaf node…</option>
-                                                                {nodeOptions
-                                                                    .filter(({ node }) =>
-                                                                        !(template.nodeIds || []).includes(node.id)
-                                                                        && !nodeHasChildren(nodes, node.id)
-                                                                    )
-                                                                    .map(({ node, depth }) => (
-                                                                        <option key={node.id} value={node.id}>
-                                                                            {`${"  ".repeat(depth)}${node.title || "Untitled node"}`}
-                                                                        </option>
-                                                                    ))}
-                                                            </select>
-                                                            <button
-                                                                type="button"
-                                                                className="secondary-btn"
-                                                                onClick={() => linkTemplate(template.id)}
-                                                                disabled={!linkTarget}
-                                                            >
-                                                                Link
-                                                            </button>
-                                                        </div>
-                                                    </article>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
-                                </section>
-                            </>
-                        ) : (
-                            <div className="node-canvas-empty">
-                                <EmptyState
-                                    message="No node selected."
-                                    action={<button type="button" className="primary-btn" onClick={openRootNodeModal}>Create root node</button>}
-                                />
+                                <button type="button" className="primary-btn" onClick={openRootNodeModal}>+ Section</button>
                             </div>
-                        )}
-                    </section>
+                            <div className="node-tree-list node-tree-list--primary">
+                                {nodes.length === 0 ? (
+                                    <EmptyState
+                                        message="No sections yet."
+                                        action={<button type="button" className="secondary-btn" onClick={openRootNodeModal}>Create section</button>}
+                                    />
+                                ) : (
+                                    <NodeTreeRows
+                                        nodes={nodes}
+                                        templates={templates}
+                                        parentId={null}
+                                        selectedNodeId={selectedNodeId}
+                                        onSelect={setSelectedNodeId}
+                                    />
+                                )}
+                            </div>
+                        </section>
+                    ) : (
+                        <section className="node-canvas-panel node-detail-view" aria-label="Section detail">
+                            <button type="button" className="node-back-btn node-list-back-btn" onClick={goBackOneLevel}>
+                                {selectedNode.parentId ? "← Back" : "← Sections"}
+                            </button>
 
-                    <aside className="node-inspector-panel" aria-label="Node inspector">
-                        {selectedNode ? (
-                            <>
-                                <div className="node-inspector-title">
-                                    <span className="node-object-icon"><NodeIconGlyph icon={selectedNode.icon} /></span>
-                                    <strong>{selectedNode.title || "Untitled node"}</strong>
+                            <div className="node-canvas-hero node-canvas-hero--detail">
+                                <div className="node-hero-icon"><NodeIconGlyph icon={selectedNode.icon} /></div>
+                                <div className="node-hero-copy">
+                                    <h2>{selectedNode.title || "Untitled section"}</h2>
                                 </div>
-                                <div className="node-inspector-actions">
+                                <div className="node-detail-top-actions">
                                     <button type="button" className="secondary-btn" onClick={() => openEditNodeModal(selectedNode)}>Rename</button>
                                     <button type="button" className="reset-fields-btn" onClick={() => setConfirmNodeDelete(selectedNode.id)}>Delete</button>
                                 </div>
-                                <div className="node-admin-block">
-                                    <label>Parent</label>
-                                    <select
-                                        value={parentSelectValue}
-                                        onChange={(event) => changeSelectedParent(event.target.value)}
+                            </div>
+
+                            <section className="node-board-section">
+                                <div className="node-board-head">
+                                    <h3>Subsections</h3>
+                                    <button
+                                        type="button"
+                                        className="secondary-btn"
+                                        onClick={() => openChildNodeModal(selectedNode.id)}
+                                        disabled={!selectedNodeCanAddChild}
+                                        title={!selectedNodeCanAddChild ? "This section already contains templates — remove them first" : undefined}
                                     >
-                                        <option value={ROOT_PARENT_VALUE}>Root</option>
-                                        {nodeOptions
-                                            .filter(({ node }) => (
-                                                node.id !== selectedNode.id
-                                                && !selectedDescendantIds.includes(node.id)
-                                                && canMoveNode(nodes, selectedNode.id, node.id)
-                                            ))
-                                            .map(({ node, depth }) => (
-                                                <option key={node.id} value={node.id}>
-                                                    {`${"  ".repeat(depth)}${node.title || "Untitled node"}`}
-                                                </option>
-                                            ))}
-                                    </select>
-                                    {selectedParentTitle && <small>{selectedParentTitle}</small>}
+                                        + Section
+                                    </button>
                                 </div>
-                                <div className="node-admin-block">
-                                    <label>Order</label>
-                                    <div className="node-order-controls">
-                                        <button type="button" className="secondary-btn" onClick={() => reorderSelectedNode(selectedNode.id, "up")}>Up</button>
-                                        <button type="button" className="secondary-btn" onClick={() => reorderSelectedNode(selectedNode.id, "down")}>Down</button>
+                                {!selectedNodeCanAddChild && selectedChildNodes.length === 0 ? (
+                                    <p className="node-rule-hint">This section already contains templates.</p>
+                                ) : selectedChildNodes.length === 0 ? (
+                                    <button type="button" className="node-empty-tile" onClick={() => openChildNodeModal(selectedNode.id)}>
+                                        + Section
+                                    </button>
+                                ) : (
+                                    <div className="node-tree-list node-tree-list--level">
+                                        <NodeTreeRows
+                                            nodes={nodes}
+                                            templates={templates}
+                                            parentId={selectedNode.id}
+                                            selectedNodeId={selectedNodeId}
+                                            onSelect={setSelectedNodeId}
+                                        />
+                                    </div>
+                                )}
+                            </section>
+
+                            <section className="node-board-section">
+                                <div className="node-board-head">
+                                    <h3>Templates</h3>
+                                    <button
+                                        type="button"
+                                        className="primary-btn"
+                                        onClick={() => openTemplateCreationPicker(selectedNode.id)}
+                                        disabled={!selectedNodeCanAddTemplate}
+                                        title={!selectedNodeCanAddTemplate ? "This section has subsections — templates go in final sections only" : undefined}
+                                    >
+                                        + Template
+                                    </button>
+                                </div>
+                                {!selectedNodeCanAddTemplate && selectedTemplates.length === 0 ? (
+                                    <p className="node-rule-hint">Templates go in final sections only.</p>
+                                ) : selectedTemplates.length === 0 ? (
+                                    <button
+                                        type="button"
+                                        className="node-empty-tile"
+                                        onClick={() => openTemplateCreationPicker(selectedNode.id)}
+                                    >
+                                        + Template
+                                    </button>
+                                ) : (
+                                    <div className="node-template-grid">
+                                        {selectedTemplates.map((template) => {
+                                            const linkTarget = templateLinkTargets[template.id] || "";
+                                            const otherNodes = (template.nodeIds || [])
+                                                .filter((nid) => nid !== selectedNode.id)
+                                                .map((nid) => nodes.find((n) => n.id === nid))
+                                                .filter(Boolean);
+                                            return (
+                                                <article key={template.id} className="node-template-card">
+                                                    <div className="node-template-copy">
+                                                        <strong>{template.title || "Untitled template"}</strong>
+                                                        <div className="node-channel-pills">
+                                                            {template.channels.map((channel) => (
+                                                                <span key={channel} className="variant-pill">{CHANNEL_LABELS[channel] || channel}</span>
+                                                            ))}
+                                                        </div>
+                                                        {otherNodes.length > 0 && (
+                                                            <div className="node-template-nodes">
+                                                                <span className="node-template-nodes-label">Also in:</span>
+                                                                {otherNodes.map((n) => (
+                                                                    <span key={n.id} className="node-template-node-pill">{n.title}</span>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <div className="node-template-toolbar">
+                                                        <button
+                                                            type="button"
+                                                            className="secondary-btn"
+                                                            onClick={() => setTemplateModal({ mode: "edit", template, parentNodeId: template.parentNodeId })}
+                                                        >
+                                                            Edit
+                                                        </button>
+                                                        <button type="button" className="secondary-btn" onClick={() => duplicateSelectedTemplate(template.id)}>Duplicate</button>
+                                                        {(template.nodeIds || []).length > 1 && (
+                                                            <button
+                                                                type="button"
+                                                                className="secondary-btn"
+                                                                onClick={() => unlinkFromNode(template.id, selectedNode.id)}
+                                                                title="Remove this template from this section only"
+                                                            >
+                                                                Unlink
+                                                            </button>
+                                                        )}
+                                                        <button type="button" className="icon-btn delete-btn" onClick={() => setConfirmTemplateDelete(template.id)} aria-label={`Delete ${template.title}`}>
+                                                            <span className="icon-trash" aria-hidden="true"></span>
+                                                        </button>
+                                                    </div>
+                                                    <div className="node-template-move">
+                                                        <select
+                                                            value={linkTarget}
+                                                            onChange={(event) => setTemplateLinkTargets((current) => ({
+                                                                ...current,
+                                                                [template.id]: event.target.value
+                                                            }))}
+                                                        >
+                                                            <option value="">Link to final section…</option>
+                                                            {nodeOptions
+                                                                .filter(({ node }) =>
+                                                                    !(template.nodeIds || []).includes(node.id)
+                                                                    && !nodeHasChildren(nodes, node.id)
+                                                                )
+                                                                .map(({ node, depth }) => (
+                                                                    <option key={node.id} value={node.id}>
+                                                                        {`${"  ".repeat(depth)}${node.title || "Untitled section"}`}
+                                                                    </option>
+                                                                ))}
+                                                        </select>
+                                                        <button
+                                                            type="button"
+                                                            className="secondary-btn"
+                                                            onClick={() => linkTemplate(template.id)}
+                                                            disabled={!linkTarget}
+                                                        >
+                                                            Link
+                                                        </button>
+                                                    </div>
+                                                </article>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </section>
+
+                            <details className="node-detail-settings">
+                                <summary>Settings</summary>
+                                <div className="node-detail-settings-grid">
+                                    <div className="node-admin-block">
+                                        <label>Parent</label>
+                                        <select
+                                            value={parentSelectValue}
+                                            onChange={(event) => changeSelectedParent(event.target.value)}
+                                        >
+                                            <option value={ROOT_PARENT_VALUE}>Top level</option>
+                                            {nodeOptions
+                                                .filter(({ node }) => (
+                                                    node.id !== selectedNode.id
+                                                    && !selectedDescendantIds.includes(node.id)
+                                                    && canMoveNode(nodes, selectedNode.id, node.id)
+                                                ))
+                                                .map(({ node, depth }) => (
+                                                    <option key={node.id} value={node.id}>
+                                                        {`${"  ".repeat(depth)}${node.title || "Untitled section"}`}
+                                                    </option>
+                                                ))}
+                                        </select>
+                                        {selectedParentTitle && <small>{selectedParentTitle}</small>}
+                                    </div>
+                                    <div className="node-admin-block">
+                                        <label>Order</label>
+                                        <div className="node-order-controls">
+                                            <button type="button" className="secondary-btn" onClick={() => reorderSelectedNode(selectedNode.id, "up")}>Up</button>
+                                            <button type="button" className="secondary-btn" onClick={() => reorderSelectedNode(selectedNode.id, "down")}>Down</button>
+                                        </div>
                                     </div>
                                 </div>
-                            </>
-                        ) : (
-                            <EmptyState message="Select a node." />
-                        )}
-                    </aside>
+                            </details>
+                        </section>
+                    )}
                 </div>
 
                 {nodeModal && (
@@ -1308,23 +1460,9 @@ export default function ManageNodes() {
                 {templateModal && (
                     <TemplateFormModal
                         initial={templateModal.template}
-                        parentTitle={nodes.find((node) => node.id === templateModal.parentNodeId)?.title || "Selected node"}
+                        parentTitle={nodes.find((node) => node.id === templateModal.parentNodeId)?.title || "Selected section"}
                         onClose={() => setTemplateModal(null)}
                         onSave={saveTemplate}
-                    />
-                )}
-
-                {templatePickerModal && (
-                    <TemplateCreatePickerModal
-                        onClose={() => setTemplatePickerModal(null)}
-                        onCreateNew={() => {
-                            setTemplatePickerModal(null);
-                            setTemplateModal({ mode: "create", parentNodeId: templatePickerModal.nodeId });
-                        }}
-                        onLinkExisting={() => {
-                            setTemplatePickerModal(null);
-                            setExistingPickerModal({ nodeId: templatePickerModal.nodeId });
-                        }}
                     />
                 )}
 
@@ -1340,8 +1478,8 @@ export default function ManageNodes() {
 
                 {confirmNodeDelete && (
                     <ConfirmDialog
-                        title="Delete node"
-                        message="Delete this node, its sub-nodes, and all templates inside them?"
+                        title="Delete section"
+                        message="Delete this section, its subsections, and all templates inside them?"
                         confirmLabel="Delete"
                         cancelLabel="Cancel"
                         variant="danger"
@@ -1353,7 +1491,7 @@ export default function ManageNodes() {
                 {confirmTemplateDelete && (
                     <ConfirmDialog
                         title="Delete template"
-                        message="Delete this template from the node tree?"
+                        message="Delete this template from the playbook?"
                         confirmLabel="Delete"
                         cancelLabel="Cancel"
                         variant="danger"
