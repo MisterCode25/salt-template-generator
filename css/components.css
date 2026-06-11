@@ -4023,6 +4023,8 @@ textarea:focus {
     outline: none;
     line-height: 1.6;
     overflow-y: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
 }
 
 .rich-token-chip {
