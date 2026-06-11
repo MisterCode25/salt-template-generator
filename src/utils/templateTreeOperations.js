@@ -18,7 +18,7 @@ function sortByTitle(a, b) {
 
 export function getChildNodes(nodes = [], parentId = null) {
     const normalizedParentId = normalizeParentId(parentId);
-    return [...nodes]
+    return nodes
         .filter((node) => normalizeParentId(node.parentId) === normalizedParentId)
         .sort(sortByOrderThenTitle);
 }
@@ -51,11 +51,15 @@ export function getIndexedChildNodes(childrenByParent, parentId = null) {
 export function getNextNodeOrder(nodes = [], parentId = null) {
     const siblings = getChildNodes(nodes, parentId);
     if (siblings.length === 0) return 1;
-    return Math.max(...siblings.map((node) => node.order || 0)) + 1;
+    let maxOrder = 0;
+    siblings.forEach((node) => {
+        maxOrder = Math.max(maxOrder, node.order || 0);
+    });
+    return maxOrder + 1;
 }
 
-export function getDescendantNodeIds(nodes = [], nodeId) {
-    if (!nodeId) return [];
+function getDescendantNodeIdSet(nodes = [], nodeId) {
+    if (!nodeId) return new Set();
 
     const childrenByParent = new Map();
     nodes.forEach((node) => {
@@ -66,21 +70,26 @@ export function getDescendantNodeIds(nodes = [], nodeId) {
         childrenByParent.set(parentId, children);
     });
 
-    const descendants = [];
+    const descendants = new Set();
     const stack = [...(childrenByParent.get(nodeId) || [])];
     while (stack.length > 0) {
         const currentId = stack.pop();
-        descendants.push(currentId);
+        if (descendants.has(currentId)) continue;
+        descendants.add(currentId);
         stack.push(...(childrenByParent.get(currentId) || []));
     }
     return descendants;
+}
+
+export function getDescendantNodeIds(nodes = [], nodeId) {
+    return Array.from(getDescendantNodeIdSet(nodes, nodeId));
 }
 
 export function canMoveNode(nodes = [], nodeId, parentId = null) {
     const normalizedParentId = normalizeParentId(parentId);
     if (!nodeId || nodeId === normalizedParentId) return false;
     if (normalizedParentId && !nodes.some((node) => node.id === normalizedParentId)) return false;
-    return !getDescendantNodeIds(nodes, nodeId).includes(normalizedParentId);
+    return !getDescendantNodeIdSet(nodes, nodeId).has(normalizedParentId);
 }
 
 export function createNodeForParent(nodes = [], parentId = null, fields = {}, templates = []) {
@@ -141,7 +150,8 @@ export function reorderNode(nodes = [], nodeId, direction) {
 }
 
 export function removeNodeCascade(nodes = [], templates = [], nodeId) {
-    const removedNodeIds = new Set([nodeId, ...getDescendantNodeIds(nodes, nodeId)]);
+    const removedNodeIds = getDescendantNodeIdSet(nodes, nodeId);
+    removedNodeIds.add(nodeId);
     const nextTemplates = templates
         .map((template) => {
             const nextNodeIds = (template.nodeIds || []).filter((id) => !removedNodeIds.has(id));
