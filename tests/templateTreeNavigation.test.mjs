@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
 
 const {
+  buildTemplateTreeSearchIndex,
   getAvailableTemplateChannels,
   getNodePath,
   getTemplatePath,
   resolveChannelModel,
-  searchTemplateTree
+  searchTemplateTree,
+  searchTemplateTreeIndex
 } = await import("../src/utils/templateTreeNavigation.js");
 
 const nodes = [
@@ -44,5 +46,9 @@ assert.deepEqual(getAvailableTemplateChannels(treeTemplate), ["email", "sms"]);
 const searchResults = searchTemplateTree(nodes, [treeTemplate], "oto");
 assert.deepEqual(searchResults.nodes.map((node) => node.id), ["child"]);
 assert.deepEqual(searchTemplateTree(nodes, [treeTemplate], "sms").templates.map((template) => template.id), ["leaf"]);
+
+const searchIndex = buildTemplateTreeSearchIndex(nodes, [treeTemplate]);
+assert.deepEqual(searchTemplateTreeIndex(searchIndex, "call").templates.map((template) => template.id), ["leaf"]);
+assert.deepEqual(searchTemplateTreeIndex(searchIndex, "signal").nodes.map((node) => node.id), ["root"]);
 
 console.log("templateTreeNavigation tests passed");

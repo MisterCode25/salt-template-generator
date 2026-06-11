@@ -5,10 +5,11 @@ function normalizeNeedle(value) {
     return String(value || "").trim().toLowerCase();
 }
 
-function includesNeedle(value, query) {
-    const needle = normalizeNeedle(query);
-    if (!needle) return true;
-    return normalizeNeedle(value).includes(needle);
+function buildSearchText(values = []) {
+    return values
+        .map(normalizeNeedle)
+        .filter(Boolean)
+        .join(" ");
 }
 
 export function getNodePath(nodes = [], nodeId) {
@@ -51,19 +52,37 @@ export function getNodeCardSummary(nodes = [], templates = [], nodeId) {
     };
 }
 
-export function searchTemplateTree(nodes = [], templates = [], query = "") {
+export function buildTemplateTreeSearchIndex(nodes = [], templates = []) {
+    return {
+        nodes: nodes.map((node) => ({
+            item: node,
+            searchText: buildSearchText([node.title, node.description])
+        })),
+        templates: templates.map((template) => ({
+            item: template,
+            searchText: buildSearchText([
+                template.title,
+                template.description,
+                ...(Array.isArray(template.channels) ? template.channels : [])
+            ])
+        }))
+    };
+}
+
+export function searchTemplateTreeIndex(index = {}, query = "") {
     const needle = normalizeNeedle(query);
     if (!needle) return { nodes: [], templates: [] };
 
     return {
-        nodes: nodes.filter((node) =>
-            includesNeedle(node.title, needle)
-            || includesNeedle(node.description, needle)
-        ),
-        templates: templates.filter((template) =>
-            includesNeedle(template.title, needle)
-            || includesNeedle(template.description, needle)
-            || template.channels.some((channel) => includesNeedle(channel, needle))
-        )
+        nodes: (index.nodes || [])
+            .filter((entry) => entry.searchText.includes(needle))
+            .map((entry) => entry.item),
+        templates: (index.templates || [])
+            .filter((entry) => entry.searchText.includes(needle))
+            .map((entry) => entry.item)
     };
+}
+
+export function searchTemplateTree(nodes = [], templates = [], query = "") {
+    return searchTemplateTreeIndex(buildTemplateTreeSearchIndex(nodes, templates), query);
 }

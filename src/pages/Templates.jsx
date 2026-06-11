@@ -42,9 +42,10 @@ import {
     updateTemplate
 } from "../utils/templateTreeOperations.js";
 import {
+    buildTemplateTreeSearchIndex,
     getAvailableTemplateChannels,
     resolveChannelModel,
-    searchTemplateTree
+    searchTemplateTreeIndex
 } from "../utils/templateTreeNavigation.js";
 import { formatTokenPreviewHTML } from "../utils/richTextTokens.js";
 import { applyTheme, getInitialTheme } from "../utils/theme.js";
@@ -506,6 +507,10 @@ export default function Templates() {
         () => new Map(treeTemplates.map((template) => [template.id, template])),
         [treeTemplates]
     );
+    const searchIndex = useMemo(
+        () => buildTemplateTreeSearchIndex(nodes, treeTemplates),
+        [nodes, treeTemplates]
+    );
     const nodeSummaryById = useMemo(() => {
         const summaries = new Map();
         nodes.forEach((node) => {
@@ -540,8 +545,8 @@ export default function Templates() {
     );
     const rootNodes = useMemo(() => getIndexedChildNodes(childrenByParent, null), [childrenByParent]);
     const searchResults = useMemo(
-        () => searchTemplateTree(nodes, treeTemplates, deferredQuery),
-        [deferredQuery, nodes, treeTemplates]
+        () => searchTemplateTreeIndex(searchIndex, deferredQuery),
+        [deferredQuery, searchIndex]
     );
     const activeNodePath = useMemo(() => {
         const path = [];
