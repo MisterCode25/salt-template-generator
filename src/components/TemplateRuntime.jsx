@@ -6,7 +6,7 @@ import {
     loadActiveClientPayload,
     saveActiveClientPayload
 } from "../services/activeClientService.js";
-import { copyHtml, showToast } from "../services/clipboardService.js";
+import { copyHtml, formatClipboardHtmlBody, showToast } from "../services/clipboardService.js";
 import { loadTokens } from "../services/tokenService.js";
 import {
     getClientInfoSections,
@@ -211,7 +211,7 @@ export function TemplateResultModal({ result, onCopy, onClose }) {
             <div
                 className="rich-preview template-result-preview"
                 data-placeholder="No content."
-                dangerouslySetInnerHTML={{ __html: formatTokenPreviewHTML(result.html || "") }}
+                dangerouslySetInnerHTML={{ __html: formatTokenPreviewHTML(formatClipboardHtmlBody(result.html || "")) }}
             />
             <div className="popup-actions">
                 <button type="button" className="primary-btn" onClick={onCopy}>

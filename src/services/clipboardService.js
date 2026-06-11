@@ -8,6 +8,25 @@ function decodeHtmlEntities(str) {
         .replace(/&#39;/g, "'");
 }
 
+export function formatClipboardHtmlBody(html) {
+    if (!html) return "";
+    const isHtml = /<[a-z][\s\S]*>/i.test(html);
+    return isHtml
+        ? html
+        : html.split(/\n\n+/).map(p => `<p>${p.replace(/\n/g, "<br />\n")}</p>`).join("\n");
+}
+
+export function formatClipboardPlainText(html) {
+    return decodeHtmlEntities(
+        formatClipboardHtmlBody(html)
+            .replace(/<br\s*\/?>/gi, "\n")
+            .replace(/<\/p>/gi, "\n\n")
+            .replace(/<[^>]+>/g, "")
+            .replace(/\n{3,}/g, "\n\n")
+            .trim()
+    );
+}
+
 export async function copyText(text, opts = {}) {
     if (!text) return;
     const {
@@ -47,19 +66,8 @@ export async function copyHtml(html, opts = {}) {
         variant = "info"
     } = opts;
 
-    const isHtml = /<[a-z][\s\S]*>/i.test(html);
-    const body = isHtml
-        ? html
-        : html.split(/\n\n+/).map(p => `<p>${p.replace(/\n/g, "<br />\n")}</p>`).join("\n");
-
-    const plainText = decodeHtmlEntities(
-        body
-            .replace(/<br\s*\/?>/gi, "\n")
-            .replace(/<\/p>/gi, "\n\n")
-            .replace(/<[^>]+>/g, "")
-            .replace(/\n{3,}/g, "\n\n")
-            .trim()
-    );
+    const body = formatClipboardHtmlBody(html);
+    const plainText = formatClipboardPlainText(html);
 
     try {
         const item = new ClipboardItem({

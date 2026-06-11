@@ -1,0 +1,20 @@
+import assert from "node:assert/strict";
+import {
+  formatClipboardHtmlBody,
+  formatClipboardPlainText
+} from "../src/services/clipboardService.js";
+
+{
+  const body = formatClipboardHtmlBody("Hello,\nLine two.\n\nBest regards,\nSalt");
+
+  assert.equal(body, "<p>Hello,<br />\nLine two.</p>\n<p>Best regards,<br />\nSalt</p>");
+}
+
+{
+  const html = "<p>Hello<br />World</p>";
+
+  assert.equal(formatClipboardHtmlBody(html), html);
+  assert.equal(formatClipboardPlainText(html), "Hello\nWorld");
+}
+
+console.log("clipboardService tests passed");
