@@ -1074,6 +1074,118 @@ const NodeTreeRows = memo(function NodeTreeRows({
     ));
 });
 
+const NodeTemplateRow = memo(function NodeTemplateRow({
+    template,
+    selectedNodeId,
+    linkTarget,
+    nodeLookup,
+    finalNodeOptions,
+    onEdit,
+    onDuplicate,
+    onUnlink,
+    onDelete,
+    onLinkTargetChange,
+    onLink
+}) {
+    const otherNodes = useMemo(() => (
+        (template.nodeIds || [])
+            .filter((nodeId) => nodeId !== selectedNodeId)
+            .map((nodeId) => nodeLookup.get(nodeId))
+            .filter(Boolean)
+    ), [nodeLookup, selectedNodeId, template.nodeIds]);
+
+    const linkOptions = useMemo(() => (
+        finalNodeOptions.filter(({ node }) => !(template.nodeIds || []).includes(node.id))
+    ), [finalNodeOptions, template.nodeIds]);
+
+    const handleEdit = useCallback(() => {
+        onEdit(template);
+    }, [onEdit, template]);
+
+    const handleDuplicate = useCallback(() => {
+        onDuplicate(template.id);
+    }, [onDuplicate, template.id]);
+
+    const handleUnlink = useCallback(() => {
+        onUnlink(template.id, selectedNodeId);
+    }, [onUnlink, selectedNodeId, template.id]);
+
+    const handleDelete = useCallback(() => {
+        onDelete(template.id);
+    }, [onDelete, template.id]);
+
+    const handleLinkTargetChange = useCallback((event) => {
+        onLinkTargetChange(template.id, event.target.value);
+    }, [onLinkTargetChange, template.id]);
+
+    const handleLink = useCallback(() => {
+        onLink(template.id, linkTarget);
+    }, [linkTarget, onLink, template.id]);
+
+    return (
+        <article className="node-template-row">
+            <div className="node-template-main">
+                <span className="node-tree-icon node-template-icon"><NodeIconGlyph icon="template" /></span>
+                <div className="node-template-copy">
+                    <strong>{template.title || "Untitled template"}</strong>
+                    <div className="node-template-meta">
+                        <div className="node-channel-pills">
+                            {template.channels.map((channel) => (
+                                <span key={channel} className="variant-pill">{CHANNEL_LABELS[channel] || channel}</span>
+                            ))}
+                        </div>
+                        {otherNodes.length > 0 && (
+                            <div className="node-template-nodes">
+                                <span className="node-template-nodes-label">Also in:</span>
+                                {otherNodes.map((node) => (
+                                    <span key={node.id} className="node-template-node-pill">{node.title}</span>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+            <div className="node-template-toolbar">
+                <button type="button" className="secondary-btn" onClick={handleEdit}>
+                    Edit
+                </button>
+                <button type="button" className="secondary-btn" onClick={handleDuplicate}>Duplicate</button>
+                {(template.nodeIds || []).length > 1 && (
+                    <button
+                        type="button"
+                        className="secondary-btn"
+                        onClick={handleUnlink}
+                        title="Remove this template from this section only"
+                    >
+                        Unlink
+                    </button>
+                )}
+                <button type="button" className="icon-btn delete-btn" onClick={handleDelete} aria-label={`Delete ${template.title}`}>
+                    <span className="icon-trash" aria-hidden="true"></span>
+                </button>
+            </div>
+            <div className="node-template-move">
+                <select value={linkTarget} onChange={handleLinkTargetChange}>
+                    <option value="">Link to final section...</option>
+                    {linkOptions.map(({ node, depth }) => (
+                        <option key={node.id} value={node.id}>
+                            {`${"  ".repeat(depth)}${node.title || "Untitled section"}`}
+                        </option>
+                    ))}
+                </select>
+                <button
+                    type="button"
+                    className="secondary-btn"
+                    onClick={handleLink}
+                    disabled={!linkTarget}
+                >
+                    Link
+                </button>
+            </div>
+        </article>
+    );
+});
+
 export default function ManageNodes({ embedded = false, onClose = null }) {
     const navigate = useNavigate();
     const [nodes, setNodes] = useState([]);
@@ -1156,11 +1268,11 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
         [selectedChildNodes, selectedNode]
     );
 
-    const persist = async (nextNodes = nodes, nextTemplates = templates) => {
+    const persist = useCallback(async (nextNodes = nodes, nextTemplates = templates) => {
         setNodes(nextNodes);
         setTemplates(nextTemplates);
         await saveTemplateTreeData({ nodes: nextNodes, templates: nextTemplates });
-    };
+    }, [nodes, templates]);
 
     const openRootNodeModal = () => {
         setNodeModal({ mode: "create", parentId: null });
@@ -1250,11 +1362,26 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
         showToast("Template deleted", "warning");
     };
 
-    const duplicateSelectedTemplate = async (templateId) => {
+    const openTemplateEditModal = useCallback((template) => {
+        setTemplateModal({ mode: "edit", template, parentNodeId: template.parentNodeId });
+    }, []);
+
+    const requestTemplateDelete = useCallback((templateId) => {
+        setConfirmTemplateDelete(templateId);
+    }, []);
+
+    const changeTemplateLinkTarget = useCallback((templateId, targetNodeId) => {
+        setTemplateLinkTargets((current) => ({
+            ...current,
+            [templateId]: targetNodeId
+        }));
+    }, []);
+
+    const duplicateSelectedTemplate = useCallback(async (templateId) => {
         const nextTemplates = duplicateTemplate(templates, templateId);
         await persist(nodes, nextTemplates);
         showToast("Template duplicated", "info");
-    };
+    }, [nodes, persist, templates]);
 
     const openTemplateCreationPicker = (nodeId = selectedNodeId) => {
         if (!nodeId) return;
@@ -1274,8 +1401,7 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
         }
     };
 
-    const linkTemplate = async (templateId) => {
-        const targetNodeId = templateLinkTargets[templateId];
+    const linkTemplate = useCallback(async (templateId, targetNodeId) => {
         if (!targetNodeId) return;
         try {
             const nextTemplates = linkTemplateToNode(templates, templateId, targetNodeId, nodes);
@@ -1290,15 +1416,15 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
             console.error(error);
             showToast("Template cannot be linked there", "error");
         }
-    };
+    }, [nodes, persist, templates]);
 
-    const unlinkFromNode = async (templateId, nodeId) => {
+    const unlinkFromNode = useCallback(async (templateId, nodeId) => {
         const template = templates.find((t) => t.id === templateId);
         if (!template || (template.nodeIds || []).length <= 1) return;
         const nextTemplates = unlinkTemplateFromNode(templates, templateId, nodeId);
         await persist(nodes, nextTemplates);
         showToast("Template unlinked from section", "info");
-    };
+    }, [nodes, persist, templates]);
 
     const parentSelectValue = selectedNode?.parentId || ROOT_PARENT_VALUE;
     const selectedParentTitle = selectedNode?.parentId
@@ -1426,89 +1552,22 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
                                     </button>
                                 ) : (
                                     <div className="node-template-list">
-                                        {selectedTemplates.map((template) => {
-                                            const linkTarget = templateLinkTargets[template.id] || "";
-                                            const otherNodes = (template.nodeIds || [])
-                                                .filter((nid) => nid !== selectedNode.id)
-                                                .map((nid) => nodeLookup.get(nid))
-                                                .filter(Boolean);
-                                            return (
-                                                <article key={template.id} className="node-template-row">
-                                                    <div className="node-template-main">
-                                                        <span className="node-tree-icon node-template-icon"><NodeIconGlyph icon="template" /></span>
-                                                        <div className="node-template-copy">
-                                                            <strong>{template.title || "Untitled template"}</strong>
-                                                            <div className="node-template-meta">
-                                                                <div className="node-channel-pills">
-                                                                    {template.channels.map((channel) => (
-                                                                        <span key={channel} className="variant-pill">{CHANNEL_LABELS[channel] || channel}</span>
-                                                                    ))}
-                                                                </div>
-                                                                {otherNodes.length > 0 && (
-                                                                    <div className="node-template-nodes">
-                                                                        <span className="node-template-nodes-label">Also in:</span>
-                                                                        {otherNodes.map((n) => (
-                                                                            <span key={n.id} className="node-template-node-pill">{n.title}</span>
-                                                                        ))}
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div className="node-template-toolbar">
-                                                        <button
-                                                            type="button"
-                                                            className="secondary-btn"
-                                                            onClick={() => setTemplateModal({ mode: "edit", template, parentNodeId: template.parentNodeId })}
-                                                        >
-                                                            Edit
-                                                        </button>
-                                                        <button type="button" className="secondary-btn" onClick={() => duplicateSelectedTemplate(template.id)}>Duplicate</button>
-                                                        {(template.nodeIds || []).length > 1 && (
-                                                            <button
-                                                                type="button"
-                                                                className="secondary-btn"
-                                                                onClick={() => unlinkFromNode(template.id, selectedNode.id)}
-                                                                title="Remove this template from this section only"
-                                                            >
-                                                                Unlink
-                                                            </button>
-                                                        )}
-                                                        <button type="button" className="icon-btn delete-btn" onClick={() => setConfirmTemplateDelete(template.id)} aria-label={`Delete ${template.title}`}>
-                                                            <span className="icon-trash" aria-hidden="true"></span>
-                                                        </button>
-                                                    </div>
-                                                    <div className="node-template-move">
-                                                        <select
-                                                            value={linkTarget}
-                                                            onChange={(event) => setTemplateLinkTargets((current) => ({
-                                                                ...current,
-                                                                [template.id]: event.target.value
-                                                            }))}
-                                                        >
-                                                            <option value="">Link to final section…</option>
-                                                            {finalNodeOptions
-                                                                .filter(({ node }) =>
-                                                                    !(template.nodeIds || []).includes(node.id)
-                                                                )
-                                                                .map(({ node, depth }) => (
-                                                                    <option key={node.id} value={node.id}>
-                                                                        {`${"  ".repeat(depth)}${node.title || "Untitled section"}`}
-                                                                    </option>
-                                                                ))}
-                                                        </select>
-                                                        <button
-                                                            type="button"
-                                                            className="secondary-btn"
-                                                            onClick={() => linkTemplate(template.id)}
-                                                            disabled={!linkTarget}
-                                                        >
-                                                            Link
-                                                        </button>
-                                                    </div>
-                                                </article>
-                                            );
-                                        })}
+                                        {selectedTemplates.map((template) => (
+                                            <NodeTemplateRow
+                                                key={template.id}
+                                                template={template}
+                                                selectedNodeId={selectedNode.id}
+                                                linkTarget={templateLinkTargets[template.id] || ""}
+                                                nodeLookup={nodeLookup}
+                                                finalNodeOptions={finalNodeOptions}
+                                                onEdit={openTemplateEditModal}
+                                                onDuplicate={duplicateSelectedTemplate}
+                                                onUnlink={unlinkFromNode}
+                                                onDelete={requestTemplateDelete}
+                                                onLinkTargetChange={changeTemplateLinkTarget}
+                                                onLink={linkTemplate}
+                                            />
+                                        ))}
                                     </div>
                                 )}
                             </section>
