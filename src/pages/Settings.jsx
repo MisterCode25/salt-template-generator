@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { loadTokens, saveTokens } from "../services/tokenService.js";
 import { loadTemplateTreeData, saveTemplateTreeData } from "../services/templateTreeService.js";
@@ -9,6 +9,29 @@ import { getStorageInfo, requestPersistentStorage } from "../services/storageInf
 import { AGENT_PROFILE_FIELDS, loadAgentProfile, saveAgentProfile } from "../services/agentProfileService.js";
 import Modal from "../components/Modal.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
+
+const AgentProfileField = memo(function AgentProfileField({ field, value, onChange }) {
+    const handleChange = useCallback((event) => {
+        onChange(field.key, event.target.value);
+    }, [field.key, onChange]);
+
+    const inputType = field.key === "email"
+        ? "email"
+        : field.key === "phoneNumber" ? "tel" : "text";
+
+    return (
+        <div className="field-line">
+            <label>{field.settingsLabel}</label>
+            <input
+                type={inputType}
+                value={value}
+                onChange={handleChange}
+                placeholder={field.token}
+            />
+            <span className="hint">{field.token}</span>
+        </div>
+    );
+});
 
 export default function Settings({ embedded = false, onClose = null }) {
     const navigate = useNavigate();
@@ -27,25 +50,25 @@ export default function Settings({ embedded = false, onClose = null }) {
         getStorageInfo().then(setStorageInfo).catch(() => setStorageInfo(null));
     }, []);
 
-    const refreshStorageInfo = () => {
+    const refreshStorageInfo = useCallback(() => {
         getStorageInfo().then(setStorageInfo).catch(() => setStorageInfo(null));
-    };
+    }, []);
 
-    const requestPersist = async () => {
+    const requestPersist = useCallback(async () => {
         const persisted = await requestPersistentStorage();
         refreshStorageInfo();
         showToast(
             persisted ? "Persistent browser storage enabled" : "Persistent storage was not granted",
             persisted ? "success" : "warning"
         );
-    };
+    }, [refreshStorageInfo]);
 
-    const startExport = () => {
+    const startExport = useCallback(() => {
         setExportNameValue(configName);
         setExportNameOpen(true);
-    };
+    }, [configName]);
 
-    const doExport = () => {
+    const doExport = useCallback(() => {
         const nextName = exportNameValue.trim() || configName;
         setExportNameOpen(false);
         setConfigName(nextName);
@@ -58,16 +81,16 @@ export default function Settings({ embedded = false, onClose = null }) {
         a.download = `${nextName || "config"}.templageConfig`;
         a.click();
         URL.revokeObjectURL(url);
-    };
+    }, [configName, exportNameValue, tokens, treeData]);
 
-    const importConfig = () => {
+    const importConfig = useCallback(() => {
         if (fileInputRef.current) {
             fileInputRef.current.value = "";
             fileInputRef.current.click();
         }
-    };
+    }, []);
 
-    const handleFile = async (e) => {
+    const handleFile = useCallback(async (e) => {
         const file = e.target.files?.[0];
         if (!file) return;
         try {
@@ -97,21 +120,23 @@ export default function Settings({ embedded = false, onClose = null }) {
             console.error(err);
             showToast("Import failed", "error");
         }
-    };
+    }, [navigate, refreshStorageInfo]);
 
-    const triggerReset = () => setConfirmReset(true);
+    const triggerReset = useCallback(() => {
+        setConfirmReset(true);
+    }, []);
 
-    const updateAgentProfileField = (key, value) => {
+    const updateAgentProfileField = useCallback((key, value) => {
         setAgentProfile((prev) => ({ ...prev, [key]: value }));
-    };
+    }, []);
 
-    const saveAgentSettings = () => {
+    const saveAgentSettings = useCallback(() => {
         const savedProfile = saveAgentProfile(agentProfile);
         setAgentProfile(savedProfile);
         showToast("Agent profile saved", "success");
-    };
+    }, [agentProfile]);
 
-    const resetStorage = async () => {
+    const resetStorage = useCallback(async () => {
         setConfirmReset(false);
         const keysToDelete = [];
         const appScopedLegacyKeys = new Set(["tokens", "models", "theme_pref", "active_client_payload", "agent_profile"]);
@@ -130,7 +155,23 @@ export default function Settings({ embedded = false, onClose = null }) {
         await clearAppIndexedDB();
         showToast("Local data reset", "warning");
         window.location.href = "/";
-    };
+    }, []);
+
+    const closeExportNameModal = useCallback(() => {
+        setExportNameOpen(false);
+    }, []);
+
+    const handleExportNameChange = useCallback((event) => {
+        setExportNameValue(event.target.value);
+    }, []);
+
+    const handleExportNameKeyDown = useCallback((event) => {
+        if (event.key === "Enter") doExport();
+    }, [doExport]);
+
+    const cancelReset = useCallback(() => {
+        setConfirmReset(false);
+    }, []);
 
     const content = (
         <>
@@ -160,16 +201,12 @@ export default function Settings({ embedded = false, onClose = null }) {
                         <p className="hint">Used by the hard-coded agent tokens in templates and tool URLs.</p>
                         <div className="settings-agent-grid">
                             {AGENT_PROFILE_FIELDS.map((field) => (
-                                <div className="field-line" key={field.key}>
-                                    <label>{field.settingsLabel}</label>
-                                    <input
-                                        type={field.key === "email" ? "email" : field.key === "phoneNumber" ? "tel" : "text"}
-                                        value={agentProfile[field.key] || ""}
-                                        onChange={(event) => updateAgentProfileField(field.key, event.target.value)}
-                                        placeholder={field.token}
-                                    />
-                                    <span className="hint">{field.token}</span>
-                                </div>
+                                <AgentProfileField
+                                    key={field.key}
+                                    field={field}
+                                    value={agentProfile[field.key] || ""}
+                                    onChange={updateAgentProfileField}
+                                />
                             ))}
                         </div>
                         <div className="flex-row gap-sm flex-wrap mt-md">
@@ -217,7 +254,7 @@ export default function Settings({ embedded = false, onClose = null }) {
                 </div>
             </div>
             {exportNameOpen && (
-                <Modal onClose={() => setExportNameOpen(false)} ariaLabel="Configuration name">
+                <Modal onClose={closeExportNameModal} ariaLabel="Configuration name">
                     <div className="popup-header">
                         <h2>Export configuration</h2>
                     </div>
@@ -227,8 +264,8 @@ export default function Settings({ embedded = false, onClose = null }) {
                             <input
                                 autoFocus
                                 value={exportNameValue}
-                                onChange={(e) => setExportNameValue(e.target.value)}
-                                onKeyDown={(e) => { if (e.key === "Enter") doExport(); }}
+                                onChange={handleExportNameChange}
+                                onKeyDown={handleExportNameKeyDown}
                                 placeholder="My configuration"
                             />
                         </div>
@@ -245,7 +282,7 @@ export default function Settings({ embedded = false, onClose = null }) {
                     confirmLabel="Reset"
                     variant="danger"
                     onConfirm={resetStorage}
-                    onCancel={() => setConfirmReset(false)}
+                    onCancel={cancelReset}
                 />
             )}
         </>
