@@ -1,6 +1,7 @@
 const DB_NAME = "salt-template-generator";
 const DB_VERSION = 1;
 const STORE_NAME = "appData";
+let databasePromise = null;
 
 function hasIndexedDB() {
     return typeof indexedDB !== "undefined";
@@ -11,37 +12,48 @@ function openDatabase() {
         return Promise.reject(new Error("IndexedDB is not available."));
     }
 
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open(DB_NAME, DB_VERSION);
+    if (!databasePromise) {
+        databasePromise = new Promise((resolve, reject) => {
+            const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-        request.onupgradeneeded = () => {
-            const db = request.result;
-            if (!db.objectStoreNames.contains(STORE_NAME)) {
-                db.createObjectStore(STORE_NAME);
-            }
-        };
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error || new Error("Unable to open IndexedDB."));
-    });
+            request.onupgradeneeded = () => {
+                const db = request.result;
+                if (!db.objectStoreNames.contains(STORE_NAME)) {
+                    db.createObjectStore(STORE_NAME);
+                }
+            };
+            request.onsuccess = () => {
+                const db = request.result;
+                db.onversionchange = () => {
+                    db.close();
+                    databasePromise = null;
+                };
+                resolve(db);
+            };
+            request.onerror = () => reject(request.error || new Error("Unable to open IndexedDB."));
+            request.onblocked = () => reject(new Error("IndexedDB open request was blocked."));
+        }).catch((error) => {
+            databasePromise = null;
+            throw error;
+        });
+    }
+
+    return databasePromise;
 }
 
-async function withStore(mode, action) {
-    const db = await openDatabase();
+function runStoreTransaction(db, mode, action) {
     return new Promise((resolve, reject) => {
         const transaction = db.transaction(STORE_NAME, mode);
         const store = transaction.objectStore(STORE_NAME);
         let actionResult;
 
         transaction.oncomplete = () => {
-            db.close();
             resolve(actionResult);
         };
         transaction.onerror = () => {
-            db.close();
             reject(transaction.error || new Error("IndexedDB transaction failed."));
         };
         transaction.onabort = () => {
-            db.close();
             reject(transaction.error || new Error("IndexedDB transaction aborted."));
         };
 
@@ -52,6 +64,17 @@ async function withStore(mode, action) {
             reject(error);
         }
     });
+}
+
+async function withStore(mode, action) {
+    const db = await openDatabase();
+    try {
+        return await runStoreTransaction(db, mode, action);
+    } catch (error) {
+        if (error?.name !== "InvalidStateError") throw error;
+        databasePromise = null;
+        return runStoreTransaction(await openDatabase(), mode, action);
+    }
 }
 
 export async function loadIndexedJSON(key, fallback = null) {
