@@ -101,7 +101,34 @@ const ToolTokenOption = memo(function ToolTokenOption({
     );
 });
 
-function ToolModal({ initial, onClose, onSave }) {
+const ToolRow = memo(function ToolRow({ tool, onEdit, onDelete }) {
+    const handleEdit = useCallback(() => {
+        onEdit(tool);
+    }, [onEdit, tool]);
+
+    const handleDelete = useCallback(() => {
+        onDelete(tool.id);
+    }, [onDelete, tool.id]);
+
+    return (
+        <div className="model-row">
+            <div>
+                <strong>{tool.title}</strong>
+                <div className="hint mt-sm" style={{ wordBreak: "break-all" }}>{tool.url}</div>
+            </div>
+            <div className="flex-row gap-sm" style={{ marginLeft: "auto" }}>
+                <button className="icon-btn edit-btn" onClick={handleEdit}>
+                    <span className="icon-pencil" aria-hidden="true"></span>
+                </button>
+                <button className="icon-btn delete-btn" onClick={handleDelete}>
+                    <span className="icon-trash" aria-hidden="true"></span>
+                </button>
+            </div>
+        </div>
+    );
+});
+
+const ToolModal = memo(function ToolModal({ initial, onClose, onSave }) {
     const [title, setTitle] = useState(initial?.title || "");
     const [url, setUrl] = useState(initial?.url || "");
     const [tokens, setTokens] = useState([]);
@@ -272,7 +299,7 @@ function ToolModal({ initial, onClose, onSave }) {
             </div>
         </Modal>
     );
-}
+});
 
 export default function ManageTools({ embedded = false, onClose = null }) {
     const [tools, setTools] = useState([]);
@@ -283,13 +310,13 @@ export default function ManageTools({ embedded = false, onClose = null }) {
         loadTools().then(setTools);
     }, []);
 
-    const persist = async (next) => {
+    const persist = useCallback(async (next) => {
         setTools(next);
         await saveTools(next);
         window.dispatchEvent(new CustomEvent("tools-updated"));
-    };
+    }, []);
 
-    const onSave = async (tool) => {
+    const onSave = useCallback(async (tool) => {
         let next;
         if (tool.id) {
             next = tools.map((t) => (t.id === tool.id ? tool : t));
@@ -298,13 +325,33 @@ export default function ManageTools({ embedded = false, onClose = null }) {
         }
         await persist(next);
         setModalTool(null);
-    };
+    }, [persist, tools]);
 
-    const onDelete = async () => {
+    const onDelete = useCallback(async () => {
         if (!confirmDelete) return;
         await persist(tools.filter((t) => t.id !== confirmDelete));
         setConfirmDelete(null);
-    };
+    }, [confirmDelete, persist, tools]);
+
+    const openNewTool = useCallback(() => {
+        setModalTool({});
+    }, []);
+
+    const editTool = useCallback((tool) => {
+        setModalTool(tool);
+    }, []);
+
+    const requestToolDelete = useCallback((toolId) => {
+        setConfirmDelete(toolId);
+    }, []);
+
+    const closeToolModal = useCallback(() => {
+        setModalTool(null);
+    }, []);
+
+    const cancelDelete = useCallback(() => {
+        setConfirmDelete(null);
+    }, []);
 
     return (
         <main className={embedded ? "management-embedded-page" : "page-container"}>
@@ -319,32 +366,24 @@ export default function ManageTools({ embedded = false, onClose = null }) {
                 <div className="models-list">
                     {tools.length === 0 && <EmptyState message="No tools yet." />}
                     {tools.map((tool) => (
-                        <div key={tool.id} className="model-row">
-                            <div>
-                                <strong>{tool.title}</strong>
-                                <div className="hint mt-sm" style={{ wordBreak: "break-all" }}>{tool.url}</div>
-                            </div>
-                            <div className="flex-row gap-sm" style={{ marginLeft: "auto" }}>
-                                <button className="icon-btn edit-btn" onClick={() => setModalTool(tool)}>
-                                    <span className="icon-pencil" aria-hidden="true"></span>
-                                </button>
-                                <button className="icon-btn delete-btn" onClick={() => setConfirmDelete(tool.id)}>
-                                    <span className="icon-trash" aria-hidden="true"></span>
-                                </button>
-                            </div>
-                        </div>
+                        <ToolRow
+                            key={tool.id}
+                            tool={tool}
+                            onEdit={editTool}
+                            onDelete={requestToolDelete}
+                        />
                     ))}
                 </div>
 
                 <div className="add-btn-container">
-                    <button className="primary-btn" onClick={() => setModalTool({})}>+ Add Tool</button>
+                    <button className="primary-btn" onClick={openNewTool}>+ Add Tool</button>
                 </div>
             </div>
 
             {modalTool !== null && (
                 <ToolModal
                     initial={modalTool.id ? modalTool : null}
-                    onClose={() => setModalTool(null)}
+                    onClose={closeToolModal}
                     onSave={onSave}
                 />
             )}
@@ -355,7 +394,7 @@ export default function ManageTools({ embedded = false, onClose = null }) {
                     confirmLabel="Delete"
                     variant="danger"
                     onConfirm={onDelete}
-                    onCancel={() => setConfirmDelete(null)}
+                    onCancel={cancelDelete}
                 />
             )}
         </main>
