@@ -17,14 +17,15 @@ function normalizeManualInputs(manualInputs) {
     let dirty = false;
     const next = {};
 
-    Object.entries(manualInputs).forEach(([name, value]) => {
+    for (const name in manualInputs) {
+        if (!Object.prototype.hasOwnProperty.call(manualInputs, name)) continue;
         const canonicalToken = canonicalizeInputTokenValue(name);
         const canonicalName = normalizeTokenName(canonicalToken);
-        if (!canonicalName) return;
+        if (!canonicalName) continue;
 
         if (canonicalName !== name) dirty = true;
-        next[canonicalName] = value;
-    });
+        next[canonicalName] = manualInputs[name];
+    }
 
     return { manualInputs: next, dirty };
 }
@@ -74,10 +75,18 @@ export function migrateStoredClientInputValues(storage = globalThis.localStorage
 }
 
 function dispatchClientInputValuesUpdated(values) {
-    if (typeof window === "undefined" || !values || Object.keys(values).length === 0) return;
+    if (typeof window === "undefined" || !hasRecordValues(values)) return;
     window.dispatchEvent(new CustomEvent(CLIENT_INPUT_VALUES_UPDATED_EVENT, {
         detail: { values }
     }));
+}
+
+function hasRecordValues(record) {
+    if (!record) return false;
+    for (const key in record) {
+        if (Object.prototype.hasOwnProperty.call(record, key)) return true;
+    }
+    return false;
 }
 
 function normalizeClientInputEntry(tokenDef, value) {
@@ -91,23 +100,26 @@ function normalizeClientInputEntry(tokenDef, value) {
 }
 
 function saveClientInputEntries(entries, storage = globalThis.localStorage) {
-    const normalizedEntries = entries
-        .map(({ tokenDef, value }) => normalizeClientInputEntry(tokenDef, value))
-        .filter(Boolean);
+    const normalizedEntries = [];
     const valuesByToken = {};
 
-    normalizedEntries.forEach((entry) => {
+    for (const { tokenDef, value } of entries) {
+        const entry = normalizeClientInputEntry(tokenDef, value);
+        if (!entry) continue;
+        normalizedEntries.push(entry);
         valuesByToken[entry.token] = entry.value;
-    });
+    }
 
     const changedValuesByToken = {};
     if (storage) {
-        Object.entries(valuesByToken).forEach(([token, value]) => {
+        for (const token in valuesByToken) {
+            if (!Object.prototype.hasOwnProperty.call(valuesByToken, token)) continue;
+            const value = valuesByToken[token];
             const storageKey = `${STORED_INPUT_PREFIX}${token}`;
-            if (storage.getItem(storageKey) === value) return;
+            if (storage.getItem(storageKey) === value) continue;
             storage.setItem(storageKey, value);
             changedValuesByToken[token] = value;
-        });
+        }
     } else {
         Object.assign(changedValuesByToken, valuesByToken);
     }
@@ -121,20 +133,20 @@ function saveClientInputEntries(entries, storage = globalThis.localStorage) {
     const previousInputs = payload[MANUAL_CLIENT_INPUTS_KEY];
     const { manualInputs, dirty: normalizedInputsDirty } = normalizeManualInputs(previousInputs);
     let payloadDirty = normalizedInputsDirty;
-    normalizedEntries.forEach((entry) => {
-        if (!entry.name) return;
+    for (const entry of normalizedEntries) {
+        if (!entry.name) continue;
         if (entry.value === "") {
-            if (!Object.prototype.hasOwnProperty.call(manualInputs, entry.name)) return;
+            if (!Object.prototype.hasOwnProperty.call(manualInputs, entry.name)) continue;
             delete manualInputs[entry.name];
             changedValuesByToken[entry.token] = entry.value;
             payloadDirty = true;
-            return;
+            continue;
         }
-        if (manualInputs[entry.name] === entry.value) return;
+        if (manualInputs[entry.name] === entry.value) continue;
         manualInputs[entry.name] = entry.value;
         changedValuesByToken[entry.token] = entry.value;
         payloadDirty = true;
-    });
+    }
 
     const nextPayload = payloadDirty
         ? {
