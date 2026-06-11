@@ -387,7 +387,7 @@ function TemplateDetail({ template, activeChannel, setActiveChannel, runtime, on
             if (nextModel.variants?.length) {
                 runtime.setVariantPicker({ model: nextModel, sectionKey });
             } else {
-                runtime.requestTokenInputs(nextModel, sectionKey);
+                runtime.requestTemplateResult(nextModel, sectionKey);
             }
         }
     };
@@ -615,28 +615,7 @@ export default function Templates() {
         runtime.setLang(code);
     };
 
-    const requestFirstMissingChannelInputs = (template, preferredChannel) => {
-        if (!template) return false;
-        const available = getAvailableTemplateChannels(template);
-        const channels = (available.length > 0 ? available : template.channels)
-            .filter((channel, index, list) => list.indexOf(channel) === index);
-        const orderedChannels = [
-            preferredChannel,
-            ...channels.filter((channel) => channel !== preferredChannel)
-        ].filter(Boolean);
-
-        for (const channel of orderedChannels) {
-            const model = resolveChannelModel(template, channel);
-            if (model && runtime.requestTokenInputs(model, `tree_${template.id}_${channel}`)) {
-                setActiveChannel(channel);
-                return true;
-            }
-        }
-
-        return false;
-    };
-
-    const requestFirstVariantPicker = (template, preferredChannel) => {
+    const requestFirstTemplateWorkflow = (template, preferredChannel) => {
         if (!template) return false;
         const available = getAvailableTemplateChannels(template);
         const channels = (available.length > 0 ? available : template.channels)
@@ -653,6 +632,11 @@ export default function Templates() {
                 runtime.setVariantPicker({ model, sectionKey: `tree_${template.id}_${channel}` });
                 return true;
             }
+            if (model) {
+                setActiveChannel(channel);
+                runtime.requestTemplateResult(model, `tree_${template.id}_${channel}`);
+                return true;
+            }
         }
 
         return false;
@@ -665,9 +649,7 @@ export default function Templates() {
         const channels = template ? getAvailableTemplateChannels(template) : [];
         const nextChannel = channels[0] || template?.channels?.[0] || Channel.EMAIL;
         setActiveChannel(nextChannel);
-        if (!requestFirstVariantPicker(template, nextChannel)) {
-            requestFirstMissingChannelInputs(template, nextChannel);
-        }
+        requestFirstTemplateWorkflow(template, nextChannel);
         setQuery("");
     };
 

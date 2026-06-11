@@ -688,7 +688,7 @@ export function useTemplateRuntime() {
         if (model.variants && model.variants.length > 0) {
             setVariantPicker({ model, sectionKey });
         } else {
-            copyModel(model, sectionKey);
+            requestTemplateResult(model, sectionKey);
         }
     };
 
