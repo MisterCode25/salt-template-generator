@@ -1347,7 +1347,7 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
                                         + Template
                                     </button>
                                 ) : (
-                                    <div className="node-template-grid">
+                                    <div className="node-template-list">
                                         {selectedTemplates.map((template) => {
                                             const linkTarget = templateLinkTargets[template.id] || "";
                                             const otherNodes = (template.nodeIds || [])
@@ -1355,22 +1355,27 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
                                                 .map((nid) => nodes.find((n) => n.id === nid))
                                                 .filter(Boolean);
                                             return (
-                                                <article key={template.id} className="node-template-card">
-                                                    <div className="node-template-copy">
-                                                        <strong>{template.title || "Untitled template"}</strong>
-                                                        <div className="node-channel-pills">
-                                                            {template.channels.map((channel) => (
-                                                                <span key={channel} className="variant-pill">{CHANNEL_LABELS[channel] || channel}</span>
-                                                            ))}
-                                                        </div>
-                                                        {otherNodes.length > 0 && (
-                                                            <div className="node-template-nodes">
-                                                                <span className="node-template-nodes-label">Also in:</span>
-                                                                {otherNodes.map((n) => (
-                                                                    <span key={n.id} className="node-template-node-pill">{n.title}</span>
-                                                                ))}
+                                                <article key={template.id} className="node-template-row">
+                                                    <div className="node-template-main">
+                                                        <span className="node-tree-icon node-template-icon"><NodeIconGlyph icon="template" /></span>
+                                                        <div className="node-template-copy">
+                                                            <strong>{template.title || "Untitled template"}</strong>
+                                                            <div className="node-template-meta">
+                                                                <div className="node-channel-pills">
+                                                                    {template.channels.map((channel) => (
+                                                                        <span key={channel} className="variant-pill">{CHANNEL_LABELS[channel] || channel}</span>
+                                                                    ))}
+                                                                </div>
+                                                                {otherNodes.length > 0 && (
+                                                                    <div className="node-template-nodes">
+                                                                        <span className="node-template-nodes-label">Also in:</span>
+                                                                        {otherNodes.map((n) => (
+                                                                            <span key={n.id} className="node-template-node-pill">{n.title}</span>
+                                                                        ))}
+                                                                    </div>
+                                                                )}
                                                             </div>
-                                                        )}
+                                                        </div>
                                                     </div>
                                                     <div className="node-template-toolbar">
                                                         <button
