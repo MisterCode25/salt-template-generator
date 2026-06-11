@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import EmptyState from "../components/EmptyState.jsx";
@@ -112,8 +112,12 @@ const NODE_ICON_PRESETS = [
     { value: "tag", label: "Tag", category: "Business", kind: "tag", terms: "label type" }
 ];
 
+const NODE_ICON_PRESET_BY_VALUE = new Map(
+    NODE_ICON_PRESETS.map((preset) => [preset.value, preset])
+);
+
 function getNodeIconPreset(icon) {
-    return NODE_ICON_PRESETS.find((preset) => preset.value === icon) || null;
+    return NODE_ICON_PRESET_BY_VALUE.get(icon) || null;
 }
 
 function renderNodeIconPaths(kind) {
@@ -232,14 +236,14 @@ function renderNodeIconPaths(kind) {
     }
 }
 
-function NodeIconGlyph({ icon }) {
+const NodeIconGlyph = memo(function NodeIconGlyph({ icon }) {
     const preset = getNodeIconPreset(icon);
     return (
         <svg className="node-symbol" viewBox="0 0 24 24" aria-hidden="true">
             {renderNodeIconPaths(preset?.kind || "tag")}
         </svg>
     );
-}
+});
 
 function createChannelContentDraft(channel, title = "") {
     return {
@@ -292,6 +296,17 @@ function buildNodeOptions(childrenByParent, parentId = null, depth = 0) {
         { node, depth },
         ...buildNodeOptions(childrenByParent, node.id, depth + 1)
     ]);
+}
+
+function normalizeTemplatePickerQuery(value = "") {
+    return String(value || "").trim().toLowerCase();
+}
+
+function buildTemplatePickerSearchIndex(templates = []) {
+    return templates.map((template) => ({
+        template,
+        searchText: normalizeTemplatePickerQuery(template.title)
+    }));
 }
 
 function NodeFormModal({ mode, initial, parentTitle, onClose, onSave }) {
@@ -452,21 +467,36 @@ function NodeFormModal({ mode, initial, parentTitle, onClose, onSave }) {
 
 function ExistingTemplatePickerModal({ currentNodeId, allTemplates, nodeLookup, onClose, onLink }) {
     const [query, setQuery] = useState("");
-
-    const alreadyLinked = new Set(
-        allTemplates
-            .filter((t) => (t.nodeIds || []).includes(currentNodeId))
-            .map((t) => t.id)
+    const deferredQuery = useDeferredValue(query);
+    const normalizedQuery = useMemo(
+        () => normalizeTemplatePickerQuery(deferredQuery),
+        [deferredQuery]
     );
-
-    const filtered = allTemplates.filter((t) => {
-        if (alreadyLinked.has(t.id)) return false;
-        const q = query.trim().toLowerCase();
-        if (!q) return true;
-        return (
-            (t.title || "").toLowerCase().includes(q)
-        );
-    });
+    const alreadyLinked = useMemo(
+        () => new Set(
+            allTemplates
+                .filter((t) => (t.nodeIds || []).includes(currentNodeId))
+                .map((t) => t.id)
+        ),
+        [allTemplates, currentNodeId]
+    );
+    const templateSearchIndex = useMemo(
+        () => buildTemplatePickerSearchIndex(allTemplates),
+        [allTemplates]
+    );
+    const filteredRows = useMemo(() => (
+        templateSearchIndex
+            .filter(({ template, searchText }) => (
+                !alreadyLinked.has(template.id)
+                && (!normalizedQuery || searchText.includes(normalizedQuery))
+            ))
+            .map(({ template }) => ({
+                template,
+                nodeNames: (template.nodeIds || [])
+                    .map((id) => nodeLookup.get(id)?.title || "?")
+                    .join(", ")
+            }))
+    ), [alreadyLinked, nodeLookup, normalizedQuery, templateSearchIndex]);
 
     return (
         <Modal onClose={onClose} ariaLabel="Link existing template">
@@ -485,17 +515,14 @@ function ExistingTemplatePickerModal({ currentNodeId, allTemplates, nodeLookup, 
                         />
                     </div>
                     <div className="node-picker-list">
-                        {filtered.length === 0 ? (
+                        {filteredRows.length === 0 ? (
                             <p className="node-picker-empty">
                                 {allTemplates.length === alreadyLinked.size
                                     ? "All templates are already linked to this section."
                                     : "No matching templates."}
                             </p>
                         ) : (
-                            filtered.map((template) => {
-                                const nodeNames = (template.nodeIds || [])
-                                    .map((id) => nodeLookup.get(id)?.title || "?")
-                                    .join(", ");
+                            filteredRows.map(({ template, nodeNames }) => {
                                 return (
                                     <div key={template.id} className="node-picker-row">
                                         <div className="node-picker-copy">
@@ -1085,6 +1112,10 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
         [childrenByParent, selectedNode]
     );
     const nodeOptions = useMemo(() => buildNodeOptions(childrenByParent), [childrenByParent]);
+    const finalNodeOptions = useMemo(
+        () => nodeOptions.filter(({ node }) => getIndexedChildNodes(childrenByParent, node.id).length === 0),
+        [childrenByParent, nodeOptions]
+    );
     const selectedDescendantIds = useMemo(
         () => selectedNode ? getDescendantNodeIds(nodes, selectedNode.id) : [],
         [nodes, selectedNode]
@@ -1431,10 +1462,9 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
                                                             }))}
                                                         >
                                                             <option value="">Link to final section…</option>
-                                                            {nodeOptions
+                                                            {finalNodeOptions
                                                                 .filter(({ node }) =>
                                                                     !(template.nodeIds || []).includes(node.id)
-                                                                    && getIndexedChildNodes(childrenByParent, node.id).length === 0
                                                                 )
                                                                 .map(({ node, depth }) => (
                                                                     <option key={node.id} value={node.id}>
