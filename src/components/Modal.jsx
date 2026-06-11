@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from "react";
+import { useCallback, useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 
 function getFocusableElements(container) {
@@ -21,6 +21,12 @@ export default function Modal({
     disableEscapeClose = false
 }) {
     const dialogRef = useRef(null);
+    const onCloseRef = useRef(onClose);
+    onCloseRef.current = onClose;
+
+    const requestClose = useCallback(() => {
+        onCloseRef.current?.();
+    }, []);
 
     useLayoutEffect(() => {
         const previousActive = document.activeElement;
@@ -39,7 +45,7 @@ export default function Modal({
         const onKeyDown = (event) => {
             if (event.key === "Escape" && !disableEscapeClose) {
                 event.preventDefault();
-                onClose?.();
+                requestClose();
                 return;
             }
 
@@ -57,10 +63,10 @@ export default function Modal({
 
             if (event.shiftKey && active === first) {
                 event.preventDefault();
-                last.focus();
+                last.focus({ preventScroll: true });
             } else if (!event.shiftKey && active === last) {
                 event.preventDefault();
-                first.focus();
+                first.focus({ preventScroll: true });
             }
         };
 
@@ -72,7 +78,7 @@ export default function Modal({
                 previousActive.focus({ preventScroll: true });
             }
         };
-    }, [onClose, disableEscapeClose]);
+    }, [disableEscapeClose, requestClose]);
 
     const modal = (
         <div
@@ -80,7 +86,7 @@ export default function Modal({
             onMouseDown={(event) => {
                 if (!closeOnOverlay) return;
                 if (event.target === event.currentTarget) {
-                    onClose?.();
+                    requestClose();
                 }
             }}
         >
@@ -98,7 +104,7 @@ export default function Modal({
                 <button
                     type="button"
                     className="modal-close-btn"
-                    onClick={onClose}
+                    onClick={requestClose}
                     aria-label="Close dialog"
                     title="Close"
                 >
