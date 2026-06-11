@@ -14,8 +14,13 @@ export async function loadJSON(key, fallback = null) {
 export async function saveJSON(key, value) {
     try {
         const serialized = JSON.stringify(value);
-        localStorage.setItem(LOCAL_PREFIX + key, serialized);
-        localStorage.setItem(key, serialized);
+        const prefixedKey = LOCAL_PREFIX + key;
+        if (localStorage.getItem(prefixedKey) !== serialized) {
+            localStorage.setItem(prefixedKey, serialized);
+        }
+        if (localStorage.getItem(key) !== serialized) {
+            localStorage.setItem(key, serialized);
+        }
     } catch (e) {
         console.error("saveJSON error", e);
     }

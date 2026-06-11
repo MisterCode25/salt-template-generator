@@ -26,13 +26,34 @@ function normalizeTokenDefinition(tokenDef) {
     });
 }
 
+function shallowRecordsEqual(left, right) {
+    if (left === right) return true;
+    if (!left || !right || typeof left !== "object" || typeof right !== "object") return false;
+
+    const leftKeys = Object.keys(left);
+    const rightKeys = Object.keys(right);
+    if (leftKeys.length !== rightKeys.length) return false;
+
+    return leftKeys.every((key) => (
+        Object.prototype.hasOwnProperty.call(right, key)
+        && left[key] === right[key]
+    ));
+}
+
+function tokenListsEqual(left = [], right = []) {
+    if (left === right) return true;
+    if (left.length !== right.length) return false;
+
+    return left.every((tokenDef, index) => shallowRecordsEqual(tokenDef, right[index]));
+}
+
 export async function loadTokens() {
     const tokens = await loadJSON(TOKEN_PATH, []);
     const storedTokens = Array.isArray(tokens) ? tokens : [];
 
     const normalized = canonicalizeTokenDefinitions(storedTokens.map(normalizeTokenDefinition))
         .filter((tokenDef) => !isSystemToken(tokenDef));
-    if (JSON.stringify(normalized) !== JSON.stringify(storedTokens)) {
+    if (!tokenListsEqual(normalized, storedTokens)) {
         await saveTokens(normalized);
     }
     return canonicalizeTokenDefinitions([...SYSTEM_TOKENS, ...normalized]);
