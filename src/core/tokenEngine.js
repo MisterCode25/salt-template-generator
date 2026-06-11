@@ -1,11 +1,13 @@
 export function applyTokens(text, values) {
     if (!text) return "";
-    const entries = Object.entries(values || {}).filter(([token]) => token && text.includes(token));
-    if (entries.length === 0) return text;
+    if (!text.includes("{")) return text;
 
-    const replacements = new Map(entries);
-    const pattern = new RegExp(entries.map(([token]) => escapeRegExp(token)).join("|"), "g");
-    return text.replace(pattern, (token) => replacements.get(token));
+    const replacements = values || {};
+    return text.replace(/\{[^{}]+\}/g, (token) => (
+        Object.prototype.hasOwnProperty.call(replacements, token)
+            ? replacements[token]
+            : token
+    ));
 }
 
 export const TEMPLATE_LANGUAGE_FIELDS = Object.freeze([
@@ -26,10 +28,6 @@ const TEMPLATE_LANGUAGE_FALLBACKS_BY_CODE = new Map(
         ])
     ])
 );
-
-function escapeRegExp(value = "") {
-    return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
 
 function hasText(value) {
     return typeof value === "string" && value.trim() !== "";

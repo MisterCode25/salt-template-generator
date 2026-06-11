@@ -31,6 +31,11 @@ const sampleModel = {
 }
 
 {
+  const output = applyTokens("Hello {name} {missing}", { "{name}": "World" });
+  assert.equal(output, "Hello World {missing}");
+}
+
+{
   const values = { "{customer}": "Alice" };
   const en = generateFinalText(sampleModel, "en", values);
   assert.equal(en, "Hello Alice");
