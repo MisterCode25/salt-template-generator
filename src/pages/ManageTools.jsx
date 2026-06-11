@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { loadTools, saveTools } from "../services/toolsService.js";
 import { loadTokens } from "../services/tokenService.js";
+import { loadActiveClientPayload } from "../services/activeClientService.js";
+import { getClientInternalTokenData } from "../utils/clientClipboard.js";
 import Modal from "../components/Modal.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import EmptyState from "../components/EmptyState.jsx";
@@ -30,6 +32,22 @@ function tokenMatchesQuery(token, query = "") {
         .some((value) => String(value).toLowerCase().includes(normalizedQuery));
 }
 
+async function loadToolTokens() {
+    const configuredTokens = await loadTokens();
+    const clientPayload = loadActiveClientPayload();
+    const clientTokens = clientPayload
+        ? getClientInternalTokenData(clientPayload).tokenDefs
+        : [];
+    const byToken = new Map();
+
+    [...configuredTokens, ...clientTokens].forEach((tokenDef) => {
+        if (!tokenDef?.token || byToken.has(tokenDef.token)) return;
+        byToken.set(tokenDef.token, tokenDef);
+    });
+
+    return Array.from(byToken.values());
+}
+
 function ToolModal({ initial, onClose, onSave }) {
     const [title, setTitle] = useState(initial?.title || "");
     const [url, setUrl] = useState(initial?.url || "");
@@ -39,7 +57,13 @@ function ToolModal({ initial, onClose, onSave }) {
     const urlRef = useRef(null);
 
     useEffect(() => {
-        loadTokens().then(setTokens);
+        let active = true;
+        loadToolTokens().then((loadedTokens) => {
+            if (active) setTokens(loadedTokens);
+        });
+        return () => {
+            active = false;
+        };
     }, []);
 
     const filteredTokens = tokenMenu
