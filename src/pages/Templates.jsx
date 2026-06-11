@@ -281,6 +281,42 @@ const FavoriteTemplateButton = memo(function FavoriteTemplateButton({
     );
 });
 
+const PlaybookSearchBox = memo(function PlaybookSearchBox({
+    placeholder,
+    resetSignal,
+    onQueryChange
+}) {
+    const [draftQuery, setDraftQuery] = useState("");
+    const deferredDraftQuery = useDeferredValue(draftQuery);
+
+    useEffect(() => {
+        setDraftQuery("");
+        onQueryChange("");
+    }, [onQueryChange, resetSignal]);
+
+    useEffect(() => {
+        onQueryChange(deferredDraftQuery);
+    }, [deferredDraftQuery, onQueryChange]);
+
+    const handleChange = useCallback((event) => {
+        setDraftQuery(event.target.value);
+    }, []);
+
+    return (
+        <label className="templates-search-wrap">
+            <span className="sr-only">Search in playbook</span>
+            <Search size={17} aria-hidden="true" />
+            <input
+                type="text"
+                className="templates-search"
+                value={draftQuery}
+                onChange={handleChange}
+                placeholder={placeholder}
+            />
+        </label>
+    );
+});
+
 const PlaybookColumn = memo(function PlaybookColumn({
     title,
     nodes: columnNodes,
@@ -575,12 +611,12 @@ export default function Templates() {
     const [activeTemplateId, setActiveTemplateId] = useState(null);
     const [activeChannel, setActiveChannel] = useState(Channel.EMAIL);
     const [query, setQuery] = useState("");
+    const [searchResetSignal, setSearchResetSignal] = useState(0);
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [theme, setTheme] = useState(() => getInitialTheme());
     const [activeWorkspace, setActiveWorkspace] = useState(null);
     const [externalGeneratorOpen, setExternalGeneratorOpen] = useState(false);
     const [externalGeneratorClosing, setExternalGeneratorClosing] = useState(false);
-    const deferredQuery = useDeferredValue(query);
     const configName = localStorage.getItem("local_configName") || "No configuration";
 
     const refreshTreeData = () => {
@@ -658,8 +694,8 @@ export default function Templates() {
     );
     const rootNodes = useMemo(() => getIndexedChildNodes(childrenByParent, null), [childrenByParent]);
     const searchResults = useMemo(
-        () => searchTemplateTreeIndex(searchIndex, deferredQuery),
-        [deferredQuery, searchIndex]
+        () => searchTemplateTreeIndex(searchIndex, query),
+        [query, searchIndex]
     );
     const activeNodePath = useMemo(() => {
         const path = [];
@@ -684,17 +720,26 @@ export default function Templates() {
         }
     }, [activeChannel, activeTemplate, getIndexedTemplateChannels]);
 
+    const handleSearchQueryChange = useCallback((nextQuery) => {
+        setQuery(nextQuery);
+    }, []);
+
+    const resetSearchQuery = useCallback(() => {
+        setQuery("");
+        setSearchResetSignal((signal) => signal + 1);
+    }, []);
+
     const openNode = useCallback((nodeId) => {
         setActiveNodeId(nodeId);
         setActiveTemplateId(null);
-        setQuery("");
-    }, []);
+        resetSearchQuery();
+    }, [resetSearchQuery]);
 
     const resetCaseNavigation = () => {
         setActiveNodeId(null);
         setActiveTemplateId(null);
         setActiveChannel(Channel.EMAIL);
-        setQuery("");
+        resetSearchQuery();
     };
 
     const clearClientAndResetCase = () => {
@@ -751,8 +796,8 @@ export default function Templates() {
         const nextChannel = channels[0] || template?.channels?.[0] || Channel.EMAIL;
         setActiveChannel(nextChannel);
         requestFirstTemplateWorkflow(template, nextChannel);
-        setQuery("");
-    }, [getIndexedTemplateChannels, requestFirstTemplateWorkflow, templateLookup]);
+        resetSearchQuery();
+    }, [getIndexedTemplateChannels, requestFirstTemplateWorkflow, resetSearchQuery, templateLookup]);
 
     const closeTemplateWorkflow = () => {
         setActiveTemplateId(null);
@@ -807,7 +852,7 @@ export default function Templates() {
         }
     };
 
-    const searchMode = deferredQuery.trim().length > 0 && !activeTemplate;
+    const searchMode = query.trim().length > 0 && !activeTemplate;
     const navigationColumns = useMemo(() => {
         if (searchMode) {
             const count = searchResults.nodes.length + searchResults.templates.length;
@@ -909,17 +954,11 @@ export default function Templates() {
             <section className="templates-workbench templates-workbench--columns">
                 <section className="templates-playbook-panel" aria-label="Playbook">
                     <div className="templates-playbook-head">
-                        <label className="templates-search-wrap">
-                            <span className="sr-only">Search in playbook</span>
-                            <Search size={17} aria-hidden="true" />
-                            <input
-                                type="text"
-                                className="templates-search"
-                                value={query}
-                                onChange={(event) => setQuery(event.target.value)}
-                                placeholder={activeNode ? "Search..." : "Search in playbook..."}
-                            />
-                        </label>
+                        <PlaybookSearchBox
+                            placeholder={activeNode ? "Search..." : "Search in playbook..."}
+                            resetSignal={searchResetSignal}
+                            onQueryChange={handleSearchQueryChange}
+                        />
                     </div>
 
                     {favoriteTemplates.length > 0 && (
