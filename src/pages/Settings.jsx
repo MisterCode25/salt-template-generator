@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { loadTokens } from "../services/tokenService.js";
+import { loadTokens, saveTokens } from "../services/tokenService.js";
 import { loadTemplateTreeData, saveTemplateTreeData } from "../services/templateTreeService.js";
-import { saveJSON } from "../services/storageService.js";
 import { clearAppIndexedDB } from "../services/indexedDbService.js";
 import { buildConfigPayload, validateImportedConfig } from "../services/configService.js";
 import { showToast } from "../services/clipboardService.js";
@@ -78,10 +77,14 @@ export default function Settings({ embedded = false, onClose = null }) {
                 templates: importedTemplates,
                 configName: importedName
             } = validateImportedConfig(json);
-            await saveJSON("tokens", importedTokens);
+            await saveTokens(importedTokens);
             await saveTemplateTreeData({ nodes: importedNodes, templates: importedTemplates });
-            setTokens(importedTokens);
-            setTreeData({ nodes: importedNodes, templates: importedTemplates });
+            const [normalizedTokens, normalizedTreeData] = await Promise.all([
+                loadTokens(),
+                loadTemplateTreeData()
+            ]);
+            setTokens(normalizedTokens);
+            setTreeData(normalizedTreeData);
             refreshStorageInfo();
             const name = importedName || "Imported configuration";
             localStorage.setItem("local_configName", name);

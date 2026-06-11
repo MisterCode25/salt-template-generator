@@ -202,16 +202,15 @@ ${JSON.stringify(sampleClientJSON, null, 2)}`);
     }
   };
   const { values } = matchClientDataToTokens(payloadWithManualInputs, [
-    { token: "{ticket_num}", label: "Ticket number" },
-    { token: "{so_number}", label: "SO number" }
+    { token: "{so_ticket_num}", label: "SO ticket number" }
   ]);
   const internal = getClientInternalTokenData(payloadWithManualInputs);
   const vtiData = getClientInfoSections(payloadWithManualInputs).find((section) => section.id === "vtiData");
 
-  assert.equal(values["{ticket_num}"], "SO-123");
-  assert.equal(values["{so_number}"], "SO-123");
-  assert.equal(internal.values["{ticket_num}"], "SO-123");
-  assert.equal(internal.values["{so_number}"], "SO-123");
+  assert.equal(values["{so_ticket_num}"], "SO-123");
+  assert.equal(internal.values["{so_ticket_num}"], "SO-123");
+  assert.equal(internal.values["{ticket_num}"], undefined);
+  assert.equal(internal.values["{so_number}"], undefined);
   assert.equal(Boolean(vtiData?.fields.some((field) => field.label.includes("template Inputs"))), false);
 }
 

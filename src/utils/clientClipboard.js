@@ -1,4 +1,5 @@
 import { MANUAL_CLIENT_INPUTS_KEY } from "../services/activeClientService.js";
+import { canonicalizeInputTokenValue, normalizeTokenName } from "./tokenCanonicalization.js";
 
 const CLIENT_FIELD_GROUPS = [
     {
@@ -311,7 +312,7 @@ function getManualInputEntries(payload) {
 
     return Object.entries(manualInputs)
         .map(([name, value]) => ({
-            name: tokenSegment(name),
+            name: normalizeTokenName(canonicalizeInputTokenValue(name)),
             label: humanizePathSegment(name),
             value: displayValue(value)
         }))

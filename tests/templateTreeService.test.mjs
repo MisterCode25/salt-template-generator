@@ -267,7 +267,7 @@ await saveTemplateTreeData({
           title: "Customer unreachable",
           type: "sms",
           mainVariantName: "Main",
-          text_fr: "Bonjour {old_token}",
+          text_fr: "Bonjour {old_token} {ticket_num}",
           text_en: "Hello",
           text_de: "",
           text_it: "",
@@ -275,7 +275,7 @@ await saveTemplateTreeData({
             {
               id: "sms-variant",
               name: "Short",
-              text_fr: "Variante {old_token}",
+              text_fr: "Variante {old_token} {so_number}",
               text_en: "",
               text_de: "",
               text_it: ""
@@ -302,8 +302,8 @@ const savedTemplates = indexedDB.data.get(NODE_TEMPLATE_KEY);
 assert.equal(savedTemplates.length, 1);
 assert.equal(savedTemplates[0].id, "tpl-leaf");
 assert.deepEqual(savedTemplates[0].channels, ["sms", "other"]);
-assert.equal(savedTemplates[0].contentByChannel.sms.text_fr, "Bonjour {old_token}");
-assert.equal(savedTemplates[0].contentByChannel.sms.variants[0].text_fr, "Variante {old_token}");
+assert.equal(savedTemplates[0].contentByChannel.sms.text_fr, "Bonjour {old_token} {so_ticket_num}");
+assert.equal(savedTemplates[0].contentByChannel.sms.variants[0].text_fr, "Variante {old_token} {so_ticket_num}");
 assert.equal(savedTemplates[0].contentByChannel.other.title, "Customer unreachable");
 
 const loaded = await loadTemplateTreeData();
@@ -312,7 +312,7 @@ assert.equal(loaded.templates[0].parentNodeId, "node-root");
 
 await renameTokenInTemplateTree("{old_token}", "{new_token}");
 const renamed = await loadTemplateTreeData();
-assert.equal(renamed.templates[0].contentByChannel.sms.text_fr, "Bonjour {new_token}");
-assert.equal(renamed.templates[0].contentByChannel.sms.variants[0].text_fr, "Variante {new_token}");
+assert.equal(renamed.templates[0].contentByChannel.sms.text_fr, "Bonjour {new_token} {so_ticket_num}");
+assert.equal(renamed.templates[0].contentByChannel.sms.variants[0].text_fr, "Variante {new_token} {so_ticket_num}");
 
 console.log("templateTreeService tests passed");

@@ -4,6 +4,7 @@ import Modal from "../components/Modal.jsx";
 import { copyText, showToast } from "../services/clipboardService.js";
 import { loadActiveClientPayload } from "../services/activeClientService.js";
 import { loadTokens, saveTokens } from "../services/tokenService.js";
+import { SO_TICKET_NUM_TOKEN, SO_TICKET_TOKEN_KEY } from "../utils/tokenCanonicalization.js";
 import {
     EXTERNAL_DEFAULT_FIELDS,
     EXTERNAL_GENERATOR_PARTNERS,
@@ -14,10 +15,7 @@ import {
     parseExternalId
 } from "../utils/externalGenerator.js";
 
-// Stable key used to link a token to the soTicket field.
-// Rename the token freely — as long as its `key` property equals this value,
-// the SO Ticket field will always be pre-filled from it.
-const SO_TICKET_TOKEN_KEY = "soTicket";
+// Stable key used to link the canonical SO ticket token to the soTicket field.
 
 const FLAGGING_OPTIONS = ["VALID", "MINFO", "WRCAT", "UNTKT"];
 const PROMPT_BACK = "__PROMPT_BACK__";
@@ -311,9 +309,7 @@ export default function ExternalGenerator({ embedded = false, onClose, clientPay
         setFields((prev) => mergeExternalFields(prev, patch));
     };
 
-    // Auto-fill soTicket from the token linked via key === SO_TICKET_TOKEN_KEY.
-    // Fallback: if no token has that key yet but {ticket_num} exists, the key is
-    // automatically assigned so renaming the token later keeps the link intact.
+    // Auto-fill soTicket from the canonical token linked via key === SO_TICKET_TOKEN_KEY.
     useEffect(() => {
         (async () => {
             const allTokens = await loadTokens();
@@ -321,9 +317,9 @@ export default function ExternalGenerator({ embedded = false, onClose, clientPay
             // Primary lookup: stable key, survives token renaming
             let linked = allTokens.find(t => t.key === SO_TICKET_TOKEN_KEY);
 
-            // Fallback: token still named {ticket_num} — auto-assign the key
+            // Fallback: canonical token exists but has no stable key yet.
             if (!linked) {
-                const byName = allTokens.find(t => t.token === "{ticket_num}");
+                const byName = allTokens.find(t => t.token === SO_TICKET_NUM_TOKEN);
                 if (byName) {
                     linked = byName;
                     await saveTokens(
@@ -334,9 +330,7 @@ export default function ExternalGenerator({ embedded = false, onClose, clientPay
                 }
             }
 
-            if (!linked) return;
-
-            const stored = localStorage.getItem("input_" + linked.token);
+            const stored = localStorage.getItem("input_" + SO_TICKET_NUM_TOKEN);
             if (stored !== null && stored.trim() !== "") {
                 setFields(prev => ({ ...prev, soTicket: stored.trim() }));
             }

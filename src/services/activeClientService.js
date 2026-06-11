@@ -1,76 +1,84 @@
+import {
+    canonicalizeInputTokenValue,
+    canonicalizeTokenDefinition,
+    normalizeTokenName
+} from "../utils/tokenCanonicalization.js";
+
 const ACTIVE_CLIENT_KEY = "active_client_payload";
 export const STORED_INPUT_PREFIX = "input_";
 export const MANUAL_CLIENT_INPUTS_KEY = "__templateInputs";
 
-function normalizeManualInputName(name = "") {
-    return String(name)
-        .replace(/[{}]/g, "")
-        .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .toLowerCase()
-        .replace(/&/g, "and")
-        .replace(/[^a-z0-9]+/g, "_")
-        .replace(/^_+|_+$/g, "");
-}
-
-function formatManualInputToken(name = "") {
-    const normalized = normalizeManualInputName(name);
-    return normalized ? `{${normalized}}` : "";
-}
-
-function rawTokenValue(token = "") {
-    const trimmed = String(token).trim();
-    return /^\{[^{}]+\}$/.test(trimmed) ? trimmed : formatManualInputToken(trimmed);
-}
-
-export function getManualClientInputAliases(tokenDef = {}) {
-    const definition = typeof tokenDef === "string" ? { token: tokenDef } : tokenDef || {};
-    const aliases = new Set();
-    [definition.token, definition.label, definition.key, definition.name]
-        .filter(Boolean)
-        .forEach((source) => {
-            const normalized = normalizeManualInputName(source);
-            if (normalized) aliases.add(normalized);
-        });
-
-    const names = Array.from(aliases);
-    const hasPartnerTicket = names.some((name) => name.includes("partner_ticket"));
-    const hasSoTicket = names.some((name) =>
-        name === "so"
-        || name.startsWith("so_")
-        || name.includes("_so_")
-        || name.includes("so_ticket")
-    );
-    const hasDefaultTicketName = names.some((name) =>
-        ["ticket_num", "ticket_number", "ticket_no"].includes(name)
-    );
-
-    if (!hasPartnerTicket && (hasSoTicket || hasDefaultTicketName)) {
-        [
-            "so_ticket",
-            "so_ticket_number",
-            "so_number",
-            "so_num",
-            "ticket_num",
-            "ticket_number"
-        ].forEach((alias) => aliases.add(alias));
+function normalizeManualInputs(manualInputs) {
+    if (!manualInputs || typeof manualInputs !== "object" || Array.isArray(manualInputs)) {
+        return { manualInputs: {}, dirty: Boolean(manualInputs) };
     }
 
-    return Array.from(aliases);
+    let dirty = false;
+    const next = {};
+
+    Object.entries(manualInputs).forEach(([name, value]) => {
+        const canonicalToken = canonicalizeInputTokenValue(name);
+        const canonicalName = normalizeTokenName(canonicalToken);
+        if (!canonicalName) return;
+
+        if (canonicalName !== name) dirty = true;
+        next[canonicalName] = value;
+    });
+
+    return { manualInputs: next, dirty };
+}
+
+function normalizeActiveClientPayload(payload) {
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+        return { payload, dirty: false };
+    }
+
+    const { manualInputs, dirty } = normalizeManualInputs(payload[MANUAL_CLIENT_INPUTS_KEY]);
+    if (!dirty) return { payload, dirty: false };
+
+    return {
+        payload: {
+            ...payload,
+            [MANUAL_CLIENT_INPUTS_KEY]: manualInputs
+        },
+        dirty: true
+    };
+}
+
+export function migrateStoredClientInputValues(storage = globalThis.localStorage) {
+    if (!storage) return 0;
+
+    let migrated = 0;
+    const inputEntries = [];
+    for (let index = 0; index < storage.length; index++) {
+        const key = storage.key(index);
+        if (!key?.startsWith(STORED_INPUT_PREFIX)) continue;
+        inputEntries.push([key, storage.getItem(key)]);
+    }
+
+    inputEntries.forEach(([key, value]) => {
+        const token = key.slice(STORED_INPUT_PREFIX.length);
+        const canonicalToken = canonicalizeInputTokenValue(token);
+        const canonicalKey = `${STORED_INPUT_PREFIX}${canonicalToken}`;
+        if (!canonicalToken || canonicalKey === key) return;
+
+        if (storage.getItem(canonicalKey) === null && value !== null) {
+            storage.setItem(canonicalKey, value);
+        }
+        storage.removeItem(key);
+        migrated++;
+    });
+
+    return migrated;
 }
 
 export function saveClientInputValue(tokenDef, value, storage = globalThis.localStorage) {
-    const definition = typeof tokenDef === "string" ? { token: tokenDef } : tokenDef || {};
+    const definition = canonicalizeTokenDefinition(typeof tokenDef === "string" ? { token: tokenDef } : tokenDef || {});
     const valueText = value === null || value === undefined ? "" : String(value);
-    const aliases = getManualClientInputAliases(definition);
     const inputTokens = new Set();
-    const exactToken = rawTokenValue(definition.token);
-    if (exactToken) inputTokens.add(exactToken);
-    aliases.forEach((alias) => {
-        const token = formatManualInputToken(alias);
-        if (token) inputTokens.add(token);
-    });
+    const canonicalToken = canonicalizeInputTokenValue(definition.token);
+    const canonicalName = normalizeTokenName(canonicalToken);
+    if (canonicalToken) inputTokens.add(canonicalToken);
 
     if (storage) {
         inputTokens.forEach((token) => storage.setItem(`${STORED_INPUT_PREFIX}${token}`, valueText));
@@ -78,33 +86,36 @@ export function saveClientInputValue(tokenDef, value, storage = globalThis.local
 
     const payload = loadActiveClientPayload();
     if (!payload) {
-        return { aliases, inputTokens: Array.from(inputTokens), payload: null };
+        return { inputTokens: Array.from(inputTokens), payload: null };
     }
 
     const previousInputs = payload[MANUAL_CLIENT_INPUTS_KEY];
-    const manualInputs = previousInputs && typeof previousInputs === "object" && !Array.isArray(previousInputs)
-        ? { ...previousInputs }
-        : {};
-    aliases.forEach((alias) => {
+    const { manualInputs } = normalizeManualInputs(previousInputs);
+    if (canonicalName) {
         if (valueText === "") {
-            delete manualInputs[alias];
+            delete manualInputs[canonicalName];
         } else {
-            manualInputs[alias] = valueText;
+            manualInputs[canonicalName] = valueText;
         }
-    });
+    }
 
     const nextPayload = {
         ...payload,
         [MANUAL_CLIENT_INPUTS_KEY]: manualInputs
     };
     saveActiveClientPayload(nextPayload);
-    return { aliases, inputTokens: Array.from(inputTokens), payload: nextPayload };
+    return { inputTokens: Array.from(inputTokens), payload: nextPayload };
 }
 
 export function loadActiveClientPayload() {
     try {
         const raw = localStorage.getItem(`local_${ACTIVE_CLIENT_KEY}`) || localStorage.getItem(ACTIVE_CLIENT_KEY);
-        return raw ? JSON.parse(raw) : null;
+        if (!raw) return null;
+
+        const parsed = JSON.parse(raw);
+        const normalized = normalizeActiveClientPayload(parsed);
+        if (normalized.dirty) saveActiveClientPayload(normalized.payload);
+        return normalized.payload;
     } catch (error) {
         console.error("loadActiveClientPayload error", error);
         return null;
@@ -113,7 +124,8 @@ export function loadActiveClientPayload() {
 
 export function saveActiveClientPayload(payload) {
     try {
-        const serialized = JSON.stringify(payload);
+        const { payload: normalizedPayload } = normalizeActiveClientPayload(payload);
+        const serialized = JSON.stringify(normalizedPayload);
         localStorage.setItem(`local_${ACTIVE_CLIENT_KEY}`, serialized);
         localStorage.setItem(ACTIVE_CLIENT_KEY, serialized);
     } catch (error) {

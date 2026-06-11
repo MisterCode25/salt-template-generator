@@ -4,6 +4,7 @@ import {
     clearActiveClientPayload,
     clearStoredInputValues,
     loadActiveClientPayload,
+    migrateStoredClientInputValues,
     saveClientInputValue,
     saveActiveClientPayload
 } from "../services/activeClientService.js";
@@ -18,6 +19,7 @@ import {
     parseClientClipboardJSON
 } from "../utils/clientClipboard.js";
 import { formatTokenPreviewHTML } from "../utils/richTextTokens.js";
+import { canonicalizeInputTokenValue } from "../utils/tokenCanonicalization.js";
 import Modal from "./Modal.jsx";
 
 const CLIENT_CLIPBOARD_READ_TIMEOUT_MS = 3500;
@@ -395,6 +397,7 @@ export function useTemplateRuntime() {
     const [clientPasteInitialError, setClientPasteInitialError] = useState("");
 
     useEffect(() => {
+        migrateStoredClientInputValues();
         loadTokens().then(setTokens);
         const storedClient = loadActiveClientPayload();
         if (storedClient) {
@@ -426,10 +429,19 @@ export function useTemplateRuntime() {
     const getTokenValue = (tokenDef) => {
         const token = typeof tokenDef === "string" ? tokenDef : tokenDef?.token;
         if (!token) return "";
-        const stateValue = values[token];
-        if (stateValue !== undefined && stateValue !== null) return stateValue;
-        const storedValue = readStoredInputValue(token);
-        if (storedValue !== null) return storedValue;
+        const canonicalToken = canonicalizeInputTokenValue(token);
+        const candidateTokens = canonicalToken && canonicalToken !== token
+            ? [token, canonicalToken]
+            : [token];
+
+        for (const candidateToken of candidateTokens) {
+            const stateValue = values[candidateToken];
+            if (stateValue !== undefined && stateValue !== null) return stateValue;
+        }
+        for (const candidateToken of candidateTokens) {
+            const storedValue = readStoredInputValue(candidateToken);
+            if (storedValue !== null) return storedValue;
+        }
         return typeof tokenDef === "object" ? tokenDef?.default ?? "" : "";
     };
 
@@ -578,22 +590,33 @@ export function useTemplateRuntime() {
         const tokensNeeded = Array.from(new Set(text.match(/\{[^{}]+\}/g) || []));
         if (tokensNeeded.length === 0) return null;
 
-        const tokenMap = new Map(templateTokens.map((tokenDef) => [tokenDef.token, tokenDef]));
-        const missingTokensNeeded = tokensNeeded.filter((tokenName) => {
-            const tokenDef = tokenMap.get(tokenName);
-            const stored = getTokenValue(tokenDef || tokenName);
-            return stored === "" || stored === null || stored === undefined;
+        const tokenMap = new Map();
+        templateTokens.forEach((tokenDef) => {
+            tokenMap.set(tokenDef.token, tokenDef);
+            tokenMap.set(canonicalizeInputTokenValue(tokenDef.token), tokenDef);
         });
-        if (missingTokensNeeded.length === 0) return null;
+        const promptDefs = [];
+        const seenPromptTokens = new Set();
+        tokensNeeded.forEach((tokenName) => {
+            const tokenDef = tokenMap.get(tokenName) || tokenMap.get(canonicalizeInputTokenValue(tokenName));
+            const stored = getTokenValue(tokenDef || tokenName);
+            if (stored !== "" && stored !== null && stored !== undefined) return;
+
+            const promptDef = tokenDef || {
+                token: canonicalizeInputTokenValue(tokenName) || tokenName,
+                label: canonicalizeInputTokenValue(tokenName) || tokenName,
+                input_type: "text"
+            };
+            if (seenPromptTokens.has(promptDef.token)) return;
+            seenPromptTokens.add(promptDef.token);
+            promptDefs.push(promptDef);
+        });
+        if (promptDefs.length === 0) return null;
 
         return {
             mode,
             title: getTemplateDisplayTitle(effectiveModel),
-            tokenDefs: missingTokensNeeded.map((tokenName) => tokenMap.get(tokenName) || {
-                token: tokenName,
-                label: tokenName,
-                input_type: "text"
-            }),
+            tokenDefs: promptDefs,
             effectiveModel,
             sectionKey
         };

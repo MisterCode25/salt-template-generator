@@ -4,6 +4,7 @@ import {
   clearStoredInputValues,
   MANUAL_CLIENT_INPUTS_KEY,
   loadActiveClientPayload,
+  migrateStoredClientInputValues,
   saveClientInputValue,
   saveActiveClientPayload
 } from "../src/services/activeClientService.js";
@@ -67,13 +68,25 @@ function createMemoryStorage(initial = {}) {
     key: "soTicket"
   }, "31436062");
 
-  assert.ok(inputTokens.includes("{ticket_num}"));
-  assert.ok(inputTokens.includes("{so_number}"));
-  assert.equal(localStorage.getItem("input_{ticket_num}"), "31436062");
-  assert.equal(localStorage.getItem("input_{so_number}"), "31436062");
-  assert.equal(localStorage.getItem("input_{so_ticket}"), "31436062");
-  assert.equal(loadActiveClientPayload()[MANUAL_CLIENT_INPUTS_KEY].ticket_num, "31436062");
-  assert.equal(loadActiveClientPayload()[MANUAL_CLIENT_INPUTS_KEY].so_number, "31436062");
+  assert.deepEqual(inputTokens, ["{so_ticket_num}"]);
+  assert.equal(localStorage.getItem("input_{ticket_num}"), null);
+  assert.equal(localStorage.getItem("input_{so_number}"), null);
+  assert.equal(localStorage.getItem("input_{so_ticket_num}"), "31436062");
+  assert.equal(loadActiveClientPayload()[MANUAL_CLIENT_INPUTS_KEY].so_ticket_num, "31436062");
+}
+
+{
+  const storage = createMemoryStorage({
+    "input_{ticket_num}": "SO-123",
+    "input_{customer_name}": "Peter"
+  });
+
+  const migrated = migrateStoredClientInputValues(storage);
+
+  assert.equal(migrated, 1);
+  assert.equal(storage.getItem("input_{ticket_num}"), null);
+  assert.equal(storage.getItem("input_{so_ticket_num}"), "SO-123");
+  assert.equal(storage.getItem("input_{customer_name}"), "Peter");
 }
 
 console.log("activeClientService tests passed");

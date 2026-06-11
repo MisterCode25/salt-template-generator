@@ -2,6 +2,7 @@ import { loadIndexedJSON, saveIndexedJSON } from "./indexedDbService.js";
 import { loadJSON, saveJSON } from "./storageService.js";
 import { CHANNEL_VALUES, normalizeNode, normalizeTemplate } from "../models/templateTreeModel.js";
 import { migrateLegacyModelsToTemplateTree } from "../utils/legacyTemplateMigration.js";
+import { canonicalizeTemplateTokensInText } from "../utils/tokenCanonicalization.js";
 
 export const TEMPLATE_NODE_KEY = "template_nodes";
 export const NODE_TEMPLATE_KEY = "node_templates";
@@ -49,16 +50,77 @@ export async function loadTemplateTreeData() {
     ]);
 
     const migrated = await migrateStoredLegacyTemplates({ nodes, templates });
-    if (migrated) return migrated;
+    if (migrated) return migrateCanonicalTemplateTokens(migrated);
 
-    return { nodes, templates };
+    return migrateCanonicalTemplateTokens({ nodes, templates });
 }
 
 export async function saveTemplateTreeData({ nodes = [], templates = [] } = {}) {
+    const canonicalizedTemplates = templates.map((template) => canonicalizeTemplateTokens(template).template);
     await Promise.all([
         saveTemplateNodes(nodes),
-        saveNodeTemplates(templates)
+        saveNodeTemplates(canonicalizedTemplates)
     ]);
+}
+
+function canonicalizeChannelContentTokens(content) {
+    if (!content) return { content, dirty: false };
+
+    const variants = (content.variants || []).map((variant) => ({
+        ...variant,
+        text_fr: canonicalizeTemplateTokensInText(variant.text_fr || ""),
+        text_en: canonicalizeTemplateTokensInText(variant.text_en || ""),
+        text_de: canonicalizeTemplateTokensInText(variant.text_de || ""),
+        text_it: canonicalizeTemplateTokensInText(variant.text_it || "")
+    }));
+
+    const nextContent = {
+        ...content,
+        text_fr: canonicalizeTemplateTokensInText(content.text_fr || ""),
+        text_en: canonicalizeTemplateTokensInText(content.text_en || ""),
+        text_de: canonicalizeTemplateTokensInText(content.text_de || ""),
+        text_it: canonicalizeTemplateTokensInText(content.text_it || ""),
+        variants
+    };
+
+    return {
+        content: nextContent,
+        dirty: JSON.stringify(nextContent) !== JSON.stringify(content)
+    };
+}
+
+function canonicalizeTemplateTokens(template) {
+    const contentByChannel = { ...(template.contentByChannel || {}) };
+    let dirty = false;
+
+    CHANNEL_VALUES.forEach((channel) => {
+        const result = canonicalizeChannelContentTokens(contentByChannel[channel]);
+        contentByChannel[channel] = result.content;
+        dirty = dirty || result.dirty;
+    });
+
+    return {
+        template: normalizeTemplate({
+            ...template,
+            contentByChannel
+        }),
+        dirty
+    };
+}
+
+async function migrateCanonicalTemplateTokens({ nodes = [], templates = [] } = {}) {
+    let dirty = false;
+    const nextTemplates = templates.map((template) => {
+        const result = canonicalizeTemplateTokens(template);
+        dirty = dirty || result.dirty;
+        return result.template;
+    });
+
+    if (dirty) {
+        await saveTemplateTreeData({ nodes, templates: nextTemplates });
+    }
+
+    return { nodes, templates: nextTemplates };
 }
 
 async function loadStoredLegacyModels() {

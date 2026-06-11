@@ -22,16 +22,23 @@ class LocalStorageMock {
 global.localStorage = new LocalStorageMock();
 
 await ensureTokensFromTexts([
-  "Hello {customer_name} {client_first_name} {contact_error} {healthcheck_oto_id}"
+  "Hello {customer_name} {client_first_name} {contact_error} {healthcheck_oto_id}",
+  "Ticket {ticket_num} {so_number}"
 ]);
 
 const tokens = await loadTokens();
 const customerToken = tokens.find((tokenDef) => tokenDef.token === "{customer_name}");
+const soTicketToken = tokens.find((tokenDef) => tokenDef.token === "{so_ticket_num}");
 
 assert.ok(customerToken);
+assert.ok(soTicketToken);
 assert.equal(customerToken.display_mode, "on_demand");
+assert.equal(soTicketToken.label, "SO ticket number");
+assert.equal(soTicketToken.key, "soTicket");
 assert.equal(tokens.some((tokenDef) => tokenDef.token === "{client_first_name}"), false);
 assert.equal(tokens.some((tokenDef) => tokenDef.token === "{contact_error}"), false);
 assert.equal(tokens.some((tokenDef) => tokenDef.token === "{healthcheck_oto_id}"), false);
+assert.equal(tokens.some((tokenDef) => tokenDef.token === "{ticket_num}"), false);
+assert.equal(tokens.some((tokenDef) => tokenDef.token === "{so_number}"), false);
 
 console.log("tokenService tests passed");
