@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import {
   clearActiveClientPayload,
   clearStoredInputValues,
+  MANUAL_CLIENT_INPUTS_KEY,
   loadActiveClientPayload,
+  saveClientInputValue,
   saveActiveClientPayload
 } from "../src/services/activeClientService.js";
 
@@ -53,6 +55,25 @@ function createMemoryStorage(initial = {}) {
 
   clearActiveClientPayload();
   assert.equal(loadActiveClientPayload(), null);
+}
+
+{
+  globalThis.localStorage = createMemoryStorage();
+  saveActiveClientPayload({ client: { firstName: "Peter" } });
+
+  const { inputTokens } = saveClientInputValue({
+    token: "{ticket_num}",
+    label: "SO number",
+    key: "soTicket"
+  }, "31436062");
+
+  assert.ok(inputTokens.includes("{ticket_num}"));
+  assert.ok(inputTokens.includes("{so_number}"));
+  assert.equal(localStorage.getItem("input_{ticket_num}"), "31436062");
+  assert.equal(localStorage.getItem("input_{so_number}"), "31436062");
+  assert.equal(localStorage.getItem("input_{so_ticket}"), "31436062");
+  assert.equal(loadActiveClientPayload()[MANUAL_CLIENT_INPUTS_KEY].ticket_num, "31436062");
+  assert.equal(loadActiveClientPayload()[MANUAL_CLIENT_INPUTS_KEY].so_number, "31436062");
 }
 
 console.log("activeClientService tests passed");

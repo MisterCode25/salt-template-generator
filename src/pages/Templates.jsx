@@ -924,12 +924,9 @@ export default function Templates() {
                     mode={runtime.tokenPrompt.mode}
                     onChange={(token, nextValue) => {
                         runtime.setValues((prev) => {
-                            const next = { ...prev, [token]: nextValue };
-                            localStorage.setItem("input_" + token, nextValue);
-                            return next;
+                            return { ...prev, [token]: nextValue };
                         });
                         runtime.setPromptMissingTokens((prev) => prev.filter((name) => name !== token));
-                        runtime.inputChangeVersion.current++;
                     }}
                     onConfirm={runtime.confirmTokenPrompt}
                     onClose={() => {

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { MANUAL_CLIENT_INPUTS_KEY } from "../src/services/activeClientService.js";
 import {
   getClientInternalTokenData,
   getClientLanguageCode,
@@ -190,6 +191,28 @@ ${JSON.stringify(sampleClientJSON, null, 2)}`);
   ]).values["{healthcheck_router_serial_number}"], "GFAB11004892");
   assert.equal(values["{unknown}"], undefined);
   assert.equal(matchedTokens.length, 7);
+}
+
+{
+  const payloadWithManualInputs = {
+    ...sampleClientJSON,
+    [MANUAL_CLIENT_INPUTS_KEY]: {
+      ticket_num: "SO-123",
+      so_number: "SO-123"
+    }
+  };
+  const { values } = matchClientDataToTokens(payloadWithManualInputs, [
+    { token: "{ticket_num}", label: "Ticket number" },
+    { token: "{so_number}", label: "SO number" }
+  ]);
+  const internal = getClientInternalTokenData(payloadWithManualInputs);
+  const vtiData = getClientInfoSections(payloadWithManualInputs).find((section) => section.id === "vtiData");
+
+  assert.equal(values["{ticket_num}"], "SO-123");
+  assert.equal(values["{so_number}"], "SO-123");
+  assert.equal(internal.values["{ticket_num}"], "SO-123");
+  assert.equal(internal.values["{so_number}"], "SO-123");
+  assert.equal(Boolean(vtiData?.fields.some((field) => field.label.includes("template Inputs"))), false);
 }
 
 console.log("clientClipboard tests passed");

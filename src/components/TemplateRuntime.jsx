@@ -4,6 +4,7 @@ import {
     clearActiveClientPayload,
     clearStoredInputValues,
     loadActiveClientPayload,
+    saveClientInputValue,
     saveActiveClientPayload
 } from "../services/activeClientService.js";
 import { copyHtml, formatClipboardHtmlBody, showToast } from "../services/clipboardService.js";
@@ -414,6 +415,24 @@ export function useTemplateRuntime() {
     const clientInfoSections = useMemo(() => getClientInfoSections(clientPayload), [clientPayload]);
     const clientSummaryFields = useMemo(() => getClientSummaryFields(clientPayload), [clientPayload]);
 
+    const readStoredInputValue = (token) => {
+        try {
+            return localStorage.getItem("input_" + token);
+        } catch {
+            return null;
+        }
+    };
+
+    const getTokenValue = (tokenDef) => {
+        const token = typeof tokenDef === "string" ? tokenDef : tokenDef?.token;
+        if (!token) return "";
+        const stateValue = values[token];
+        if (stateValue !== undefined && stateValue !== null) return stateValue;
+        const storedValue = readStoredInputValue(token);
+        if (storedValue !== null) return storedValue;
+        return typeof tokenDef === "object" ? tokenDef?.default ?? "" : "";
+    };
+
     useEffect(() => {
         if (!clientPayload || tokens.length === 0 || clientInternalTokens.length > 0) return;
 
@@ -433,6 +452,9 @@ export function useTemplateRuntime() {
         const tokensToClear = new Map();
         [...internalMatchedTokens, ...matchedTokens].forEach((match) => {
             tokensToClear.set(match.token, match);
+        });
+        tokensToClear.forEach(({ token, value }) => {
+            localStorage.setItem("input_" + token, value);
         });
 
         setClientInternalTokens(internalTokenDefs);
@@ -480,6 +502,11 @@ export function useTemplateRuntime() {
             tokensToClear.set(match.token, match);
         });
 
+        clearStoredInputValues();
+        tokensToClear.forEach(({ token, value }) => {
+            localStorage.setItem("input_" + token, value);
+        });
+
         setClientPayload(payload);
         saveActiveClientPayload(payload);
         setClientInternalTokens(internalTokenDefs);
@@ -491,14 +518,7 @@ export function useTemplateRuntime() {
         setVariantPicker(null);
         if (nextLanguage) setLang(nextLanguage);
 
-        setValues((prev) => {
-            const next = { ...prev };
-            clientMatchedTokens.forEach(({ token }) => {
-                delete next[token];
-                localStorage.removeItem("input_" + token);
-            });
-            return { ...next, ...nextValues };
-        });
+        setValues(nextValues);
         inputChangeVersion.current++;
         setClientImportStatus({ type: "success", message: "" });
     };
@@ -536,7 +556,7 @@ export function useTemplateRuntime() {
 
         templateTokens.forEach((tokenDef) => {
             knownTokens.add(tokenDef.token);
-            const stored = values[tokenDef.token] ?? tokenDef.default ?? "";
+            const stored = getTokenValue(tokenDef);
             if (set.size === 0 || set.has(tokenDef.token)) {
                 if (stored === "" || stored === null || stored === undefined) missing.push(tokenDef.token);
             }
@@ -545,7 +565,7 @@ export function useTemplateRuntime() {
 
         set.forEach((tokenName) => {
             if (knownTokens.has(tokenName)) return;
-            const stored = values[tokenName] ?? "";
+            const stored = getTokenValue(tokenName);
             vals[tokenName] = stored;
             if (stored === "" || stored === null || stored === undefined) missing.push(tokenName);
         });
@@ -561,7 +581,7 @@ export function useTemplateRuntime() {
         const tokenMap = new Map(templateTokens.map((tokenDef) => [tokenDef.token, tokenDef]));
         const missingTokensNeeded = tokensNeeded.filter((tokenName) => {
             const tokenDef = tokenMap.get(tokenName);
-            const stored = values[tokenName] ?? tokenDef?.default ?? "";
+            const stored = getTokenValue(tokenDef || tokenName);
             return stored === "" || stored === null || stored === undefined;
         });
         if (missingTokensNeeded.length === 0) return null;
@@ -703,26 +723,41 @@ export function useTemplateRuntime() {
         });
     };
 
+    const persistTokenPromptValues = (tokenDefs, filledValues) => {
+        const persistedValues = {};
+        tokenDefs.forEach((tokenDef) => {
+            const value = filledValues[tokenDef.token] ?? getTokenValue(tokenDef);
+            const { inputTokens } = saveClientInputValue(tokenDef, value);
+            inputTokens.forEach((token) => {
+                persistedValues[token] = value;
+            });
+        });
+
+        if (Object.keys(persistedValues).length > 0) {
+            setValues((prev) => ({ ...prev, ...persistedValues }));
+        }
+        inputChangeVersion.current++;
+    };
+
     const confirmTokenPrompt = async () => {
         if (!tokenPrompt) return;
         const requiredTokens = tokenPrompt.tokenDefs.map((tokenDef) => tokenDef.token);
-        const { missing } = collectInputValues(requiredTokens);
+        const { values: filled, missing } = collectInputValues(requiredTokens);
         if (missing.length > 0) {
             setPromptMissingTokens(missing);
             showToast("Missing data for: " + missing.join(", "), "error");
             return;
         }
         const { effectiveModel, sectionKey, tokenDefs } = tokenPrompt;
+        persistTokenPromptValues(tokenDefs, filled);
         setTokenPrompt(null);
         setPromptMissingTokens([]);
         if (tokenPrompt.mode === "fill") return;
         if (tokenPrompt.mode === "result") {
             await openTemplateResult(effectiveModel, sectionKey);
-            clearOnDemandValues(tokenDefs);
             return;
         }
         await copyModel(effectiveModel, sectionKey, null, true);
-        clearOnDemandValues(tokenDefs);
     };
 
     return {

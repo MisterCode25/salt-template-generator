@@ -1,3 +1,5 @@
+import { MANUAL_CLIENT_INPUTS_KEY } from "../services/activeClientService.js";
+
 const CLIENT_FIELD_GROUPS = [
     {
         id: "client",
@@ -299,6 +301,23 @@ function walkPayloadLeaves(value, path = [], leaves = []) {
     return leaves;
 }
 
+function isManualInputPath(path = []) {
+    return path[0] === MANUAL_CLIENT_INPUTS_KEY;
+}
+
+function getManualInputEntries(payload) {
+    const manualInputs = payload?.[MANUAL_CLIENT_INPUTS_KEY];
+    if (!manualInputs || typeof manualInputs !== "object" || Array.isArray(manualInputs)) return [];
+
+    return Object.entries(manualInputs)
+        .map(([name, value]) => ({
+            name: tokenSegment(name),
+            label: humanizePathSegment(name),
+            value: displayValue(value)
+        }))
+        .filter((entry) => entry.name && entry.value !== "");
+}
+
 function firstValue(values) {
     for (const value of values) {
         const formatted = displayValue(value);
@@ -454,6 +473,7 @@ export function getClientInfoSections(payload) {
 
     const dynamicFields = walkPayloadLeaves(payload)
         .filter((leaf) => leaf.value !== "")
+        .filter((leaf) => !isManualInputPath(leaf.path))
         .filter((leaf) => !knownPaths.has(leaf.path.join(".")))
         .map((leaf) => ({
             label: formatPathLabel(leaf.path),
@@ -547,6 +567,7 @@ export function buildClientTokenIndex(payload) {
     const index = new Map();
 
     walkPayloadLeaves(payload).forEach((leaf) => {
+        if (isManualInputPath(leaf.path)) return;
         if (leaf.value === "") return;
         const token = formatPathToken(leaf.path);
         if (token) addIndexEntry(index, token, leaf.value);
@@ -573,6 +594,10 @@ export function buildClientTokenIndex(payload) {
         });
     });
 
+    getManualInputEntries(payload).forEach((entry) => {
+        addIndexEntry(index, entry.name, entry.value);
+    });
+
     return index;
 }
 
@@ -583,6 +608,7 @@ export function getClientInternalTokenData(payload) {
     const seen = new Set();
 
     walkPayloadLeaves(payload).forEach((leaf) => {
+        if (isManualInputPath(leaf.path)) return;
         const token = formatPathToken(leaf.path);
         if (!token || seen.has(token)) return;
         seen.add(token);
@@ -603,6 +629,29 @@ export function getClientInternalTokenData(payload) {
             token,
             value: leaf.value,
             label
+        });
+    });
+
+    getManualInputEntries(payload).forEach((entry) => {
+        const token = `{${entry.name}}`;
+        if (seen.has(token)) return;
+        seen.add(token);
+
+        tokenDefs.push({
+            id: `client-manual:${entry.name}`,
+            token,
+            label: entry.label || token,
+            key: `${MANUAL_CLIENT_INPUTS_KEY}.${entry.name}`,
+            input_type: "text",
+            display_mode: "on_demand",
+            internal: true
+        });
+
+        values[token] = entry.value;
+        matchedTokens.push({
+            token,
+            value: entry.value,
+            label: entry.label || token
         });
     });
 
