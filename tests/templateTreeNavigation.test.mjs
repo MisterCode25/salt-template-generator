@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 const {
   buildTemplateTreeSearchIndex,
   getAvailableTemplateChannels,
+  getNodeCardSummary,
   getNodePath,
   getTemplatePath,
   resolveChannelModel,
@@ -18,6 +19,7 @@ const nodes = [
 const treeTemplate = {
   id: "leaf",
   parentNodeId: "child",
+  nodeIds: ["child"],
   title: "Customer unreachable",
   description: "Call failed",
   channels: ["email", "sms"],
@@ -37,6 +39,8 @@ const treeTemplate = {
 
 assert.deepEqual(getNodePath(nodes, "child").map((node) => node.id), ["root", "child"]);
 assert.deepEqual(getTemplatePath(nodes, treeTemplate).map((node) => node.id), ["root", "child"]);
+assert.deepEqual(getNodeCardSummary(nodes, [treeTemplate], "root"), { childCount: 1, templateCount: 0 });
+assert.deepEqual(getNodeCardSummary(nodes, [treeTemplate], "child"), { childCount: 0, templateCount: 1 });
 
 assert.equal(resolveChannelModel(treeTemplate, "sms").id, "sms-content");
 assert.equal(resolveChannelModel(treeTemplate, "email").id, "email-content");

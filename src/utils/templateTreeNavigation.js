@@ -1,26 +1,45 @@
 import { CHANNEL_VALUES } from "../models/templateTreeModel.js";
-import { getChildNodes, getTemplatesForNode } from "./templateTreeOperations.js";
+import { buildNodeLookup } from "./templateTreeOperations.js";
 
 const nodeLookupCache = typeof WeakMap !== "undefined" ? new WeakMap() : null;
+
+function normalizeParentId(parentId) {
+    return typeof parentId === "string" && parentId.length > 0 ? parentId : null;
+}
 
 function normalizeNeedle(value) {
     return String(value || "").trim().toLowerCase();
 }
 
-function buildSearchText(values = []) {
-    let text = "";
-    values.forEach((value) => {
-        const normalized = normalizeNeedle(value);
-        if (!normalized) return;
-        text = text ? `${text} ${normalized}` : normalized;
-    });
+function appendSearchText(text, value) {
+    const normalized = normalizeNeedle(value);
+    if (!normalized) return text;
+    return text ? `${text} ${normalized}` : normalized;
+}
+
+function buildNodeSearchText(node) {
+    let text = appendSearchText("", node.title);
+    text = appendSearchText(text, node.description);
+    return text;
+}
+
+function buildTemplateSearchText(template) {
+    let text = appendSearchText("", template.title);
+    text = appendSearchText(text, template.description);
+
+    if (Array.isArray(template.channels)) {
+        for (const channel of template.channels) {
+            text = appendSearchText(text, channel);
+        }
+    }
+
     return text;
 }
 
 export function getNodePath(nodes = [], nodeId) {
     let byId = nodeLookupCache?.get(nodes);
     if (!byId) {
-        byId = new Map(nodes.map((node) => [node.id, node]));
+        byId = buildNodeLookup(nodes);
         nodeLookupCache?.set(nodes, byId);
     }
     const path = [];
@@ -56,26 +75,47 @@ export function getAvailableTemplateChannels(treeTemplate) {
 }
 
 export function getNodeCardSummary(nodes = [], templates = [], nodeId) {
+    const normalizedNodeId = normalizeParentId(nodeId);
+    let childCount = 0;
+    let templateCount = 0;
+
+    for (const node of nodes) {
+        if (normalizeParentId(node.parentId) === normalizedNodeId) childCount += 1;
+    }
+
+    for (const template of templates) {
+        if (Array.isArray(template.nodeIds) && template.nodeIds.includes(nodeId)) {
+            templateCount += 1;
+        }
+    }
+
     return {
-        childCount: getChildNodes(nodes, nodeId).length,
-        templateCount: getTemplatesForNode(templates, nodeId).length
+        childCount,
+        templateCount
     };
 }
 
 export function buildTemplateTreeSearchIndex(nodes = [], templates = []) {
-    return {
-        nodes: nodes.map((node) => ({
+    const nodeIndex = [];
+    const templateIndex = [];
+
+    for (const node of nodes) {
+        nodeIndex.push({
             item: node,
-            searchText: buildSearchText([node.title, node.description])
-        })),
-        templates: templates.map((template) => ({
+            searchText: buildNodeSearchText(node)
+        });
+    }
+
+    for (const template of templates) {
+        templateIndex.push({
             item: template,
-            searchText: buildSearchText([
-                template.title,
-                template.description,
-                ...(Array.isArray(template.channels) ? template.channels : [])
-            ])
-        }))
+            searchText: buildTemplateSearchText(template)
+        });
+    }
+
+    return {
+        nodes: nodeIndex,
+        templates: templateIndex
     };
 }
 
@@ -86,12 +126,12 @@ export function searchTemplateTreeIndex(index = {}, query = "") {
     const nodes = [];
     const templates = [];
 
-    (index.nodes || []).forEach((entry) => {
+    for (const entry of index.nodes || []) {
         if (entry.searchText.includes(needle)) nodes.push(entry.item);
-    });
-    (index.templates || []).forEach((entry) => {
+    }
+    for (const entry of index.templates || []) {
         if (entry.searchText.includes(needle)) templates.push(entry.item);
-    });
+    }
 
     return { nodes, templates };
 }
