@@ -173,9 +173,6 @@ export function VariantModal({ model, displayTitle, onSelect, onClose }) {
                     </button>
                 ))}
             </div>
-            <div className="popup-actions">
-                <button className="secondary-btn" onClick={onClose}>Close</button>
-            </div>
         </Modal>
     );
 }

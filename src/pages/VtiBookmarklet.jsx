@@ -42,9 +42,6 @@ export default function VtiBookmarklet({ embedded = false, onClose = null }) {
                 >
                     Capture VTI data
                 </a>
-                {embedded && (
-                    <button type="button" className="secondary-btn" onClick={onClose}>Close</button>
-                )}
             </section>
 
             <section className="vti-bookmarklet-grid">

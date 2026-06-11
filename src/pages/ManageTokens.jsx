@@ -141,9 +141,6 @@ export default function ManageTokens({ embedded = false, onClose = null }) {
                         <p className="eyebrow">Data tokens</p>
                         <h2>Manage Tokens</h2>
                     </div>
-                    {embedded && (
-                        <button type="button" className="secondary-btn" onClick={onClose}>Close</button>
-                    )}
                 </div>
 
                 <div id="tokens-list" className="models-list">

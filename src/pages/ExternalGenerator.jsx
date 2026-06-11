@@ -910,13 +910,11 @@ export default function ExternalGenerator({ embedded = false, onClose, clientPay
                         <p className="eyebrow">HCAMP</p>
                         <h2>External Generator</h2>
                     </div>
-                    <div className="flex-row gap-sm flex-wrap">
-                        {embedded ? (
-                            <button type="button" className="secondary-btn" onClick={onClose}>Close</button>
-                        ) : (
+                    {!embedded && (
+                        <div className="flex-row gap-sm flex-wrap">
                             <button type="button" className="secondary-btn" onClick={() => navigate("/")}>Back</button>
-                        )}
-                    </div>
+                        </div>
+                    )}
                 </div>
 
                 <div className="external-generator-layout">

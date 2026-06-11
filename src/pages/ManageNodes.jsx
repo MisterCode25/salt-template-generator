@@ -1210,19 +1210,15 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
             <div className="node-builder-shell">
                 <header className="node-builder-header">
                     <div className="node-builder-title">
-                        <button
-                            type="button"
-                            className="node-back-btn"
-                            onClick={() => {
-                                if (embedded && onClose) {
-                                    onClose();
-                                    return;
-                                }
-                                navigate("/");
-                            }}
-                        >
-                            {embedded ? "Close" : "Back"}
-                        </button>
+                        {!embedded && (
+                            <button
+                                type="button"
+                                className="node-back-btn"
+                                onClick={() => navigate("/")}
+                            >
+                                Back
+                            </button>
+                        )}
                         <h1>Playbook</h1>
                     </div>
                 </header>

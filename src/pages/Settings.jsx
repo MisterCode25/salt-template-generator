@@ -132,15 +132,11 @@ export default function Settings({ embedded = false, onClose = null }) {
                         <p className="eyebrow">App</p>
                         <h2>Settings <span className="settings-version-tag">V2.5</span></h2>
                     </div>
-                    <button className="secondary-btn" onClick={() => {
-                        if (embedded && onClose) {
-                            onClose();
-                            return;
-                        }
-                        navigate("/");
-                    }}>
-                        {embedded ? "Close" : "Back"}
-                    </button>
+                    {!embedded && (
+                        <button className="secondary-btn" onClick={() => navigate("/")}>
+                            Back
+                        </button>
+                    )}
                 </div>
 
                 <div className="popup-grid mt-md">

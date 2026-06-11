@@ -250,9 +250,6 @@ export default function ManageTools({ embedded = false, onClose = null }) {
                         <p className="eyebrow">Quick tools</p>
                         <h2>Manage Tools</h2>
                     </div>
-                    {embedded && (
-                        <button type="button" className="secondary-btn" onClick={onClose}>Close</button>
-                    )}
                 </div>
 
                 <div className="models-list">
