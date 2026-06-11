@@ -769,7 +769,6 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
                                     <div className="node-content-editor-head">
                                         <div>
                                             <label>{CHANNEL_LABELS[selectedContentChannel]}</label>
-                                            <strong>{activeLanguageDef.label}</strong>
                                         </div>
                                         <div className="node-template-editor-actions">
                                             <div className="node-language-tabs" role="tablist" aria-label="Template languages">
