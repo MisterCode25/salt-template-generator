@@ -41,6 +41,7 @@ assert.equal(canMoveNode(nodes, "child-a", null), true);
 
 nodes = updateNode(nodes, "root-a", { title: "No signal updated" });
 assert.equal(nodes.find((node) => node.id === "root-a").title, "No signal updated");
+assert.equal(nodes.find((node) => node.id === "root-b"), rootB);
 
 nodes = moveNode(nodes, "child-a", null);
 assert.equal(nodes.find((node) => node.id === "child-a").parentId, null);
@@ -79,9 +80,11 @@ let templates = [
 assert.deepEqual(getTemplatesForNode(templates, "child-a").map((template) => template.id), ["tpl-a"]);
 assert.deepEqual(getIndexedTemplatesForNode(buildTemplateNodeIndex(templates), "child-a").map((template) => template.id), ["tpl-a"]);
 
+const tplDeepBeforeUpdate = templates.find((template) => template.id === "tpl-deep");
 templates = updateTemplate(templates, "tpl-a", { title: "Customer unreachable updated", channels: ["email"] });
 assert.equal(templates.find((template) => template.id === "tpl-a").title, "Customer unreachable updated");
 assert.deepEqual(templates.find((template) => template.id === "tpl-a").channels, ["email"]);
+assert.equal(templates.find((template) => template.id === "tpl-deep"), tplDeepBeforeUpdate);
 
 templates = updateTemplate(templates, "tpl-a", { title: "Customer unreachable", channels: ["sms", "other"] });
 

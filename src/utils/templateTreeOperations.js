@@ -108,7 +108,7 @@ export function updateNode(nodes = [], nodeId, fields = {}) {
     return nodes.map((node) => (
         node.id === nodeId
             ? normalizeNode({ ...node, ...fields, id: node.id })
-            : normalizeNode(node)
+            : node
     ));
 }
 
@@ -122,7 +122,7 @@ export function moveNode(nodes = [], nodeId, parentId = null) {
     return nodes.map((node) => (
         node.id === nodeId
             ? normalizeNode({ ...node, parentId: normalizedParentId, order: nextOrder })
-            : normalizeNode(node)
+            : node
     ));
 }
 
@@ -145,7 +145,7 @@ export function reorderNode(nodes = [], nodeId, direction) {
     return nodes.map((candidate) => (
         orderById.has(candidate.id)
             ? normalizeNode({ ...candidate, order: orderById.get(candidate.id) })
-            : normalizeNode(candidate)
+            : candidate
     ));
 }
 
@@ -216,7 +216,7 @@ export function updateTemplate(templates = [], templateId, fields = {}) {
     return templates.map((template) => (
         template.id === templateId
             ? normalizeTemplate({ ...template, ...fields, id: template.id })
-            : normalizeTemplate(template)
+            : template
     ));
 }
 
@@ -228,7 +228,7 @@ export function moveTemplateToNode(templates = [], templateId, targetNodeId, nod
     return templates.map((template) => (
         template.id === templateId
             ? normalizeTemplate({ ...template, nodeIds: [targetNodeId, ...(template.nodeIds || []).filter((id) => id !== template.nodeIds[0])] })
-            : normalizeTemplate(template)
+            : template
     ));
 }
 
@@ -243,7 +243,7 @@ export function linkTemplateToNode(templates = [], templateId, nodeId, nodes = [
     return templates.map((template) => (
         template.id === templateId
             ? normalizeTemplate({ ...template, nodeIds: [...new Set([...(template.nodeIds || []), nodeId])] })
-            : normalizeTemplate(template)
+            : template
     ));
 }
 
@@ -251,7 +251,7 @@ export function unlinkTemplateFromNode(templates = [], templateId, nodeId) {
     return templates.map((template) => (
         template.id === templateId
             ? normalizeTemplate({ ...template, nodeIds: (template.nodeIds || []).filter((id) => id !== nodeId) })
-            : normalizeTemplate(template)
+            : template
     ));
 }
 
