@@ -1,6 +1,7 @@
 function decodeHtmlEntities(str) {
-    if (!String(str || "").includes("&")) return str;
-    return str
+    const text = String(str || "");
+    if (!text.includes("&")) return text;
+    return text
         .replace(/&nbsp;/g, " ")
         .replace(/&amp;/g, "&")
         .replace(/&lt;/g, "<")
@@ -42,7 +43,10 @@ export function formatClipboardHtmlBody(html) {
 }
 
 export function formatClipboardPlainText(html) {
-    return stripHtmlToPlainText(formatClipboardHtmlBody(html));
+    const text = String(html || "");
+    return HTML_TAG_PATTERN.test(text)
+        ? stripHtmlToPlainText(text)
+        : normalizePlainText(text);
 }
 
 export async function copyText(text, opts = {}) {
