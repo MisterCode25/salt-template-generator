@@ -346,6 +346,56 @@ function formatResultPreviewHTML(value = "", tokenMap = EMPTY_TOKEN_MAP, tokens 
     return formatTokenPreviewHTML(hydrated, tokens);
 }
 
+const TemplateChannelPreviewCard = memo(function TemplateChannelPreviewCard({
+    preview,
+    isActive,
+    lang,
+    onSelectChannel
+}) {
+    const PreviewIcon = preview.meta.Icon;
+    const handleClick = useCallback(() => {
+        onSelectChannel(preview.channel);
+    }, [onSelectChannel, preview.channel]);
+    const handleKeyDown = useCallback((event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        onSelectChannel(preview.channel);
+    }, [onSelectChannel, preview.channel]);
+
+    return (
+        <article
+            className={`templates-channel-result${isActive ? " is-active" : ""}`}
+            role="button"
+            tabIndex={0}
+            aria-pressed={isActive}
+            onClick={handleClick}
+            onKeyDown={handleKeyDown}
+        >
+            <div className="templates-channel-result-head">
+                <span className="templates-channel-result-label">
+                    <PreviewIcon size={17} aria-hidden="true" />
+                    <strong>{preview.meta.label}</strong>
+                </span>
+                <span className="templates-channel-lang">{preview.langLabel}</span>
+            </div>
+            {preview.channel === Channel.EMAIL && preview.subject && (
+                <div className="templates-channel-subject">
+                    <span>Subject</span>
+                    <strong>{preview.subject}</strong>
+                </div>
+            )}
+            <div className="templates-consultation-preview">
+                <div
+                    key={`${preview.channel}-${lang}-${preview.langLabel}`}
+                    className="rich-preview templates-html-preview"
+                    data-placeholder="No content for this language."
+                    dangerouslySetInnerHTML={{ __html: preview.html }}
+                />
+            </div>
+        </article>
+    );
+});
+
 function TemplateDetail({ template, activeChannel, setActiveChannel, visibleChannels, runtime, onManage, onToggleFavorite }) {
     const {
         lang,
@@ -382,21 +432,21 @@ function TemplateDetail({ template, activeChannel, setActiveChannel, visibleChan
     const model = activePreview?.model || null;
     const hasVariants = Boolean(model?.variants?.length);
     const copyKey = `tree_${template.id}_${activePreview?.channel || activeChannel}`;
-    const detailIcon = templateIcon(template);
-    const detailTone = toneForValue(template.title);
+    const detailIcon = useMemo(() => templateIcon(template), [template]);
+    const detailTone = useMemo(() => toneForValue(template.title), [template.title]);
 
-    const copyTemplate = () => {
+    const copyTemplate = useCallback(() => {
         if (!model) return;
         requestCopy(model, copyKey);
-    };
+    }, [copyKey, model, requestCopy]);
 
-    const openVariantResult = (variant) => {
+    const openVariantResult = useCallback((variant) => {
         if (!model) return;
         const sectionKey = variant ? `${copyKey}_${variant.id}` : `${copyKey}_main`;
         requestTemplateResult(variant || model, sectionKey, variant ? model : null);
-    };
+    }, [copyKey, model, requestTemplateResult]);
 
-    const selectChannel = (channel) => {
+    const selectChannel = useCallback((channel) => {
         setActiveChannel(channel);
         const nextModel = resolveChannelModel(template, channel);
         if (nextModel) {
@@ -407,13 +457,7 @@ function TemplateDetail({ template, activeChannel, setActiveChannel, visibleChan
                 requestTemplateResult(nextModel, sectionKey);
             }
         }
-    };
-
-    const handleChannelCardKeyDown = (event, channel) => {
-        if (event.key !== "Enter" && event.key !== " ") return;
-        event.preventDefault();
-        selectChannel(channel);
-    };
+    }, [requestTemplateResult, setActiveChannel, setVariantPicker, template]);
 
     return (
         <>
@@ -448,39 +492,14 @@ function TemplateDetail({ template, activeChannel, setActiveChannel, visibleChan
                         <div className="templates-channel-result-grid">
                             {channelPreviews.map((preview) => {
                                 const isActive = preview.channel === (activePreview?.channel || activeChannel);
-                                const PreviewIcon = preview.meta.Icon;
                                 return (
-                                    <article
+                                    <TemplateChannelPreviewCard
                                         key={preview.channel}
-                                        className={`templates-channel-result${isActive ? " is-active" : ""}`}
-                                        role="button"
-                                        tabIndex={0}
-                                        aria-pressed={isActive}
-                                        onClick={() => selectChannel(preview.channel)}
-                                        onKeyDown={(event) => handleChannelCardKeyDown(event, preview.channel)}
-                                    >
-                                        <div className="templates-channel-result-head">
-                                            <span className="templates-channel-result-label">
-                                                <PreviewIcon size={17} aria-hidden="true" />
-                                                <strong>{preview.meta.label}</strong>
-                                            </span>
-                                            <span className="templates-channel-lang">{preview.langLabel}</span>
-                                        </div>
-                                        {preview.channel === Channel.EMAIL && preview.subject && (
-                                            <div className="templates-channel-subject">
-                                                <span>Subject</span>
-                                                <strong>{preview.subject}</strong>
-                                            </div>
-                                        )}
-                                        <div className="templates-consultation-preview">
-                                            <div
-                                                key={`${preview.channel}-${runtime.lang}-${preview.langLabel}`}
-                                                className="rich-preview templates-html-preview"
-                                                data-placeholder="No content for this language."
-                                                dangerouslySetInnerHTML={{ __html: preview.html }}
-                                            />
-                                        </div>
-                                    </article>
+                                        preview={preview}
+                                        isActive={isActive}
+                                        lang={lang}
+                                        onSelectChannel={selectChannel}
+                                    />
                                 );
                             })}
                         </div>
