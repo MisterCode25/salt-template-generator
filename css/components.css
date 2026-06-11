@@ -4496,6 +4496,17 @@ textarea:focus {
     font-size: 12px;
 }
 
+.node-mini-btn--icon {
+    width: 32px;
+    min-width: 32px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    line-height: 1;
+}
+
 .node-mini-btn:disabled,
 .node-template-move .secondary-btn:disabled {
     opacity: 0.45;

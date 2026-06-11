@@ -86,7 +86,6 @@ function TokenModal({ initial, tokens, onClose, onSave }) {
                 </div>
 
                 <div className="popup-actions">
-                    <button type="button" className="secondary-btn" onClick={onClose}>Cancel</button>
                     <button type="button" className="primary-btn" onClick={handleSave}>Save</button>
                 </div>
         </Modal>
@@ -183,7 +182,6 @@ export default function ManageTokens({ embedded = false, onClose = null }) {
                     title="Delete token"
                     message="Are you sure you want to delete this token? This action cannot be undone."
                     confirmLabel="Delete"
-                    cancelLabel="Cancel"
                     variant="danger"
                     onConfirm={confirmDeleteToken}
                     onCancel={() => setConfirmDelete(null)}

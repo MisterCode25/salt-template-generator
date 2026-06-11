@@ -203,7 +203,6 @@ function ToolModal({ initial, onClose, onSave }) {
             </div>
 
             <div className="popup-actions">
-                <button type="button" className="secondary-btn" onClick={onClose}>Cancel</button>
                 <button type="button" className="primary-btn" onClick={handleSave}>Save</button>
             </div>
         </Modal>
@@ -289,7 +288,6 @@ export default function ManageTools({ embedded = false, onClose = null }) {
                     title="Delete tool"
                     message="Are you sure you want to delete this tool?"
                     confirmLabel="Delete"
-                    cancelLabel="Cancel"
                     variant="danger"
                     onConfirm={onDelete}
                     onCancel={() => setConfirmDelete(null)}

@@ -374,7 +374,15 @@ function NodeFormModal({ mode, initial, parentTitle, onClose, onSave }) {
                                                 onChange={(event) => setIconQuery(event.target.value)}
                                                 placeholder="Search symbols"
                                             />
-                                            <button type="button" className="node-mini-btn" onClick={() => setIconMenuOpen(false)}>Close</button>
+                                            <button
+                                                type="button"
+                                                className="node-mini-btn node-mini-btn--icon"
+                                                onClick={() => setIconMenuOpen(false)}
+                                                aria-label="Close symbol picker"
+                                                title="Close"
+                                            >
+                                                ×
+                                            </button>
                                         </div>
                                         <div className="node-symbol-categories" aria-label="Symbol categories">
                                             {NODE_ICON_CATEGORIES.map((category) => (
@@ -419,7 +427,6 @@ function NodeFormModal({ mode, initial, parentTitle, onClose, onSave }) {
                     </div>
                 </div>
                 <div className="popup-actions">
-                    <button type="button" className="secondary-btn" onClick={onClose}>Cancel</button>
                     <button type="submit" className="primary-btn" disabled={!canSubmit}>{isEdit ? "Save" : "Create"}</button>
                 </div>
             </form>
@@ -492,9 +499,6 @@ function ExistingTemplatePickerModal({ currentNodeId, allTemplates, nodes, onClo
                             })
                         )}
                     </div>
-                </div>
-                <div className="popup-actions">
-                    <button type="button" className="secondary-btn" onClick={onClose}>Cancel</button>
                 </div>
             </div>
         </Modal>
@@ -942,7 +946,6 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
                     </section>
                 </div>
                 <div className="popup-actions">
-                    <button type="button" className="secondary-btn" onClick={onClose}>Cancel</button>
                     <button type="submit" className="primary-btn" disabled={!canSubmit}>{isEdit ? "Save" : "Create"}</button>
                 </div>
             </form>
@@ -1477,7 +1480,6 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
                         title="Delete section"
                         message="Delete this section, its subsections, and all templates inside them?"
                         confirmLabel="Delete"
-                        cancelLabel="Cancel"
                         variant="danger"
                         onConfirm={deleteSelectedNode}
                         onCancel={() => setConfirmNodeDelete(null)}
@@ -1489,7 +1491,6 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
                         title="Delete template"
                         message="Delete this template from the playbook?"
                         confirmLabel="Delete"
-                        cancelLabel="Cancel"
                         variant="danger"
                         onConfirm={deleteTemplate}
                         onCancel={() => setConfirmTemplateDelete(null)}

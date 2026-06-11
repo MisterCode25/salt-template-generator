@@ -197,7 +197,6 @@ export default function Settings({ embedded = false, onClose = null }) {
                         </div>
                     </div>
                     <div className="popup-actions">
-                        <button type="button" className="secondary-btn" onClick={() => setExportNameOpen(false)}>Cancel</button>
                         <button type="button" className="primary-btn" onClick={doExport}>Export</button>
                     </div>
                 </Modal>
@@ -207,7 +206,6 @@ export default function Settings({ embedded = false, onClose = null }) {
                     title="Reset local data"
                     message="Are you sure you want to reset all stored data? This will delete all your templates, tokens, and settings. This action cannot be undone."
                     confirmLabel="Reset"
-                    cancelLabel="Cancel"
                     variant="danger"
                     onConfirm={resetStorage}
                     onCancel={() => setConfirmReset(false)}

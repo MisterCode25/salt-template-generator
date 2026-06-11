@@ -149,7 +149,6 @@ function PromptModal({ state, onCancel, onSubmit }) {
                             <button type="button" className="prompt-dialog__btn prompt-dialog__btn--back" onClick={() => onSubmit(PROMPT_BACK)}>← Back</button>
                         )}
                         <div className="prompt-dialog__actions-end">
-                            <button type="button" className="prompt-dialog__btn prompt-dialog__btn--cancel" onClick={onCancel}>Cancel</button>
                             <button type="button" className="prompt-dialog__btn prompt-dialog__btn--continue" onClick={() => onSubmit(inputValue)}>Continue →</button>
                         </div>
                     </div>
@@ -212,23 +211,24 @@ function PromptModal({ state, onCancel, onSubmit }) {
                     ))}
                     {filtered.length === 0 && <p className="prompt-dialog__empty">No result.</p>}
                 </div>
-                <div className="prompt-dialog__actions">
-                    {displayState.showBack && (
-                        <button type="button" className="prompt-dialog__btn prompt-dialog__btn--back" onClick={() => onSubmit(PROMPT_BACK)}>← Back</button>
-                    )}
-                    <div className="prompt-dialog__actions-end">
-                        <button type="button" className="prompt-dialog__btn prompt-dialog__btn--cancel" onClick={onCancel}>Cancel</button>
+                {(displayState.showBack || displayState.customNote) && (
+                    <div className="prompt-dialog__actions">
+                        {displayState.showBack && (
+                            <button type="button" className="prompt-dialog__btn prompt-dialog__btn--back" onClick={() => onSubmit(PROMPT_BACK)}>← Back</button>
+                        )}
                         {displayState.customNote && (
-                            <button
-                                type="button"
-                                className="prompt-dialog__btn prompt-dialog__btn--continue"
-                                onClick={() => inputValue.trim() && onSubmit(inputValue.trim())}
-                            >
-                                Continue →
-                            </button>
+                            <div className="prompt-dialog__actions-end">
+                                <button
+                                    type="button"
+                                    className="prompt-dialog__btn prompt-dialog__btn--continue"
+                                    onClick={() => inputValue.trim() && onSubmit(inputValue.trim())}
+                                >
+                                    Continue →
+                                </button>
+                            </div>
                         )}
                     </div>
-                </div>
+                )}
             </div>
         </Modal>
     );

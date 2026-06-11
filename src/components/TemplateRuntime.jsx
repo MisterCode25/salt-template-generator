@@ -147,7 +147,6 @@ export function TokenPromptModal({ title, tokenDefs, values, missingTokens, mode
                 })}
             </div>
             <div className="popup-actions">
-                <button className="secondary-btn" onClick={onClose}>Cancel</button>
                 <button className="primary-btn" onClick={onConfirm}>{isFillMode ? "Apply" : "Copy text"}</button>
             </div>
         </Modal>
@@ -322,7 +321,6 @@ export function ClientPasteModal({ onClose, onImport, initialError = "" }) {
                 placeholder='{"client": {...}, "contact": {...}, "healthcheck": {...}}'
             />
             <div className="popup-actions">
-                <button type="button" className="secondary-btn" onClick={onClose}>Cancel</button>
                 <button type="button" className="primary-btn" onClick={submit}>Import</button>
             </div>
         </Modal>
