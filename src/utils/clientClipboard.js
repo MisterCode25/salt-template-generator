@@ -246,12 +246,24 @@ const CLIENT_FIELD_GROUPS = [
 ];
 let knownClientFieldPathCache = null;
 const payloadLeavesCache = typeof WeakMap !== "undefined" ? new WeakMap() : null;
+const pathSegmentsCache = new Map();
+
+function getPathSegments(path = "") {
+    let segments = pathSegmentsCache.get(path);
+    if (!segments) {
+        segments = path.split(".");
+        pathSegmentsCache.set(path, segments);
+    }
+    return segments;
+}
 
 function readPath(source, path) {
-    return path.split(".").reduce((current, segment) => {
+    let current = source;
+    for (const segment of getPathSegments(path)) {
         if (current === null || current === undefined) return undefined;
-        return current[segment];
-    }, source);
+        current = current[segment];
+    }
+    return current;
 }
 
 function displayValue(value) {
@@ -278,30 +290,42 @@ function tokenSegment(segment = "") {
 }
 
 function formatPathToken(path) {
-    const name = path.map(tokenSegment).filter(Boolean).join("_");
+    let name = "";
+    for (const segment of path) {
+        const part = tokenSegment(segment);
+        if (!part) continue;
+        name = name ? `${name}_${part}` : part;
+    }
     return name ? `{${name}}` : "";
 }
 
 function formatPathLabel(path) {
-    return path.map(humanizePathSegment).filter(Boolean).join(" ");
+    let label = "";
+    for (const segment of path) {
+        const part = humanizePathSegment(segment);
+        if (!part) continue;
+        label = label ? `${label} ${part}` : part;
+    }
+    return label;
 }
 
 function walkPayloadLeaves(value, path = [], leaves = []) {
     if (Array.isArray(value)) {
-        value.forEach((item, index) => {
+        for (let index = 0; index < value.length; index++) {
             path.push(String(index + 1));
-            walkPayloadLeaves(item, path, leaves);
+            walkPayloadLeaves(value[index], path, leaves);
             path.pop();
-        });
+        }
         return leaves;
     }
 
     if (value && typeof value === "object") {
-        Object.entries(value).forEach(([key, item]) => {
+        for (const key in value) {
+            if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
             path.push(key);
-            walkPayloadLeaves(item, path, leaves);
+            walkPayloadLeaves(value[key], path, leaves);
             path.pop();
-        });
+        }
         return leaves;
     }
 
@@ -333,13 +357,19 @@ function getManualInputEntries(payload) {
     const manualInputs = payload?.[MANUAL_CLIENT_INPUTS_KEY];
     if (!manualInputs || typeof manualInputs !== "object" || Array.isArray(manualInputs)) return [];
 
-    return Object.entries(manualInputs)
-        .map(([name, value]) => ({
-            name: normalizeTokenName(canonicalizeInputTokenValue(name)),
+    const entries = [];
+    for (const name in manualInputs) {
+        if (!Object.prototype.hasOwnProperty.call(manualInputs, name)) continue;
+        const entryName = normalizeTokenName(canonicalizeInputTokenValue(name));
+        const value = displayValue(manualInputs[name]);
+        if (!entryName || value === "") continue;
+        entries.push({
+            name: entryName,
             label: humanizePathSegment(name),
-            value: displayValue(value)
-        }))
-        .filter((entry) => entry.name && entry.value !== "");
+            value
+        });
+    }
+    return entries;
 }
 
 function firstValue(values) {
@@ -486,25 +516,36 @@ export function getClientInfoSections(payload) {
     if (!payload) return [];
 
     const knownPaths = knownClientFieldPaths();
-    const sections = CLIENT_FIELD_GROUPS.map((group) => ({
-        id: group.id,
-        title: group.title,
-        fields: group.fields
-            .map((field) => ({
-                label: field.label,
-                value: valueForField(payload, field)
-            }))
-            .filter((field) => field.value !== "")
-    })).filter((group) => group.fields.length > 0);
+    const sections = [];
 
-    const dynamicFields = getPayloadLeaves(payload)
-        .filter((leaf) => leaf.value !== "")
-        .filter((leaf) => !isManualInputPath(leaf.path))
-        .filter((leaf) => !knownPaths.has(leaf.path.join(".")))
-        .map((leaf) => ({
+    for (const group of CLIENT_FIELD_GROUPS) {
+        const fields = [];
+        for (const field of group.fields) {
+            const value = valueForField(payload, field);
+            if (value === "") continue;
+            fields.push({
+                label: field.label,
+                value
+            });
+        }
+        if (fields.length > 0) {
+            sections.push({
+                id: group.id,
+                title: group.title,
+                fields
+            });
+        }
+    }
+
+    const dynamicFields = [];
+    for (const leaf of getPayloadLeaves(payload)) {
+        if (leaf.value === "" || isManualInputPath(leaf.path)) continue;
+        if (knownPaths.has(leaf.path.join("."))) continue;
+        dynamicFields.push({
             label: formatPathLabel(leaf.path),
             value: leaf.value
-        }));
+        });
+    }
 
     if (dynamicFields.length > 0) {
         sections.push({
@@ -592,23 +633,22 @@ function addIndexEntry(index, alias, value) {
 export function buildClientTokenIndex(payload) {
     const index = new Map();
 
-    getPayloadLeaves(payload).forEach((leaf) => {
-        if (isManualInputPath(leaf.path)) return;
-        if (leaf.value === "") return;
+    for (const leaf of getPayloadLeaves(payload)) {
+        if (isManualInputPath(leaf.path) || leaf.value === "") continue;
         const token = formatPathToken(leaf.path);
         if (token) addIndexEntry(index, token, leaf.value);
         addIndexEntry(index, leaf.path.join(" "), leaf.value);
         addIndexEntry(index, leaf.path.join(""), leaf.value);
-    });
+    }
 
-    CLIENT_FIELD_GROUPS.forEach((group) => {
-        group.fields.forEach((field) => {
+    for (const group of CLIENT_FIELD_GROUPS) {
+        for (const field of group.fields) {
             const value = valueForField(payload, field);
-            if (value === "") return;
+            if (value === "") continue;
 
             addIndexEntry(index, field.label, value);
             if (field.path) {
-                const pathParts = field.path.split(".");
+                const pathParts = getPathSegments(field.path);
                 const lastPart = pathParts[pathParts.length - 1];
                 addIndexEntry(index, lastPart, value);
                 addIndexEntry(index, pathParts.join(" "), value);
@@ -616,13 +656,15 @@ export function buildClientTokenIndex(payload) {
                 addIndexEntry(index, `${group.id} ${lastPart}`, value);
                 addIndexEntry(index, `${group.id}${lastPart}`, value);
             }
-            (field.aliases || []).forEach((alias) => addIndexEntry(index, alias, value));
-        });
-    });
+            for (const alias of field.aliases || []) {
+                addIndexEntry(index, alias, value);
+            }
+        }
+    }
 
-    getManualInputEntries(payload).forEach((entry) => {
+    for (const entry of getManualInputEntries(payload)) {
         addIndexEntry(index, entry.name, entry.value);
-    });
+    }
 
     return index;
 }
@@ -633,10 +675,10 @@ export function getClientInternalTokenData(payload) {
     const matchedTokens = [];
     const seen = new Set();
 
-    getPayloadLeaves(payload).forEach((leaf) => {
-        if (isManualInputPath(leaf.path)) return;
+    for (const leaf of getPayloadLeaves(payload)) {
+        if (isManualInputPath(leaf.path)) continue;
         const token = formatPathToken(leaf.path);
-        if (!token || seen.has(token)) return;
+        if (!token || seen.has(token)) continue;
         seen.add(token);
 
         const label = formatPathLabel(leaf.path) || token;
@@ -656,11 +698,11 @@ export function getClientInternalTokenData(payload) {
             value: leaf.value,
             label
         });
-    });
+    }
 
-    getManualInputEntries(payload).forEach((entry) => {
+    for (const entry of getManualInputEntries(payload)) {
         const token = `{${entry.name}}`;
-        if (seen.has(token)) return;
+        if (seen.has(token)) continue;
         seen.add(token);
 
         tokenDefs.push({
@@ -679,7 +721,7 @@ export function getClientInternalTokenData(payload) {
             value: entry.value,
             label: entry.label || token
         });
-    });
+    }
 
     return { tokenDefs, values, matchedTokens };
 }
@@ -689,12 +731,12 @@ export function matchClientDataToTokens(payload, tokens = []) {
     const values = {};
     const matchedTokens = [];
 
-    tokens.forEach((tokenDef) => {
+    for (const tokenDef of tokens) {
         const token = typeof tokenDef === "string" ? tokenDef : tokenDef?.token;
-        if (!token) return;
+        if (!token) continue;
 
         const key = normalizeClientTokenName(token);
-        if (!index.has(key)) return;
+        if (!index.has(key)) continue;
 
         const value = index.get(key);
         values[token] = value;
@@ -703,7 +745,7 @@ export function matchClientDataToTokens(payload, tokens = []) {
             value,
             label: tokenDef?.label || token
         });
-    });
+    }
 
     return { values, matchedTokens };
 }
