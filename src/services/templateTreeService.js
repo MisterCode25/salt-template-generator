@@ -13,15 +13,30 @@ const TEMPLATE_TEXT_FIELDS = Object.freeze(["text_fr", "text_en", "text_de", "te
 async function loadList(key, normalize) {
     const indexedList = await loadIndexedJSON(key, null);
     if (Array.isArray(indexedList)) {
-        return indexedList.map(normalize);
+        const normalized = [];
+        for (const item of indexedList) {
+            normalized.push(normalize(item));
+        }
+        return normalized;
     }
 
     const legacyList = await loadJSON(key, []);
-    return Array.isArray(legacyList) ? legacyList.map(normalize) : [];
+    if (!Array.isArray(legacyList)) return [];
+
+    const normalized = [];
+    for (const item of legacyList) {
+        normalized.push(normalize(item));
+    }
+    return normalized;
 }
 
 async function saveList(key, items, normalize) {
-    const normalizedItems = Array.isArray(items) ? items.map(normalize) : [];
+    const normalizedItems = [];
+    if (Array.isArray(items)) {
+        for (const item of items) {
+            normalizedItems.push(normalize(item));
+        }
+    }
     const saved = await saveIndexedJSON(key, normalizedItems);
     if (!saved) {
         await saveJSON(key, normalizedItems);
@@ -57,7 +72,10 @@ export async function loadTemplateTreeData() {
 }
 
 export async function saveTemplateTreeData({ nodes = [], templates = [] } = {}) {
-    const canonicalizedTemplates = templates.map((template) => canonicalizeTemplateTokens(template).template);
+    const canonicalizedTemplates = [];
+    for (const template of templates) {
+        canonicalizedTemplates.push(canonicalizeTemplateTokens(template).template);
+    }
     await Promise.all([
         saveTemplateNodes(nodes),
         saveNodeTemplates(canonicalizedTemplates)
@@ -68,14 +86,14 @@ function transformTextFields(source = {}, transformText) {
     let dirty = false;
     let nextFields = null;
 
-    TEMPLATE_TEXT_FIELDS.forEach((field) => {
+    for (const field of TEMPLATE_TEXT_FIELDS) {
         const current = source[field];
         const next = transformText(current || "");
-        if (current === next) return;
+        if (current === next) continue;
         dirty = true;
         nextFields = nextFields || {};
         nextFields[field] = next;
-    });
+    }
 
     return {
         value: dirty ? { ...source, ...nextFields } : source,
@@ -92,13 +110,14 @@ function transformChannelContentText(content, transformText) {
     let variants = hasVariantList ? originalVariants : [];
     let dirty = contentResult.dirty || !hasVariantList;
 
-    originalVariants.forEach((variant, index) => {
+    for (let index = 0; index < originalVariants.length; index++) {
+        const variant = originalVariants[index];
         const variantResult = transformTextFields(variant, transformText);
-        if (!variantResult.dirty) return;
+        if (!variantResult.dirty) continue;
         if (variants === originalVariants) variants = originalVariants.slice();
         variants[index] = variantResult.value;
         dirty = true;
-    });
+    }
 
     if (!dirty) {
         return { content, dirty: false };
@@ -120,31 +139,42 @@ function canonicalizeChannelContentTokens(content) {
 }
 
 function canonicalizeTemplateTokens(template) {
-    const contentByChannel = { ...(template.contentByChannel || {}) };
+    const originalContentByChannel = template.contentByChannel || {};
+    let contentByChannel = originalContentByChannel;
     let dirty = false;
 
-    CHANNEL_VALUES.forEach((channel) => {
+    for (const channel of CHANNEL_VALUES) {
         const result = canonicalizeChannelContentTokens(contentByChannel[channel]);
+        if (!result.dirty) continue;
+        if (contentByChannel === originalContentByChannel) {
+            contentByChannel = { ...originalContentByChannel };
+        }
         contentByChannel[channel] = result.content;
-        dirty = dirty || result.dirty;
-    });
+        dirty = true;
+    }
 
-    return {
-        template: normalizeTemplate({
-            ...template,
-            contentByChannel
-        }),
-        dirty
-    };
+    return dirty
+        ? {
+            template: normalizeTemplate({
+                ...template,
+                contentByChannel
+            }),
+            dirty
+        }
+        : {
+            template: normalizeTemplate(template),
+            dirty: false
+        };
 }
 
 async function migrateCanonicalTemplateTokens({ nodes = [], templates = [] } = {}) {
     let dirty = false;
-    const nextTemplates = templates.map((template) => {
+    const nextTemplates = [];
+    for (const template of templates) {
         const result = canonicalizeTemplateTokens(template);
         dirty = dirty || result.dirty;
-        return result.template;
-    });
+        nextTemplates.push(result.template);
+    }
 
     if (dirty) {
         await saveTemplateTreeData({ nodes, templates: nextTemplates });
@@ -190,6 +220,7 @@ async function migrateStoredLegacyTemplates({ nodes = [], templates = [] } = {})
 
 function replaceInText(text, fromToken, toToken) {
     if (!text || !fromToken || fromToken === toToken) return text;
+    if (!text.includes(fromToken)) return text;
     return text.split(fromToken).join(toToken);
 }
 
@@ -202,20 +233,30 @@ export async function renameTokenInTemplateTree(fromToken, toToken) {
 
     const { nodes, templates } = await loadTemplateTreeData();
     let dirty = false;
-    const nextTemplates = templates.map((template) => {
-        const contentByChannel = { ...(template.contentByChannel || {}) };
+    const nextTemplates = [];
+    for (const template of templates) {
+        const originalContentByChannel = template.contentByChannel || {};
+        let contentByChannel = originalContentByChannel;
+        let templateDirty = false;
 
-        CHANNEL_VALUES.forEach((channel) => {
+        for (const channel of CHANNEL_VALUES) {
             const result = replaceTokenInChannelContent(contentByChannel[channel], fromToken, toToken);
+            if (!result.dirty) continue;
+            if (contentByChannel === originalContentByChannel) {
+                contentByChannel = { ...originalContentByChannel };
+            }
             contentByChannel[channel] = result.content;
-            dirty = dirty || result.dirty;
-        });
+            templateDirty = true;
+        }
 
-        return normalizeTemplate({
-            ...template,
-            contentByChannel
-        });
-    });
+        dirty = dirty || templateDirty;
+        nextTemplates.push(templateDirty
+            ? normalizeTemplate({
+                ...template,
+                contentByChannel
+            })
+            : normalizeTemplate(template));
+    }
 
     if (dirty) {
         await saveTemplateTreeData({ nodes, templates: nextTemplates });
