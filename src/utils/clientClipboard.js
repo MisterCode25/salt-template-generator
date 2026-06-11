@@ -244,6 +244,8 @@ const CLIENT_FIELD_GROUPS = [
         ]
     }
 ];
+let knownClientFieldPathCache = null;
+const payloadLeavesCache = typeof WeakMap !== "undefined" ? new WeakMap() : null;
 
 function readPath(source, path) {
     return path.split(".").reduce((current, segment) => {
@@ -286,19 +288,40 @@ function formatPathLabel(path) {
 
 function walkPayloadLeaves(value, path = [], leaves = []) {
     if (Array.isArray(value)) {
-        value.forEach((item, index) => walkPayloadLeaves(item, [...path, String(index + 1)], leaves));
+        value.forEach((item, index) => {
+            path.push(String(index + 1));
+            walkPayloadLeaves(item, path, leaves);
+            path.pop();
+        });
         return leaves;
     }
 
     if (value && typeof value === "object") {
-        Object.entries(value).forEach(([key, item]) => walkPayloadLeaves(item, [...path, key], leaves));
+        Object.entries(value).forEach(([key, item]) => {
+            path.push(key);
+            walkPayloadLeaves(item, path, leaves);
+            path.pop();
+        });
         return leaves;
     }
 
     leaves.push({
-        path,
+        path: path.slice(),
         value: displayValue(value)
     });
+    return leaves;
+}
+
+function getPayloadLeaves(payload) {
+    if (!payload || typeof payload !== "object") {
+        return walkPayloadLeaves(payload);
+    }
+
+    const cached = payloadLeavesCache?.get(payload);
+    if (cached) return cached;
+
+    const leaves = walkPayloadLeaves(payload);
+    payloadLeavesCache?.set(payload, leaves);
     return leaves;
 }
 
@@ -333,14 +356,16 @@ function valueForField(payload, field) {
 }
 
 function knownClientFieldPaths() {
-    const paths = new Set();
+    if (knownClientFieldPathCache) return knownClientFieldPathCache;
 
+    const paths = new Set();
     CLIENT_FIELD_GROUPS.forEach((group) => {
         group.fields.forEach((field) => {
             if (field.path) paths.add(field.path);
         });
     });
 
+    knownClientFieldPathCache = paths;
     return paths;
 }
 
@@ -472,7 +497,7 @@ export function getClientInfoSections(payload) {
             .filter((field) => field.value !== "")
     })).filter((group) => group.fields.length > 0);
 
-    const dynamicFields = walkPayloadLeaves(payload)
+    const dynamicFields = getPayloadLeaves(payload)
         .filter((leaf) => leaf.value !== "")
         .filter((leaf) => !isManualInputPath(leaf.path))
         .filter((leaf) => !knownPaths.has(leaf.path.join(".")))
@@ -567,7 +592,7 @@ function addIndexEntry(index, alias, value) {
 export function buildClientTokenIndex(payload) {
     const index = new Map();
 
-    walkPayloadLeaves(payload).forEach((leaf) => {
+    getPayloadLeaves(payload).forEach((leaf) => {
         if (isManualInputPath(leaf.path)) return;
         if (leaf.value === "") return;
         const token = formatPathToken(leaf.path);
@@ -608,7 +633,7 @@ export function getClientInternalTokenData(payload) {
     const matchedTokens = [];
     const seen = new Set();
 
-    walkPayloadLeaves(payload).forEach((leaf) => {
+    getPayloadLeaves(payload).forEach((leaf) => {
         if (isManualInputPath(leaf.path)) return;
         const token = formatPathToken(leaf.path);
         if (!token || seen.has(token)) return;
