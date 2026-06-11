@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import {
     Cable,
     Camera,
@@ -48,13 +48,14 @@ import {
 } from "../utils/templateTreeNavigation.js";
 import { formatTokenPreviewHTML } from "../utils/richTextTokens.js";
 import { applyTheme, getInitialTheme } from "../utils/theme.js";
-import ExternalGenerator from "./ExternalGenerator.jsx";
 import ToolsBar from "../components/ToolsBar.jsx";
-import ManageNodes from "./ManageNodes.jsx";
-import ManageTokens from "./ManageTokens.jsx";
-import ManageTools from "./ManageTools.jsx";
-import SettingsPage from "./Settings.jsx";
-import VtiBookmarklet from "./VtiBookmarklet.jsx";
+
+const ExternalGenerator = lazy(() => import("./ExternalGenerator.jsx"));
+const ManageNodes = lazy(() => import("./ManageNodes.jsx"));
+const ManageTokens = lazy(() => import("./ManageTokens.jsx"));
+const ManageTools = lazy(() => import("./ManageTools.jsx"));
+const SettingsPage = lazy(() => import("./Settings.jsx"));
+const VtiBookmarklet = lazy(() => import("./VtiBookmarklet.jsx"));
 
 const CHANNEL_LABELS = {
     [Channel.EMAIL]: "Email",
@@ -862,7 +863,9 @@ export default function Templates() {
                     dialogClassName={`popup-box workspace-modal workspace-modal--${activeWorkspace}`}
                     ariaLabel="Workspace"
                 >
-                    {renderWorkspace()}
+                    <Suspense fallback={<div className="node-content-empty">Loading...</div>}>
+                        {renderWorkspace()}
+                    </Suspense>
                 </Modal>
             )}
 
@@ -941,7 +944,9 @@ export default function Templates() {
                     dialogClassName={`popup-box external-generator-overlay-box${externalGeneratorClosing ? " is-closing" : ""}`}
                     ariaLabel="External Generator"
                 >
-                    <ExternalGenerator embedded onClose={closeExternalGenerator} clientPayload={runtime.clientPayload} />
+                    <Suspense fallback={<div className="node-content-empty">Loading...</div>}>
+                        <ExternalGenerator embedded onClose={closeExternalGenerator} clientPayload={runtime.clientPayload} />
+                    </Suspense>
                 </Modal>
             )}
         </main>
