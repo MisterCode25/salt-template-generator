@@ -5026,6 +5026,10 @@ textarea:focus {
     gap: 12px;
 }
 
+.node-form--compact {
+    gap: 10px;
+}
+
 .node-section-dialog {
     width: min(640px, 100%);
 }
@@ -5202,6 +5206,32 @@ textarea:focus {
     min-height: 42px;
 }
 
+.node-template-setup {
+    display: grid;
+    grid-template-columns: minmax(240px, 0.78fr) minmax(360px, 1fr);
+    gap: 10px;
+    align-items: end;
+    padding: 10px 12px;
+    border-radius: var(--radius-md);
+    border: 1px solid rgba(129, 153, 214, 0.16);
+    background: rgba(255, 255, 255, 0.035);
+}
+
+.node-template-title-field,
+.node-template-channel-control {
+    min-width: 0;
+}
+
+.node-template-field-label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 12px;
+    font-weight: 800;
+    color: #cbd8f8;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
 .node-channel-options {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -5259,6 +5289,27 @@ textarea:focus {
     color: #b9f7df;
 }
 
+.node-channel-options--compact {
+    gap: 6px;
+}
+
+.node-channel-options--compact .node-channel-option {
+    min-height: 42px;
+    grid-template-columns: 22px minmax(0, 1fr);
+    gap: 6px;
+    padding: 8px 10px;
+}
+
+.node-channel-options--compact .node-channel-check {
+    grid-row: auto;
+    width: 20px;
+    height: 20px;
+}
+
+.node-channel-options--compact .node-channel-option strong {
+    white-space: nowrap;
+}
+
 .node-content-workbench {
     display: grid;
     grid-template-columns: minmax(126px, 150px) minmax(0, 1fr);
@@ -5267,6 +5318,11 @@ textarea:focus {
 
 .node-content-workbench.is-single {
     grid-template-columns: 1fr;
+}
+
+.node-template-section--editor {
+    gap: 10px;
+    padding: 10px;
 }
 
 .node-content-tabs,
@@ -5472,6 +5528,10 @@ textarea:focus {
         grid-template-columns: 1fr;
     }
 
+    .node-template-setup {
+        grid-template-columns: 1fr;
+    }
+
     .node-content-tabs {
         flex-direction: row;
         flex-wrap: wrap;
@@ -5556,6 +5616,7 @@ textarea:focus {
 .light-theme .node-admin-block,
 .light-theme .node-detail-settings,
 .light-theme .node-template-section,
+.light-theme .node-template-setup,
 .light-theme .node-object-card,
 .light-theme .node-template-card,
 .light-theme .node-tree-list--level,
@@ -5629,6 +5690,7 @@ textarea:focus {
 .light-theme .node-admin-block label,
 .light-theme .node-detail-settings summary,
 .light-theme .node-form .form-field label,
+.light-theme .node-template-field-label,
 .light-theme .node-content-editor-head label {
     color: #30405f;
 }

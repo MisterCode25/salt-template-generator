@@ -699,15 +699,6 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
             value: activeVariantTextValue
         });
     };
-    const hasAnyContent = channels.some((channel) =>
-        LANGUAGES.some((language) => (contentByChannel[channel]?.[language.field] || "").trim().length > 0)
-    );
-    const workflowSteps = [
-        { label: "Details", complete: title.trim().length > 0 },
-        { label: "Channels", complete: channels.length > 0 },
-        { label: "Content", complete: hasAnyContent }
-    ];
-
     return (
         <Modal
             onClose={onClose}
@@ -718,83 +709,44 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
                 <div className="popup-header">
                     <div>
                         <h2>{isEdit ? "Edit template" : "New template"}</h2>
-                        <p className="node-modal-subtitle">{parentTitle}</p>
                     </div>
                 </div>
-                <div className="node-form">
-                    <div className="node-template-workflow" aria-label="Template progress">
-                        {workflowSteps.map((step, index) => (
-                            <span
-                                key={step.label}
-                                className={`node-template-step${step.complete ? " is-complete" : ""}`}
-                            >
-                                <span>{index + 1}</span>
-                                {step.label}
-                            </span>
-                        ))}
+                <div className="node-form node-form--compact">
+                    <div className="node-template-setup">
+                        <div className="form-field node-template-title-field">
+                            <label>Title</label>
+                            <input
+                                autoFocus
+                                value={title}
+                                onChange={(event) => setTitle(event.target.value)}
+                                placeholder="Request OTO photo"
+                            />
+                        </div>
+                        <div className="node-template-channel-control">
+                            <span className="node-template-field-label">Channels</span>
+                            <div className="node-channel-options node-channel-options--compact">
+                                {CHANNEL_VALUES.map((channel) => {
+                                    const selected = channels.includes(channel);
+                                    return (
+                                        <button
+                                            key={channel}
+                                            type="button"
+                                            className={`node-channel-option${selected ? " is-selected" : ""}`}
+                                            onClick={() => toggleChannel(channel)}
+                                            aria-pressed={selected}
+                                            aria-label={`${CHANNEL_LABELS[channel]} - ${CHANNEL_DESCRIPTIONS[channel]}`}
+                                            title={CHANNEL_DESCRIPTIONS[channel]}
+                                        >
+                                            <span className="node-channel-check" aria-hidden="true">{selected ? "✓" : ""}</span>
+                                            <strong>{CHANNEL_LABELS[channel]}</strong>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
                     </div>
 
-                    <section className="node-template-section">
-                        <div className="node-template-section-head">
-                            <span className="node-template-section-index">1</span>
-                            <div>
-                                <h3>Template details</h3>
-                                <p>Name it like the operator will search for it.</p>
-                            </div>
-                        </div>
-                        <div className="node-template-detail-grid">
-                            <div className="form-field">
-                                <label>Title</label>
-                                <input
-                                    autoFocus
-                                    value={title}
-                                    onChange={(event) => setTitle(event.target.value)}
-                                    placeholder="Request OTO photo"
-                                />
-                            </div>
-                            <div className="node-form-parent node-template-section-card">
-                                <span className="client-info-label">Section</span>
-                                <strong>{parentTitle}</strong>
-                            </div>
-                        </div>
-                    </section>
-
-                    <section className="node-template-section">
-                        <div className="node-template-section-head">
-                            <span className="node-template-section-index">2</span>
-                            <div>
-                                <h3>Channels</h3>
-                                <p>Choose where this template can be used.</p>
-                            </div>
-                        </div>
-                        <div className="node-channel-options">
-                            {CHANNEL_VALUES.map((channel) => {
-                                const selected = channels.includes(channel);
-                                return (
-                                    <button
-                                        key={channel}
-                                        type="button"
-                                        className={`node-channel-option${selected ? " is-selected" : ""}`}
-                                        onClick={() => toggleChannel(channel)}
-                                        aria-pressed={selected}
-                                    >
-                                        <span className="node-channel-check" aria-hidden="true">{selected ? "✓" : ""}</span>
-                                        <strong>{CHANNEL_LABELS[channel]}</strong>
-                                        <small>{CHANNEL_DESCRIPTIONS[channel]}</small>
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </section>
-
-                    <section className="node-template-section node-template-section--content">
-                        <div className="node-template-section-head">
-                            <span className="node-template-section-index">3</span>
-                            <div>
-                                <h3>Content</h3>
-                                <p>Edit one channel and language at a time.</p>
-                            </div>
-                        </div>
+                    <section className="node-template-section node-template-section--content node-template-section--editor">
                         {selectedContentChannel ? (
                             <div className={`node-content-workbench${channels.length === 1 ? " is-single" : ""}`}>
                                 {channels.length > 1 && (
@@ -867,7 +819,6 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
                                         <div className="variant-editor-head">
                                             <div>
                                                 <label>Variants</label>
-                                                <p className="hint">Optional alternate versions for the selected channel.</p>
                                             </div>
                                             <button
                                                 type="button"
