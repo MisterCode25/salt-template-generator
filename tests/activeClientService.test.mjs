@@ -6,6 +6,7 @@ import {
   loadActiveClientPayload,
   migrateStoredClientInputValues,
   saveClientInputValue,
+  saveClientInputValues,
   saveActiveClientPayload
 } from "../src/services/activeClientService.js";
 
@@ -73,6 +74,24 @@ function createMemoryStorage(initial = {}) {
   assert.equal(localStorage.getItem("input_{so_number}"), null);
   assert.equal(localStorage.getItem("input_{so_ticket_num}"), "31436062");
   assert.equal(loadActiveClientPayload()[MANUAL_CLIENT_INPUTS_KEY].so_ticket_num, "31436062");
+}
+
+{
+  globalThis.localStorage = createMemoryStorage();
+  saveActiveClientPayload({ client: { firstName: "Peter" } });
+
+  const { inputTokens, values } = saveClientInputValues({
+    "{external_partner}": "EWB",
+    "{external_partner_ticket_number}": "ABC-123"
+  });
+
+  assert.deepEqual(inputTokens, ["{external_partner}", "{external_partner_ticket_number}"]);
+  assert.deepEqual(values, {
+    "{external_partner}": "EWB",
+    "{external_partner_ticket_number}": "ABC-123"
+  });
+  assert.equal(localStorage.getItem("input_{external_partner_ticket_number}"), "ABC-123");
+  assert.equal(loadActiveClientPayload()[MANUAL_CLIENT_INPUTS_KEY].external_partner_ticket_number, "ABC-123");
 }
 
 {

@@ -1,3 +1,5 @@
+import { SO_TICKET_NUM_TOKEN, SO_TICKET_TOKEN_KEY } from "./tokenCanonicalization.js";
+
 export const EXTERNAL_GENERATOR_PARTNERS = [
     "ALO", "AMB", "ANI", "COMNET", "DANET", "DEK", "DWW", "EBS", "ENERCOM", "ENIWA", "ESAG", "ESI", "EVAL", "EVB", "EVK",
     "EVM", "EWB", "EWBU", "EWG", "EWH", "EWL", "EWLA", "EWM", "EWMAI", "EWME", "EWR", "EWS", "EWW", "EWZ", "FLMS", "FTTH-FR",
@@ -42,6 +44,33 @@ export const EXTERNAL_DEFAULT_FIELDS = {
     comment: ""
 };
 
+export const EXTERNAL_SYSTEM_TOKEN_FIELDS = Object.freeze([
+    { field: "flagging", token: "{external_flagging}", label: "External ID flagging" },
+    { field: "data", token: "{external_date}", label: "External ID date", input_type: "date" },
+    { field: "customer", token: "{external_customer}", label: "External ID customer" },
+    { field: "soTicket", token: SO_TICKET_NUM_TOKEN, label: "SO ticket number", key: SO_TICKET_TOKEN_KEY },
+    { field: "SignalStatus", token: "{external_signal_status}", label: "External ID signal status" },
+    { field: "LedStatus", token: "{external_led_status}", label: "External ID LED status" },
+    { field: "treatmentStep", token: "{external_treatment_step}", label: "External ID treatment step" },
+    { field: "boxType", token: "{external_box_type}", label: "External ID box type" },
+    { field: "partner", token: "{external_partner}", label: "External ID partner" },
+    { field: "partnerTicketNumber", token: "{external_partner_ticket_number}", label: "External ID partner ticket number" },
+    { field: "lexId", token: "{external_lex_id}", label: "External ID LEX ID" },
+    { field: "oltName", token: "{external_olt_name}", label: "External ID OLT name" },
+    { field: "oltBoard", token: "{external_olt_board}", label: "External ID OLT board" },
+    { field: "bokBof", token: "{external_bok_bof}", label: "External ID BOK/BOF" }
+]);
+
+export const EXTERNAL_SYSTEM_TOKENS = Object.freeze(EXTERNAL_SYSTEM_TOKEN_FIELDS.map((field) => ({
+    id: `system:external:${field.field}`,
+    token: field.token,
+    key: field.key || field.field,
+    label: field.label,
+    input_type: field.input_type || "text",
+    display_mode: "on_demand",
+    system: true
+})));
+
 function normalizeSegment(value) {
     const trimmed = String(value ?? "").trim();
     return trimmed === "" ? " " : trimmed;
@@ -65,6 +94,22 @@ export function buildExternalCode(fields) {
     return EXTERNAL_FIELD_ORDER
         .map((field) => normalizeSegment(valuesByField[field]))
         .join("//");
+}
+
+function formatTokenFieldValue(field, value) {
+    if (field === "data" && value) {
+        return String(value).split("-").reverse().join(".");
+    }
+    return value === null || value === undefined ? "" : String(value);
+}
+
+export function buildExternalTokenValues(fields = {}) {
+    return Object.fromEntries(
+        EXTERNAL_SYSTEM_TOKEN_FIELDS.map(({ field, token }) => [
+            token,
+            formatTokenFieldValue(field, fields[field])
+        ])
+    );
 }
 
 export function parseExternalId(externalId) {

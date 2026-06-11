@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { generateFinalText, getTemplateTextByLang } from "../core/tokenEngine.js";
 import {
+    CLIENT_INPUT_VALUES_UPDATED_EVENT,
     clearActiveClientPayload,
     clearStoredInputValues,
     loadActiveClientPayload,
@@ -416,7 +417,14 @@ export function useTemplateRuntime() {
         const handleAgentProfileUpdated = (event) => {
             applyAgentProfile(event.detail?.profile);
         };
+        const handleClientInputValuesUpdated = (event) => {
+            const nextValues = event.detail?.values;
+            if (!nextValues || typeof nextValues !== "object") return;
+            setValues((prev) => ({ ...prev, ...nextValues }));
+            inputChangeVersion.current++;
+        };
         window.addEventListener(AGENT_PROFILE_UPDATED_EVENT, handleAgentProfileUpdated);
+        window.addEventListener(CLIENT_INPUT_VALUES_UPDATED_EVENT, handleClientInputValuesUpdated);
 
         const storedClient = loadActiveClientPayload();
         if (storedClient) {
@@ -425,6 +433,7 @@ export function useTemplateRuntime() {
         }
         return () => {
             window.removeEventListener(AGENT_PROFILE_UPDATED_EVENT, handleAgentProfileUpdated);
+            window.removeEventListener(CLIENT_INPUT_VALUES_UPDATED_EVENT, handleClientInputValuesUpdated);
         };
     }, []);
 

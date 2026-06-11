@@ -6,11 +6,13 @@ import {
     canonicalizeTokenDefinitions
 } from "../utils/tokenCanonicalization.js";
 import { AGENT_PROFILE_TOKENS } from "./agentProfileService.js";
+import { EXTERNAL_SYSTEM_TOKENS } from "../utils/externalGenerator.js";
 
 const TOKEN_PATH = "tokens";
 const TOKEN_PATTERN = /\{[^{}]+\}/g;
 const INTERNAL_TOKEN_PREFIX_PATTERN = /^\{(?:client|contact|healthcheck)_/i;
-const SYSTEM_TOKEN_SET = new Set(AGENT_PROFILE_TOKENS.map((tokenDef) => tokenDef.token));
+const SYSTEM_TOKENS = [...AGENT_PROFILE_TOKENS, ...EXTERNAL_SYSTEM_TOKENS];
+const SYSTEM_TOKEN_SET = new Set(SYSTEM_TOKENS.map((tokenDef) => tokenDef.token));
 
 function isSystemToken(tokenDef) {
     return SYSTEM_TOKEN_SET.has(tokenDef?.token);
@@ -33,7 +35,7 @@ export async function loadTokens() {
     if (JSON.stringify(normalized) !== JSON.stringify(storedTokens)) {
         await saveTokens(normalized);
     }
-    return canonicalizeTokenDefinitions([...AGENT_PROFILE_TOKENS, ...normalized]);
+    return canonicalizeTokenDefinitions([...SYSTEM_TOKENS, ...normalized]);
 }
 
 export async function saveTokens(tokens) {

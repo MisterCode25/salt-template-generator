@@ -7,6 +7,7 @@ import {
 const ACTIVE_CLIENT_KEY = "active_client_payload";
 export const STORED_INPUT_PREFIX = "input_";
 export const MANUAL_CLIENT_INPUTS_KEY = "__templateInputs";
+export const CLIENT_INPUT_VALUES_UPDATED_EVENT = "client-input-values-updated";
 
 function normalizeManualInputs(manualInputs) {
     if (!manualInputs || typeof manualInputs !== "object" || Array.isArray(manualInputs)) {
@@ -72,39 +73,77 @@ export function migrateStoredClientInputValues(storage = globalThis.localStorage
     return migrated;
 }
 
-export function saveClientInputValue(tokenDef, value, storage = globalThis.localStorage) {
+function dispatchClientInputValuesUpdated(values) {
+    if (typeof window === "undefined" || !values || Object.keys(values).length === 0) return;
+    window.dispatchEvent(new CustomEvent(CLIENT_INPUT_VALUES_UPDATED_EVENT, {
+        detail: { values }
+    }));
+}
+
+function normalizeClientInputEntry(tokenDef, value) {
     const definition = canonicalizeTokenDefinition(typeof tokenDef === "string" ? { token: tokenDef } : tokenDef || {});
     const valueText = value === null || value === undefined ? "" : String(value);
-    const inputTokens = new Set();
     const canonicalToken = canonicalizeInputTokenValue(definition.token);
     const canonicalName = normalizeTokenName(canonicalToken);
-    if (canonicalToken) inputTokens.add(canonicalToken);
+
+    if (!canonicalToken) return null;
+    return { token: canonicalToken, name: canonicalName, value: valueText };
+}
+
+function saveClientInputEntries(entries, storage = globalThis.localStorage) {
+    const normalizedEntries = entries
+        .map(({ tokenDef, value }) => normalizeClientInputEntry(tokenDef, value))
+        .filter(Boolean);
+    const valuesByToken = {};
+
+    normalizedEntries.forEach((entry) => {
+        valuesByToken[entry.token] = entry.value;
+    });
 
     if (storage) {
-        inputTokens.forEach((token) => storage.setItem(`${STORED_INPUT_PREFIX}${token}`, valueText));
+        Object.entries(valuesByToken).forEach(([token, value]) => {
+            storage.setItem(`${STORED_INPUT_PREFIX}${token}`, value);
+        });
     }
 
     const payload = loadActiveClientPayload();
     if (!payload) {
-        return { inputTokens: Array.from(inputTokens), payload: null };
+        dispatchClientInputValuesUpdated(valuesByToken);
+        return { inputTokens: Object.keys(valuesByToken), payload: null, values: valuesByToken };
     }
 
     const previousInputs = payload[MANUAL_CLIENT_INPUTS_KEY];
     const { manualInputs } = normalizeManualInputs(previousInputs);
-    if (canonicalName) {
-        if (valueText === "") {
-            delete manualInputs[canonicalName];
+    normalizedEntries.forEach((entry) => {
+        if (!entry.name) return;
+        if (entry.value === "") {
+            delete manualInputs[entry.name];
         } else {
-            manualInputs[canonicalName] = valueText;
+            manualInputs[entry.name] = entry.value;
         }
-    }
+    });
 
     const nextPayload = {
         ...payload,
         [MANUAL_CLIENT_INPUTS_KEY]: manualInputs
     };
     saveActiveClientPayload(nextPayload);
-    return { inputTokens: Array.from(inputTokens), payload: nextPayload };
+    dispatchClientInputValuesUpdated(valuesByToken);
+    return { inputTokens: Object.keys(valuesByToken), payload: nextPayload, values: valuesByToken };
+}
+
+export function saveClientInputValue(tokenDef, value, storage = globalThis.localStorage) {
+    return saveClientInputEntries([{ tokenDef, value }], storage);
+}
+
+export function saveClientInputValues(valuesByToken = {}, storage = globalThis.localStorage) {
+    return saveClientInputEntries(
+        Object.entries(valuesByToken).map(([token, value]) => ({
+            tokenDef: { token },
+            value
+        })),
+        storage
+    );
 }
 
 export function loadActiveClientPayload() {

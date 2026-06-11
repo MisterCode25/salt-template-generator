@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Modal from "../components/Modal.jsx";
 import { copyText, showToast } from "../services/clipboardService.js";
-import { loadActiveClientPayload } from "../services/activeClientService.js";
+import { loadActiveClientPayload, saveClientInputValues } from "../services/activeClientService.js";
 import { loadTokens, saveTokens } from "../services/tokenService.js";
 import { SO_TICKET_NUM_TOKEN, SO_TICKET_TOKEN_KEY } from "../utils/tokenCanonicalization.js";
 import {
@@ -10,6 +10,7 @@ import {
     EXTERNAL_GENERATOR_PARTNERS,
     buildExternalFieldsFromClientPayload,
     buildExternalCode,
+    buildExternalTokenValues,
     formatDateForInput,
     mergeExternalFields,
     parseExternalId
@@ -257,6 +258,7 @@ export default function ExternalGenerator({ embedded = false, onClose, clientPay
     const externalIdFieldRef = useRef(null);
     const fieldsRef = useRef(fields);
     const appliedClientSignatureRef = useRef("");
+    const externalTokenSyncReadyRef = useRef(false);
 
     useEffect(() => {
         const tick = () => {
@@ -309,6 +311,10 @@ export default function ExternalGenerator({ embedded = false, onClose, clientPay
         setFields((prev) => mergeExternalFields(prev, patch));
     };
 
+    const syncExternalTokenValues = (nextFields) => {
+        saveClientInputValues(buildExternalTokenValues(nextFields));
+    };
+
     // Auto-fill soTicket from the canonical token linked via key === SO_TICKET_TOKEN_KEY.
     useEffect(() => {
         (async () => {
@@ -331,11 +337,19 @@ export default function ExternalGenerator({ embedded = false, onClose, clientPay
             }
 
             const stored = localStorage.getItem("input_" + SO_TICKET_NUM_TOKEN);
+            externalTokenSyncReadyRef.current = true;
             if (stored !== null && stored.trim() !== "") {
                 setFields(prev => ({ ...prev, soTicket: stored.trim() }));
+            } else {
+                syncExternalTokenValues(fieldsRef.current);
             }
         })();
     }, []); // runs once on mount — ExternalGenerator unmounts on close so re-opens always re-read
+
+    useEffect(() => {
+        if (!externalTokenSyncReadyRef.current) return;
+        syncExternalTokenValues(fields);
+    }, [fields]);
 
     const askInput = (title, placeholder = "", initialValue = "", extra = {}) => {
         return new Promise((resolve) => {

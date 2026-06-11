@@ -1,10 +1,33 @@
 import assert from "node:assert/strict";
 import {
+    EXTERNAL_SYSTEM_TOKENS,
     buildExternalFieldsFromClientPayload,
     buildExternalCode,
+    buildExternalTokenValues,
     parseExternalId,
     parseVtiClipboard
 } from "../src/utils/externalGenerator.js";
+
+{
+    const partnerTicketToken = EXTERNAL_SYSTEM_TOKENS.find((tokenDef) => tokenDef.token === "{external_partner_ticket_number}");
+    assert.ok(partnerTicketToken);
+    assert.equal(partnerTicketToken.system, true);
+    assert.equal(partnerTicketToken.key, "partnerTicketNumber");
+    assert.equal(EXTERNAL_SYSTEM_TOKENS.some((tokenDef) => tokenDef.token === "{external_comment}"), false);
+
+    const values = buildExternalTokenValues({
+        data: "2026-02-26",
+        soTicket: "SO1",
+        partner: "EWB",
+        partnerTicketNumber: "ABC",
+        comment: "do not expose"
+    });
+    assert.equal(values["{external_date}"], "26.02.2026");
+    assert.equal(values["{so_ticket_num}"], "SO1");
+    assert.equal(values["{external_partner}"], "EWB");
+    assert.equal(values["{external_partner_ticket_number}"], "ABC");
+    assert.equal(values["{external_comment}"], undefined);
+}
 
 {
     const code = buildExternalCode({
