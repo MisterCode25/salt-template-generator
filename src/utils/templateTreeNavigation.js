@@ -8,10 +8,13 @@ function normalizeNeedle(value) {
 }
 
 function buildSearchText(values = []) {
-    return values
-        .map(normalizeNeedle)
-        .filter(Boolean)
-        .join(" ");
+    let text = "";
+    values.forEach((value) => {
+        const normalized = normalizeNeedle(value);
+        if (!normalized) return;
+        text = text ? `${text} ${normalized}` : normalized;
+    });
+    return text;
 }
 
 export function getNodePath(nodes = [], nodeId) {
