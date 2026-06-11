@@ -465,7 +465,34 @@ function NodeFormModal({ mode, initial, parentTitle, onClose, onSave }) {
     );
 }
 
-function ExistingTemplatePickerModal({ currentNodeId, allTemplates, nodeLookup, onClose, onLink }) {
+const ExistingTemplatePickerRow = memo(function ExistingTemplatePickerRow({
+    template,
+    nodeNames,
+    onLink
+}) {
+    const handleLink = useCallback(() => {
+        onLink(template.id);
+    }, [onLink, template.id]);
+
+    return (
+        <div className="node-picker-row">
+            <div className="node-picker-copy">
+                <strong>{template.title || "Untitled template"}</strong>
+                {nodeNames && <span className="node-picker-nodes">In: {nodeNames}</span>}
+                <div className="node-channel-pills">
+                    {template.channels.map((channel) => (
+                        <span key={channel} className="variant-pill">{CHANNEL_LABELS[channel] || channel}</span>
+                    ))}
+                </div>
+            </div>
+            <button type="button" className="primary-btn" onClick={handleLink}>
+                Link
+            </button>
+        </div>
+    );
+});
+
+const ExistingTemplatePickerModal = memo(function ExistingTemplatePickerModal({ currentNodeId, allTemplates, nodeLookup, onClose, onLink }) {
     const [query, setQuery] = useState("");
     const deferredQuery = useDeferredValue(query);
     const normalizedQuery = useMemo(
@@ -522,31 +549,21 @@ function ExistingTemplatePickerModal({ currentNodeId, allTemplates, nodeLookup, 
                                     : "No matching templates."}
                             </p>
                         ) : (
-                            filteredRows.map(({ template, nodeNames }) => {
-                                return (
-                                    <div key={template.id} className="node-picker-row">
-                                        <div className="node-picker-copy">
-                                            <strong>{template.title || "Untitled template"}</strong>
-                                            {nodeNames && <span className="node-picker-nodes">In: {nodeNames}</span>}
-                                            <div className="node-channel-pills">
-                                                {template.channels.map((channel) => (
-                                                    <span key={channel} className="variant-pill">{CHANNEL_LABELS[channel] || channel}</span>
-                                                ))}
-                                            </div>
-                                        </div>
-                                        <button type="button" className="primary-btn" onClick={() => onLink(template.id)}>
-                                            Link
-                                        </button>
-                                    </div>
-                                );
-                            })
+                            filteredRows.map(({ template, nodeNames }) => (
+                                <ExistingTemplatePickerRow
+                                    key={template.id}
+                                    template={template}
+                                    nodeNames={nodeNames}
+                                    onLink={onLink}
+                                />
+                            ))
                         )}
                     </div>
                 </div>
             </div>
         </Modal>
     );
-}
+});
 
 function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
     const isEdit = Boolean(initial);
@@ -1388,7 +1405,7 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
         setTemplateModal({ mode: "create", parentNodeId: nodeId });
     };
 
-    const linkTemplateToCurrentNode = async (templateId) => {
+    const linkTemplateToCurrentNode = useCallback(async (templateId) => {
         if (!existingPickerModal?.nodeId) return;
         try {
             const nextTemplates = linkTemplateToNode(templates, templateId, existingPickerModal.nodeId, nodes);
@@ -1399,7 +1416,7 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
             console.error(error);
             showToast("Template cannot be linked there", "error");
         }
-    };
+    }, [existingPickerModal?.nodeId, nodes, persist, templates]);
 
     const linkTemplate = useCallback(async (templateId, targetNodeId) => {
         if (!targetNodeId) return;
