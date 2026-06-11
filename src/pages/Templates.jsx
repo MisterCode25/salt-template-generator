@@ -653,6 +653,14 @@ export default function Templates() {
         setQuery("");
     };
 
+    const closeTemplateWorkflow = () => {
+        setActiveTemplateId(null);
+        runtime.setVariantPicker(null);
+        runtime.setTokenPrompt(null);
+        runtime.setPromptMissingTokens([]);
+        runtime.setCopyPreview(null);
+    };
+
     const openExternalGenerator = () => {
         setExternalGeneratorClosing(false);
         setExternalGeneratorOpen(true);
@@ -888,7 +896,7 @@ export default function Templates() {
                         runtime.tokens,
                         runtime.values
                     )}
-                    onClose={() => runtime.setVariantPicker(null)}
+                    onClose={closeTemplateWorkflow}
                     onSelect={(variant) => {
                         const picker = runtime.variantPicker;
                         const baseKey = picker.sectionKey || `variant_${picker.model.id}`;
@@ -926,8 +934,7 @@ export default function Templates() {
                     onConfirm={runtime.confirmTokenPrompt}
                     onClose={() => {
                         const defs = runtime.tokenPrompt?.tokenDefs ?? [];
-                        runtime.setPromptMissingTokens([]);
-                        runtime.setTokenPrompt(null);
+                        closeTemplateWorkflow();
                         runtime.clearOnDemandValues(defs);
                     }}
                 />
@@ -937,7 +944,7 @@ export default function Templates() {
                 <TemplateResultModal
                     result={runtime.copyPreview}
                     onCopy={runtime.copyTemplateResultAgain}
-                    onClose={() => runtime.setCopyPreview(null)}
+                    onClose={closeTemplateWorkflow}
                 />
             )}
 
