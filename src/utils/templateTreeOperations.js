@@ -18,9 +18,12 @@ function sortByTitle(a, b) {
 
 export function getChildNodes(nodes = [], parentId = null) {
     const normalizedParentId = normalizeParentId(parentId);
-    return nodes
-        .filter((node) => normalizeParentId(node.parentId) === normalizedParentId)
-        .sort(sortByOrderThenTitle);
+    const children = [];
+    for (const node of nodes) {
+        if (normalizeParentId(node.parentId) === normalizedParentId) children.push(node);
+    }
+    children.sort(sortByOrderThenTitle);
+    return children;
 }
 
 export function buildNodeLookup(nodes = []) {
@@ -55,10 +58,11 @@ export function getIndexedChildNodes(childrenByParent, parentId = null) {
     return childrenByParent?.get(normalizeParentId(parentId)) || [];
 }
 
-export function getNextNodeOrder(nodes = [], parentId = null) {
+export function getNextNodeOrder(nodes = [], parentId = null, excludedNodeId = null) {
     const normalizedParentId = normalizeParentId(parentId);
     let maxOrder = 0;
     for (const node of nodes) {
+        if (node.id === excludedNodeId) continue;
         if (normalizeParentId(node.parentId) !== normalizedParentId) continue;
         if ((node.order || 0) > maxOrder) maxOrder = node.order || 0;
     }
@@ -98,8 +102,15 @@ export function getDescendantNodeIds(nodes = [], nodeId) {
 export function canMoveNode(nodes = [], nodeId, parentId = null) {
     const normalizedParentId = normalizeParentId(parentId);
     if (!nodeId || nodeId === normalizedParentId) return false;
-    if (normalizedParentId && !nodes.some((node) => node.id === normalizedParentId)) return false;
+    if (normalizedParentId && !nodeExists(nodes, normalizedParentId)) return false;
     return !getDescendantNodeIdSet(nodes, nodeId).has(normalizedParentId);
+}
+
+function nodeExists(nodes = [], nodeId) {
+    for (const node of nodes) {
+        if (node.id === nodeId) return true;
+    }
+    return false;
 }
 
 export function createNodeForParent(nodes = [], parentId = null, fields = {}, templates = []) {
@@ -128,7 +139,7 @@ export function moveNode(nodes = [], nodeId, parentId = null) {
         throw new Error("Invalid node move");
     }
 
-    const nextOrder = getNextNodeOrder(nodes.filter((node) => node.id !== nodeId), normalizedParentId);
+    const nextOrder = getNextNodeOrder(nodes, normalizedParentId, nodeId);
     return nodes.map((node) => (
         node.id === nodeId
             ? normalizeNode({ ...node, parentId: normalizedParentId, order: nextOrder })
@@ -150,7 +161,10 @@ export function reorderNode(nodes = [], nodeId, direction) {
     const reordered = [...siblings];
     const [moved] = reordered.splice(currentIndex, 1);
     reordered.splice(targetIndex, 0, moved);
-    const orderById = new Map(reordered.map((candidate, index) => [candidate.id, index + 1]));
+    const orderById = new Map();
+    for (let index = 0; index < reordered.length; index++) {
+        orderById.set(reordered[index].id, index + 1);
+    }
 
     return nodes.map((candidate) => (
         orderById.has(candidate.id)
@@ -162,46 +176,67 @@ export function reorderNode(nodes = [], nodeId, direction) {
 export function removeNodeCascade(nodes = [], templates = [], nodeId) {
     const removedNodeIds = getDescendantNodeIdSet(nodes, nodeId);
     removedNodeIds.add(nodeId);
-    const nextTemplates = templates
-        .map((template) => {
-            const currentNodeIds = template.nodeIds || [];
-            const nextNodeIds = currentNodeIds.filter((id) => !removedNodeIds.has(id));
-            if (nextNodeIds.length === currentNodeIds.length) return template;
-            return normalizeTemplate({ ...template, nodeIds: nextNodeIds });
-        })
-        .filter((template) => Array.isArray(template.nodeIds) && template.nodeIds.length > 0);
+    const nextTemplates = [];
+    for (const template of templates) {
+        const currentNodeIds = template.nodeIds || [];
+        const nextNodeIds = [];
+        for (const id of currentNodeIds) {
+            if (!removedNodeIds.has(id)) nextNodeIds.push(id);
+        }
+        if (nextNodeIds.length === 0) continue;
+        nextTemplates.push(nextNodeIds.length === currentNodeIds.length
+            ? template
+            : normalizeTemplate({ ...template, nodeIds: nextNodeIds }));
+    }
+
+    const nextNodes = [];
+    for (const node of nodes) {
+        if (!removedNodeIds.has(node.id)) nextNodes.push(node);
+    }
+
     return {
-        nodes: nodes.filter((node) => !removedNodeIds.has(node.id)),
+        nodes: nextNodes,
         templates: nextTemplates
     };
 }
 
 export function nodeHasChildren(nodes = [], nodeId) {
-    return nodes.some((node) => normalizeParentId(node.parentId) === nodeId);
+    for (const node of nodes) {
+        if (normalizeParentId(node.parentId) === nodeId) return true;
+    }
+    return false;
 }
 
 export function nodeHasTemplates(templates = [], nodeId) {
-    return templates.some((template) => Array.isArray(template.nodeIds) && template.nodeIds.includes(nodeId));
+    for (const template of templates) {
+        if (templateHasNode(template, nodeId)) return true;
+    }
+    return false;
 }
 
 export function getTemplatesForNode(templates = [], nodeId) {
-    return templates
-        .filter((template) => Array.isArray(template.nodeIds) && template.nodeIds.includes(nodeId))
-        .map(normalizeTemplate)
-        .sort(sortByTitle);
+    const nodeTemplates = [];
+    for (const template of templates) {
+        if (templateHasNode(template, nodeId)) nodeTemplates.push(normalizeTemplate(template));
+    }
+    nodeTemplates.sort(sortByTitle);
+    return nodeTemplates;
 }
 
 export function buildTemplateNodeIndex(templates = []) {
     const templatesByNode = new Map();
 
-    templates.forEach((template) => {
+    for (const template of templates) {
         const normalizedTemplate = normalizeTemplate(template);
-        normalizedTemplate.nodeIds.forEach((nodeId) => {
-            const nodeTemplates = templatesByNode.get(nodeId) || [];
+        for (const nodeId of normalizedTemplate.nodeIds) {
+            let nodeTemplates = templatesByNode.get(nodeId);
+            if (!nodeTemplates) {
+                nodeTemplates = [];
+                templatesByNode.set(nodeId, nodeTemplates);
+            }
             nodeTemplates.push(normalizedTemplate);
-            templatesByNode.set(nodeId, nodeTemplates);
-        });
-    });
+        }
+    }
 
     templatesByNode.forEach((nodeTemplates) => {
         nodeTemplates.sort(sortByTitle);
@@ -233,19 +268,19 @@ export function updateTemplate(templates = [], templateId, fields = {}) {
 }
 
 export function moveTemplateToNode(templates = [], templateId, targetNodeId, nodes = []) {
-    if (!nodes.some((node) => node.id === targetNodeId)) {
+    if (!nodeExists(nodes, targetNodeId)) {
         throw new Error("Template target node does not exist");
     }
 
     return templates.map((template) => (
         template.id === templateId
-            ? normalizeTemplate({ ...template, nodeIds: [targetNodeId, ...(template.nodeIds || []).filter((id) => id !== template.nodeIds[0])] })
+            ? normalizeTemplate({ ...template, nodeIds: movePrimaryNodeId(template.nodeIds || [], targetNodeId) })
             : template
     ));
 }
 
 export function linkTemplateToNode(templates = [], templateId, nodeId, nodes = []) {
-    if (!nodes.some((node) => node.id === nodeId)) {
+    if (!nodeExists(nodes, nodeId)) {
         throw new Error("Template target node does not exist");
     }
     if (nodeHasChildren(nodes, nodeId)) {
@@ -254,7 +289,7 @@ export function linkTemplateToNode(templates = [], templateId, nodeId, nodes = [
 
     return templates.map((template) => (
         template.id === templateId
-            ? normalizeTemplate({ ...template, nodeIds: [...new Set([...(template.nodeIds || []), nodeId])] })
+            ? normalizeTemplate({ ...template, nodeIds: appendUniqueNodeId(template.nodeIds || [], nodeId) })
             : template
     ));
 }
@@ -262,9 +297,45 @@ export function linkTemplateToNode(templates = [], templateId, nodeId, nodes = [
 export function unlinkTemplateFromNode(templates = [], templateId, nodeId) {
     return templates.map((template) => (
         template.id === templateId
-            ? normalizeTemplate({ ...template, nodeIds: (template.nodeIds || []).filter((id) => id !== nodeId) })
+            ? normalizeTemplate({ ...template, nodeIds: removeNodeId(template.nodeIds || [], nodeId) })
             : template
     ));
+}
+
+function templateHasNode(template, nodeId) {
+    if (!Array.isArray(template.nodeIds)) return false;
+    for (const id of template.nodeIds) {
+        if (id === nodeId) return true;
+    }
+    return false;
+}
+
+function movePrimaryNodeId(nodeIds = [], targetNodeId) {
+    const nextNodeIds = [targetNodeId];
+    const previousPrimaryNodeId = nodeIds[0];
+    for (const id of nodeIds) {
+        if (id !== previousPrimaryNodeId) nextNodeIds.push(id);
+    }
+    return nextNodeIds;
+}
+
+function appendUniqueNodeId(nodeIds = [], nodeId) {
+    const nextNodeIds = [];
+    let hasNode = false;
+    for (const id of nodeIds) {
+        if (id === nodeId) hasNode = true;
+        nextNodeIds.push(id);
+    }
+    if (!hasNode) nextNodeIds.push(nodeId);
+    return nextNodeIds;
+}
+
+function removeNodeId(nodeIds = [], nodeId) {
+    const nextNodeIds = [];
+    for (const id of nodeIds) {
+        if (id !== nodeId) nextNodeIds.push(id);
+    }
+    return nextNodeIds;
 }
 
 export function duplicateTemplate(templates = [], templateId) {
@@ -272,19 +343,24 @@ export function duplicateTemplate(templates = [], templateId) {
     if (!template) return templates.map(normalizeTemplate);
 
     const title = `${template.title || "Untitled template"} copy`;
-    const contentByChannel = Object.fromEntries(
-        Object.entries(template.contentByChannel || {}).map(([channel, content]) => [
-            channel,
-            {
-                ...content,
-                id: undefined,
-                title,
-                variants: Array.isArray(content.variants)
-                    ? content.variants.map((variant) => ({ ...variant, id: undefined }))
-                    : []
+    const contentByChannel = {};
+    const sourceContentByChannel = template.contentByChannel || {};
+    for (const channel in sourceContentByChannel) {
+        if (!Object.prototype.hasOwnProperty.call(sourceContentByChannel, channel)) continue;
+        const content = sourceContentByChannel[channel];
+        const variants = [];
+        if (Array.isArray(content.variants)) {
+            for (const variant of content.variants) {
+                variants.push({ ...variant, id: undefined });
             }
-        ])
-    );
+        }
+        contentByChannel[channel] = {
+            ...content,
+            id: undefined,
+            title,
+            variants
+        };
+    }
 
     const copy = createTemplate({
         nodeIds: template.nodeIds || [],
