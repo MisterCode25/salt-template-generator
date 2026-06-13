@@ -121,7 +121,169 @@ export function formatAloAutofillPayload(clientPayload = {}, agentProfile = {}, 
     return JSON.stringify(buildAloAutofillPayload(clientPayload, agentProfile, superOfficePayload), null, 2);
 }
 
+function aloAutofillBookmarkletRunner(expectedSource) {
+    function text(value) {
+        if (value === null || value === undefined) return "";
+        return String(value).trim();
+    }
+
+    function first(values) {
+        for (var i = 0; i < values.length; i += 1) {
+            var value = text(values[i]);
+            if (value) return value;
+        }
+        return "";
+    }
+
+    function escapeHtml(value) {
+        return text(value).replace(/[&<>"']/g, function replaceHtmlChar(char) {
+            return {
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                "\"": "&quot;",
+                "'": "&#39;"
+            }[char];
+        });
+    }
+
+    function show(title, detail, kind) {
+        var existing = document.getElementById("saltAloFillOverlay");
+        if (existing) existing.remove();
+
+        var box = document.createElement("div");
+        box.id = "saltAloFillOverlay";
+        box.style.cssText = "position:fixed;z-index:2147483647;right:18px;top:18px;max-width:360px;background:"
+            + (kind === "error" ? "#7f1d1d" : "#111827")
+            + ";color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:12px;padding:14px 16px;font:13px Arial,sans-serif;line-height:1.35;box-shadow:0 16px 40px rgba(0,0,0,.35)";
+        box.innerHTML = "<strong style='display:block;margin-bottom:4px;font-size:14px'>"
+            + escapeHtml(title)
+            + "</strong><span style='color:#d8d8df'>"
+            + escapeHtml(detail)
+            + "</span>";
+        document.body.appendChild(box);
+
+        if (kind !== "error") {
+            setTimeout(function removeOverlay() {
+                try {
+                    box.remove();
+                } catch {
+                    // The page may already have navigated.
+                }
+            }, 4500);
+        }
+    }
+
+    function field(payload, name, fallbacks) {
+        var fields = (payload && payload.fields) || {};
+        return first([fields[name]].concat(fallbacks || []));
+    }
+
+    function byAttribute(name, value) {
+        var safe = String(value).replace(/["\\]/g, "\\$&");
+        return document.querySelector("[" + name + "=\"" + safe + "\"]");
+    }
+
+    function findField(id) {
+        return document.getElementById(id)
+            || byAttribute("name", id)
+            || byAttribute("formcontrolname", id)
+            || byAttribute("data-testid", id);
+    }
+
+    function setVal(id, value, allowEmpty) {
+        var normalized = allowEmpty ? String(value === null || value === undefined ? "" : value) : text(value);
+        if (!allowEmpty && !normalized) return false;
+
+        var el = findField(id);
+        if (!el) return false;
+
+        if ("value" in el) {
+            el.value = normalized;
+        } else {
+            el.textContent = normalized;
+        }
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+        el.dispatchEvent(new Event("change", { bubbles: true }));
+        return true;
+    }
+
+    function run(payload) {
+        if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+            show("ALO fill", "ALO fill data invalid.", "error");
+            return;
+        }
+        if (payload.source && payload.source !== expectedSource) {
+            show("ALO fill", "Clipboard does not contain ALO fill data from Salt Templater.", "error");
+            return;
+        }
+
+        var client = payload.client || {};
+        var technical = payload.technical || payload.healthcheck || {};
+        var agent = payload.agent || {};
+        var superOffice = payload.superOffice || {};
+        var tokenValues = superOffice.tokenValues || payload.tokenValues || {};
+        var count = 0;
+
+        function apply(id, value, allowEmpty) {
+            if (setVal(id, value, allowEmpty)) count += 1;
+        }
+
+        apply("ticket.extRef", field(payload, "externalReference", [superOffice.sourceTicketId, superOffice.ticketId, payload.ticketId, tokenValues["{so_ticket_num}"]]));
+        apply("ticket.socketId", field(payload, "socketId", [technical.socketId, technical.otoId, technical.oto_id, technical.oto]));
+        apply("ticket.plugNr", field(payload, "plugNr", [technical.plugNr, technical.otoPortId, technical.otoPort, technical.oto_port]));
+        apply("ticket.breakoutCable", field(payload, "breakoutCable", [technical.breakoutCable, technical.breakoutCableId, technical.cable]));
+        apply("ticket.breakoutFiber", field(payload, "breakoutFiber", [technical.breakoutFiber, technical.fiberNumber, technical.fiber, technical.fibre]));
+        apply("ticket.otoAddress.firstName", field(payload, "firstName", [client.firstName, client.firstname, client.givenName]));
+        apply("ticket.otoAddress.lastName", field(payload, "lastName", [client.lastName, client.lastname, client.surname, client.familyName]));
+        apply("ticket.contactPersonFirstName", field(payload, "firstName", [client.firstName, client.firstname, client.givenName]));
+        apply("ticket.contactPersonLastName", field(payload, "lastName", [client.lastName, client.lastname, client.surname, client.familyName]));
+        apply("ticket.contactPersonPhone1", field(payload, "contactPhone1", [client.contactPhone1, client.fixedNumber, client.mobileRaw, client.mobile, client.phone]));
+        apply("ticket.contactPersonPhone2", field(payload, "contactPhone2", [client.contactPhone2]));
+        apply("ticket.contactPersonMail", field(payload, "contactEmail", [client.email, client.mail]));
+        apply("ticket.contactPersonIspFirstName", field(payload, "ispFirstName", [agent.firstName]));
+        apply("ticket.contactPersonIspLastName", field(payload, "ispLastName", [agent.lastName]));
+        apply("ticket.contactPersonIspPhone", field(payload, "ispPhone", [agent.phoneNumber, agent.phone]));
+        apply("ticket.contactPersonIspMail", field(payload, "ispEmail", [agent.email]));
+        apply("ticket.problemDescription", field(payload, "problemDescription", ["No signal"]));
+        apply("ticket.problemNotes", field(payload, "problemNotes", [""]), true);
+        apply("ticket.problemCode1", field(payload, "problemCode1", ["400"]));
+        apply("ticket.problemCode2", field(payload, "problemCode2", ["800"]));
+        apply("ticket.problemCode3", field(payload, "problemCode3", ["900"]));
+
+        if (!count) {
+            show("ALO fill", "No ALO form fields were found on this page. Open the ALO ticket form, then click the shortcut again.", "error");
+            return;
+        }
+        show("ALO fill", "Fields populated: " + count, "success");
+    }
+
+    show("ALO fill", "Reading copied ALO data...", "info");
+    if (!navigator.clipboard || !navigator.clipboard.readText) {
+        show("ALO fill", "Clipboard API not available on this page.", "error");
+        return;
+    }
+
+    navigator.clipboard.readText().then(function handleClipboard(raw) {
+        if (!text(raw)) {
+            show("ALO fill", "Clipboard empty. Click ALO fill in Salt Templater first.", "error");
+            return;
+        }
+
+        var payload;
+        try {
+            payload = JSON.parse(raw);
+        } catch {
+            show("ALO fill", "Clipboard does not contain valid ALO data.", "error");
+            return;
+        }
+        run(payload);
+    }).catch(function handleClipboardError(error) {
+        show("ALO fill", "Clipboard error: " + (error && error.message ? error.message : error), "error");
+    });
+}
+
 export function buildAloAutofillBookmarklet() {
     const sourceLiteral = JSON.stringify(ALO_AUTOFILL_CLIPBOARD_SOURCE);
-    return `javascript:(function(){try{var expectedSource=${sourceLiteral};function text(value){if(value===null||value===undefined)return"";return String(value).trim();}function first(values){for(var i=0;i<values.length;i++){var value=text(values[i]);if(value)return value;}return"";}function field(payload,name,fallbacks){var fields=payload&&payload.fields||{};return first([fields[name]].concat(fallbacks||[]));}function setVal(id,value,allowEmpty){var normalized=allowEmpty?String(value===null||value===undefined?"":value):text(value);if(!allowEmpty&&!normalized)return false;var el=document.getElementById(id);if(!el)return false;el.value=normalized;el.dispatchEvent(new Event("input",{bubbles:true}));el.dispatchEvent(new Event("change",{bubbles:true}));return true;}function run(payload){if(!payload||typeof payload!=="object"||Array.isArray(payload)){alert("ALO fill data invalid.");return;}if(payload.source&&payload.source!==expectedSource){alert("Clipboard does not contain ALO fill data from Salt Templater.");return;}var client=payload.client||{};var technical=payload.technical||payload.healthcheck||{};var agent=payload.agent||{};var superOffice=payload.superOffice||{};var tokenValues=superOffice.tokenValues||payload.tokenValues||{};var count=0;function apply(id,value,allowEmpty){if(setVal(id,value,allowEmpty))count++;}apply("ticket.extRef",field(payload,"externalReference",[superOffice.sourceTicketId,superOffice.ticketId,payload.ticketId,tokenValues["{so_ticket_num}"]));apply("ticket.socketId",field(payload,"socketId",[technical.socketId,technical.otoId,technical.oto_id,technical.oto]));apply("ticket.plugNr",field(payload,"plugNr",[technical.plugNr,technical.otoPortId,technical.otoPort,technical.oto_port]));apply("ticket.breakoutCable",field(payload,"breakoutCable",[technical.breakoutCable,technical.breakoutCableId,technical.cable]));apply("ticket.breakoutFiber",field(payload,"breakoutFiber",[technical.breakoutFiber,technical.fiberNumber,technical.fiber,technical.fibre]));apply("ticket.otoAddress.firstName",field(payload,"firstName",[client.firstName,client.firstname,client.givenName]));apply("ticket.otoAddress.lastName",field(payload,"lastName",[client.lastName,client.lastname,client.surname,client.familyName]));apply("ticket.contactPersonFirstName",field(payload,"firstName",[client.firstName,client.firstname,client.givenName]));apply("ticket.contactPersonLastName",field(payload,"lastName",[client.lastName,client.lastname,client.surname,client.familyName]));apply("ticket.contactPersonPhone1",field(payload,"contactPhone1",[client.contactPhone1,client.fixedNumber,client.mobileRaw,client.mobile,client.phone]));apply("ticket.contactPersonPhone2",field(payload,"contactPhone2",[client.contactPhone2]));apply("ticket.contactPersonMail",field(payload,"contactEmail",[client.email,client.mail]));apply("ticket.contactPersonIspFirstName",field(payload,"ispFirstName",[agent.firstName]));apply("ticket.contactPersonIspLastName",field(payload,"ispLastName",[agent.lastName]));apply("ticket.contactPersonIspPhone",field(payload,"ispPhone",[agent.phoneNumber,agent.phone]));apply("ticket.contactPersonIspMail",field(payload,"ispEmail",[agent.email]));apply("ticket.problemDescription",field(payload,"problemDescription",["No signal"]));apply("ticket.problemNotes",field(payload,"problemNotes",[""]),true);apply("ticket.problemCode1",field(payload,"problemCode1",["400"]));apply("ticket.problemCode2",field(payload,"problemCode2",["800"]));apply("ticket.problemCode3",field(payload,"problemCode3",["900"]));if(!count){alert("ALO form fields not found on this page.");return;}alert("ALO fields populated.");}if(!navigator.clipboard||!navigator.clipboard.readText){alert("Clipboard API not available");return;}navigator.clipboard.readText().then(function(raw){if(!text(raw)){alert("Clipboard empty");return;}var payload;try{payload=JSON.parse(raw);}catch(e){alert("Clipboard does not contain valid ALO JSON.");return;}run(payload);}).catch(function(e){alert("Clipboard error: "+e);});}catch(e){alert("Global error: "+e);}})();`;
+    return `javascript:(${aloAutofillBookmarkletRunner.toString()})(${sourceLiteral});`;
 }

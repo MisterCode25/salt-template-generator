@@ -1,4 +1,3 @@
-import { useEffect, useRef } from "react";
 import superOfficeBookmarklet from "../data/superOfficeBookmarklet.txt?raw";
 import vtiHealthcheckBookmarklet from "../data/vtiHealthcheckBookmarklet.txt?raw";
 import { showToast } from "../services/clipboardService.js";
@@ -60,12 +59,6 @@ function copyTextFallback(value) {
 }
 
 function ShortcutCard({ shortcut }) {
-    const bookmarkletRef = useRef(null);
-
-    useEffect(() => {
-        bookmarkletRef.current?.setAttribute("href", shortcut.bookmarklet);
-    }, [shortcut.bookmarklet]);
-
     const copyBookmarklet = async () => {
         try {
             await navigator.clipboard.writeText(shortcut.bookmarklet);
@@ -83,13 +76,15 @@ function ShortcutCard({ shortcut }) {
                 <p className="hint">{shortcut.description}</p>
             </div>
             <a
-                ref={bookmarkletRef}
                 className={`vti-bookmarklet-button vti-bookmarklet-button--${shortcut.id}`}
-                href="#"
+                href={shortcut.bookmarklet}
                 draggable="true"
+                title={shortcut.buttonLabel}
+                aria-label={shortcut.buttonLabel}
                 onDragStart={(event) => {
                     event.dataTransfer.setData("text/uri-list", shortcut.bookmarklet);
                     event.dataTransfer.setData("text/plain", shortcut.bookmarklet);
+                    event.dataTransfer.setData("text/x-moz-url", `${shortcut.bookmarklet}\n${shortcut.buttonLabel}`);
                     event.dataTransfer.effectAllowed = "copyLink";
                 }}
                 onClick={(event) => {

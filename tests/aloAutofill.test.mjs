@@ -50,7 +50,9 @@ const agentProfile = {
 {
   const bookmarklet = buildAloAutofillBookmarklet();
 
-  assert.ok(bookmarklet.startsWith("javascript:(function()"));
+  assert.ok(bookmarklet.startsWith("javascript:(function aloAutofillBookmarkletRunner("));
+  assert.match(bookmarklet, /saltAloFillOverlay/);
+  assert.match(bookmarklet, /byAttribute\("name", id\)/);
   assert.match(bookmarklet, /ticket\.socketId/);
   assert.match(bookmarklet, /ticket\.contactPersonIspFirstName/);
   assert.match(bookmarklet, /ticket\.contactPersonIspMail/);
