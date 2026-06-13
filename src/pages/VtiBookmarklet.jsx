@@ -1,6 +1,8 @@
+import { useEffect, useRef } from "react";
 import superOfficeBookmarklet from "../data/superOfficeBookmarklet.txt?raw";
 import vtiHealthcheckBookmarklet from "../data/vtiHealthcheckBookmarklet.txt?raw";
 import { showToast } from "../services/clipboardService.js";
+import { buildAloAutofillBookmarklet } from "../utils/aloAutofill.js";
 
 const shortcuts = [
     {
@@ -29,6 +31,20 @@ const shortcuts = [
             "Come back to Salt Templater and click Import data from SO.",
             "Ticket photos will appear in the Photos SO tool when image attachments are present."
         ]
+    },
+    {
+        id: "alo",
+        eyebrow: "ALO ticket form",
+        title: "Fill ALO site",
+        buttonLabel: "Fill ALO site",
+        bookmarklet: buildAloAutofillBookmarklet(),
+        description: "Reads the structured ALO fill data copied from Salt Templater and fills the ticket, end-user and ISP contact fields.",
+        steps: [
+            "Import VTI data in Salt Templater.",
+            "Import SO data if you want the SO ticket copied into Ext. reference.",
+            "Click ALO fill in the tools bar to copy the structured data.",
+            "Open the ALO ticket form, then click this bookmarklet from the bookmarks bar."
+        ]
     }
 ];
 
@@ -44,6 +60,12 @@ function copyTextFallback(value) {
 }
 
 function ShortcutCard({ shortcut }) {
+    const bookmarkletRef = useRef(null);
+
+    useEffect(() => {
+        bookmarkletRef.current?.setAttribute("href", shortcut.bookmarklet);
+    }, [shortcut.bookmarklet]);
+
     const copyBookmarklet = async () => {
         try {
             await navigator.clipboard.writeText(shortcut.bookmarklet);
@@ -61,9 +83,15 @@ function ShortcutCard({ shortcut }) {
                 <p className="hint">{shortcut.description}</p>
             </div>
             <a
+                ref={bookmarkletRef}
                 className={`vti-bookmarklet-button vti-bookmarklet-button--${shortcut.id}`}
-                href={shortcut.bookmarklet}
+                href="#"
                 draggable="true"
+                onDragStart={(event) => {
+                    event.dataTransfer.setData("text/uri-list", shortcut.bookmarklet);
+                    event.dataTransfer.setData("text/plain", shortcut.bookmarklet);
+                    event.dataTransfer.effectAllowed = "copyLink";
+                }}
                 onClick={(event) => {
                     event.preventDefault();
                     showToast("Drag this button to the bookmarks bar.", "info");
@@ -93,6 +121,7 @@ export default function VtiBookmarklet({ embedded = false }) {
                     <p className="vti-bookmarklet-lead">
                         Drag the buttons into the bookmarks bar. VTI imports full customer data;
                         SuperOffice imports the SO ticket number, a valid External ID and ticket photos with their message dates when present.
+                        The ALO shortcut fills the ticket form from the structured data prepared by the app.
                     </p>
                 </div>
             </section>

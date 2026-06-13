@@ -8446,6 +8446,10 @@ textarea::placeholder,
     --tool-accent: #7c6df2;
 }
 
+.tools-bar-btn--alo {
+    --tool-accent: #18a07a;
+}
+
 .tools-bar-btn--so {
     --tool-accent: #d99a2b;
 }

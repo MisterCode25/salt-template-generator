@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ExternalLink, Image as ImageIcon, Settings2 } from "lucide-react";
+import { ClipboardPaste, ExternalLink, Image as ImageIcon, Settings2 } from "lucide-react";
 import { loadTools, resolveToolUrl, sanitizeToolColor } from "../services/toolsService.js";
 
 const ToolButton = memo(function ToolButton({ tool, onOpenTool }) {
@@ -26,6 +26,8 @@ function ToolsBar({
     valuesRef: externalValuesRef = null,
     onOpenExternalGenerator,
     hasExternalId = false,
+    onCopyAloAutofillData,
+    hasAloAutofillData = false,
     onOpenSuperOfficePhotos,
     superOfficePhotoCount = 0,
     onManageTools
@@ -58,7 +60,7 @@ function ToolsBar({
         navigate("/tools");
     }, [navigate, onManageTools]);
 
-    if (tools.length === 0 && !onOpenExternalGenerator && !onOpenSuperOfficePhotos) return null;
+    if (tools.length === 0 && !onOpenExternalGenerator && !onCopyAloAutofillData && !onOpenSuperOfficePhotos) return null;
 
     return (
         <div className="tools-bar">
@@ -73,6 +75,19 @@ function ToolsBar({
                         title={hasExternalId ? "External ID already present" : "Generate external ID"}
                     >
                         Generate external ID
+                    </button>
+                )}
+                {onCopyAloAutofillData && (
+                    <button
+                        type="button"
+                        className={`tools-bar-btn tools-bar-btn--system tools-bar-btn--alo${hasAloAutofillData ? "" : " is-disabled"}`}
+                        onClick={onCopyAloAutofillData}
+                        disabled={!hasAloAutofillData}
+                        aria-disabled={!hasAloAutofillData}
+                        title={hasAloAutofillData ? "Copy ALO fill data for the bookmarklet" : "Import VTI data before preparing ALO fill data"}
+                    >
+                        <ClipboardPaste size={14} strokeWidth={2} aria-hidden="true" />
+                        ALO fill
                     </button>
                 )}
                 {onOpenSuperOfficePhotos && superOfficePhotoCount > 0 && (
@@ -117,6 +132,8 @@ export default memo(ToolsBar, (prevProps, nextProps) => {
     return valuesEqual
         && prevProps.onOpenExternalGenerator === nextProps.onOpenExternalGenerator
         && prevProps.hasExternalId === nextProps.hasExternalId
+        && prevProps.onCopyAloAutofillData === nextProps.onCopyAloAutofillData
+        && prevProps.hasAloAutofillData === nextProps.hasAloAutofillData
         && prevProps.onOpenSuperOfficePhotos === nextProps.onOpenSuperOfficePhotos
         && prevProps.superOfficePhotoCount === nextProps.superOfficePhotoCount
         && prevProps.onManageTools === nextProps.onManageTools;

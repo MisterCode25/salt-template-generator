@@ -54,11 +54,14 @@ import { formatTokenPreviewHTML } from "../utils/richTextTokens.js";
 import { applyTheme, getInitialTheme } from "../utils/theme.js";
 import ToolsBar from "../components/ToolsBar.jsx";
 import SuperOfficePhotoGallery from "../components/SuperOfficePhotoGallery.jsx";
+import { copyText } from "../services/clipboardService.js";
+import { loadAgentProfile } from "../services/agentProfileService.js";
 import {
     SUPER_OFFICE_TICKET_UPDATED_EVENT,
     hasSuperOfficeTicketPayload,
     loadSuperOfficeTicketPayload
 } from "../services/superOfficeTicketService.js";
+import { formatAloAutofillPayload } from "../utils/aloAutofill.js";
 import { getKeyboardShortcutForEvent } from "../utils/keyboardShortcuts.js";
 
 const ExternalGenerator = lazy(() => import("./ExternalGenerator.jsx"));
@@ -797,6 +800,16 @@ export default function Templates() {
         setSuperOfficeGalleryOpen(false);
     }, []);
 
+    const copyAloAutofillData = useCallback(async () => {
+        const clientPayload = runtimeRef.current.clientPayload;
+        if (!clientPayload) return;
+
+        await copyText(
+            formatAloAutofillPayload(clientPayload, loadAgentProfile(), loadSuperOfficeTicketPayload()),
+            { message: "ALO fill data copied", variant: "success" }
+        );
+    }, []);
+
     const importClientFromPasteAndResetCase = useCallback((text) => {
         runtimeRef.current.importClientFromPaste(text);
         resetCaseNavigation();
@@ -1150,6 +1163,8 @@ export default function Templates() {
                 valuesRef={toolValuesRef}
                 onOpenExternalGenerator={openExternalGenerator}
                 hasExternalId={Boolean(runtime.clientExternalId)}
+                onCopyAloAutofillData={copyAloAutofillData}
+                hasAloAutofillData={Boolean(runtime.clientPayload)}
                 onOpenSuperOfficePhotos={openSuperOfficeGallery}
                 superOfficePhotoCount={superOfficeTicket?.imageAttachments?.length || 0}
                 onManageTools={openToolsWorkspace}
