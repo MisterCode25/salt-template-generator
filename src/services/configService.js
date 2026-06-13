@@ -1,7 +1,8 @@
 import { normalizeNode, normalizeTemplate } from "../models/templateTreeModel.js";
 import { migrateLegacyModelsToTemplateTree } from "../utils/legacyTemplateMigration.js";
+import { normalizeTemplateImages } from "../utils/templateImages.js";
 
-const CONFIG_SCHEMA_VERSION = 2;
+const CONFIG_SCHEMA_VERSION = 3;
 
 function computeConfigChecksum(serialized) {
     return Array.from(serialized).reduce((sum, ch) => (sum + ch.charCodeAt(0)) % 1000000007, 0);
@@ -14,15 +15,16 @@ function normalizeTreeData(treeData = {}) {
     };
 }
 
-export function buildConfigPayload(configName, tokens, treeData) {
+export function buildConfigPayload(configName, tokens, treeData, templateImages = []) {
     const { nodes, templates } = normalizeTreeData(treeData);
+    const images = normalizeTemplateImages(templateImages);
     const meta = {
         configName,
         schemaVersion: CONFIG_SCHEMA_VERSION,
         exportedAt: Date.now(),
         checksum: 0
     };
-    const base = { meta, tokens, nodes, templates };
+    const base = { meta, tokens, nodes, templates, templateImages: images };
     const serialized = JSON.stringify({ ...base, meta: { ...meta, checksum: 0 } });
     meta.checksum = computeConfigChecksum(serialized);
     return {
@@ -30,6 +32,7 @@ export function buildConfigPayload(configName, tokens, treeData) {
         tokens,
         nodes,
         templates,
+        templateImages: images,
         configName
     };
 }
@@ -45,6 +48,7 @@ export function validateImportedConfig(raw = {}) {
     const { nodes, templates } = hasLegacyModels
         ? migrateLegacyModelsToTemplateTree(raw.models)
         : normalizeTreeData(raw);
+    const templateImages = normalizeTemplateImages(raw.templateImages);
     const meta = raw.meta || {};
     const configName = meta.configName || raw.configName || "Imported configuration";
 
@@ -56,14 +60,22 @@ export function validateImportedConfig(raw = {}) {
         meta: { ...meta, checksum: 0 },
         tokens,
         nodes,
+        templates,
+        templateImages
+    });
+    const legacySerialized = JSON.stringify({
+        meta: { ...meta, checksum: 0 },
+        tokens,
+        nodes,
         templates
     });
     if (!hasLegacyModels && meta.checksum !== undefined) {
         const computed = computeConfigChecksum(serialized);
-        if (computed !== meta.checksum) {
+        const legacyComputed = computeConfigChecksum(legacySerialized);
+        if (computed !== meta.checksum && legacyComputed !== meta.checksum) {
             throw new Error("Checksum mismatch");
         }
     }
 
-    return { tokens, nodes, templates, configName };
+    return { tokens, nodes, templates, templateImages, configName };
 }

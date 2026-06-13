@@ -1,3 +1,5 @@
+import { serializeTemplateImageReferences, TEMPLATE_IMAGE_SELECTOR } from "./templateImages.js";
+
 const TOKEN_PATTERN = /\{[^{}]+\}/g;
 const ACTIVE_TOKEN_TRIGGER_PATTERN = /(^|[\s\u00a0])@([a-zA-Z0-9 _-]*)$/;
 const COMPLETED_TOKEN_TRIGGER_PATTERN = /(^|[\s\u00a0])@([a-zA-Z0-9 _-]+)([\s\u00a0])$/;
@@ -113,26 +115,31 @@ export function formatTokenPreviewHTML(value = "", tokens = []) {
     return formatted || escapeHtml("");
 }
 
-function cloneWithSerializedTokens(root) {
+function hasSerializableNodes(root) {
+    return Boolean(root.querySelector?.(`.rich-token-chip, ${TEMPLATE_IMAGE_SELECTOR}`));
+}
+
+function cloneWithSerializedContent(root) {
     const clone = root.cloneNode(true);
     clone.querySelectorAll(".rich-token-chip").forEach((chip) => {
         chip.replaceWith(clone.ownerDocument.createTextNode(chip.dataset.token || ""));
     });
+    serializeTemplateImageReferences(clone);
     return clone;
 }
 
 export function serializeRichText(root) {
-    if (!root.querySelector?.(".rich-token-chip")) {
+    if (!hasSerializableNodes(root)) {
         return root.innerHTML.replaceAll(CARET_BOUNDARY, "");
     }
-    return cloneWithSerializedTokens(root).innerHTML.replaceAll(CARET_BOUNDARY, "");
+    return cloneWithSerializedContent(root).innerHTML.replaceAll(CARET_BOUNDARY, "");
 }
 
 export function serializeRichTextPlain(root) {
-    if (!root.querySelector?.(".rich-token-chip")) {
+    if (!hasSerializableNodes(root)) {
         return root.textContent.replaceAll(CARET_BOUNDARY, "");
     }
-    return cloneWithSerializedTokens(root).textContent.replaceAll(CARET_BOUNDARY, "");
+    return cloneWithSerializedContent(root).textContent.replaceAll(CARET_BOUNDARY, "");
 }
 
 export function normalizePastedRichTextHTML(value = "", tokens = []) {
@@ -147,6 +154,7 @@ export function normalizePastedRichTextHTML(value = "", tokens = []) {
             chip.replaceWith(document.createTextNode(chip.dataset.token || chip.textContent || ""));
         });
     }
+    serializeTemplateImageReferences(template.content);
     return formatRichTextForEditor(template.innerHTML, tokens);
 }
 

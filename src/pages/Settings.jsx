@@ -4,6 +4,7 @@ import { Copy } from "lucide-react";
 import { loadTokens, saveTokens } from "../services/tokenService.js";
 import { loadTemplateTreeData, saveTemplateTreeData } from "../services/templateTreeService.js";
 import { clearAppIndexedDB } from "../services/indexedDbService.js";
+import { loadTemplateImages, saveTemplateImages } from "../services/templateImageService.js";
 import { buildConfigPayload, validateImportedConfig } from "../services/configService.js";
 import { copyText, showToast } from "../services/clipboardService.js";
 import { getStorageInfo, requestPersistentStorage } from "../services/storageInfoService.js";
@@ -74,12 +75,17 @@ export default function Settings({ embedded = false, onClose = null }) {
         setExportNameOpen(true);
     }, [configName]);
 
-    const doExport = useCallback(() => {
+    const doExport = useCallback(async () => {
         const nextName = exportNameValue.trim() || configName;
         setExportNameOpen(false);
         setConfigName(nextName);
         localStorage.setItem("local_configName", nextName);
-        const payload = buildConfigPayload(nextName, tokens.filter((tokenDef) => !tokenDef.system), treeData);
+        const payload = buildConfigPayload(
+            nextName,
+            tokens.filter((tokenDef) => !tokenDef.system),
+            treeData,
+            await loadTemplateImages()
+        );
         const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -106,10 +112,12 @@ export default function Settings({ embedded = false, onClose = null }) {
                 tokens: importedTokens,
                 nodes: importedNodes,
                 templates: importedTemplates,
+                templateImages: importedTemplateImages,
                 configName: importedName
             } = validateImportedConfig(json);
             await saveTokens(importedTokens);
             await saveTemplateTreeData({ nodes: importedNodes, templates: importedTemplates });
+            await saveTemplateImages(importedTemplateImages);
             const [normalizedTokens, normalizedTreeData] = await Promise.all([
                 loadTokens(),
                 loadTemplateTreeData()

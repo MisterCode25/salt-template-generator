@@ -43,6 +43,9 @@ const TOOL_OPTIONS = [
 const COLOR_OPTIONS = ["#ef4444", "#f59e0b", "#22c55e", "#06b6d4", "#3b82f6", "#a855f7"];
 const MIN_DRAW_DISTANCE = 8;
 const MIN_CROP_SIZE = 36;
+const DEFAULT_STROKE_WIDTH = 4;
+const MIN_STROKE_WIDTH = 1;
+const MAX_STROKE_WIDTH = 14;
 const ARROW_CURVE_SEGMENTS = 28;
 const ARROW_HANDLE_RADIUS = 5;
 
@@ -210,6 +213,20 @@ function clamp(value, min, max) {
     return Math.min(Math.max(value, min), max);
 }
 
+function normalizeStrokeWidth(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return DEFAULT_STROKE_WIDTH;
+    return clamp(Math.round(numeric), MIN_STROKE_WIDTH, MAX_STROKE_WIDTH);
+}
+
+function getAnnotationStrokeWidth(annotation = {}) {
+    return normalizeStrokeWidth(annotation.strokeWidth ?? DEFAULT_STROKE_WIDTH);
+}
+
+function getArrowPointerSize(strokeWidth) {
+    return Math.max(10, strokeWidth * 4);
+}
+
 function stageCoordsToImagePoint(point, imageRect) {
     const scale = imageRect.scale || 1;
     const sourceX = Number.isFinite(imageRect.sourceX) ? imageRect.sourceX : 0;
@@ -352,6 +369,7 @@ function renderAnnotationShape(annotation, imageRect, options = {}) {
     } = options;
     const scale = imageRect.scale || 1;
     const color = annotation.color || COLOR_OPTIONS[0];
+    const strokeWidth = getAnnotationStrokeWidth(annotation);
     const commonProps = editable ? {
         draggable: true,
         listening: true,
@@ -385,14 +403,14 @@ function renderAnnotationShape(annotation, imageRect, options = {}) {
             <KonvaArrow
                 key={`${keyPrefix}${annotation.id}`}
                 points={getArrowStagePoints(annotation, imageRect)}
-                pointerLength={16}
-                pointerWidth={16}
+                pointerLength={getArrowPointerSize(strokeWidth)}
+                pointerWidth={getArrowPointerSize(strokeWidth)}
                 stroke={color}
                 fill={color}
-                strokeWidth={4}
+                strokeWidth={strokeWidth}
                 lineCap="round"
                 lineJoin="round"
-                hitStrokeWidth={22}
+                hitStrokeWidth={Math.max(22, strokeWidth + 18)}
                 {...commonProps}
             />
         );
@@ -408,7 +426,7 @@ function renderAnnotationShape(annotation, imageRect, options = {}) {
                 width={(annotation.width || 0) * scale}
                 height={(annotation.height || 0) * scale}
                 stroke={color}
-                strokeWidth={4}
+                strokeWidth={strokeWidth}
                 fill={colorWithAlpha(color)}
                 cornerRadius={4}
                 {...commonProps}
@@ -533,7 +551,8 @@ function materializeDraftAnnotation(draft) {
             id: draft.id,
             type: "arrow",
             points: [draft.start.x, draft.start.y, draft.end.x, draft.end.y],
-            color: draft.color
+            color: draft.color,
+            strokeWidth: draft.strokeWidth
         };
     }
     if (draft.type === "rect") {
@@ -541,7 +560,8 @@ function materializeDraftAnnotation(draft) {
             id: draft.id,
             type: "rect",
             ...normalizeRectFromPoints(draft.start, draft.end),
-            color: draft.color
+            color: draft.color,
+            strokeWidth: draft.strokeWidth
         };
     }
     return null;
@@ -549,15 +569,18 @@ function materializeDraftAnnotation(draft) {
 
 function addAnnotationToKonvaLayer(layer, annotation, exportScale, sourceRect) {
     const color = annotation.color || COLOR_OPTIONS[0];
+    const strokeWidth = getAnnotationStrokeWidth(annotation);
+    const exportStrokeWidth = Math.max(1, strokeWidth * exportScale);
+    const exportArrowPointerSize = Math.max(8, getArrowPointerSize(strokeWidth) * exportScale);
 
     if (annotation.type === "arrow") {
         layer.add(new Konva.Arrow({
             points: getArrowExportPoints(annotation, exportScale, sourceRect),
-            pointerLength: Math.max(12, 22 * exportScale),
-            pointerWidth: Math.max(12, 22 * exportScale),
+            pointerLength: exportArrowPointerSize,
+            pointerWidth: exportArrowPointerSize,
             stroke: color,
             fill: color,
-            strokeWidth: Math.max(3, 6 * exportScale),
+            strokeWidth: exportStrokeWidth,
             lineCap: "round",
             lineJoin: "round"
         }));
@@ -571,7 +594,7 @@ function addAnnotationToKonvaLayer(layer, annotation, exportScale, sourceRect) {
             width: annotation.width * exportScale,
             height: annotation.height * exportScale,
             stroke: color,
-            strokeWidth: Math.max(3, 6 * exportScale),
+            strokeWidth: exportStrokeWidth,
             fill: colorWithAlpha(color, 0.24),
             cornerRadius: Math.max(4, 8 * exportScale)
         }));
@@ -665,6 +688,7 @@ export default function SuperOfficeImageAnnotator({
     const [workspaceRef, workspaceSize] = useElementSize();
     const [tool, setTool] = useState("arrow");
     const [color, setColor] = useState(COLOR_OPTIONS[0]);
+    const [strokeWidth, setStrokeWidth] = useState(DEFAULT_STROKE_WIDTH);
     const [draft, setDraft] = useState(null);
     const draftRef = useRef(null);
     const [selectedId, setSelectedId] = useState(null);
@@ -698,6 +722,11 @@ export default function SuperOfficeImageAnnotator({
     const selectedAnnotation = useMemo(() => (
         annotations.find((annotation) => annotation.id === selectedId) || null
     ), [annotations, selectedId]);
+
+    const selectedSupportsStroke = selectedAnnotation?.type === "arrow" || selectedAnnotation?.type === "rect";
+    const activeStrokeWidth = selectedSupportsStroke
+        ? getAnnotationStrokeWidth(selectedAnnotation)
+        : strokeWidth;
 
     const setAnnotations = useCallback((nextAnnotations) => {
         onChangeAnnotations?.(nextAnnotations);
@@ -739,6 +768,17 @@ export default function SuperOfficeImageAnnotator({
     const handleSelectAnnotation = useCallback((annotationId) => {
         setSelectedId(annotationId);
     }, []);
+
+    const handleStrokeWidthChange = useCallback((event) => {
+        const nextStrokeWidth = normalizeStrokeWidth(event.target.value);
+        setStrokeWidth(nextStrokeWidth);
+        if (selectedSupportsStroke) {
+            updateAnnotation(selectedAnnotation.id, (current) => ({
+                ...current,
+                strokeWidth: nextStrokeWidth
+            }));
+        }
+    }, [selectedAnnotation, selectedSupportsStroke, updateAnnotation]);
 
     const handleAnnotationDragEnd = useCallback((annotation, event) => {
         event.cancelBubble = true;
@@ -869,9 +909,10 @@ export default function SuperOfficeImageAnnotator({
             type: tool,
             start: point,
             end: point,
-            color
+            color,
+            strokeWidth
         });
-    }, [addAnnotation, color, imageRect, loadedImage.status, loadedImage.width, tool, updateDraft]);
+    }, [addAnnotation, color, imageRect, loadedImage.status, loadedImage.width, strokeWidth, tool, updateDraft]);
 
     const handlePointerMove = useCallback((event) => {
         const currentDraft = draftRef.current;
@@ -909,7 +950,8 @@ export default function SuperOfficeImageAnnotator({
                 id: currentDraft.id,
                 type: "arrow",
                 points: [start.x, start.y, end.x, end.y],
-                color: currentDraft.color
+                color: currentDraft.color,
+                strokeWidth: currentDraft.strokeWidth
             });
         }
         if (currentDraft.type === "rect") {
@@ -918,7 +960,8 @@ export default function SuperOfficeImageAnnotator({
                 id: currentDraft.id,
                 type: "rect",
                 ...rect,
-                color: currentDraft.color
+                color: currentDraft.color,
+                strokeWidth: currentDraft.strokeWidth
             });
         }
         updateDraft(null);
@@ -1053,6 +1096,19 @@ export default function SuperOfficeImageAnnotator({
                             />
                         ))}
                     </div>
+                    <label className="so-annotator__stroke" title="Épaisseur">
+                        <span>Trait</span>
+                        <input
+                            type="range"
+                            min={MIN_STROKE_WIDTH}
+                            max={MAX_STROKE_WIDTH}
+                            step="1"
+                            value={activeStrokeWidth}
+                            onChange={handleStrokeWidthChange}
+                            aria-label="Épaisseur du trait"
+                        />
+                        <output>{activeStrokeWidth}</output>
+                    </label>
                     <div className="so-annotator__tool-group">
                         <button type="button" onClick={handleUndo} disabled={annotations.length === 0} title="Undo" aria-label="Undo">
                             <RotateCcw size={18} aria-hidden="true" />

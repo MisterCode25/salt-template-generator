@@ -11,6 +11,11 @@ import {
     slugifyTokenLabel,
     tokenName
 } from "../utils/richTextTokens.js";
+import { createTemplateImageMarkup, stripImagesFromHtml } from "../utils/templateImages.js";
+import { hydrateStoredTemplateImageElements, saveTemplateImageFile } from "../services/templateImageService.js";
+
+const MIN_IMAGE_DIMENSION = 16;
+const MAX_IMAGE_DIMENSION = 4000;
 
 const TOOLBAR_ACTIONS = [
     { command: "bold", label: <strong>B</strong>, title: "Bold" },
@@ -20,10 +25,20 @@ const TOOLBAR_ACTIONS = [
     { command: "insertOrderedList", label: "1.", title: "Ordered list" },
     { command: "insertUnorderedList", label: "•", title: "Unordered list" },
     { type: "sep" },
-    { command: "insertImageByUrl", label: "Img", title: "Insert image by URL" },
+    { command: "insertImage", label: "Img", title: "Insert image" },
     { type: "sep" },
     { command: "removeFormat", label: "✕", title: "Clear formatting" },
 ];
+
+function getToolbarActions({ allowImages = true } = {}) {
+    const actions = TOOLBAR_ACTIONS.filter((action) => allowImages || action.command !== "insertImage");
+    return actions.filter((action, index, list) => {
+        if (action.type !== "sep") return true;
+        const previous = list[index - 1];
+        const next = list[index + 1];
+        return previous && next && previous.type !== "sep" && next.type !== "sep";
+    });
+}
 
 function normalizeTokenSearchValue(value = "") {
     return String(value || "").trim().toLowerCase();
@@ -146,23 +161,89 @@ function getTokenPreviewValue(tokenDef = {}) {
     return text.length > 90 ? `${text.slice(0, 87)}...` : text;
 }
 
+function parseImageDimension(value) {
+    if (value === null || value === undefined || value === "") return null;
+    const numeric = Number.parseInt(String(value).replace(/[^\d.]/g, ""), 10);
+    return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
+}
+
+function clampImageDimension(value) {
+    const numeric = parseImageDimension(value);
+    if (!numeric) return null;
+    return Math.min(Math.max(numeric, MIN_IMAGE_DIMENSION), MAX_IMAGE_DIMENSION);
+}
+
+function getImageDisplayDimensions(image) {
+    const rect = image.getBoundingClientRect();
+    const width = parseImageDimension(image.style.width)
+        || parseImageDimension(image.getAttribute("width"))
+        || Math.round(rect.width)
+        || image.naturalWidth
+        || MIN_IMAGE_DIMENSION;
+    const height = parseImageDimension(image.style.height)
+        || parseImageDimension(image.getAttribute("height"))
+        || Math.round(rect.height)
+        || image.naturalHeight
+        || MIN_IMAGE_DIMENSION;
+    const originalWidth = image.naturalWidth || parseImageDimension(image.getAttribute("width")) || width;
+    const originalHeight = image.naturalHeight || parseImageDimension(image.getAttribute("height")) || height;
+
+    return {
+        width: clampImageDimension(width) || MIN_IMAGE_DIMENSION,
+        height: clampImageDimension(height) || MIN_IMAGE_DIMENSION,
+        originalWidth: clampImageDimension(originalWidth) || width,
+        originalHeight: clampImageDimension(originalHeight) || height
+    };
+}
+
+function buildImageResizeState(image) {
+    const dimensions = getImageDisplayDimensions(image);
+    const ratio = dimensions.originalWidth > 0 && dimensions.originalHeight > 0
+        ? dimensions.originalWidth / dimensions.originalHeight
+        : dimensions.width / Math.max(dimensions.height, 1);
+
+    return {
+        width: String(dimensions.width),
+        height: String(dimensions.height),
+        originalWidth: dimensions.originalWidth,
+        originalHeight: dimensions.originalHeight,
+        aspectRatio: Number.isFinite(ratio) && ratio > 0 ? ratio : 1,
+        lockAspectRatio: image.style.height ? image.style.height === "auto" : true,
+        name: image.getAttribute("data-template-image-name") || image.getAttribute("alt") || "Image"
+    };
+}
+
+function nextHeightForWidth(width, aspectRatio) {
+    return String(clampImageDimension(Math.round(width / Math.max(aspectRatio, 0.01))) || MIN_IMAGE_DIMENSION);
+}
+
+function nextWidthForHeight(height, aspectRatio) {
+    return String(clampImageDimension(Math.round(height * Math.max(aspectRatio, 0.01))) || MIN_IMAGE_DIMENSION);
+}
+
 function RichTextEditor({
     value,
     onChange,
     placeholder,
     className = "",
     tokens = [],
-    onTokenCreate
+    onTokenCreate,
+    allowImages = true
 }) {
     const editorRef = useRef(null);
     const menuRef = useRef(null);
+    const fileInputRef = useRef(null);
+    const savedSelectionRange = useRef(null);
+    const imageResizeTargetRef = useRef(null);
     const skipSync = useRef(false);
     const slashRange = useRef(null);
     const [slashQuery, setSlashQuery] = useState("");
     const [activeIndex, setActiveIndex] = useState(0);
     const [menuOpen, setMenuOpen] = useState(false);
     const [menuStyle, setMenuStyle] = useState({});
+    const [imageResize, setImageResize] = useState(null);
     const tokenSearchIndex = useMemo(() => buildTokenSearchIndex(tokens), [tokens]);
+    const toolbarActions = useMemo(() => getToolbarActions({ allowImages }), [allowImages]);
 
     const tokenMatches = useMemo(
         () => menuOpen ? buildTokenMatches(slashQuery, tokenSearchIndex) : [],
@@ -170,31 +251,76 @@ function RichTextEditor({
     );
     const tokenMatchGroups = useMemo(() => groupTokenMatches(tokenMatches), [tokenMatches]);
 
+    const hydrateImages = useCallback(() => {
+        const editor = editorRef.current;
+        if (!editor) return;
+        hydrateStoredTemplateImageElements(editor).catch((error) => {
+            console.error("Unable to hydrate template images", error);
+        });
+    }, []);
+
     useEffect(() => {
         const el = editorRef.current;
         if (!el) return;
         if (skipSync.current) {
             skipSync.current = false;
+            hydrateImages();
             return;
         }
-        const nextHtml = formatRichTextForEditor(value || "", tokens);
+        const sourceValue = value || "";
+        const editorValue = allowImages ? sourceValue : stripImagesFromHtml(sourceValue);
+        const nextHtml = formatRichTextForEditor(editorValue, tokens);
         if (el.innerHTML !== nextHtml) {
             el.innerHTML = nextHtml;
         }
-    }, [value, tokens]);
+        hydrateImages();
+        if (!allowImages && editorValue !== sourceValue) {
+            onChange?.(editorValue);
+        }
+    }, [allowImages, hydrateImages, onChange, value, tokens]);
 
     const handleInput = useCallback(() => {
         const el = editorRef.current;
         if (!el) return;
         skipSync.current = true;
-        onChange?.(serializeRichText(el));
-    }, [onChange]);
+        const html = serializeRichText(el);
+        onChange?.(allowImages ? html : stripImagesFromHtml(html));
+    }, [allowImages, onChange]);
 
     const closeMenu = useCallback(() => {
         slashRange.current = null;
         setSlashQuery("");
         setActiveIndex(0);
         setMenuOpen(false);
+    }, []);
+
+    const closeImageResize = useCallback(() => {
+        imageResizeTargetRef.current = null;
+        setImageResize(null);
+    }, []);
+
+    const saveSelectionRange = useCallback(() => {
+        const editor = editorRef.current;
+        const selection = window.getSelection();
+        if (!editor || !selection?.rangeCount) return;
+        const range = selection.getRangeAt(0);
+        if (!editor.contains(range.commonAncestorContainer)) return;
+        savedSelectionRange.current = range.cloneRange();
+    }, []);
+
+    const restoreSelectionRange = useCallback(() => {
+        const editor = editorRef.current;
+        const selection = window.getSelection();
+        const range = savedSelectionRange.current;
+        if (!editor || !selection || !range) {
+            editor?.focus();
+            return false;
+        }
+        editor.focus();
+        selection.removeAllRanges();
+        selection.addRange(range);
+        savedSelectionRange.current = null;
+        return true;
     }, []);
 
     const updateMenuPosition = useCallback(() => {
@@ -367,6 +493,15 @@ function RichTextEditor({
         }
     }, [activeIndex, closeMenu, insertToken, menuOpen, slashQuery, tokenMatches, tokenSearchIndex]);
 
+    useEffect(() => {
+        if (!imageResize) return;
+        const handleWindowKeyDown = (event) => {
+            if (event.key === "Escape") closeImageResize();
+        };
+        window.addEventListener("keydown", handleWindowKeyDown);
+        return () => window.removeEventListener("keydown", handleWindowKeyDown);
+    }, [closeImageResize, imageResize]);
+
     const writeSelectionToClipboard = useCallback((event) => {
         const editor = editorRef.current;
         const selection = window.getSelection();
@@ -395,41 +530,224 @@ function RichTextEditor({
         handleInput();
     }, [handleInput, writeSelectionToClipboard]);
 
+    const openImageResize = useCallback((image) => {
+        if (!allowImages) return;
+        imageResizeTargetRef.current = image;
+        setImageResize(buildImageResizeState(image));
+        closeMenu();
+    }, [allowImages, closeMenu]);
+
+    const handleEditorDoubleClick = useCallback((event) => {
+        if (!allowImages) return;
+        const editor = editorRef.current;
+        const image = event.target?.closest?.("img");
+        if (!editor || !image || !editor.contains(image)) return;
+
+        event.preventDefault();
+        openImageResize(image);
+    }, [allowImages, openImageResize]);
+
+    const updateImageResizeWidth = useCallback((event) => {
+        const widthValue = event.target.value;
+        setImageResize((current) => {
+            if (!current) return current;
+            const width = clampImageDimension(widthValue);
+            return {
+                ...current,
+                width: widthValue,
+                height: current.lockAspectRatio && width
+                    ? nextHeightForWidth(width, current.aspectRatio)
+                    : current.height
+            };
+        });
+    }, []);
+
+    const updateImageResizeHeight = useCallback((event) => {
+        const heightValue = event.target.value;
+        setImageResize((current) => {
+            if (!current) return current;
+            const height = clampImageDimension(heightValue);
+            return {
+                ...current,
+                width: current.lockAspectRatio && height
+                    ? nextWidthForHeight(height, current.aspectRatio)
+                    : current.width,
+                height: heightValue
+            };
+        });
+    }, []);
+
+    const toggleImageAspectRatio = useCallback((event) => {
+        const checked = event.target.checked;
+        setImageResize((current) => {
+            if (!current) return current;
+            const width = clampImageDimension(current.width);
+            return {
+                ...current,
+                lockAspectRatio: checked,
+                height: checked && width
+                    ? nextHeightForWidth(width, current.aspectRatio)
+                    : current.height
+            };
+        });
+    }, []);
+
+    const resetImageResizeToOriginal = useCallback(() => {
+        setImageResize((current) => {
+            if (!current) return current;
+            return {
+                ...current,
+                width: String(current.originalWidth),
+                height: String(current.originalHeight)
+            };
+        });
+    }, []);
+
+    const applyImageResize = useCallback((event) => {
+        event?.preventDefault?.();
+        event?.stopPropagation?.();
+        const image = imageResizeTargetRef.current;
+        const editor = editorRef.current;
+        if (!imageResize || !image || !editor?.contains(image)) {
+            closeImageResize();
+            return;
+        }
+
+        const width = clampImageDimension(imageResize.width);
+        const height = clampImageDimension(imageResize.height);
+        if (!width || !height) return;
+
+        image.setAttribute("width", String(width));
+        image.setAttribute("height", String(height));
+        image.style.width = `${width}px`;
+        image.style.maxWidth = "100%";
+        image.style.height = imageResize.lockAspectRatio ? "auto" : `${height}px`;
+        image.style.objectFit = imageResize.lockAspectRatio ? "" : "fill";
+        image.classList.add("template-image");
+
+        handleInput();
+        closeImageResize();
+    }, [closeImageResize, handleInput, imageResize]);
+
+    const insertTemplateImage = useCallback((imageRecord) => {
+        if (!allowImages) return;
+        const html = createTemplateImageMarkup(imageRecord, { includeSrc: true });
+        if (!html) return;
+
+        restoreSelectionRange();
+        const editor = editorRef.current;
+        const selection = window.getSelection();
+        if (!editor || !selection) return;
+        editor.focus();
+
+        const range = selection.rangeCount ? selection.getRangeAt(0) : null;
+        if (!range || !editor.contains(range.commonAncestorContainer)) {
+            editor.insertAdjacentHTML("beforeend", `${html} `);
+        } else {
+            const template = document.createElement("template");
+            template.innerHTML = html;
+            const image = template.content.firstElementChild;
+            if (!image) return;
+
+            const fragment = document.createDocumentFragment();
+            const trailingSpace = document.createTextNode(" ");
+            fragment.appendChild(image);
+            fragment.appendChild(trailingSpace);
+            range.deleteContents();
+            range.insertNode(fragment);
+
+            const nextRange = document.createRange();
+            nextRange.setStartAfter(trailingSpace);
+            nextRange.collapse(true);
+            selection.removeAllRanges();
+            selection.addRange(nextRange);
+        }
+        closeMenu();
+        handleInput();
+        hydrateImages();
+    }, [allowImages, closeMenu, handleInput, hydrateImages, restoreSelectionRange]);
+
+    const insertImageFiles = useCallback(async (files = []) => {
+        if (!allowImages) return false;
+        const imageFiles = Array.from(files).filter((file) => file?.type?.startsWith("image/"));
+        if (imageFiles.length === 0) return false;
+
+        for (const file of imageFiles) {
+            try {
+                const imageRecord = await saveTemplateImageFile(file);
+                insertTemplateImage(imageRecord);
+            } catch (error) {
+                console.error("Template image import failed", error);
+                window.alert(error?.message || "Image import failed.");
+            }
+        }
+        return true;
+    }, [allowImages, insertTemplateImage]);
+
+    const getPastedImageFiles = useCallback((clipboardData) => {
+        const files = [];
+        if (clipboardData?.items?.length) {
+            Array.from(clipboardData.items).forEach((item) => {
+                if (item.kind === "file" && item.type?.startsWith("image/")) {
+                    const file = item.getAsFile();
+                    if (file) files.push(file);
+                }
+            });
+        }
+        if (files.length === 0 && clipboardData?.files?.length) {
+            Array.from(clipboardData.files).forEach((file) => {
+                if (file?.type?.startsWith("image/")) files.push(file);
+            });
+        }
+        return files;
+    }, []);
+
     const handlePaste = useCallback((event) => {
         const editor = editorRef.current;
         if (!editor) return;
+
+        const pastedImageFiles = getPastedImageFiles(event.clipboardData);
+        if (pastedImageFiles.length > 0) {
+            event.preventDefault();
+            if (!allowImages) return;
+            saveSelectionRange();
+            insertImageFiles(pastedImageFiles);
+            return;
+        }
 
         const html = event.clipboardData?.getData("text/html") || "";
         const text = event.clipboardData?.getData("text/plain") || "";
         if (!html && !text) return;
 
         const nextHtml = html
-            ? normalizePastedRichTextHTML(html, tokens)
+            ? normalizePastedRichTextHTML(allowImages ? html : stripImagesFromHtml(html), tokens)
             : normalizePastedPlainText(text, tokens);
 
         event.preventDefault();
         document.execCommand("insertHTML", false, nextHtml);
         closeMenu();
         handleInput();
-    }, [closeMenu, handleInput, tokens]);
+        hydrateImages();
+    }, [allowImages, closeMenu, getPastedImageFiles, handleInput, hydrateImages, insertImageFiles, saveSelectionRange, tokens]);
 
-    const insertImageByUrl = () => {
-        editorRef.current?.focus();
-        const url = window.prompt("Image URL");
-        const trimmed = url?.trim();
-        if (!trimmed) return;
-        if (!/^https?:\/\//i.test(trimmed)) {
-            window.alert("Use an http:// or https:// image URL.");
-            return;
-        }
-        document.execCommand("insertImage", false, trimmed);
-        handleInput();
+    const openImagePicker = () => {
+        if (!allowImages) return;
+        saveSelectionRange();
+        fileInputRef.current?.click();
+    };
+
+    const handleImageInputChange = (event) => {
+        const files = event.target.files ? Array.from(event.target.files) : [];
+        event.target.value = "";
+        if (!allowImages) return;
+        insertImageFiles(files);
     };
 
     const exec = (command) => {
         editorRef.current?.focus();
-        if (command === "insertImageByUrl") {
-            insertImageByUrl();
+        if (command === "insertImage") {
+            if (!allowImages) return;
+            openImagePicker();
             return;
         }
         document.execCommand(command, false, null);
@@ -438,8 +756,18 @@ function RichTextEditor({
 
     return (
         <div className={`rich-editor ${className}`.trim()}>
+            {allowImages && (
+                <input
+                    ref={fileInputRef}
+                    className="rich-editor__file-input"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    onChange={handleImageInputChange}
+                    tabIndex={-1}
+                />
+            )}
             <div className="rich-editor__toolbar">
-                {TOOLBAR_ACTIONS.map((action, idx) =>
+                {toolbarActions.map((action, idx) =>
                     action.type === "sep"
                         ? <span key={idx} className="rich-editor__sep" />
                         : (
@@ -465,6 +793,7 @@ function RichTextEditor({
                 onCopy={handleCopy}
                 onCut={handleCut}
                 onPaste={handlePaste}
+                onDoubleClick={handleEditorDoubleClick}
                 data-placeholder={placeholder}
             />
             <div
@@ -512,6 +841,70 @@ function RichTextEditor({
                     ))}
                 </div>
             </div>
+            {imageResize && (
+                <div
+                    className="rich-image-resize"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label="Resize image"
+                    onClick={(event) => event.stopPropagation()}
+                    onMouseDown={(event) => {
+                        if (event.target === event.currentTarget) closeImageResize();
+                    }}
+                >
+                    <div
+                        className="rich-image-resize__dialog"
+                        role="document"
+                        onKeyDown={(event) => {
+                            if (event.key === "Enter") applyImageResize(event);
+                        }}
+                    >
+                        <div className="rich-image-resize__header">
+                            <div>
+                                <p>Image</p>
+                                <h3>{imageResize.name}</h3>
+                            </div>
+                            <button type="button" className="rich-image-resize__close" onClick={closeImageResize}>×</button>
+                        </div>
+                        <div className="rich-image-resize__fields">
+                            <label>
+                                <span>Width</span>
+                                <input
+                                    type="number"
+                                    min={MIN_IMAGE_DIMENSION}
+                                    max={MAX_IMAGE_DIMENSION}
+                                    value={imageResize.width}
+                                    onChange={updateImageResizeWidth}
+                                    autoFocus
+                                />
+                            </label>
+                            <label>
+                                <span>Height</span>
+                                <input
+                                    type="number"
+                                    min={MIN_IMAGE_DIMENSION}
+                                    max={MAX_IMAGE_DIMENSION}
+                                    value={imageResize.height}
+                                    onChange={updateImageResizeHeight}
+                                />
+                            </label>
+                        </div>
+                        <label className="rich-image-resize__lock">
+                            <input
+                                type="checkbox"
+                                checked={imageResize.lockAspectRatio}
+                                onChange={toggleImageAspectRatio}
+                            />
+                            <span>Keep proportions</span>
+                        </label>
+                        <div className="rich-image-resize__actions">
+                            <button type="button" className="secondary-btn" onClick={resetImageResizeToOriginal}>Original</button>
+                            <button type="button" className="secondary-btn" onClick={closeImageResize}>Cancel</button>
+                            <button type="button" className="primary-btn" onClick={applyImageResize}>Apply</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -12,6 +12,8 @@ import {
     saveActiveClientPayload
 } from "../services/activeClientService.js";
 import { copyHtml, formatClipboardHtmlBody, showToast } from "../services/clipboardService.js";
+import { resolveTemplateImagesInHtml } from "../services/templateImageService.js";
+import { stripImagesFromHtml } from "../utils/templateImages.js";
 import { loadTokens } from "../services/tokenService.js";
 import {
     AGENT_PROFILE_UPDATED_EVENT,
@@ -56,6 +58,10 @@ import Modal from "./Modal.jsx";
 const CLIENT_CLIPBOARD_READ_TIMEOUT_MS = 3500;
 const CLIENT_BAR_FIELDS_KEY = "client_bar_fields";
 const CLIENT_BAR_FIELD_LIMIT = 8;
+
+function sanitizeGeneratedTemplateHtml(model, html = "") {
+    return model?.type === "sms" ? stripImagesFromHtml(html) : html;
+}
 
 function clientBarFieldKey(scope, label) {
     return `${scope}:${String(label || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "_")}`;
@@ -1287,7 +1293,7 @@ export function useTemplateRuntime() {
     };
 
     const copyPreviewHtml = async (html, id) => {
-        await copyHtml(html, { message: "Text copied", variant: "success" });
+        await copyHtml(await resolveTemplateImagesInHtml(html), { message: "Text copied", variant: "success" });
         setCopyPreviewCopied(id);
     };
 
@@ -1302,7 +1308,10 @@ export function useTemplateRuntime() {
             return false;
         }
 
-        const finalText = generateFinalText(effectiveModel, lang, filled);
+        const finalText = await resolveTemplateImagesInHtml(sanitizeGeneratedTemplateHtml(
+            effectiveModel,
+            generateFinalText(effectiveModel, lang, filled)
+        ));
         const id = copyPreviewId.current + 1;
         copyPreviewId.current = id;
         setCopyPreview({
@@ -1341,7 +1350,10 @@ export function useTemplateRuntime() {
         const tokensNeeded = Array.from(new Set(text.match(/\{[^{}]+\}/g) || []));
 
         if (tokensNeeded.length === 0) {
-            const finalText = generateFinalText(effectiveModel, lang, {});
+            const finalText = await resolveTemplateImagesInHtml(sanitizeGeneratedTemplateHtml(
+                effectiveModel,
+                generateFinalText(effectiveModel, lang, {})
+            ));
             await copyHtml(finalText, { message: "Text copied", variant: "info" });
             lastSectionClickVersion.current[sectionKey] = inputChangeVersion.current;
             return;
@@ -1368,7 +1380,10 @@ export function useTemplateRuntime() {
         Object.entries(filled).forEach(([token, val]) => {
             map[token] = val;
         });
-        const finalText = generateFinalText(effectiveModel, lang, map);
+        const finalText = await resolveTemplateImagesInHtml(sanitizeGeneratedTemplateHtml(
+            effectiveModel,
+            generateFinalText(effectiveModel, lang, map)
+        ));
         await copyHtml(finalText, {
             message: warnSameSection ? "Text copied (data unchanged)." : "Text copied",
             variant: warnSameSection ? "warning" : "info"

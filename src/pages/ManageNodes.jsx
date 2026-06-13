@@ -5,6 +5,7 @@ import EmptyState from "../components/EmptyState.jsx";
 import Modal from "../components/Modal.jsx";
 import { showToast } from "../services/clipboardService.js";
 import { loadTemplateTreeData, saveTemplateTreeData } from "../services/templateTreeService.js";
+import { loadTemplateImageMap } from "../services/templateImageService.js";
 import { loadTokens, loadTokensWithClientData, saveTokens } from "../services/tokenService.js";
 import { Channel, CHANNEL_VALUES } from "../models/templateTreeModel.js";
 import {
@@ -27,6 +28,11 @@ import {
     updateNode,
     updateTemplate
 } from "../utils/templateTreeOperations.js";
+import {
+    hydrateTemplateImageHtml,
+    stripImagesFromHtml,
+    TEMPLATE_IMAGES_UPDATED_EVENT
+} from "../utils/templateImages.js";
 
 const ROOT_PARENT_VALUE = "__root__";
 const RichTextEditor = lazy(() => import("../components/RichTextEditor.jsx"));
@@ -264,6 +270,25 @@ function createChannelContentDraft(channel, title = "") {
         text_it: "",
         variants: []
     };
+}
+
+function sanitizeContentForChannel(channel, content = {}) {
+    if (channel !== Channel.SMS) return content;
+
+    const sanitized = { ...content };
+    LANGUAGES.forEach(({ field }) => {
+        sanitized[field] = stripImagesFromHtml(sanitized[field] || "");
+    });
+    sanitized.variants = Array.isArray(sanitized.variants)
+        ? sanitized.variants.map((variant) => {
+            const nextVariant = { ...variant };
+            LANGUAGES.forEach(({ field }) => {
+                nextVariant[field] = stripImagesFromHtml(nextVariant[field] || "");
+            });
+            return nextVariant;
+        })
+        : [];
+    return sanitized;
 }
 
 function createVariantId() {
@@ -583,6 +608,7 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
     const [activeVariantByChannel, setActiveVariantByChannel] = useState({});
     const [previewRequest, setPreviewRequest] = useState(null);
     const [tokens, setTokens] = useState([]);
+    const [templateImageMap, setTemplateImageMap] = useState(() => new Map());
     const canSubmit = title.trim().length > 0 && channels.length > 0;
 
     useEffect(() => {
@@ -592,6 +618,21 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
         });
         return () => {
             active = false;
+        };
+    }, []);
+
+    useEffect(() => {
+        let active = true;
+        const refreshTemplateImages = () => {
+            loadTemplateImageMap().then((imageMap) => {
+                if (active) setTemplateImageMap(imageMap);
+            });
+        };
+        refreshTemplateImages();
+        window.addEventListener(TEMPLATE_IMAGES_UPDATED_EVENT, refreshTemplateImages);
+        return () => {
+            active = false;
+            window.removeEventListener(TEMPLATE_IMAGES_UPDATED_EVENT, refreshTemplateImages);
         };
     }, []);
 
@@ -721,7 +762,7 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
             channels,
             contentByChannel: CHANNEL_VALUES.reduce((acc, channel) => {
                 if (!channels.includes(channel)) return acc;
-                acc[channel] = {
+                const nextContent = {
                     ...createChannelContentDraft(channel, normalizedTitle),
                     ...(contentByChannel[channel] || {}),
                     title: normalizedTitle,
@@ -730,6 +771,7 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
                         ? contentByChannel[channel].variants
                         : []
                 };
+                acc[channel] = sanitizeContentForChannel(channel, nextContent);
                 return acc;
             }, {})
         });
@@ -754,6 +796,7 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
         : selectedVariants[0]?.id || "";
     const activeVariant = selectedVariants.find((variant) => variant.id === activeVariantId) || null;
     const activeVariantTextValue = activeVariant?.[activeLanguageDef.field] || "";
+    const activeChannelAllowsImages = selectedContentChannel !== Channel.SMS;
     const languageCompletion = useMemo(() => LANGUAGES.map((language) => {
         const values = [
             selectedContent?.[language.field] || "",
@@ -792,17 +835,21 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
         setPreviewRequest({
             title: `${CHANNEL_LABELS[selectedContentChannel]} · ${activeLanguageDef.label}`,
             label: selectedContent?.mainVariantName || selectedContent?.title || "Main text",
-            value: activeTextValue
+            value: activeChannelAllowsImages
+                ? hydrateTemplateImageHtml(activeTextValue, templateImageMap)
+                : stripImagesFromHtml(activeTextValue)
         });
-    }, [activeLanguageDef.label, activeTextValue, selectedContent, selectedContentChannel]);
+    }, [activeChannelAllowsImages, activeLanguageDef.label, activeTextValue, selectedContent, selectedContentChannel, templateImageMap]);
     const openVariantPreview = useCallback(() => {
         if (!selectedContentChannel || !activeVariant) return;
         setPreviewRequest({
             title: `${activeVariant.name || "Variant"} · ${activeLanguageDef.label}`,
             label: CHANNEL_LABELS[selectedContentChannel],
-            value: activeVariantTextValue
+            value: activeChannelAllowsImages
+                ? hydrateTemplateImageHtml(activeVariantTextValue, templateImageMap)
+                : stripImagesFromHtml(activeVariantTextValue)
         });
-    }, [activeLanguageDef.label, activeVariant, activeVariantTextValue, selectedContentChannel]);
+    }, [activeChannelAllowsImages, activeLanguageDef.label, activeVariant, activeVariantTextValue, selectedContentChannel, templateImageMap]);
     return (
         <Modal
             onClose={onClose}
@@ -925,6 +972,7 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
                                                     placeholder={`${activeLanguageDef.label} HTML`}
                                                     tokens={tokens}
                                                     onTokenCreate={createToken}
+                                                    allowImages={activeChannelAllowsImages}
                                                 />
                                             </Suspense>
                                         </div>
@@ -998,6 +1046,7 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
                                                                             placeholder={`${activeLanguageDef.label} variant HTML`}
                                                                             tokens={tokens}
                                                                             onTokenCreate={createToken}
+                                                                            allowImages={activeChannelAllowsImages}
                                                                         />
                                                                     </Suspense>
                                                                 </div>

@@ -51,6 +51,12 @@ import {
     searchTemplateTreeIndex
 } from "../utils/templateTreeNavigation.js";
 import { formatTokenPreviewHTML } from "../utils/richTextTokens.js";
+import {
+    hydrateTemplateImageHtml,
+    stripImagesFromHtml,
+    TEMPLATE_IMAGES_UPDATED_EVENT
+} from "../utils/templateImages.js";
+import { loadTemplateImageMap } from "../services/templateImageService.js";
 import { applyTheme, getInitialTheme } from "../utils/theme.js";
 import ToolsBar from "../components/ToolsBar.jsx";
 import SuperOfficePhotoGallery from "../components/SuperOfficePhotoGallery.jsx";
@@ -618,12 +624,14 @@ function formatResultPreviewText(value = "", tokenMap = EMPTY_TOKEN_MAP, values 
     );
 }
 
-function formatResultPreviewHTML(value = "", tokenMap = EMPTY_TOKEN_MAP, tokens = [], values = {}) {
-    const hydrated = String(value || "").replace(TEMPLATE_TOKEN_PATTERN, (tokenName) => {
+function formatResultPreviewHTML(value = "", tokenMap = EMPTY_TOKEN_MAP, tokens = [], values = {}, templateImageMap = new Map(), options = {}) {
+    const source = options.allowImages === false ? stripImagesFromHtml(value) : value;
+    const hydrated = String(source || "").replace(TEMPLATE_TOKEN_PATTERN, (tokenName) => {
         const resolved = resolvePreviewTokenValue(tokenName, tokenMap, values);
         return resolved === null ? tokenName : escapePreviewHTML(resolved);
     });
-    return formatTokenPreviewHTML(hydrated, tokens);
+    const formatted = formatTokenPreviewHTML(hydrated, tokens);
+    return options.allowImages === false ? formatted : hydrateTemplateImageHtml(formatted, templateImageMap);
 }
 
 const TemplateChannelPreviewCard = memo(function TemplateChannelPreviewCard({
@@ -684,6 +692,7 @@ const TemplateDetail = memo(function TemplateDetail({
     lang,
     tokens,
     values,
+    templateImageMap,
     onRequestCopy,
     onRequestTemplateResult,
     onSetVariantPicker,
@@ -706,10 +715,12 @@ const TemplateDetail = memo(function TemplateDetail({
                 ? `${(textResult.lang || lang).toUpperCase()} fallback`
                 : (textResult.lang || lang).toUpperCase(),
             subject: formatResultPreviewText(subject, previewTokenMap, values),
-            html: formatResultPreviewHTML(textResult.text, previewTokenMap, tokens, values),
+            html: formatResultPreviewHTML(textResult.text, previewTokenMap, tokens, values, templateImageMap, {
+                allowImages: channel !== Channel.SMS
+            }),
             meta: CHANNEL_META[channel] || CHANNEL_META[Channel.OTHER]
         };
-    }), [lang, previewTokenMap, template, tokens, uniqueVisibleChannels, values]);
+    }), [lang, previewTokenMap, template, templateImageMap, tokens, uniqueVisibleChannels, values]);
     const activePreview = useMemo(
         () => channelPreviews.find((preview) => preview.channel === activeChannel) || channelPreviews[0] || null,
         [activeChannel, channelPreviews]
@@ -848,6 +859,7 @@ export default function Templates() {
     const [superOfficeDataPresent, setSuperOfficeDataPresent] = useState(() => hasSuperOfficeTicketPayload());
     const [superOfficeGalleryOpen, setSuperOfficeGalleryOpen] = useState(false);
     const [aloPreparation, setAloPreparation] = useState(null);
+    const [templateImageMap, setTemplateImageMap] = useState(() => new Map());
     const configName = localStorage.getItem("local_configName") || "No configuration";
 
     const refreshTreeData = () => {
@@ -859,6 +871,21 @@ export default function Templates() {
 
     useEffect(() => {
         refreshTreeData();
+    }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+        const refreshTemplateImages = () => {
+            loadTemplateImageMap().then((imageMap) => {
+                if (!cancelled) setTemplateImageMap(imageMap);
+            });
+        };
+        refreshTemplateImages();
+        window.addEventListener(TEMPLATE_IMAGES_UPDATED_EVENT, refreshTemplateImages);
+        return () => {
+            cancelled = true;
+            window.removeEventListener(TEMPLATE_IMAGES_UPDATED_EVENT, refreshTemplateImages);
+        };
     }, []);
 
     useEffect(() => {
@@ -1473,6 +1500,7 @@ export default function Templates() {
                         lang={runtime.lang}
                         tokens={runtime.tokens}
                         values={runtime.values}
+                        templateImageMap={templateImageMap}
                         onRequestCopy={requestDetailCopy}
                         onRequestTemplateResult={requestDetailTemplateResult}
                         onSetVariantPicker={setDetailVariantPicker}
