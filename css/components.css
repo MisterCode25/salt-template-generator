@@ -8680,8 +8680,8 @@ textarea::placeholder,
 /* ─── SuperOffice Photo Gallery ─────────────────────────────── */
 
 .so-photo-gallery-modal {
-    width: min(1120px, calc(100vw - 28px));
-    height: min(820px, calc(100vh - 32px));
+    width: min(1280px, calc(100vw - 28px));
+    height: min(880px, calc(100vh - 32px));
     padding: 0;
     display: flex;
     flex-direction: column;
@@ -8748,8 +8748,8 @@ textarea::placeholder,
 
 .so-photo-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(188px, 1fr));
+    gap: 16px;
 }
 
 .so-photo-thumb {
@@ -8758,7 +8758,7 @@ textarea::placeholder,
     align-items: stretch;
     justify-content: center;
     width: 100%;
-    aspect-ratio: 1;
+    aspect-ratio: 4 / 3;
     border: 1px solid var(--border-default);
     border-radius: 8px;
     background: var(--read-bg);
@@ -8781,6 +8781,7 @@ textarea::placeholder,
     width: 100%;
     height: 100%;
     object-fit: cover;
+    object-position: center;
     display: block;
 }
 
@@ -8821,43 +8822,64 @@ textarea::placeholder,
 }
 
 .so-photo-viewer {
-    position: fixed;
+    position: absolute;
     inset: 0;
     z-index: calc(var(--z-modal) + 40);
     display: grid;
     place-items: center;
     background: rgba(0,0,0,0.86);
     padding: 22px;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
 }
 
 .so-photo-viewer__stage {
     position: relative;
-    width: min(1180px, 100%);
-    height: min(820px, calc(100vh - 44px));
+    width: 100%;
+    max-width: min(1440px, 100%);
+    height: 100%;
+    max-height: 100%;
+    box-sizing: border-box;
     display: grid;
-    grid-template-columns: 48px minmax(0, 1fr) 48px;
-    grid-template-rows: minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 12px;
+    grid-template-rows: auto minmax(0, 1fr);
+    overflow: hidden;
+    border-radius: 8px;
+    background: rgba(10, 12, 16, 0.64);
+    box-shadow: 0 18px 60px rgba(0,0,0,0.5);
 }
 
-.so-photo-viewer__image-wrap {
-    grid-column: 2;
-    grid-row: 1;
+.so-photo-viewer__image-shell {
+    position: relative;
     min-width: 0;
     min-height: 0;
     width: 100%;
     height: 100%;
+    overflow: hidden;
+}
+
+.so-photo-viewer__image-wrap {
+    position: absolute;
+    inset: 0;
+    min-width: 0;
+    min-height: 0;
     display: grid;
     place-items: center;
+    overflow: hidden;
 }
 
 .so-photo-viewer__image-wrap img {
-    max-width: 100%;
-    max-height: 100%;
+    position: absolute;
+    inset: 0;
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
     object-fit: contain;
-    border-radius: 8px;
-    box-shadow: 0 18px 60px rgba(0,0,0,0.5);
+    object-position: center;
+    display: block;
+    border-radius: inherit;
 }
 
 .so-photo-viewer__fallback {
@@ -8883,16 +8905,21 @@ textarea::placeholder,
 }
 
 .so-photo-viewer__nav {
-    grid-row: 1;
+    position: absolute;
+    top: 50%;
+    z-index: 4;
     display: grid;
     place-items: center;
     width: 44px;
     height: 44px;
+    transform: translateY(-50%);
     border: 1px solid rgba(255,255,255,0.16);
     border-radius: 999px;
-    background: rgba(255,255,255,0.09);
+    background: rgba(0,0,0,0.48);
     color: #fff;
     cursor: pointer;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
 }
 
 .so-photo-viewer__nav:hover,
@@ -8901,23 +8928,25 @@ textarea::placeholder,
 }
 
 .so-photo-viewer__nav--prev {
-    grid-column: 1;
+    left: 22px;
 }
 
 .so-photo-viewer__nav--next {
-    grid-column: 3;
+    right: 22px;
 }
 
 .so-photo-viewer__meta {
-    grid-column: 2;
-    grid-row: 2;
+    position: relative;
+    z-index: 6;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
     min-width: 0;
-    padding: 8px 2px;
-    color: rgba(255,255,255,0.82);
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.12);
+    background: rgba(12, 16, 26, 0.94);
+    color: rgba(255,255,255,0.88);
 }
 
 .so-photo-viewer__meta strong {
@@ -8933,6 +8962,202 @@ textarea::placeholder,
     color: rgba(255,255,255,0.56);
     font-size: 12px;
     font-weight: 700;
+}
+
+.so-photo-viewer__meta-actions {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.so-photo-viewer__meta-actions button {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 30px;
+    padding: 5px 10px;
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 7px;
+    background: rgba(255,255,255,0.1);
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.so-photo-viewer__meta-actions button:hover,
+.so-photo-viewer__meta-actions button:focus-visible {
+    background: rgba(255,255,255,0.17);
+    outline: none;
+}
+
+.so-annotator {
+    position: fixed;
+    inset: 0;
+    z-index: calc(var(--z-modal) + 60);
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 0;
+    background: rgba(5, 7, 12, 0.96);
+    color: #ffffff;
+}
+
+.so-annotator__bar {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.12);
+    background: rgba(12, 16, 26, 0.94);
+}
+
+.so-annotator__title {
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+}
+
+.so-annotator__title strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+    line-height: 1.2;
+}
+
+.so-annotator__title span {
+    color: rgba(255,255,255,0.48);
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.so-annotator__tools {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    min-width: 0;
+    flex-wrap: wrap;
+}
+
+.so-annotator__tool-group,
+.so-annotator__colors {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.so-annotator__tool-group button,
+.so-annotator__colors button {
+    display: inline-grid;
+    place-items: center;
+    min-width: 34px;
+    height: 34px;
+    padding: 0;
+    border: 1px solid rgba(255,255,255,0.16);
+    border-radius: 7px;
+    background: rgba(255,255,255,0.08);
+    color: #ffffff;
+    cursor: pointer;
+}
+
+.so-annotator__tool-group button:hover:not(:disabled),
+.so-annotator__tool-group button:focus-visible,
+.so-annotator__colors button:hover,
+.so-annotator__colors button:focus-visible,
+.so-annotator__tool-group button.is-active {
+    background: rgba(96, 165, 250, 0.24);
+    border-color: rgba(147, 197, 253, 0.52);
+    outline: none;
+}
+
+.so-annotator__tool-group button:disabled {
+    cursor: not-allowed;
+    opacity: 0.35;
+}
+
+.so-annotator__colors button {
+    width: 24px;
+    min-width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    background: var(--annotation-color);
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,0.18);
+}
+
+.so-annotator__colors button.is-active {
+    border-color: #ffffff;
+    box-shadow: 0 0 0 2px rgba(255,255,255,0.32), inset 0 0 0 2px rgba(0,0,0,0.18);
+}
+
+.so-annotator__text-action {
+    width: auto;
+    min-width: 52px !important;
+    padding: 0 10px !important;
+    font-size: 12px;
+    font-weight: 850;
+    line-height: 1;
+}
+
+.so-annotator__copy {
+    grid-auto-flow: column;
+    gap: 7px;
+    width: auto;
+    padding: 0 11px !important;
+    font-size: 12px;
+    font-weight: 850;
+    white-space: nowrap;
+}
+
+.so-annotator__workspace {
+    min-width: 0;
+    min-height: 0;
+    position: relative;
+    overflow: hidden;
+    background:
+        linear-gradient(45deg, rgba(255,255,255,0.035) 25%, transparent 25%),
+        linear-gradient(-45deg, rgba(255,255,255,0.035) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, rgba(255,255,255,0.035) 75%),
+        linear-gradient(-45deg, transparent 75%, rgba(255,255,255,0.035) 75%),
+        #05070c;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+    background-size: 20px 20px;
+}
+
+.so-annotator__workspace canvas {
+    cursor: crosshair;
+}
+
+.so-annotator__state {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    color: rgba(255,255,255,0.72);
+    font-size: 13px;
+    font-weight: 750;
+}
+
+.so-annotator__state.is-error {
+    color: #fecaca;
+}
+
+.so-annotator__status {
+    min-height: 38px;
+    padding: 10px 16px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    background: rgba(12, 16, 26, 0.94);
+    color: rgba(255,255,255,0.72);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.so-annotator__status.is-error {
+    color: #fecaca;
 }
 
 @media (max-width: 720px) {
@@ -8952,8 +9177,8 @@ textarea::placeholder,
     }
 
     .so-photo-grid {
-        grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
-        gap: 10px;
+        grid-template-columns: repeat(auto-fill, minmax(142px, 1fr));
+        gap: 12px;
     }
 
     .so-photo-viewer {
@@ -8961,35 +9186,41 @@ textarea::placeholder,
     }
 
     .so-photo-viewer__stage {
-        height: calc(100vh - 24px);
-        grid-template-columns: 1fr 1fr;
-        grid-template-rows: minmax(0, 1fr) auto auto;
-        gap: 10px;
-    }
-
-    .so-photo-viewer__image-wrap {
-        grid-column: 1 / -1;
+        height: 100%;
     }
 
     .so-photo-viewer__nav {
-        grid-row: 2;
         width: 42px;
         height: 42px;
     }
 
     .so-photo-viewer__nav--prev {
-        grid-column: 1;
-        justify-self: end;
+        left: 14px;
     }
 
     .so-photo-viewer__nav--next {
-        grid-column: 2;
-        justify-self: start;
+        right: 14px;
     }
 
     .so-photo-viewer__meta {
-        grid-column: 1 / -1;
-        grid-row: 3;
+        align-items: flex-start;
+        flex-direction: column;
+        padding: 10px;
+    }
+
+    .so-annotator__bar {
+        align-items: flex-start;
+        padding: 10px 12px;
+        flex-direction: column;
+    }
+
+    .so-annotator__tools {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .so-annotator__copy span {
+        display: none;
     }
 }
 
