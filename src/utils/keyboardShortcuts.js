@@ -1,7 +1,7 @@
 export const KEYBOARD_SHORTCUTS = Object.freeze([
-    { id: "importVti", label: "Import VTI data", key: "q", altKey: true },
-    { id: "importSo", label: "Import SO data", key: "w", altKey: true },
-    { id: "clearData", label: "Clear imported data", key: "e", altKey: true }
+    { id: "importVti", label: "Import VTI data", key: "q", code: "KeyQ", altKey: true },
+    { id: "importSo", label: "Import SO data", key: "w", code: "KeyW", altKey: true },
+    { id: "clearData", label: "Clear imported data", key: "e", code: "KeyE", altKey: true }
 ]);
 
 const EDITABLE_TARGET_SELECTOR = [
@@ -19,6 +19,26 @@ function hasModifier(event, name) {
 
 function keyMatches(actualKey, expectedKey) {
     return String(actualKey || "").toLowerCase() === String(expectedKey || "").toLowerCase();
+}
+
+function codeMatches(actualCode, expectedCode) {
+    return Boolean(expectedCode)
+        && String(actualCode || "").toLowerCase() === String(expectedCode || "").toLowerCase();
+}
+
+function modifiersMatch(event, shortcut) {
+    return hasModifier(event, "ctrlKey") === Boolean(shortcut.ctrlKey)
+        && hasModifier(event, "altKey") === Boolean(shortcut.altKey)
+        && hasModifier(event, "shiftKey") === Boolean(shortcut.shiftKey)
+        && hasModifier(event, "metaKey") === Boolean(shortcut.metaKey);
+}
+
+function shortcutMatchesEvent(event, shortcut) {
+    return modifiersMatch(event, shortcut)
+        && (
+            keyMatches(event?.key, shortcut.key)
+            || codeMatches(event?.code, shortcut.code)
+        );
 }
 
 export function formatKeyboardShortcut(shortcut) {
@@ -45,7 +65,6 @@ export function shouldIgnoreKeyboardShortcut(event) {
     return Boolean(
         event?.defaultPrevented
         || event?.repeat
-        || event?.isComposing
         || isEditableShortcutTarget(event?.target)
     );
 }
@@ -53,11 +72,8 @@ export function shouldIgnoreKeyboardShortcut(event) {
 export function getKeyboardShortcutForEvent(event) {
     if (shouldIgnoreKeyboardShortcut(event)) return null;
 
-    return KEYBOARD_SHORTCUTS.find((shortcut) => (
-        keyMatches(event?.key, shortcut.key)
-        && hasModifier(event, "ctrlKey") === Boolean(shortcut.ctrlKey)
-        && hasModifier(event, "altKey") === Boolean(shortcut.altKey)
-        && hasModifier(event, "shiftKey") === Boolean(shortcut.shiftKey)
-        && hasModifier(event, "metaKey") === Boolean(shortcut.metaKey)
-    )) || null;
+    const shortcut = KEYBOARD_SHORTCUTS.find((candidate) => shortcutMatchesEvent(event, candidate)) || null;
+    if (!shortcut) return null;
+    if (event?.isComposing && !codeMatches(event?.code, shortcut.code)) return null;
+    return shortcut;
 }

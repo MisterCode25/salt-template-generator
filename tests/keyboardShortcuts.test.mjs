@@ -8,6 +8,7 @@ import {
 function eventFor(key, overrides = {}) {
   return {
     key,
+    code: "",
     altKey: false,
     ctrlKey: false,
     shiftKey: false,
@@ -24,6 +25,14 @@ function eventFor(key, overrides = {}) {
   assert.equal(getKeyboardShortcutForEvent(eventFor("q", { altKey: true })).id, "importVti");
   assert.equal(getKeyboardShortcutForEvent(eventFor("W", { altKey: true })).id, "importSo");
   assert.equal(getKeyboardShortcutForEvent(eventFor("e", { altKey: true })).id, "clearData");
+}
+
+{
+  assert.equal(getKeyboardShortcutForEvent(eventFor("Dead", { altKey: true, code: "KeyQ" })).id, "importVti");
+  assert.equal(getKeyboardShortcutForEvent(eventFor("∑", { altKey: true, code: "KeyW" })).id, "importSo");
+  assert.equal(getKeyboardShortcutForEvent(eventFor("Dead", { altKey: true, code: "KeyE" })).id, "clearData");
+  assert.equal(getKeyboardShortcutForEvent(eventFor("Dead", { altKey: true, code: "KeyE", isComposing: true })).id, "clearData");
+  assert.equal(getKeyboardShortcutForEvent(eventFor("Dead", { altKey: true, code: "KeyR" })), null);
 }
 
 {
