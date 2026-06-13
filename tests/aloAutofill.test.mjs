@@ -91,9 +91,11 @@ const agentProfile = {
   assert.equal(payload.fields.externalReference, "SO-123");
   assert.equal(payload.fields.problemDescription, "Bad signal");
   assert.equal(payload.fields.problemNotes, "Bad signal - Never activated - 20.06.2026");
+  assert.equal(payload.fields.problemDateTime, "20.06.2026");
   assert.equal(payload.fields.problemCode3, "Performance problem");
   assert.equal(payload.alo.type, "lowBadRxTx");
   assert.equal(payload.alo.signalState, "never");
+  assert.equal(payload.alo.problemDateTime, "20.06.2026");
   assert.equal(payload.alo.notes, "Bad signal - Never activated - 20.06.2026");
 }
 
@@ -106,6 +108,7 @@ const agentProfile = {
   assert.match(bookmarklet, /ticket\.socketId/);
   assert.match(bookmarklet, /ticket\.contactPersonIspFirstName/);
   assert.match(bookmarklet, /ticket\.contactPersonIspMail/);
+  assert.match(bookmarklet, /ticket\.problemDateTime/);
   assert.match(bookmarklet, /ticket\.problemCode3/);
   assert.match(bookmarklet, /tagName === "SELECT"/);
 }

@@ -191,6 +191,9 @@ export function buildAloAutofillFields(clientPayload = {}, agentProfile = {}, su
         options.signalState ? buildAloProblemDescription(options) : "",
         ALO_DEFAULT_PROBLEM.problemNotes
     ]);
+    const problemDateTime = options.signalState === "never"
+        ? formatDisplayDate(options.activationDate)
+        : formatDisplayDate(options.disconnectionDate);
 
     return {
         externalReference: firstValue([options.extRef, superOffice.ticketId]),
@@ -210,6 +213,7 @@ export function buildAloAutofillFields(clientPayload = {}, agentProfile = {}, su
         ...ALO_DEFAULT_PROBLEM,
         problemDescription: preparedProblemDescription,
         problemNotes: preparedProblemNotes,
+        problemDateTime,
         problemCode3: options.aloType === "lowBadRxTx" ? "Performance problem" : ALO_DEFAULT_PROBLEM.problemCode3
     };
 }
@@ -228,6 +232,7 @@ export function buildAloAutofillPayload(clientPayload = {}, agentProfile = {}, s
             signalState: options.signalState || "",
             disconnectionDate: options.disconnectionDate || "",
             activationDate: options.activationDate || "",
+            problemDateTime: fields.problemDateTime,
             notes: options.notes || ""
         },
         client: {
@@ -387,6 +392,7 @@ function aloAutofillBookmarkletRunner(expectedSource) {
         apply("ticket.contactPersonIspMail", field(payload, "ispEmail", [agent.email]));
         apply("ticket.problemDescription", field(payload, "problemDescription", ["No signal"]));
         apply("ticket.problemNotes", field(payload, "problemNotes", [""]), true);
+        apply("ticket.problemDateTime", field(payload, "problemDateTime", [payload.alo && payload.alo.problemDateTime]));
         apply("ticket.problemCode1", field(payload, "problemCode1", ["400"]));
         apply("ticket.problemCode2", field(payload, "problemCode2", ["800"]));
         apply("ticket.problemCode3", field(payload, "problemCode3", ["900"]));
