@@ -364,164 +364,176 @@ function AloPreparationModal({ defaults, templateOptions = [], onCancel, onSubmi
         signalState: defaults.signalState || "",
         disconnectionDate: defaults.disconnectionDate || "",
         activationDate: defaults.activationDate || "",
-        description: defaults.description || ""
+        notesMode: "",
+        selectedTemplateId: "",
+        notes: defaults.description || ""
     }));
-    const [descriptionEdited, setDescriptionEdited] = useState(false);
-
+    const [stepIndex, setStepIndex] = useState(0);
     const inferredType = Boolean(defaults.externalFields?.SignalStatus || defaults.externalFields?.LedStatus || defaults.externalFields?.treatmentStep);
     const inferredSignalState = Boolean(defaults.signalState);
-    const selectedDate = form.signalState === "never" ? form.activationDate : form.disconnectionDate;
-    const canSubmit = form.extRef.trim() && form.signalState && selectedDate && form.description.trim();
+
+    const steps = useMemo(() => {
+        const next = [];
+        if (!inferredType) next.push({ key: "aloType", kind: "choice", title: "Type", options: ALO_TYPE_OPTIONS });
+        next.push({ key: "extRef", kind: "input", title: "Ext ref field", inputType: "text", placeholder: "SO ticket / external reference" });
+        if (!inferredSignalState) next.push({ key: "signalState", kind: "choice", title: "Signal state", options: ALO_SIGNAL_OPTIONS });
+        next.push({
+            key: form.signalState === "never" ? "activationDate" : "disconnectionDate",
+            kind: "input",
+            title: form.signalState === "never" ? "Activation date" : "Disconnection date",
+            inputType: "date"
+        });
+        next.push({
+            key: "notesMode",
+            kind: "choice",
+            title: "Problem notes",
+            options: [
+                { value: "free", label: "Free text" },
+                { value: "template", label: "Import template", disabled: templateOptions.length === 0 }
+            ]
+        });
+        next.push(form.notesMode === "template"
+            ? { key: "selectedTemplateId", kind: "template", title: "Import template" }
+            : { key: "notes", kind: "textarea", title: "Free text" });
+        return next;
+    }, [form.notesMode, form.signalState, inferredSignalState, inferredType, templateOptions.length]);
+
+    const step = steps[Math.min(stepIndex, steps.length - 1)];
+    const showBack = stepIndex > 0;
+    const problemDescription = form.aloType === "lowBadRxTx" ? "Bad signal" : "No signal";
 
     const updateForm = (patch) => {
         setForm((current) => {
             const next = { ...current, ...patch };
-            if (!descriptionEdited && !Object.prototype.hasOwnProperty.call(patch, "description")) {
-                next.description = buildAloProblemDescription(next);
+            if (Object.prototype.hasOwnProperty.call(patch, "signalState") || Object.prototype.hasOwnProperty.call(patch, "aloType")) {
+                next.notes = buildAloProblemDescription(next);
             }
             return next;
         });
     };
 
-    const updateDescription = (value) => {
-        setDescriptionEdited(true);
-        setForm((current) => ({ ...current, description: value }));
+    const advance = () => setStepIndex((current) => Math.min(current + 1, steps.length - 1));
+    const back = () => setStepIndex((current) => Math.max(current - 1, 0));
+
+    const finish = () => onSubmit({
+        aloType: form.aloType,
+        extRef: form.extRef.trim(),
+        signalState: form.signalState,
+        disconnectionDate: form.disconnectionDate,
+        activationDate: form.activationDate,
+        description: problemDescription,
+        notes: form.notes.trim()
+    });
+
+    const continueInput = () => {
+        const value = String(form[step.key] || "").trim();
+        if (!value) return;
+        if (stepIndex === steps.length - 1) {
+            finish();
+            return;
+        }
+        advance();
     };
 
-    const resetDescription = () => {
-        setDescriptionEdited(false);
-        setForm((current) => ({ ...current, description: buildAloProblemDescription(current) }));
-    };
-
-    const importTemplate = (event) => {
-        const option = templateOptions.find((candidate) => candidate.id === event.target.value);
-        if (!option) return;
-        updateDescription(option.text);
+    const chooseValue = (value) => {
+        if (!value) return;
+        if (step.key === "selectedTemplateId") {
+            const option = templateOptions.find((candidate) => candidate.id === value);
+            if (!option) return;
+            updateForm({ selectedTemplateId: value, notes: option.text });
+            return;
+        }
+        updateForm({ [step.key]: value });
+        setTimeout(advance, 0);
     };
 
     return (
-        <Modal onClose={onCancel} dialogClassName="popup-box alo-prep-modal" ariaLabel="Prepare ALO fill">
-            <div className="popup-header alo-prep-header">
-                <div>
-                    <p className="eyebrow">ALO fill</p>
-                    <h2>Prepare ticket data</h2>
-                    <p className="hint">Confirm the missing values before copying the data for the ALO shortcut.</p>
+        <Modal onClose={onCancel} ariaLabel={step.title} dialogClassName="prompt-dialog alo-step-modal">
+            <div key={step.key} className="prompt-dialog__step">
+                <div className="prompt-dialog__header">
+                    <span className="prompt-dialog__indicator" />
+                    <div>
+                        <h2>{step.title}</h2>
+                        <p className="hint">Problem description: {problemDescription}</p>
+                    </div>
                 </div>
-            </div>
 
-            <div className="alo-prep-body">
-                <div className="alo-prep-field">
-                    <span className="alo-prep-label">Type</span>
-                    <div className="alo-prep-segments" role="tablist" aria-label="ALO problem type">
-                        {ALO_TYPE_OPTIONS.map((option) => (
+                {step.kind === "choice" && (
+                    <div className="prompt-dialog__options">
+                        {step.options.map((option) => (
                             <button
                                 key={option.value}
                                 type="button"
-                                className={`alo-prep-segment${form.aloType === option.value ? " is-active" : ""}`}
-                                onClick={() => updateForm({ aloType: option.value })}
-                                disabled={inferredType}
+                                className={`prompt-dialog__option${form[step.key] === option.value ? " is-selected" : ""}`}
+                                disabled={option.disabled}
+                                onClick={() => chooseValue(option.value)}
                             >
                                 {option.label}
                             </button>
                         ))}
                     </div>
-                    {inferredType && <span className="alo-prep-note">Detected from External ID.</span>}
-                </div>
+                )}
 
-                <label className="alo-prep-field">
-                    <span className="alo-prep-label">Ext ref field</span>
-                    <input
-                        type="text"
-                        value={form.extRef}
-                        onChange={(event) => updateForm({ extRef: event.target.value })}
-                        placeholder="SO ticket / external reference"
-                    />
-                </label>
-
-                <div className="alo-prep-grid">
-                    <div className="alo-prep-field">
-                        <span className="alo-prep-label">Signal state</span>
-                        <div className="alo-prep-segments" role="tablist" aria-label="ALO signal state">
-                            {ALO_SIGNAL_OPTIONS.map((option) => (
-                                <button
-                                    key={option.value}
-                                    type="button"
-                                    className={`alo-prep-segment${form.signalState === option.value ? " is-active" : ""}`}
-                                    onClick={() => updateForm({ signalState: option.value })}
-                                    disabled={inferredSignalState}
-                                >
-                                    {option.label}
-                                </button>
-                            ))}
-                        </div>
-                        {inferredSignalState && <span className="alo-prep-note">Detected from External ID.</span>}
+                {step.kind === "input" && (
+                    <div className="prompt-dialog__body">
+                        <input
+                            autoFocus
+                            type={step.inputType || "text"}
+                            className="prompt-dialog__input"
+                            value={form[step.key] || ""}
+                            placeholder={step.placeholder || ""}
+                            onChange={(event) => updateForm({ [step.key]: event.target.value })}
+                            onKeyDown={(event) => {
+                                if (event.key === "Enter") {
+                                    event.preventDefault();
+                                    continueInput();
+                                }
+                            }}
+                        />
                     </div>
+                )}
 
-                    {form.signalState === "lost" ? (
-                        <label className="alo-prep-field">
-                            <span className="alo-prep-label">Disconnection date</span>
-                            <input
-                                type="date"
-                                value={form.disconnectionDate}
-                                onChange={(event) => updateForm({ disconnectionDate: event.target.value })}
-                            />
-                        </label>
-                    ) : (
-                        <label className="alo-prep-field">
-                            <span className="alo-prep-label">Activation date</span>
-                            <input
-                                type="date"
-                                value={form.activationDate}
-                                onChange={(event) => updateForm({ activationDate: event.target.value })}
-                            />
-                        </label>
+                {step.kind === "textarea" && (
+                    <div className="prompt-dialog__body">
+                        <textarea
+                            autoFocus
+                            className="prompt-dialog__input alo-step-textarea"
+                            rows={6}
+                            value={form.notes}
+                            onChange={(event) => updateForm({ notes: event.target.value })}
+                        />
+                    </div>
+                )}
+
+                {step.kind === "template" && (
+                    <div className="prompt-dialog__body">
+                        <select
+                            autoFocus
+                            className="prompt-dialog__input"
+                            value={form.selectedTemplateId}
+                            onChange={(event) => chooseValue(event.target.value)}
+                        >
+                            <option value="">Choose template...</option>
+                            {templateOptions.map((option) => (
+                                <option key={option.id} value={option.id}>{option.label}</option>
+                            ))}
+                        </select>
+                        {form.notes && <p className="alo-step-preview">{form.notes}</p>}
+                    </div>
+                )}
+
+                <div className="prompt-dialog__actions">
+                    {showBack && (
+                        <button type="button" className="prompt-dialog__btn prompt-dialog__btn--back" onClick={back}>← Back</button>
                     )}
+                    <div className="prompt-dialog__actions-end">
+                        {step.kind !== "choice" && (
+                            <button type="button" className="prompt-dialog__btn prompt-dialog__btn--continue" onClick={continueInput}>
+                                {stepIndex === steps.length - 1 ? "Copy ALO data" : "Continue →"}
+                            </button>
+                        )}
+                    </div>
                 </div>
-
-                <label className="alo-prep-field">
-                    <span className="alo-prep-label">Problem description</span>
-                    <textarea
-                        value={form.description}
-                        onChange={(event) => updateDescription(event.target.value)}
-                        rows={5}
-                        placeholder="Free text for ALO problem description"
-                    />
-                </label>
-                <div className="alo-prep-description-actions">
-                    <button type="button" className="alo-prep-reset" onClick={resetDescription}>
-                        Reset auto text
-                    </button>
-                    {templateOptions.length > 0 && (
-                        <label className="alo-prep-template-picker">
-                            <span>Import template</span>
-                            <select defaultValue="" onChange={importTemplate}>
-                                <option value="" disabled>Choose template...</option>
-                                {templateOptions.map((option) => (
-                                    <option key={option.id} value={option.id}>{option.label}</option>
-                                ))}
-                            </select>
-                        </label>
-                    )}
-                </div>
-            </div>
-
-            <div className="popup-actions alo-prep-actions">
-                <button type="button" className="secondary-btn" onClick={onCancel}>Cancel</button>
-                <button
-                    type="button"
-                    className="primary-btn"
-                    disabled={!canSubmit}
-                    onClick={() => onSubmit({
-                        aloType: form.aloType,
-                        extRef: form.extRef.trim(),
-                        signalState: form.signalState,
-                        disconnectionDate: form.disconnectionDate,
-                        activationDate: form.activationDate,
-                        description: form.description.trim()
-                    })}
-                >
-                    Copy ALO data
-                </button>
             </div>
         </Modal>
     );

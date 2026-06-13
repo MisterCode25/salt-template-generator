@@ -183,8 +183,13 @@ export function buildAloAutofillFields(clientPayload = {}, agentProfile = {}, su
     ]));
     const preparedProblemDescription = firstValue([
         options.description,
-        options.signalState ? buildAloProblemDescription(options) : "",
+        options.aloType === "lowBadRxTx" ? "Bad signal" : "",
         ALO_DEFAULT_PROBLEM.problemDescription
+    ]);
+    const preparedProblemNotes = firstValue([
+        options.notes,
+        options.signalState ? buildAloProblemDescription(options) : "",
+        ALO_DEFAULT_PROBLEM.problemNotes
     ]);
 
     return {
@@ -204,6 +209,7 @@ export function buildAloAutofillFields(clientPayload = {}, agentProfile = {}, su
         ispEmail: agent.email,
         ...ALO_DEFAULT_PROBLEM,
         problemDescription: preparedProblemDescription,
+        problemNotes: preparedProblemNotes,
         problemCode3: options.aloType === "lowBadRxTx" ? "Performance problem" : ALO_DEFAULT_PROBLEM.problemCode3
     };
 }
@@ -221,7 +227,8 @@ export function buildAloAutofillPayload(clientPayload = {}, agentProfile = {}, s
             type: options.aloType || "noSignal",
             signalState: options.signalState || "",
             disconnectionDate: options.disconnectionDate || "",
-            activationDate: options.activationDate || ""
+            activationDate: options.activationDate || "",
+            notes: options.notes || ""
         },
         client: {
             firstName: fields.firstName,

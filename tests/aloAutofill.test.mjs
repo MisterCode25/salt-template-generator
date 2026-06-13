@@ -84,14 +84,17 @@ const agentProfile = {
     signalState: "never",
     extRef: "SO-123",
     activationDate: "2026-06-20",
-    description: "Bad signal - Never activated - 20.06.2026"
+    description: "Bad signal",
+    notes: "Bad signal - Never activated - 20.06.2026"
   });
 
   assert.equal(payload.fields.externalReference, "SO-123");
-  assert.equal(payload.fields.problemDescription, "Bad signal - Never activated - 20.06.2026");
+  assert.equal(payload.fields.problemDescription, "Bad signal");
+  assert.equal(payload.fields.problemNotes, "Bad signal - Never activated - 20.06.2026");
   assert.equal(payload.fields.problemCode3, "Performance problem");
   assert.equal(payload.alo.type, "lowBadRxTx");
   assert.equal(payload.alo.signalState, "never");
+  assert.equal(payload.alo.notes, "Bad signal - Never activated - 20.06.2026");
 }
 
 {
