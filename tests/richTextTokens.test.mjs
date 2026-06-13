@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 
 const {
+  matchTokenTriggerBeforeCaret,
   makeTokenChip,
   serializeRichText,
   serializeRichTextPlain
@@ -34,6 +35,22 @@ assert.equal(chipFromMap.dataset.label, "Agent email");
 
 const unknownChip = makeTokenChip(documentRef, "{unknown_token}", tokenDefs);
 assert.equal(unknownChip.dataset.label, "unknown token");
+
+assert.deepEqual(matchTokenTriggerBeforeCaret("@client"), {
+  query: "client",
+  raw: "@client"
+});
+assert.deepEqual(matchTokenTriggerBeforeCaret("Hello @client"), {
+  query: "client",
+  raw: "@client"
+});
+assert.deepEqual(matchTokenTriggerBeforeCaret("Hello @client ", { completed: true }), {
+  query: "client",
+  raw: "@client "
+});
+assert.equal(matchTokenTriggerBeforeCaret("samir@example"), null);
+assert.equal(matchTokenTriggerBeforeCaret("samir@example ", { completed: true }), null);
+assert.equal(matchTokenTriggerBeforeCaret("Text,@client"), null);
 
 {
   let cloned = false;

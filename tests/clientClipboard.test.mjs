@@ -171,6 +171,14 @@ ${JSON.stringify(sampleClientJSON, null, 2)}`);
   assert.equal(values["{healthcheck_oto_id}"], "B.111.783.391.7");
   assert.equal(values["{healthcheck_cross_connexion_port}"], "23");
   assert.equal(values["{contact_error}"], "");
+  assert.equal(tokenMap.get("{client_first_name}").label, "First name");
+  assert.equal(tokenMap.get("{client_sex}").label, "Sex");
+  assert.equal(tokenMap.get("{healthcheck_oto_id}").label, "OTO ID");
+  assert.ok(tokenMap.get("{client_first_name}").searchAliases.includes("prenom"));
+  assert.ok(tokenMap.get("{client_last_name}").searchAliases.includes("nom"));
+  assert.ok(tokenMap.get("{client_sex}").searchAliases.includes("sexe"));
+  assert.equal(tokenMap.get("{client_first_name}").previewValue, "Peter manuel");
+  assert.equal(tokenMap.get("{healthcheck_oto_id}").previewValue, "B.111.783.391.7");
   assert.equal(tokenMap.get("{client_first_name}").display_mode, "on_demand");
   assert.equal(tokenMap.get("{healthcheck_cross_connexion_port}").internal, true);
 }
@@ -218,6 +226,10 @@ ${JSON.stringify(sampleClientJSON, null, 2)}`);
 
   assert.equal(values["{so_ticket_num}"], "SO-123");
   assert.equal(internal.values["{so_ticket_num}"], "SO-123");
+  assert.equal(
+    internal.tokenDefs.find((tokenDef) => tokenDef.token === "{so_ticket_num}").previewValue,
+    "SO-123"
+  );
   assert.equal(internal.values["{ticket_num}"], undefined);
   assert.equal(internal.values["{so_number}"], undefined);
   assert.equal(Boolean(vtiData?.fields.some((field) => field.label.includes("template Inputs"))), false);

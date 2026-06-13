@@ -5,7 +5,7 @@ import EmptyState from "../components/EmptyState.jsx";
 import Modal from "../components/Modal.jsx";
 import { showToast } from "../services/clipboardService.js";
 import { loadTemplateTreeData, saveTemplateTreeData } from "../services/templateTreeService.js";
-import { loadTokens, saveTokens } from "../services/tokenService.js";
+import { loadTokens, loadTokensWithClientData, saveTokens } from "../services/tokenService.js";
 import { Channel, CHANNEL_VALUES } from "../models/templateTreeModel.js";
 import {
     buildNodeChildrenIndex,
@@ -587,7 +587,7 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
 
     useEffect(() => {
         let active = true;
-        loadTokens().then((loadedTokens) => {
+        loadTokensWithClientData().then((loadedTokens) => {
             if (active) setTokens(loadedTokens);
         });
         return () => {
@@ -596,19 +596,20 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave }) {
     }, []);
 
     const createToken = useCallback(async (tokenDef) => {
-        const currentTokens = await loadTokens();
-        const existing = currentTokens.find((token) =>
+        const visibleTokens = await loadTokensWithClientData();
+        const existing = visibleTokens.find((token) =>
             token.token === tokenDef.token
             || (token.label || "").toLowerCase() === (tokenDef.label || "").toLowerCase()
         );
         if (existing) {
-            setTokens(currentTokens);
+            setTokens(visibleTokens);
             return existing;
         }
 
+        const currentTokens = await loadTokens();
         const nextTokens = [...currentTokens, tokenDef];
         await saveTokens(nextTokens);
-        setTokens(nextTokens);
+        setTokens(await loadTokensWithClientData());
         return tokenDef;
     }, []);
 

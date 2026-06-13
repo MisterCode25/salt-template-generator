@@ -261,6 +261,7 @@ const CLIENT_FIELD_GROUPS = [
     }
 ];
 let knownClientFieldPathCache = null;
+let knownClientFieldByPathCache = null;
 const payloadLeavesCache = typeof WeakMap !== "undefined" ? new WeakMap() : null;
 const pathSegmentsCache = new Map();
 
@@ -413,6 +414,21 @@ function knownClientFieldPaths() {
 
     knownClientFieldPathCache = paths;
     return paths;
+}
+
+function knownClientFieldsByPath() {
+    if (knownClientFieldByPathCache) return knownClientFieldByPathCache;
+
+    const byPath = new Map();
+    CLIENT_FIELD_GROUPS.forEach((group) => {
+        group.fields.forEach((field) => {
+            if (!field.path) return;
+            byPath.set(field.path, { ...field, group });
+        });
+    });
+
+    knownClientFieldByPathCache = byPath;
+    return byPath;
 }
 
 export function normalizeClientTokenName(name = "") {
@@ -698,12 +714,23 @@ export function getClientInternalTokenData(payload) {
         if (!token || seen.has(token)) continue;
         seen.add(token);
 
-        const label = formatPathLabel(leaf.path) || token;
+        const pathKey = leaf.path.join(".");
+        const field = knownClientFieldsByPath().get(pathKey);
+        const pathLabel = formatPathLabel(leaf.path) || token;
+        const label = field?.label || pathLabel;
+        const searchAliases = [
+            ...(field?.aliases || []),
+            pathLabel,
+            pathKey,
+            leaf.path.join(" ")
+        ].filter(Boolean);
         tokenDefs.push({
             id: `client-json:${leaf.path.join(".")}`,
             token,
             label,
             key: leaf.path.join("."),
+            searchAliases,
+            previewValue: leaf.value,
             input_type: "text",
             display_mode: "on_demand",
             internal: true
@@ -727,6 +754,7 @@ export function getClientInternalTokenData(payload) {
             token,
             label: entry.label || token,
             key: `${MANUAL_CLIENT_INPUTS_KEY}.${entry.name}`,
+            previewValue: entry.value,
             input_type: "text",
             display_mode: "on_demand",
             internal: true

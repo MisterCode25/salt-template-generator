@@ -1,4 +1,6 @@
 const TOKEN_PATTERN = /\{[^{}]+\}/g;
+const ACTIVE_TOKEN_TRIGGER_PATTERN = /(^|[\s\u00a0])@([a-zA-Z0-9 _-]*)$/;
+const COMPLETED_TOKEN_TRIGGER_PATTERN = /(^|[\s\u00a0])@([a-zA-Z0-9 _-]+)([\s\u00a0])$/;
 const CARET_BOUNDARY = "\u200B";
 const tokenLabelLookupCache = typeof WeakMap !== "undefined" ? new WeakMap() : null;
 
@@ -187,20 +189,33 @@ function rangeFromTextOffsets(root, startOffset, endOffset) {
     return null;
 }
 
+export function matchTokenTriggerBeforeCaret(beforeCaret = "", { completed = false } = {}) {
+    const text = String(beforeCaret ?? "");
+    const match = text.match(completed ? COMPLETED_TOKEN_TRIGGER_PATTERN : ACTIVE_TOKEN_TRIGGER_PATTERN);
+    if (!match) return null;
+
+    const query = match[2] || "";
+    if (completed && !query.trim()) return null;
+
+    return {
+        query: completed ? query.trim() : query,
+        raw: `@${query}${completed ? match[3] || "" : ""}`
+    };
+}
+
 export function getSlashContext(root) {
     const offset = getCaretTextOffset(root);
     if (offset === null) return null;
 
     const beforeCaret = root.textContent.slice(0, offset);
-    const slashMatch = beforeCaret.match(/@([a-zA-Z0-9 _-]*)$/);
-    if (!slashMatch) return null;
+    const tokenMatch = matchTokenTriggerBeforeCaret(beforeCaret);
+    if (!tokenMatch) return null;
 
-    const raw = slashMatch[0];
-    const range = rangeFromTextOffsets(root, offset - raw.length, offset);
+    const range = rangeFromTextOffsets(root, offset - tokenMatch.raw.length, offset);
     if (!range) return null;
 
     return {
-        query: slashMatch[1] || "",
+        query: tokenMatch.query,
         range
     };
 }
@@ -210,18 +225,14 @@ export function getCompletedSlashContext(root) {
     if (offset === null) return null;
 
     const beforeCaret = root.textContent.slice(0, offset);
-    const slashMatch = beforeCaret.match(/@([a-zA-Z0-9 _-]+)[\s\u00a0]$/);
-    if (!slashMatch) return null;
+    const tokenMatch = matchTokenTriggerBeforeCaret(beforeCaret, { completed: true });
+    if (!tokenMatch) return null;
 
-    const raw = slashMatch[0];
-    const query = (slashMatch[1] || "").trim();
-    if (!query) return null;
-
-    const range = rangeFromTextOffsets(root, offset - raw.length, offset);
+    const range = rangeFromTextOffsets(root, offset - tokenMatch.raw.length, offset);
     if (!range) return null;
 
     return {
-        query,
+        query: tokenMatch.query,
         range
     };
 }

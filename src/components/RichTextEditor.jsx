@@ -32,11 +32,22 @@ function normalizeTokenSearchValue(value = "") {
 function buildTokenSearchIndex(tokens = []) {
     const index = [];
     for (const item of tokens || []) {
+        const aliases = [
+            item.key,
+            ...(Array.isArray(item.aliases) ? item.aliases : []),
+            ...(Array.isArray(item.searchAliases) ? item.searchAliases : [])
+        ];
         index.push({
             item,
-            labelSearch: normalizeTokenSearchValue(item.label),
+            labelSearch: normalizeTokenSearchValue([item.label, ...aliases].filter(Boolean).join(" ")),
             tokenSearch: normalizeTokenSearchValue(item.token),
-            tokenNameSearch: normalizeTokenSearchValue(tokenName(item.token))
+            tokenNameSearch: normalizeTokenSearchValue(tokenName(item.token)),
+            exactSearchValues: [
+                item.label,
+                item.token,
+                tokenName(item.token),
+                ...aliases
+            ].map(normalizeTokenSearchValue).filter(Boolean)
         });
     }
     return index;
@@ -47,11 +58,11 @@ function buildTokenMatches(queryValue, tokenSearchIndex = []) {
     const matches = [];
     let hasExactMatch = false;
 
-    for (const { item, labelSearch, tokenSearch, tokenNameSearch } of tokenSearchIndex) {
+    for (const { item, labelSearch, tokenSearch, tokenNameSearch, exactSearchValues } of tokenSearchIndex) {
         if (!query || labelSearch.includes(query) || tokenSearch.includes(query)) {
             matches.push(item);
         }
-        if (query && (labelSearch === query || tokenNameSearch === query)) {
+        if (query && (tokenNameSearch === query || exactSearchValues.includes(query))) {
             hasExactMatch = true;
         }
     }
@@ -125,6 +136,14 @@ function groupTokenMatches(matches = []) {
     });
 
     return groups.sort((a, b) => (order.get(a.id) ?? 99) - (order.get(b.id) ?? 99));
+}
+
+function getTokenPreviewValue(tokenDef = {}) {
+    const value = tokenDef.previewValue ?? tokenDef.currentValue;
+    if (value === null || value === undefined) return "";
+    const text = String(value).replace(/\s+/g, " ").trim();
+    if (!text) return "";
+    return text.length > 90 ? `${text.slice(0, 87)}...` : text;
 }
 
 function RichTextEditor({
@@ -462,21 +481,32 @@ function RichTextEditor({
                         <section key={group.id} className="rich-token-menu__group">
                             <h4>{group.title}</h4>
                             <div className="rich-token-menu__group-items">
-                                {group.items.map(({ item, index }) => (
-                                    <button
-                                        key={item.id || item.token}
-                                        type="button"
-                                        className={`${index === activeIndex ? "is-active" : ""}${item.createLabel ? " create-token" : ""}`.trim()}
-                                        onMouseEnter={() => setActiveIndex(index)}
-                                        onMouseDown={(event) => {
-                                            event.preventDefault();
-                                            insertToken(item);
-                                        }}
-                                    >
-                                        <span>{item.label || tokenName(item.token)}</span>
-                                        <small>{item.token}</small>
-                                    </button>
-                                ))}
+                                {group.items.map(({ item, index }) => {
+                                    const label = item.label || tokenName(item.token);
+                                    const previewValue = getTokenPreviewValue(item);
+
+                                    return (
+                                        <button
+                                            key={item.id || item.token}
+                                            type="button"
+                                            className={`${index === activeIndex ? "is-active" : ""}${item.createLabel ? " create-token" : ""}`.trim()}
+                                            title={previewValue ? `${label}: ${previewValue}` : undefined}
+                                            onMouseEnter={() => setActiveIndex(index)}
+                                            onMouseDown={(event) => {
+                                                event.preventDefault();
+                                                insertToken(item);
+                                            }}
+                                        >
+                                            <span className="rich-token-menu__option-main">
+                                                <span className="rich-token-menu__option-label">{label}</span>
+                                                {previewValue ? (
+                                                    <small className="rich-token-menu__preview">{previewValue}</small>
+                                                ) : null}
+                                            </span>
+                                            <small className="rich-token-menu__token-value">{item.token}</small>
+                                        </button>
+                                    );
+                                })}
                             </div>
                         </section>
                     ))}

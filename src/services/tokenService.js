@@ -7,6 +7,8 @@ import {
 } from "../utils/tokenCanonicalization.js";
 import { AGENT_PROFILE_TOKENS } from "./agentProfileService.js";
 import { EXTERNAL_SYSTEM_TOKENS } from "../utils/externalGenerator.js";
+import { loadActiveClientPayload, STORED_INPUT_PREFIX } from "./activeClientService.js";
+import { getClientInternalTokenData } from "../utils/clientClipboard.js";
 
 const TOKEN_PATH = "tokens";
 const TOKEN_PATTERN = /\{[^{}]+\}/g;
@@ -14,15 +16,44 @@ const INTERNAL_TOKEN_PREFIX_PATTERN = /^\{(?:client|contact|healthcheck|offer)_/
 const SYSTEM_TOKENS = [...AGENT_PROFILE_TOKENS, ...EXTERNAL_SYSTEM_TOKENS];
 const SYSTEM_TOKEN_SET = new Set(SYSTEM_TOKENS.map((tokenDef) => tokenDef.token));
 
-function isSystemToken(tokenDef) {
-    return SYSTEM_TOKEN_SET.has(tokenDef?.token);
+function isNonPersistentToken(tokenDef) {
+    return SYSTEM_TOKEN_SET.has(tokenDef?.token)
+        || Boolean(tokenDef?.system)
+        || Boolean(tokenDef?.internal);
 }
 
 function normalizeTokenDefinition(tokenDef) {
     if (!tokenDef || typeof tokenDef !== "object") return tokenDef;
+    const { previewValue, currentValue, ...persistedTokenDef } = tokenDef;
     return canonicalizeTokenDefinition({
-        ...tokenDef,
+        ...persistedTokenDef,
         display_mode: "on_demand"
+    });
+}
+
+function formatPreviewValue(value) {
+    if (value === null || value === undefined) return "";
+    if (typeof value === "string") return value.replace(/\s+/g, " ").trim();
+    if (typeof value === "number" || typeof value === "boolean") return String(value);
+    return "";
+}
+
+function readStoredTokenPreviewValue(token, storage = globalThis.localStorage) {
+    if (!storage || !token) return "";
+    try {
+        return formatPreviewValue(storage.getItem(`${STORED_INPUT_PREFIX}${token}`));
+    } catch {
+        return "";
+    }
+}
+
+function withTokenPreviewValues(tokenDefs = [], storage = globalThis.localStorage) {
+    return tokenDefs.map((tokenDef) => {
+        if (!tokenDef || typeof tokenDef !== "object") return tokenDef;
+
+        const previewValue = formatPreviewValue(tokenDef.previewValue ?? tokenDef.currentValue)
+            || readStoredTokenPreviewValue(tokenDef.token, storage);
+        return previewValue ? { ...tokenDef, previewValue } : tokenDef;
     });
 }
 
@@ -52,16 +83,35 @@ export async function loadTokens() {
     const storedTokens = Array.isArray(tokens) ? tokens : [];
 
     const normalized = canonicalizeTokenDefinitions(storedTokens.map(normalizeTokenDefinition))
-        .filter((tokenDef) => !isSystemToken(tokenDef));
+        .filter((tokenDef) => !isNonPersistentToken(tokenDef));
     if (!tokenListsEqual(normalized, storedTokens)) {
         await saveTokens(normalized);
     }
     return canonicalizeTokenDefinitions([...SYSTEM_TOKENS, ...normalized]);
 }
 
+export function mergeUniqueTokenDefinitions(tokenDefs = []) {
+    const byToken = new Map();
+    tokenDefs
+        .filter(Boolean)
+        .forEach((tokenDef) => {
+            if (!tokenDef?.token || byToken.has(tokenDef.token)) return;
+            byToken.set(tokenDef.token, tokenDef);
+        });
+    return Array.from(byToken.values());
+}
+
+export async function loadTokensWithClientData(clientPayload = loadActiveClientPayload()) {
+    const configuredTokens = await loadTokens();
+    const clientTokens = clientPayload
+        ? getClientInternalTokenData(clientPayload).tokenDefs
+        : [];
+    return withTokenPreviewValues(mergeUniqueTokenDefinitions([...configuredTokens, ...clientTokens]));
+}
+
 export async function saveTokens(tokens) {
     await saveJSON(TOKEN_PATH, Array.isArray(tokens)
-        ? canonicalizeTokenDefinitions(tokens.map(normalizeTokenDefinition)).filter((tokenDef) => !isSystemToken(tokenDef))
+        ? canonicalizeTokenDefinitions(tokens.map(normalizeTokenDefinition)).filter((tokenDef) => !isNonPersistentToken(tokenDef))
         : tokens);
 }
 

@@ -2782,6 +2782,10 @@ textarea:focus {
     color: #6a7891;
 }
 
+.light-theme .rich-token-menu .rich-token-menu__preview {
+    color: #51607a;
+}
+
 .light-theme .rich-preview:empty::before {
     color: #5b6b90;
 }
@@ -3024,6 +3028,10 @@ textarea:focus {
 .salt-theme .rich-token-menu button.create-token {
     background: rgba(5, 135, 80, 0.85);
     border-color: rgba(30, 215, 100, 0.52);
+}
+
+.salt-theme .rich-token-menu .rich-token-menu__preview {
+    color: rgba(223, 255, 233, 0.78);
 }
 
 .salt-theme .theme-toggle {
@@ -4404,6 +4412,19 @@ textarea:focus {
     cursor: pointer;
 }
 
+.rich-token-menu__option-main {
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+}
+
+.rich-token-menu__option-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .rich-token-menu button:hover,
 .rich-token-menu button.is-active {
     background: rgba(80, 120, 255, 0.18);
@@ -4425,6 +4446,28 @@ textarea:focus {
     color: #9fb2db;
     font-size: 12px;
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.rich-token-menu .rich-token-menu__preview {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    color: #c7d3ec;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 650;
+    line-height: 1.25;
+    opacity: 0.82;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.rich-token-menu .rich-token-menu__token-value {
+    flex: 0 0 auto;
+    max-width: 45%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .rich-editor__content:empty::before {
