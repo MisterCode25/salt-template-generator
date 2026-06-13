@@ -78,15 +78,8 @@ function ShortcutCard({ shortcut }) {
             <a
                 className={`vti-bookmarklet-button vti-bookmarklet-button--${shortcut.id}`}
                 href={shortcut.bookmarklet}
-                draggable="true"
                 title={shortcut.buttonLabel}
                 aria-label={shortcut.buttonLabel}
-                onDragStart={(event) => {
-                    event.dataTransfer.setData("text/uri-list", shortcut.bookmarklet);
-                    event.dataTransfer.setData("text/plain", shortcut.bookmarklet);
-                    event.dataTransfer.setData("text/x-moz-url", `${shortcut.bookmarklet}\n${shortcut.buttonLabel}`);
-                    event.dataTransfer.effectAllowed = "copyLink";
-                }}
                 onClick={(event) => {
                     event.preventDefault();
                     showToast("Drag this button to the bookmarks bar.", "info");
