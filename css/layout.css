@@ -116,8 +116,15 @@
     background: rgba(88, 130, 220, 0.08);
 }
 
-.client-info-external-id-label {
+.client-info-external-id-side {
     flex-shrink: 0;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+}
+
+.client-info-external-id-label {
     color: var(--text-muted);
     font-size: 10px;
     font-weight: 800;
@@ -127,11 +134,102 @@
 
 .client-info-external-id-value {
     min-width: 0;
+    flex: 1 1 auto;
     color: var(--text-primary);
     font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
     font-size: 12px;
     line-height: 1.35;
     overflow-wrap: anywhere;
+}
+
+.client-info-external-id-chips {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+}
+
+.client-info-external-id-copy {
+    flex: 0 0 auto;
+    min-height: 20px;
+    padding: 2px 7px;
+    border: 1px solid var(--button-secondary-border);
+    border-radius: 6px;
+    background: var(--button-secondary-bg);
+    color: var(--button-secondary-text);
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.client-info-external-id-copy:hover,
+.client-info-external-id-copy:focus-visible {
+    border-color: var(--control-border-hover);
+    background: var(--button-secondary-bg-hover);
+    color: var(--text-primary);
+    outline: none;
+}
+
+.client-info-external-id-segment {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+}
+
+.client-info-external-id-chip {
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
+    max-width: 150px;
+    min-height: 24px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    border: 1px solid rgba(96, 165, 250, 0.28);
+    background: rgba(30, 64, 175, 0.16);
+    color: var(--text-primary);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+}
+
+.client-info-external-id-chip:hover:not(:disabled) {
+    background: rgba(37, 99, 235, 0.26);
+    border-color: rgba(96, 165, 250, 0.48);
+    transform: translateY(-1px);
+}
+
+.client-info-external-id-chip:disabled {
+    cursor: default;
+}
+
+.client-info-external-id-chip.is-empty {
+    border-color: rgba(248, 113, 113, 0.26);
+    background: rgba(127, 29, 29, 0.14);
+    color: rgba(254, 202, 202, 0.72);
+}
+
+.client-info-external-id-chip-value {
+    min-width: 0;
+    max-width: 132px;
+    overflow: hidden;
+    color: currentColor;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 11px;
+    font-weight: 760;
+    line-height: 1.1;
+    text-overflow: ellipsis;
+}
+
+.client-info-external-id-separator {
+    color: rgba(191, 219, 254, 0.72);
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 11px;
+    font-weight: 850;
+    line-height: 1;
 }
 
 .client-info-bar-empty {
@@ -145,6 +243,144 @@
     font-size: var(--font-sm);
     color: var(--text-muted);
     white-space: nowrap;
+}
+
+.client-import-status-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin: 0 0 6px;
+}
+
+.client-import-status-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-height: 28px;
+    padding: 0 9px;
+    border-radius: 999px;
+    border: 1px solid rgba(99,102,241,0.42);
+    background: rgba(99,102,241,0.16);
+    color: var(--text-primary);
+    font-size: 12px;
+    font-weight: 760;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), opacity var(--transition-fast);
+}
+
+.client-import-status-btn:hover:not(:disabled) {
+    background: rgba(99,102,241,0.24);
+    border-color: rgba(129,140,248,0.62);
+}
+
+.client-import-status-btn--vti {
+    border-color: rgba(248,113,113,0.44);
+    background: rgba(185,28,28,0.18);
+    color: #fecaca;
+}
+
+.client-import-status-btn--vti:hover:not(:disabled) {
+    background: rgba(185,28,28,0.28);
+    border-color: rgba(248,113,113,0.62);
+    color: #fee2e2;
+}
+
+.client-import-status-btn--so {
+    border-color: rgba(45,212,191,0.42);
+    background: rgba(14,116,144,0.2);
+    color: #ccfbf1;
+}
+
+.client-import-status-btn--so:hover:not(:disabled) {
+    background: rgba(14,116,144,0.3);
+    border-color: rgba(45,212,191,0.6);
+    color: #f0fdfa;
+}
+
+.client-import-status-btn small {
+    display: inline-flex;
+    align-items: center;
+    min-height: 16px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: rgba(99,102,241,0.22);
+    color: #dfe4ff;
+    font-size: 9px;
+    font-weight: 850;
+    line-height: 1;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.client-import-status-btn--vti small {
+    background: rgba(248,113,113,0.16);
+    color: #fecaca;
+}
+
+.client-import-status-btn--so small {
+    background: rgba(45,212,191,0.16);
+    color: #99f6e4;
+}
+
+.client-import-status-btn.is-loaded {
+    border-color: rgba(148,163,184,0.22);
+    background: rgba(148,163,184,0.08);
+    color: rgba(226,232,240,0.58);
+    box-shadow: none;
+}
+
+.client-import-status-btn.is-loaded:hover:not(:disabled) {
+    background: rgba(148,163,184,0.12);
+    border-color: rgba(148,163,184,0.32);
+    color: rgba(226,232,240,0.74);
+}
+
+.client-import-status-btn.is-loaded small {
+    background: rgba(148,163,184,0.14);
+    color: rgba(226,232,240,0.56);
+}
+
+.client-import-clear-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 28px;
+    padding: 0 9px;
+    border-radius: 999px;
+    border: 1px solid rgba(248,113,113,0.26);
+    background: rgba(127,29,29,0.18);
+    color: rgba(254,202,202,0.9);
+    font-size: 12px;
+    font-weight: 720;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), opacity var(--transition-fast);
+}
+
+.client-import-clear-btn span {
+    font-size: 14px;
+    line-height: 1;
+}
+
+.client-import-clear-btn:hover:not(:disabled) {
+    background: rgba(127,29,29,0.28);
+    border-color: rgba(248,113,113,0.44);
+    color: #fee2e2;
+}
+
+.client-import-clear-btn:disabled {
+    opacity: 0.34;
+    cursor: not-allowed;
+}
+
+.client-import-status-btn:disabled {
+    opacity: 0.52;
+    cursor: not-allowed;
 }
 
 .client-info-import-btn {
@@ -854,10 +1090,115 @@
     color: #6a7fa0;
 }
 
+.light-theme .client-info-external-id {
+    border-color: rgba(30, 60, 120, 0.14);
+    background: rgba(59, 130, 246, 0.06);
+}
+
+.light-theme .client-info-external-id-chip {
+    border-color: rgba(37, 99, 235, 0.18);
+    background: rgba(59, 130, 246, 0.08);
+    color: #1e3a8a;
+}
+
+.light-theme .client-info-external-id-chip:hover:not(:disabled) {
+    border-color: rgba(37, 99, 235, 0.34);
+    background: rgba(59, 130, 246, 0.13);
+}
+
+.light-theme .client-info-external-id-copy {
+    border-color: #d8e2f0;
+    background: #ffffff;
+    color: #526078;
+}
+
+.light-theme .client-info-external-id-copy:hover,
+.light-theme .client-info-external-id-copy:focus-visible {
+    border-color: #cbd5e1;
+    background: #f1f5f9;
+    color: #172033;
+}
+
+.light-theme .client-info-external-id-chip.is-empty {
+    border-color: rgba(190, 40, 40, 0.16);
+    background: rgba(220, 38, 38, 0.06);
+    color: rgba(127, 29, 29, 0.72);
+}
+
+.light-theme .client-info-external-id-separator {
+    color: rgba(30, 64, 175, 0.46);
+}
+
 .light-theme .client-info-import-btn {
     background: var(--button-primary-bg);
     border-color: transparent;
     color: var(--button-primary-text);
+}
+
+.light-theme .client-import-status-btn {
+    border-color: rgba(79, 70, 229, 0.24);
+    background: rgba(99,102,241,0.12);
+    color: #23235f;
+}
+
+.light-theme .client-import-status-btn--vti {
+    border-color: rgba(190, 40, 40, 0.24);
+    background: rgba(220, 38, 38, 0.09);
+    color: #9f1d1d;
+}
+
+.light-theme .client-import-status-btn--vti small {
+    background: rgba(220, 38, 38, 0.1);
+    color: #9f1d1d;
+}
+
+.light-theme .client-import-status-btn--so {
+    border-color: rgba(13, 148, 136, 0.28);
+    background: rgba(20, 184, 166, 0.1);
+    color: #0f766e;
+}
+
+.light-theme .client-import-status-btn--so small {
+    background: rgba(20, 184, 166, 0.12);
+    color: #0f766e;
+}
+
+.light-theme .client-import-status-btn small {
+    background: rgba(79, 70, 229, 0.14);
+    color: #3f3ab8;
+}
+
+.light-theme .client-import-status-btn--vti small {
+    background: rgba(220, 38, 38, 0.1);
+    color: #9f1d1d;
+}
+
+.light-theme .client-import-status-btn--so small {
+    background: rgba(20, 184, 166, 0.12);
+    color: #0f766e;
+}
+
+.light-theme .client-import-status-btn.is-loaded {
+    border-color: rgba(80, 88, 110, 0.18);
+    background: rgba(80, 88, 110, 0.06);
+    color: rgba(17, 24, 39, 0.48);
+}
+
+.light-theme .client-import-status-btn.is-loaded small {
+    background: rgba(80, 88, 110, 0.1);
+    color: rgba(17, 24, 39, 0.48);
+}
+
+.light-theme .client-import-clear-btn {
+    border-color: rgba(190, 40, 40, 0.18);
+    background: rgba(220, 38, 38, 0.07);
+    color: #a52727;
+}
+
+.light-theme .client-import-clear-btn:hover:not(:disabled) {
+    background: rgba(220, 38, 38, 0.12);
+    border-color: rgba(190, 40, 40, 0.28);
+    color: #8f1f1f;
 }
 
 .light-theme .client-info-import-btn:hover:not(:disabled) {
@@ -965,6 +1306,76 @@
     background: #0a0a0a;
     border: 1px solid rgba(5, 135, 80, 0.35);
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.8);
+}
+
+.salt-theme .client-info-external-id {
+    border-color: rgba(5, 135, 80, 0.24);
+    background: rgba(5, 135, 80, 0.08);
+}
+
+.salt-theme .client-info-external-id-chip {
+    border-color: rgba(0, 232, 120, 0.28);
+    background: rgba(0, 232, 120, 0.1);
+    color: #ecffe8;
+}
+
+.salt-theme .client-info-external-id-chip:hover:not(:disabled) {
+    border-color: rgba(0, 232, 120, 0.48);
+    background: rgba(0, 232, 120, 0.16);
+}
+
+.salt-theme .client-info-external-id-chip.is-empty {
+    border-color: rgba(248,113,113,0.32);
+    background: rgba(185,28,28,0.12);
+    color: rgba(254,202,202,0.72);
+}
+
+.salt-theme .client-info-external-id-separator {
+    color: rgba(139, 244, 186, 0.56);
+}
+
+.salt-theme .client-import-status-btn {
+    border-color: rgba(0, 232, 120, 0.36);
+    background: rgba(0, 232, 120, 0.1);
+    color: #ecffe8;
+}
+
+.salt-theme .client-import-status-btn--vti {
+    border-color: rgba(248,113,113,0.42);
+    background: rgba(185,28,28,0.18);
+    color: #fecaca;
+}
+
+.salt-theme .client-import-status-btn--so {
+    border-color: rgba(45,212,191,0.42);
+    background: rgba(14,116,144,0.2);
+    color: #ccfbf1;
+}
+
+.salt-theme .client-import-status-btn small {
+    background: rgba(0, 232, 120, 0.14);
+    color: #8bf4ba;
+}
+
+.salt-theme .client-import-status-btn--vti small {
+    background: rgba(248,113,113,0.16);
+    color: #fecaca;
+}
+
+.salt-theme .client-import-status-btn--so small {
+    background: rgba(45,212,191,0.16);
+    color: #99f6e4;
+}
+
+.salt-theme .client-import-status-btn.is-loaded {
+    border-color: rgba(127, 160, 141, 0.2);
+    background: rgba(127, 160, 141, 0.06);
+    color: rgba(236,255,232,0.45);
+}
+
+.salt-theme .client-import-status-btn.is-loaded small {
+    background: rgba(127, 160, 141, 0.12);
+    color: rgba(236,255,232,0.44);
 }
 
 .salt-theme .client-info-bar-check {

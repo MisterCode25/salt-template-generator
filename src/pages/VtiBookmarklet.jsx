@@ -22,11 +22,12 @@ const shortcuts = [
         title: "Capture SO info",
         buttonLabel: "Capture SO info",
         bookmarklet: superOfficeBookmarklet.trim(),
-        description: "Extracts the SuperOffice ticket number and External ticket ID, then copies the JSON used by Import data from SO.",
+        description: "Extracts the SuperOffice ticket number, External ticket ID, attachments and message dates, then copies the JSON used by Import data from SO.",
         steps: [
             "Open the ticket in SuperOffice.",
             "Click the saved bookmarklet in the bookmarks bar.",
-            "Come back to Salt Templater and click Import data from SO."
+            "Come back to Salt Templater and click Import data from SO.",
+            "Ticket photos will appear in the Photos SO tool when image attachments are present."
         ]
     }
 ];
@@ -91,7 +92,7 @@ export default function VtiBookmarklet({ embedded = false }) {
                     <h1>Install data capture shortcuts</h1>
                     <p className="vti-bookmarklet-lead">
                         Drag the buttons into the bookmarks bar. VTI imports full customer data;
-                        SuperOffice imports the SO ticket number and a valid External ID when present.
+                        SuperOffice imports the SO ticket number, a valid External ID and ticket photos with their message dates when present.
                     </p>
                 </div>
             </section>

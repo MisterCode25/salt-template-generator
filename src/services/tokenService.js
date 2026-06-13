@@ -10,7 +10,7 @@ import { EXTERNAL_SYSTEM_TOKENS } from "../utils/externalGenerator.js";
 
 const TOKEN_PATH = "tokens";
 const TOKEN_PATTERN = /\{[^{}]+\}/g;
-const INTERNAL_TOKEN_PREFIX_PATTERN = /^\{(?:client|contact|healthcheck)_/i;
+const INTERNAL_TOKEN_PREFIX_PATTERN = /^\{(?:client|contact|healthcheck|offer)_/i;
 const SYSTEM_TOKENS = [...AGENT_PROFILE_TOKENS, ...EXTERNAL_SYSTEM_TOKENS];
 const SYSTEM_TOKEN_SET = new Set(SYSTEM_TOKENS.map((tokenDef) => tokenDef.token));
 

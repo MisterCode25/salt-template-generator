@@ -23,8 +23,11 @@ import {
 import EmptyState from "../components/EmptyState.jsx";
 import Modal from "../components/Modal.jsx";
 import {
+    ClientBarCustomizeModal,
     ClientInfoPanel,
+    ClientImportErrorModal,
     ClientPasteModal,
+    ExternalIdConflictModal,
     TemplateResultModal,
     TokenPromptModal,
     useTemplateRuntime,
@@ -50,6 +53,13 @@ import {
 import { formatTokenPreviewHTML } from "../utils/richTextTokens.js";
 import { applyTheme, getInitialTheme } from "../utils/theme.js";
 import ToolsBar from "../components/ToolsBar.jsx";
+import SuperOfficePhotoGallery from "../components/SuperOfficePhotoGallery.jsx";
+import {
+    SUPER_OFFICE_TICKET_UPDATED_EVENT,
+    hasSuperOfficeTicketPayload,
+    loadSuperOfficeTicketPayload
+} from "../services/superOfficeTicketService.js";
+import { getKeyboardShortcutForEvent } from "../utils/keyboardShortcuts.js";
 
 const ExternalGenerator = lazy(() => import("./ExternalGenerator.jsx"));
 const ManageNodes = lazy(() => import("./ManageNodes.jsx"));
@@ -621,7 +631,10 @@ export default function Templates() {
     const [theme, setTheme] = useState(() => getInitialTheme());
     const [activeWorkspace, setActiveWorkspace] = useState(null);
     const [externalGeneratorOpen, setExternalGeneratorOpen] = useState(false);
-    const [externalGeneratorClosing, setExternalGeneratorClosing] = useState(false);
+    const [externalGeneratorStartField, setExternalGeneratorStartField] = useState(null);
+    const [superOfficeTicket, setSuperOfficeTicket] = useState(() => loadSuperOfficeTicketPayload());
+    const [superOfficeDataPresent, setSuperOfficeDataPresent] = useState(() => hasSuperOfficeTicketPayload());
+    const [superOfficeGalleryOpen, setSuperOfficeGalleryOpen] = useState(false);
     const configName = localStorage.getItem("local_configName") || "No configuration";
 
     const refreshTreeData = () => {
@@ -638,6 +651,15 @@ export default function Templates() {
     useEffect(() => {
         applyTheme(theme);
     }, [theme]);
+
+    useEffect(() => {
+        const handler = (event) => {
+            setSuperOfficeTicket(event.detail?.payload || loadSuperOfficeTicketPayload());
+            setSuperOfficeDataPresent(hasSuperOfficeTicketPayload());
+        };
+        window.addEventListener(SUPER_OFFICE_TICKET_UPDATED_EVENT, handler);
+        return () => window.removeEventListener(SUPER_OFFICE_TICKET_UPDATED_EVENT, handler);
+    }, []);
 
     useEffect(() => {
         const handler = (event) => {
@@ -759,8 +781,21 @@ export default function Templates() {
 
     const importSuperOfficeFromClipboardAndResetCase = useCallback(async (event) => {
         const imported = await runtimeRef.current.readSuperOfficeClipboard(event);
-        if (imported) resetCaseNavigation();
+        if (imported) {
+            setSuperOfficeTicket(loadSuperOfficeTicketPayload());
+            setSuperOfficeDataPresent(hasSuperOfficeTicketPayload());
+            resetCaseNavigation();
+        }
     }, [resetCaseNavigation]);
+
+    const openSuperOfficeGallery = useCallback(() => {
+        setSuperOfficeTicket(loadSuperOfficeTicketPayload());
+        setSuperOfficeGalleryOpen(true);
+    }, []);
+
+    const closeSuperOfficeGallery = useCallback(() => {
+        setSuperOfficeGalleryOpen(false);
+    }, []);
 
     const importClientFromPasteAndResetCase = useCallback((text) => {
         runtimeRef.current.importClientFromPaste(text);
@@ -879,14 +914,49 @@ export default function Templates() {
         return runtimeRef.current.copyTemplateResultAgain();
     }, []);
 
+    const resultChannelOptions = useMemo(() => {
+        if (!activeTemplate) return [];
+        return getIndexedTemplateChannels(activeTemplate)
+            .filter((channel, index, list) => list.indexOf(channel) === index)
+            .filter((channel) => Boolean(resolveChannelModel(activeTemplate, channel)))
+            .map((channel) => ({
+                value: channel,
+                label: CHANNEL_LABELS[channel] || channel
+            }));
+    }, [activeTemplate, getIndexedTemplateChannels]);
+
+    const openResultChannel = useCallback((channel) => {
+        if (!activeTemplate || !channel) return false;
+        const model = resolveChannelModel(activeTemplate, channel);
+        if (!model) return false;
+
+        setActiveChannel(channel);
+        const runtimeApi = runtimeRef.current;
+        const sectionKey = `tree_${activeTemplate.id}_${channel}`;
+        if (model.variants?.length) {
+            runtimeApi.setCopyPreview(null);
+            runtimeApi.setVariantPicker({ model, sectionKey });
+            return true;
+        }
+        return runtimeApi.requestTemplateResult(model, sectionKey);
+    }, [activeTemplate]);
+
+    const openNextResultChannel = useCallback(() => {
+        if (resultChannelOptions.length === 0) return false;
+        const currentIndex = resultChannelOptions.findIndex((option) => option.value === activeChannel);
+        const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % resultChannelOptions.length;
+        return openResultChannel(resultChannelOptions[nextIndex].value);
+    }, [activeChannel, openResultChannel, resultChannelOptions]);
+
     const closeClientPasteModal = useCallback(() => {
         const runtimeApi = runtimeRef.current;
         runtimeApi.setClientPasteOpen(false);
         runtimeApi.setClientPasteInitialError("");
     }, []);
 
-    const openExternalGenerator = useCallback(() => {
-        setExternalGeneratorClosing(false);
+    const openExternalGenerator = useCallback((startField = null) => {
+        const fieldId = typeof startField === "string" ? startField : null;
+        setExternalGeneratorStartField(fieldId);
         setExternalGeneratorOpen(true);
     }, []);
 
@@ -896,11 +966,8 @@ export default function Templates() {
     }, []);
 
     const closeExternalGenerator = () => {
-        setExternalGeneratorClosing(true);
-        window.setTimeout(() => {
-            setExternalGeneratorOpen(false);
-            setExternalGeneratorClosing(false);
-        }, 220);
+        setExternalGeneratorOpen(false);
+        setExternalGeneratorStartField(null);
     };
 
     const openWorkspace = useCallback((workspace) => {
@@ -970,6 +1037,55 @@ export default function Templates() {
 
     const workflowModalOpen = Boolean(runtime.variantPicker || runtime.tokenPrompt || runtime.copyPreview);
     const runtimeTokenMap = useMemo(() => buildPreviewTokenMap(runtime.tokens), [runtime.tokens]);
+    const shortcutModalOpen = Boolean(
+        activeWorkspace
+        || activeTemplate
+        || workflowModalOpen
+        || runtime.clientPasteOpen
+        || runtime.clientImportErrorModal
+        || runtime.clientBarCustomizeOpen
+        || runtime.externalIdConflictPrompt
+        || externalGeneratorOpen
+        || superOfficeGalleryOpen
+    );
+
+    useEffect(() => {
+        const handleKeyboardShortcut = (event) => {
+            const shortcut = getKeyboardShortcutForEvent(event);
+            if (!shortcut || shortcutModalOpen || runtimeRef.current.clientImportLoading) return;
+
+            const hasVtiData = Boolean(runtimeRef.current.clientPayload);
+            const hasSoData = hasSuperOfficeTicketPayload();
+
+            if (shortcut.id === "importVti") {
+                if (hasVtiData) return;
+                event.preventDefault();
+                importClientFromClipboardAndResetCase(event);
+                return;
+            }
+
+            if (shortcut.id === "importSo") {
+                if (hasSoData) return;
+                event.preventDefault();
+                importSuperOfficeFromClipboardAndResetCase(event);
+                return;
+            }
+
+            if (shortcut.id === "clearData") {
+                if (!hasVtiData && !hasSoData) return;
+                event.preventDefault();
+                clearClientAndResetCase();
+            }
+        };
+
+        document.addEventListener("keydown", handleKeyboardShortcut);
+        return () => document.removeEventListener("keydown", handleKeyboardShortcut);
+    }, [
+        clearClientAndResetCase,
+        importClientFromClipboardAndResetCase,
+        importSuperOfficeFromClipboardAndResetCase,
+        shortcutModalOpen
+    ]);
 
     return (
         <main className="page-container page-container--home templates-page">
@@ -996,8 +1112,7 @@ export default function Templates() {
                                 <div className="dropdown-section">
                                     <div className="dropdown-title">Tools</div>
                                     <button type="button" role="menuitem" onClick={() => openWorkspace("tools")} className="dropdown-reset">Manage tools</button>
-                                    <button type="button" role="menuitem" onClick={() => openWorkspace("vti")} className="dropdown-reset">VTI shortcut</button>
-                                    <button type="button" role="menuitem" onClick={() => openWorkspace("vti")} className="dropdown-reset">SO shortcut</button>
+                                    <button type="button" role="menuitem" onClick={() => openWorkspace("vti")} className="dropdown-reset">Data shortcuts</button>
                                 </div>
                                 <div className="dropdown-section">
                                     <div className="dropdown-title">Theme</div>
@@ -1019,18 +1134,24 @@ export default function Templates() {
                 loading={runtime.clientImportLoading}
                 detailsExpanded={runtime.clientDetailsExpanded}
                 lang={runtime.lang}
+                hasVtiData={Boolean(runtime.clientPayload)}
+                hasSuperOfficeData={superOfficeDataPresent}
                 onChangeLang={changeLanguage}
                 onReadClipboard={importClientFromClipboardAndResetCase}
                 onReadSuperOffice={importSuperOfficeFromClipboardAndResetCase}
                 onOpenPaste={openClientPasteModal}
                 onClearClient={clearClientAndResetCase}
+                onCustomizeBar={() => runtimeRef.current.setClientBarCustomizeOpen(true)}
+                onExternalIdFieldClick={openExternalGenerator}
                 onToggleDetails={toggleClientDetails}
             />
 
             <ToolsBar
                 valuesRef={toolValuesRef}
                 onOpenExternalGenerator={openExternalGenerator}
-                onImportSuperOffice={importSuperOfficeFromClipboardAndResetCase}
+                hasExternalId={Boolean(runtime.clientExternalId)}
+                onOpenSuperOfficePhotos={openSuperOfficeGallery}
+                superOfficePhotoCount={superOfficeTicket?.imageAttachments?.length || 0}
                 onManageTools={openToolsWorkspace}
             />
 
@@ -1148,6 +1269,10 @@ export default function Templates() {
             {runtime.copyPreview && (
                 <TemplateResultModal
                     result={runtime.copyPreview}
+                    channelOptions={resultChannelOptions}
+                    currentChannel={activeChannel}
+                    onSelectChannel={openResultChannel}
+                    onNextChannel={openNextResultChannel}
                     onCopy={copyRuntimeTemplateResultAgain}
                     onClose={closeTemplateWorkflow}
                 />
@@ -1161,17 +1286,49 @@ export default function Templates() {
                 />
             )}
 
+            {runtime.clientImportErrorModal && (
+                <ClientImportErrorModal
+                    message={runtime.clientImportErrorModal}
+                    onClose={() => runtime.setClientImportErrorModal(null)}
+                />
+            )}
+
+            {runtime.clientBarCustomizeOpen && (
+                <ClientBarCustomizeModal
+                    groups={runtime.clientBarFieldGroups}
+                    selectedKeys={runtime.clientBarFieldKeys}
+                    defaultKeys={runtime.clientBarDefaultFieldKeys}
+                    onChange={runtime.saveClientBarSelection}
+                    onReset={runtime.resetClientBarSelection}
+                    onClose={() => runtime.setClientBarCustomizeOpen(false)}
+                />
+            )}
+
+            {runtime.externalIdConflictPrompt && (
+                <ExternalIdConflictModal
+                    conflicts={runtime.externalIdConflictPrompt.conflicts}
+                    onConfirm={runtime.confirmExternalIdConflictCorrection}
+                    onCancel={runtime.cancelExternalIdConflictCorrection}
+                />
+            )}
+
             {externalGeneratorOpen && (
-                <Modal
-                    onClose={closeExternalGenerator}
-                    overlayClassName={`popup external-generator-overlay${externalGeneratorClosing ? " is-closing" : ""}`}
-                    dialogClassName={`popup-box external-generator-overlay-box${externalGeneratorClosing ? " is-closing" : ""}`}
-                    ariaLabel="External Generator"
-                >
-                    <Suspense fallback={<div className="node-content-empty">Loading...</div>}>
-                        <ExternalGenerator embedded onClose={closeExternalGenerator} clientPayload={runtime.clientPayload} />
-                    </Suspense>
-                </Modal>
+                <Suspense fallback={null}>
+                    <ExternalGenerator
+                        embedded
+                        flowOnly
+                        startField={externalGeneratorStartField}
+                        onClose={closeExternalGenerator}
+                        clientPayload={runtime.clientPayload}
+                    />
+                </Suspense>
+            )}
+
+            {superOfficeGalleryOpen && (
+                <SuperOfficePhotoGallery
+                    ticket={superOfficeTicket}
+                    onClose={closeSuperOfficeGallery}
+                />
             )}
         </main>
     );

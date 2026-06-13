@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ExternalLink, Settings2 } from "lucide-react";
-import { loadTools, resolveToolUrl } from "../services/toolsService.js";
+import { ExternalLink, Image as ImageIcon, Settings2 } from "lucide-react";
+import { loadTools, resolveToolUrl, sanitizeToolColor } from "../services/toolsService.js";
 
 const ToolButton = memo(function ToolButton({ tool, onOpenTool }) {
     const handleClick = useCallback(() => {
@@ -11,7 +11,7 @@ const ToolButton = memo(function ToolButton({ tool, onOpenTool }) {
     return (
         <button
             type="button"
-            className="tools-bar-btn"
+            className={`tools-bar-btn tools-bar-btn--custom tools-bar-btn--${sanitizeToolColor(tool.color)}`}
             title={tool.url || tool.title}
             onClick={handleClick}
         >
@@ -21,7 +21,15 @@ const ToolButton = memo(function ToolButton({ tool, onOpenTool }) {
     );
 });
 
-function ToolsBar({ values = {}, valuesRef: externalValuesRef = null, onOpenExternalGenerator, onImportSuperOffice, onManageTools }) {
+function ToolsBar({
+    values = {},
+    valuesRef: externalValuesRef = null,
+    onOpenExternalGenerator,
+    hasExternalId = false,
+    onOpenSuperOfficePhotos,
+    superOfficePhotoCount = 0,
+    onManageTools
+}) {
     const navigate = useNavigate();
     const [tools, setTools] = useState([]);
     const internalValuesRef = useRef(values);
@@ -50,7 +58,7 @@ function ToolsBar({ values = {}, valuesRef: externalValuesRef = null, onOpenExte
         navigate("/tools");
     }, [navigate, onManageTools]);
 
-    if (tools.length === 0 && !onOpenExternalGenerator && !onImportSuperOffice) return null;
+    if (tools.length === 0 && !onOpenExternalGenerator && !onOpenSuperOfficePhotos) return null;
 
     return (
         <div className="tools-bar">
@@ -58,21 +66,25 @@ function ToolsBar({ values = {}, valuesRef: externalValuesRef = null, onOpenExte
                 {onOpenExternalGenerator && (
                     <button
                         type="button"
-                        className="tools-bar-btn"
+                        className={`tools-bar-btn tools-bar-btn--system tools-bar-btn--external${hasExternalId ? " is-disabled" : ""}`}
                         onClick={onOpenExternalGenerator}
-                        title="Open External Generator"
+                        disabled={hasExternalId}
+                        aria-disabled={hasExternalId}
+                        title={hasExternalId ? "External ID already present" : "Generate external ID"}
                     >
-                        External Generator
+                        Generate external ID
                     </button>
                 )}
-                {onImportSuperOffice && (
+                {onOpenSuperOfficePhotos && superOfficePhotoCount > 0 && (
                     <button
                         type="button"
-                        className="tools-bar-btn"
-                        onClick={onImportSuperOffice}
-                        title="Import SuperOffice ticket data from clipboard"
+                        className="tools-bar-btn tools-bar-btn--system tools-bar-btn--photos"
+                        onClick={onOpenSuperOfficePhotos}
+                        title="Afficher les photos du dernier ticket SuperOffice importé"
                     >
-                        Import data from SO
+                        <ImageIcon size={14} strokeWidth={2} aria-hidden="true" />
+                        Photos SO
+                        <span className="tools-bar-count">{superOfficePhotoCount}</span>
                     </button>
                 )}
                 {tools.map((tool) => (
@@ -104,6 +116,8 @@ export default memo(ToolsBar, (prevProps, nextProps) => {
 
     return valuesEqual
         && prevProps.onOpenExternalGenerator === nextProps.onOpenExternalGenerator
-        && prevProps.onImportSuperOffice === nextProps.onImportSuperOffice
+        && prevProps.hasExternalId === nextProps.hasExternalId
+        && prevProps.onOpenSuperOfficePhotos === nextProps.onOpenSuperOfficePhotos
+        && prevProps.superOfficePhotoCount === nextProps.superOfficePhotoCount
         && prevProps.onManageTools === nextProps.onManageTools;
 });

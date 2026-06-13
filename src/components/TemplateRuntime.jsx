@@ -32,14 +32,102 @@ import {
 import { formatTokenPreviewHTML } from "../utils/richTextTokens.js";
 import { canonicalizeInputTokenValue } from "../utils/tokenCanonicalization.js";
 import {
+    EXTERNAL_FIELD_ORDER,
     EXTERNAL_SYSTEM_TOKEN_FIELDS,
     buildExternalCode,
-    buildExternalFieldsFromTokenValues
+    buildExternalFieldsFromTokenValues,
+    parseExternalId
 } from "../utils/externalGenerator.js";
+import {
+    applyExternalIdSourceCorrections,
+    getExternalIdSourceConflicts
+} from "../utils/externalIdConflicts.js";
 import { parseSuperOfficeInfoPayload } from "../utils/superOfficeImport.js";
+import {
+    clearSuperOfficeTicketPayload,
+    consumePendingSuperOfficeTicketPayload,
+    getSuperOfficeClientSignature,
+    loadPendingSuperOfficeTicketPayload,
+    loadSuperOfficeTicketPayload,
+    saveSuperOfficeTicketPayload
+} from "../services/superOfficeTicketService.js";
 import Modal from "./Modal.jsx";
 
 const CLIENT_CLIPBOARD_READ_TIMEOUT_MS = 3500;
+const CLIENT_BAR_FIELDS_KEY = "client_bar_fields";
+const CLIENT_BAR_FIELD_LIMIT = 8;
+
+function clientBarFieldKey(scope, label) {
+    return `${scope}:${String(label || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "_")}`;
+}
+
+function loadClientBarFieldKeys() {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(CLIENT_BAR_FIELDS_KEY) || "null");
+        return Array.isArray(parsed) ? parsed.filter((key) => typeof key === "string") : null;
+    } catch {
+        return null;
+    }
+}
+
+function saveClientBarFieldKeys(keys) {
+    localStorage.setItem(CLIENT_BAR_FIELDS_KEY, JSON.stringify(keys));
+}
+
+function buildClientBarFieldGroups(summaryFields = [], sections = []) {
+    const seen = new Set();
+    const groups = [];
+    const summaryOptions = summaryFields.map((field) => ({
+        key: clientBarFieldKey("summary", field.label),
+        label: field.label,
+        value: field.value
+    }));
+    summaryOptions.forEach((option) => seen.add(option.key));
+    if (summaryOptions.length > 0) {
+        groups.push({ id: "summary", title: "Default bar", fields: summaryOptions });
+    }
+
+    sections.forEach((section) => {
+        const fields = section.fields
+            .map((field) => ({
+                key: clientBarFieldKey(section.id, field.label),
+                label: field.label,
+                value: field.value
+            }))
+            .filter((field) => {
+                if (seen.has(field.key)) return false;
+                seen.add(field.key);
+                return true;
+            });
+        if (fields.length > 0) groups.push({ id: section.id, title: section.title, fields });
+    });
+
+    return groups;
+}
+
+function flattenClientBarFieldGroups(groups = []) {
+    return groups.flatMap((group) => group.fields || []);
+}
+
+function getDefaultClientBarFieldKeys(summaryFields = []) {
+    return summaryFields
+        .slice(0, CLIENT_BAR_FIELD_LIMIT)
+        .map((field) => clientBarFieldKey("summary", field.label));
+}
+
+function resolveClientBarSummaryFields(groups = [], selectedKeys, fallbackSummaryFields = []) {
+    const allFields = flattenClientBarFieldGroups(groups);
+    if (allFields.length === 0) return fallbackSummaryFields;
+    const fallbackKeys = getDefaultClientBarFieldKeys(fallbackSummaryFields);
+    const activeKeys = Array.isArray(selectedKeys) && selectedKeys.length > 0 ? selectedKeys : fallbackKeys;
+    const byKey = new Map(allFields.map((field) => [field.key, field]));
+    const selected = activeKeys
+        .map((key) => byKey.get(key))
+        .filter(Boolean)
+        .slice(0, CLIENT_BAR_FIELD_LIMIT)
+        .map(({ label, value }) => ({ label, value }));
+    return selected.length > 0 ? selected : fallbackSummaryFields;
+}
 
 async function withClipboardTimeout(readOperation) {
     let timeoutId;
@@ -151,6 +239,43 @@ function getExternalIdFromClientPayload(payload) {
     return hasExternalIdFields ? buildExternalCode(fields) : "";
 }
 
+const EXTERNAL_ID_FIELD_LABELS = {
+    flagging: "Flagging",
+    data: "Date",
+    customer: "Contractor",
+    soTicket: "SO ticket",
+    SignalStatus: "Signal",
+    LedStatus: "LED",
+    treatmentStep: "Treatment",
+    boxType: "Box",
+    partner: "Partner",
+    partnerTicketNumber: "Partner ticket",
+    lexId: "LEX ID",
+    oltName: "OLT",
+    oltBoard: "Board",
+    bokBof: "BOK/BOF",
+    comment: "Comment"
+};
+
+function formatExternalIdSegmentValue(field, value) {
+    const text = String(value ?? "").trim();
+    if (field === "data" && text) {
+        return text.split("-").reverse().join(".");
+    }
+    return text;
+}
+
+function buildExternalIdSegments(externalId) {
+    const parsed = parseExternalId(externalId);
+    if (!parsed.ok) return [];
+
+    return EXTERNAL_FIELD_ORDER.map((field) => ({
+        field,
+        label: EXTERNAL_ID_FIELD_LABELS[field] || field,
+        value: formatExternalIdSegmentValue(field, parsed.fields[field])
+    }));
+}
+
 const TokenPromptField = memo(function TokenPromptField({
     tokenDef,
     value,
@@ -249,8 +374,17 @@ export const VariantModal = memo(function VariantModal({ model, displayTitle, on
     );
 });
 
-export const TemplateResultModal = memo(function TemplateResultModal({ result, onCopy, onClose }) {
+export const TemplateResultModal = memo(function TemplateResultModal({
+    result,
+    channelOptions = [],
+    currentChannel = "",
+    onSelectChannel,
+    onNextChannel,
+    onCopy,
+    onClose
+}) {
     if (!result) return null;
+    const showChannelControls = channelOptions.length > 1 && onSelectChannel;
 
     return (
         <Modal onClose={onClose} dialogClassName="popup-box template-result-modal" ariaLabel="Generated template">
@@ -263,6 +397,24 @@ export const TemplateResultModal = memo(function TemplateResultModal({ result, o
                     {result.copied ? "✓ Already copied" : "Copying..."}
                 </span>
             </div>
+            {showChannelControls && (
+                <div className="template-result-toolbar">
+                    <div className="template-result-channel-segments" role="tablist" aria-label="Channel">
+                        {channelOptions.map((option) => (
+                            <button
+                                key={option.value}
+                                type="button"
+                                className={`template-result-channel-segment${currentChannel === option.value ? " is-active" : ""}`}
+                                onClick={() => onSelectChannel(option.value)}
+                                role="tab"
+                                aria-selected={currentChannel === option.value}
+                            >
+                                {option.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
             <div
                 className="rich-preview template-result-preview"
                 data-placeholder="No content."
@@ -272,10 +424,137 @@ export const TemplateResultModal = memo(function TemplateResultModal({ result, o
                 <button type="button" className="primary-btn" onClick={onCopy}>
                     Copy again
                 </button>
+                {showChannelControls && (
+                    <button type="button" className="primary-btn template-result-next-btn" onClick={onNextChannel}>
+                        Next
+                    </button>
+                )}
             </div>
         </Modal>
     );
 });
+
+export function ClientBarCustomizeModal({
+    groups,
+    selectedKeys,
+    defaultKeys,
+    onChange,
+    onReset,
+    onClose
+}) {
+    const activeKeys = Array.isArray(selectedKeys) && selectedKeys.length > 0 ? selectedKeys : defaultKeys;
+    const selectedSet = useMemo(() => new Set(activeKeys), [activeKeys]);
+    const fieldByKey = useMemo(() => new Map(flattenClientBarFieldGroups(groups).map((field) => [field.key, field])), [groups]);
+    const visibleFields = useMemo(
+        () => activeKeys.map((key) => fieldByKey.get(key)).filter(Boolean).slice(0, CLIENT_BAR_FIELD_LIMIT),
+        [activeKeys, fieldByKey]
+    );
+    const selectedCount = selectedSet.size;
+
+    const toggleField = (key) => {
+        const next = selectedSet.has(key)
+            ? activeKeys.filter((item) => item !== key)
+            : [...activeKeys, key];
+        onChange(next.slice(0, CLIENT_BAR_FIELD_LIMIT));
+    };
+
+    const moveField = (key, direction) => {
+        const fromIndex = activeKeys.indexOf(key);
+        const toIndex = fromIndex + direction;
+        if (fromIndex < 0 || toIndex < 0 || toIndex >= activeKeys.length) return;
+        const next = [...activeKeys];
+        const [item] = next.splice(fromIndex, 1);
+        next.splice(toIndex, 0, item);
+        onChange(next);
+    };
+
+    return (
+        <Modal onClose={onClose} dialogClassName="popup-box client-bar-customize-modal" ariaLabel="Customize client bar">
+            <div className="popup-header">
+                <div>
+                    <h2>Customize client bar</h2>
+                    <p className="hint">Choose up to {CLIENT_BAR_FIELD_LIMIT} fields and order them in the client bar.</p>
+                </div>
+                <span className="client-bar-customize-count">{selectedCount}/{CLIENT_BAR_FIELD_LIMIT}</span>
+            </div>
+            <div className="client-bar-customize-list">
+                {visibleFields.length > 0 && (
+                    <section className="client-bar-customize-section">
+                        <h3>Visible fields</h3>
+                        <div className="client-bar-customize-visible-list">
+                            {visibleFields.map((field, index) => (
+                                <div key={field.key} className="client-bar-customize-visible-item">
+                                    <span className="client-bar-customize-drag-index">{index + 1}</span>
+                                    <span className="client-bar-customize-visible-copy">
+                                        <strong>{field.label}</strong>
+                                        <small>{field.value}</small>
+                                    </span>
+                                    <span className="client-bar-customize-reorder-actions">
+                                        <button
+                                            type="button"
+                                            onClick={() => moveField(field.key, -1)}
+                                            disabled={index === 0}
+                                            aria-label={`Move ${field.label} up`}
+                                            title="Move up"
+                                        >
+                                            ↑
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => moveField(field.key, 1)}
+                                            disabled={index === visibleFields.length - 1}
+                                            aria-label={`Move ${field.label} down`}
+                                            title="Move down"
+                                        >
+                                            ↓
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => toggleField(field.key)}
+                                            aria-label={`Remove ${field.label}`}
+                                            title="Remove"
+                                        >
+                                            ×
+                                        </button>
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+                )}
+                {groups.map((group) => (
+                    <section key={group.id} className="client-bar-customize-section">
+                        <h3>{group.title}</h3>
+                        <div className="client-bar-customize-fields">
+                            {group.fields.map((field) => {
+                                const checked = selectedSet.has(field.key);
+                                const disabled = !checked && selectedCount >= CLIENT_BAR_FIELD_LIMIT;
+                                return (
+                                    <label key={field.key} className={`client-bar-customize-option${disabled ? " is-disabled" : ""}`}>
+                                        <input
+                                            type="checkbox"
+                                            checked={checked}
+                                            disabled={disabled}
+                                            onChange={() => toggleField(field.key)}
+                                        />
+                                        <span>
+                                            <strong>{field.label}</strong>
+                                            <small>{field.value}</small>
+                                        </span>
+                                    </label>
+                                );
+                            })}
+                        </div>
+                    </section>
+                ))}
+            </div>
+            <div className="popup-actions">
+                <button type="button" className="secondary-btn" onClick={onReset}>Reset default</button>
+                <button type="button" className="primary-btn" onClick={onClose}>Done</button>
+            </div>
+        </Modal>
+    );
+}
 
 export const ClientInfoPanel = memo(function ClientInfoPanel({
     sections,
@@ -285,44 +564,81 @@ export const ClientInfoPanel = memo(function ClientInfoPanel({
     loading,
     detailsExpanded,
     lang,
+    hasVtiData = false,
+    hasSuperOfficeData = false,
     onChangeLang,
     onReadClipboard,
     onReadSuperOffice,
     onOpenPaste,
     onClearClient,
+    onCustomizeBar,
+    onExternalIdFieldClick,
     onToggleDetails
 }) {
     const hasInfo = sections.length > 0;
     const isError = status.type === "error";
+    const vtiButtonClassName = `client-import-status-btn client-import-status-btn--vti${hasVtiData ? " is-loaded" : " is-missing"}`;
+    const soButtonClassName = `client-import-status-btn client-import-status-btn--so${hasSuperOfficeData ? " is-loaded" : " is-missing"}`;
+    const hasAnyImportedData = hasVtiData || hasSuperOfficeData;
+    const vtiImportDisabled = loading || hasVtiData;
+    const soImportDisabled = loading || hasSuperOfficeData;
+    const externalIdSegments = useMemo(() => buildExternalIdSegments(externalId), [externalId]);
+    const copyExternalId = async () => {
+        try {
+            await navigator.clipboard.writeText(externalId);
+            showToast("External ID copied", "success");
+        } catch {
+            showToast("Unable to copy External ID", "error");
+        }
+    };
 
     return (
         <section className="client-info-panel" aria-label="Client information">
+            <div className="client-import-status-row" aria-label="Data imports">
+                <button
+                    type="button"
+                    className={vtiButtonClassName}
+                    onClick={onReadClipboard}
+                    disabled={vtiImportDisabled}
+                    aria-pressed={hasVtiData}
+                    title={hasVtiData ? "VTI data loaded. Use Clear to import another VTI JSON." : "Import missing VTI data. Alt+Q"}
+                >
+                    <span>{loading ? "Importing..." : "VTI"}</span>
+                    <small>{hasVtiData ? "Loaded" : "Missing"}</small>
+                </button>
+                <button
+                    type="button"
+                    className={soButtonClassName}
+                    onClick={onReadSuperOffice}
+                    disabled={soImportDisabled}
+                    aria-pressed={hasSuperOfficeData}
+                    title={hasSuperOfficeData ? "SO data loaded. Use Clear to import another SO JSON." : "Import missing SO data. Alt+W"}
+                >
+                    <span>SO</span>
+                    <small>{hasSuperOfficeData ? "Loaded" : "Missing"}</small>
+                </button>
+                <button
+                    type="button"
+                    className="client-import-clear-btn"
+                    onClick={onClearClient}
+                    disabled={loading || !hasAnyImportedData}
+                    aria-label="Clear imported data"
+                    title={hasAnyImportedData ? "Clear VTI and SO data. Alt+E" : "No imported data to clear"}
+                >
+                    <span aria-hidden="true">×</span>
+                    Clear
+                </button>
+                {isError && (
+                    <button type="button" className="client-info-paste-btn" onClick={onOpenPaste}>
+                        Paste manually
+                    </button>
+                )}
+            </div>
             <div className="client-info-bar">
                 <div className="client-info-bar-main">
                     {!hasInfo ? (
                         <div className="client-info-bar-empty">
                             <span className="client-info-bar-hint">No client loaded</span>
-                            <button
-                                type="button"
-                                className="client-info-import-btn"
-                                onClick={onReadClipboard}
-                                disabled={loading}
-                            >
-                                {loading ? "Importing…" : "Import from clipboard"}
-                            </button>
-                            <button
-                                type="button"
-                                className="client-info-paste-btn"
-                                onClick={onReadSuperOffice}
-                                disabled={loading}
-                            >
-                                Import data from SO
-                            </button>
-                            {(isError) && (
-                                <button type="button" className="client-info-paste-btn" onClick={onOpenPaste}>
-                                    Paste manually
-                                </button>
-                            )}
                         </div>
                     ) : (
                         <div className="client-info-bar-loaded">
@@ -340,16 +656,6 @@ export const ClientInfoPanel = memo(function ClientInfoPanel({
                 </div>
 
                 <div className="client-info-bar-controls">
-                    {hasInfo && (
-                        <button
-                            type="button"
-                            className="client-info-paste-btn"
-                            onClick={onReadSuperOffice}
-                            disabled={loading}
-                        >
-                            Import data from SO
-                        </button>
-                    )}
                     <div className="client-lang-picker" title="Change language">
                         <select
                             value={lang}
@@ -373,15 +679,16 @@ export const ClientInfoPanel = memo(function ClientInfoPanel({
                             >
                                 {detailsExpanded ? "Hide" : "Details"}
                             </button>
-                            <button
-                                type="button"
-                                className="client-info-clear-btn"
-                                onClick={onClearClient}
-                                aria-label="Clear client data"
-                                title="Clear client"
-                            >
-                                ✕
-                            </button>
+                            {onCustomizeBar && (
+                                <button
+                                    type="button"
+                                    className="client-info-toggle-btn"
+                                    onClick={onCustomizeBar}
+                                    title="Customize client bar"
+                                >
+                                    Customize
+                                </button>
+                            )}
                         </>
                     )}
                 </div>
@@ -389,13 +696,42 @@ export const ClientInfoPanel = memo(function ClientInfoPanel({
 
             {hasInfo && externalId && (
                 <div className="client-info-external-id" aria-label="Imported external ID">
-                    <span className="client-info-external-id-label">External ID</span>
-                    <span className="client-info-external-id-value">{externalId}</span>
+                    <span className="client-info-external-id-side">
+                        <span className="client-info-external-id-label">External ID</span>
+                        <button
+                            type="button"
+                            className="client-info-external-id-copy"
+                            onClick={copyExternalId}
+                            title="Copy External ID"
+                            aria-label="Copy External ID"
+                        >
+                            Copy
+                        </button>
+                    </span>
+                    {externalIdSegments.length > 0 ? (
+                        <div className="client-info-external-id-chips" aria-label="External ID fields">
+                            {externalIdSegments.map((segment, index) => (
+                                <span key={segment.field} className="client-info-external-id-segment">
+                                    <button
+                                        type="button"
+                                        className={`client-info-external-id-chip${segment.value ? "" : " is-empty"}`}
+                                        onClick={() => onExternalIdFieldClick?.(segment.field)}
+                                        disabled={!onExternalIdFieldClick}
+                                        title={`${segment.label}: ${segment.value || "Empty"}`}
+                                        aria-label={`Edit ${segment.label}`}
+                                    >
+                                        <span className="client-info-external-id-chip-value">{segment.value || "Empty"}</span>
+                                    </button>
+                                    {index < externalIdSegments.length - 1 && (
+                                        <span className="client-info-external-id-separator" aria-hidden="true">//</span>
+                                    )}
+                                </span>
+                            ))}
+                        </div>
+                    ) : (
+                        <span className="client-info-external-id-value">{externalId}</span>
+                    )}
                 </div>
-            )}
-
-            {isError && status.message && (
-                <p className="client-info-bar-error" aria-live="polite">{status.message}</p>
             )}
 
             {hasInfo && detailsExpanded && (
@@ -418,6 +754,23 @@ export const ClientInfoPanel = memo(function ClientInfoPanel({
         </section>
     );
 });
+
+export function ClientImportErrorModal({ message, onClose }) {
+    return (
+        <Modal onClose={onClose} dialogClassName="popup-box client-import-error-modal" ariaLabel="Import error">
+            <div className="popup-header">
+                <div>
+                    <p className="eyebrow">Import error</p>
+                    <h2>Unable to import data</h2>
+                </div>
+            </div>
+            <p className="client-import-error-message">{message}</p>
+            <div className="popup-actions">
+                <button type="button" className="primary-btn" onClick={onClose}>OK</button>
+            </div>
+        </Modal>
+    );
+}
 
 export function ClientPasteModal({ onClose, onImport, initialError = "" }) {
     const [text, setText] = useState("");
@@ -455,6 +808,44 @@ export function ClientPasteModal({ onClose, onImport, initialError = "" }) {
     );
 }
 
+export function ExternalIdConflictModal({ conflicts = [], onConfirm, onCancel }) {
+    return (
+        <Modal onClose={onCancel} dialogClassName="popup-box external-id-conflict-modal" ariaLabel="External ID conflict">
+            <div className="popup-header">
+                <div>
+                    <h2>External ID conflict</h2>
+                    <p className="hint">Some External ID values do not match the trusted import sources.</p>
+                </div>
+            </div>
+            <div className="external-id-conflict-list">
+                {conflicts.map((conflict) => (
+                    <div key={conflict.field} className="external-id-conflict-item">
+                        <div className="external-id-conflict-head">
+                            <strong>{conflict.label}</strong>
+                            <span>{conflict.sourceLabel}</span>
+                        </div>
+                        <div className="external-id-conflict-values">
+                            <div>
+                                <span>External ID</span>
+                                <code>{conflict.externalValue || "Empty"}</code>
+                            </div>
+                            <div className="external-id-conflict-arrow" aria-hidden="true">→</div>
+                            <div>
+                                <span>Correct value</span>
+                                <code>{conflict.expectedValue}</code>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+            <div className="popup-actions">
+                <button type="button" className="secondary-btn" onClick={onCancel}>Cancel import</button>
+                <button type="button" className="primary-btn" onClick={onConfirm}>Correct and import</button>
+            </div>
+        </Modal>
+    );
+}
+
 export function useTemplateRuntime() {
     const [lang, setLang] = useState("en");
     const [tokens, setTokens] = useState([]);
@@ -474,6 +865,10 @@ export function useTemplateRuntime() {
     const [clientDetailsExpanded, setClientDetailsExpanded] = useState(false);
     const [clientPasteOpen, setClientPasteOpen] = useState(false);
     const [clientPasteInitialError, setClientPasteInitialError] = useState("");
+    const [clientImportErrorModal, setClientImportErrorModal] = useState(null);
+    const [clientBarFieldKeys, setClientBarFieldKeys] = useState(() => loadClientBarFieldKeys());
+    const [clientBarCustomizeOpen, setClientBarCustomizeOpen] = useState(false);
+    const [externalIdConflictPrompt, setExternalIdConflictPrompt] = useState(null);
 
     useEffect(() => {
         migrateStoredClientInputValues();
@@ -491,6 +886,10 @@ export function useTemplateRuntime() {
             const nextValues = event.detail?.values;
             if (!nextValues || typeof nextValues !== "object") return;
             setValues((prev) => ({ ...prev, ...nextValues }));
+            const latestClientPayload = loadActiveClientPayload();
+            if (latestClientPayload) {
+                setClientPayload(latestClientPayload);
+            }
             inputChangeVersion.current++;
         };
         window.addEventListener(AGENT_PROFILE_UPDATED_EVENT, handleAgentProfileUpdated);
@@ -517,8 +916,31 @@ export function useTemplateRuntime() {
     }, [tokens, clientInternalTokens]);
 
     const clientInfoSections = useMemo(() => getClientInfoSections(clientPayload), [clientPayload]);
-    const clientSummaryFields = useMemo(() => getClientSummaryFields(clientPayload), [clientPayload]);
+    const defaultClientSummaryFields = useMemo(() => getClientSummaryFields(clientPayload), [clientPayload]);
+    const clientBarFieldGroups = useMemo(
+        () => buildClientBarFieldGroups(defaultClientSummaryFields, clientInfoSections),
+        [clientInfoSections, defaultClientSummaryFields]
+    );
+    const clientBarDefaultFieldKeys = useMemo(
+        () => getDefaultClientBarFieldKeys(defaultClientSummaryFields),
+        [defaultClientSummaryFields]
+    );
+    const clientSummaryFields = useMemo(
+        () => resolveClientBarSummaryFields(clientBarFieldGroups, clientBarFieldKeys, defaultClientSummaryFields),
+        [clientBarFieldGroups, clientBarFieldKeys, defaultClientSummaryFields]
+    );
     const clientExternalId = useMemo(() => getExternalIdFromClientPayload(clientPayload), [clientPayload]);
+
+    const saveClientBarSelection = (keys) => {
+        const next = Array.isArray(keys) ? keys.slice(0, CLIENT_BAR_FIELD_LIMIT) : [];
+        setClientBarFieldKeys(next);
+        saveClientBarFieldKeys(next);
+    };
+
+    const resetClientBarSelection = () => {
+        setClientBarFieldKeys(null);
+        localStorage.removeItem(CLIENT_BAR_FIELDS_KEY);
+    };
 
     const readStoredInputValue = (token) => {
         try {
@@ -545,6 +967,65 @@ export function useTemplateRuntime() {
             if (storedValue !== null) return storedValue;
         }
         return typeof tokenDef === "object" ? tokenDef?.default ?? "" : "";
+    };
+
+    const buildExternalIdConflictPrompt = (importResult, sourceClientPayload = clientPayload) => {
+        const conflicts = getExternalIdSourceConflicts(importResult, sourceClientPayload);
+        if (conflicts.length === 0) return null;
+
+        return {
+            importResult,
+            conflicts,
+            correctedTokenValues: applyExternalIdSourceCorrections(importResult.tokenValues || {}, conflicts)
+        };
+    };
+
+    const completeSuperOfficeImport = (importResult, tokenValues = importResult?.tokenValues || {}, options = {}) => {
+        const nextResult = {
+            ...importResult,
+            tokenValues
+        };
+        saveSuperOfficeTicketPayload(nextResult);
+
+        if (Object.keys(tokenValues).length > 0) {
+            const saved = saveClientInputValues(tokenValues);
+            if (saved.payload) setClientPayload(saved.payload);
+            setValues((prev) => ({ ...prev, ...tokenValues }));
+            inputChangeVersion.current++;
+        }
+
+        const message = options.corrected
+            ? "External ID corrected and SuperOffice data imported."
+            : nextResult.ignoredExternalId
+                ? "SO ticket imported. External ID ignored because its format is invalid."
+                : "SuperOffice data imported.";
+        setClientImportStatus({ type: "success", message: "" });
+        showToast(message, nextResult.ignoredExternalId ? "warning" : "success");
+        return true;
+    };
+
+    const openExternalIdConflictPrompt = (importResult, sourceClientPayload = clientPayload) => {
+        const prompt = buildExternalIdConflictPrompt(importResult, sourceClientPayload);
+        if (!prompt) return false;
+        setExternalIdConflictPrompt(prompt);
+        setClientImportStatus({ type: "idle", message: "" });
+        showToast("External ID conflict detected.", "warning");
+        return true;
+    };
+
+    const confirmExternalIdConflictCorrection = () => {
+        if (!externalIdConflictPrompt) return;
+        completeSuperOfficeImport(
+            externalIdConflictPrompt.importResult,
+            externalIdConflictPrompt.correctedTokenValues,
+            { corrected: true }
+        );
+        setExternalIdConflictPrompt(null);
+    };
+
+    const cancelExternalIdConflictCorrection = () => {
+        setExternalIdConflictPrompt(null);
+        showToast("SuperOffice import canceled.", "info");
     };
 
     useEffect(() => {
@@ -577,6 +1058,7 @@ export function useTemplateRuntime() {
     }, [clientPayload, clientInternalTokens.length, tokens]);
 
     const clearClientInfo = () => {
+        clearSuperOfficeTicketPayload();
         clearStoredInputValues();
         const agentValues = getAgentProfileTokenValues(loadAgentProfile());
         syncAgentProfileInputValues();
@@ -592,6 +1074,7 @@ export function useTemplateRuntime() {
         setCopyPreview(null);
         setPromptMissingTokens([]);
         setVariantPicker(null);
+        setExternalIdConflictPrompt(null);
         setClientImportStatus({ type: "idle", message: "" });
         lastSectionClickVersion.current = {};
         inputChangeVersion.current++;
@@ -599,6 +1082,11 @@ export function useTemplateRuntime() {
 
     const loadClientFromText = (text) => {
         const payload = parseClientClipboardJSON(text);
+        const currentClientSignature = getSuperOfficeClientSignature(loadActiveClientPayload());
+        const nextClientSignature = getSuperOfficeClientSignature(payload);
+        if (currentClientSignature && currentClientSignature !== nextClientSignature) {
+            clearSuperOfficeTicketPayload();
+        }
         const {
             tokenDefs: internalTokenDefs,
             values: internalValues,
@@ -625,8 +1113,36 @@ export function useTemplateRuntime() {
             localStorage.setItem("input_" + token, value);
         });
 
-        setClientPayload(payload);
         saveActiveClientPayload(payload);
+        const pendingSuperOfficeTicket = loadPendingSuperOfficeTicketPayload();
+        const storedSuperOfficeTicket = currentClientSignature === nextClientSignature
+            ? loadSuperOfficeTicketPayload()
+            : null;
+        const candidateSuperOfficeTicket = pendingSuperOfficeTicket || storedSuperOfficeTicket;
+        let activeSuperOfficeTicket = candidateSuperOfficeTicket;
+        let superOfficeTokenValues = candidateSuperOfficeTicket?.tokenValues || {};
+        let savedSuperOfficeValues = null;
+        if (candidateSuperOfficeTicket && Object.keys(superOfficeTokenValues).length > 0) {
+            const conflictPrompt = buildExternalIdConflictPrompt(candidateSuperOfficeTicket, payload);
+            if (conflictPrompt) {
+                setExternalIdConflictPrompt(conflictPrompt);
+                showToast("External ID conflict detected.", "warning");
+                superOfficeTokenValues = {};
+                activeSuperOfficeTicket = null;
+            } else {
+                if (pendingSuperOfficeTicket) {
+                    activeSuperOfficeTicket = consumePendingSuperOfficeTicketPayload();
+                    superOfficeTokenValues = activeSuperOfficeTicket?.tokenValues || {};
+                }
+                savedSuperOfficeValues = saveClientInputValues(superOfficeTokenValues);
+            }
+        } else if (pendingSuperOfficeTicket) {
+            activeSuperOfficeTicket = consumePendingSuperOfficeTicketPayload();
+            superOfficeTokenValues = activeSuperOfficeTicket?.tokenValues || {};
+        }
+        const nextPayload = savedSuperOfficeValues?.payload || payload;
+
+        setClientPayload(nextPayload);
         setClientInternalTokens(internalTokenDefs);
         setClientMatchedTokens(Array.from(tokensToClear.values()));
         setClientDetailsExpanded(false);
@@ -636,7 +1152,7 @@ export function useTemplateRuntime() {
         setVariantPicker(null);
         if (nextLanguage) setLang(nextLanguage);
 
-        setValues({ ...agentValues, ...nextValues });
+        setValues({ ...agentValues, ...nextValues, ...(savedSuperOfficeValues?.values || superOfficeTokenValues) });
         inputChangeVersion.current++;
         setClientImportStatus({ type: "success", message: "" });
     };
@@ -652,6 +1168,7 @@ export function useTemplateRuntime() {
         } catch (error) {
             const message = error?.message || "Unable to read customer data from clipboard.";
             setClientImportStatus({ type: "error", message });
+            setClientImportErrorModal(message);
             showToast(message, "error");
             setClientPasteInitialError(message);
             return false;
@@ -671,20 +1188,15 @@ export function useTemplateRuntime() {
                 throw new Error("Clipboard does not contain SuperOffice data.");
             }
 
-            const saved = saveClientInputValues(result.tokenValues);
-            if (saved.payload) setClientPayload(saved.payload);
-            setValues((prev) => ({ ...prev, ...result.tokenValues }));
-            inputChangeVersion.current++;
+            if (openExternalIdConflictPrompt(result, loadActiveClientPayload())) {
+                return false;
+            }
 
-            const message = result.ignoredExternalId
-                ? "SO ticket imported. External ID ignored because its format is invalid."
-                : "SuperOffice data imported.";
-            setClientImportStatus({ type: "success", message: "" });
-            showToast(message, result.ignoredExternalId ? "warning" : "success");
-            return true;
+            return completeSuperOfficeImport(result);
         } catch (error) {
             const message = error?.message || "Unable to import SuperOffice data.";
             setClientImportStatus({ type: "error", message });
+            setClientImportErrorModal(message);
             showToast(message, "error");
             return false;
         } finally {
@@ -939,8 +1451,20 @@ export function useTemplateRuntime() {
         clientPayload,
         clientImportStatus,
         clientImportLoading,
+        clientImportErrorModal,
+        setClientImportErrorModal,
         clientDetailsExpanded,
         setClientDetailsExpanded,
+        clientBarFieldGroups,
+        clientBarFieldKeys,
+        clientBarDefaultFieldKeys,
+        clientBarCustomizeOpen,
+        setClientBarCustomizeOpen,
+        saveClientBarSelection,
+        resetClientBarSelection,
+        externalIdConflictPrompt,
+        confirmExternalIdConflictCorrection,
+        cancelExternalIdConflictCorrection,
         readClientClipboard,
         readSuperOfficeClipboard,
         clearClientInfo,

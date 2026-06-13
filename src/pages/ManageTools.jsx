@@ -1,5 +1,11 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { loadTools, saveTools } from "../services/toolsService.js";
+import {
+    DEFAULT_TOOL_COLOR,
+    TOOL_COLOR_OPTIONS,
+    loadTools,
+    sanitizeToolColor,
+    saveTools
+} from "../services/toolsService.js";
 import { loadTokens } from "../services/tokenService.js";
 import { loadActiveClientPayload } from "../services/activeClientService.js";
 import { getClientInternalTokenData } from "../utils/clientClipboard.js";
@@ -113,7 +119,10 @@ const ToolRow = memo(function ToolRow({ tool, onEdit, onDelete }) {
     return (
         <div className="model-row">
             <div>
-                <strong>{tool.title}</strong>
+                <div className="tool-row-title">
+                    <span className={`tool-color-dot tool-color-dot--${sanitizeToolColor(tool.color)}`} aria-hidden="true" />
+                    <strong>{tool.title}</strong>
+                </div>
                 <div className="hint mt-sm" style={{ wordBreak: "break-all" }}>{tool.url}</div>
             </div>
             <div className="flex-row gap-sm" style={{ marginLeft: "auto" }}>
@@ -131,6 +140,7 @@ const ToolRow = memo(function ToolRow({ tool, onEdit, onDelete }) {
 const ToolModal = memo(function ToolModal({ initial, onClose, onSave }) {
     const [title, setTitle] = useState(initial?.title || "");
     const [url, setUrl] = useState(initial?.url || "");
+    const [color, setColor] = useState(sanitizeToolColor(initial?.color || DEFAULT_TOOL_COLOR));
     const [tokens, setTokens] = useState([]);
     const [tokenMenu, setTokenMenu] = useState(null);
     const [activeTokenIndex, setActiveTokenIndex] = useState(0);
@@ -219,6 +229,10 @@ const ToolModal = memo(function ToolModal({ initial, onClose, onSave }) {
         setTitle(event.target.value);
     }, []);
 
+    const handleColorSelect = useCallback((nextColor) => {
+        setColor(sanitizeToolColor(nextColor));
+    }, []);
+
     const closeTokenMenuSoon = useCallback(() => {
         window.setTimeout(() => setTokenMenu(null), 120);
     }, []);
@@ -232,8 +246,8 @@ const ToolModal = memo(function ToolModal({ initial, onClose, onSave }) {
         const u = url.trim();
         if (!t) { showToast("Title is required.", "error"); return; }
         if (!u) { showToast("URL is required.", "error"); return; }
-        onSave({ ...initial, title: t, url: u });
-    }, [initial, onSave, title, url]);
+        onSave({ ...initial, title: t, url: u, color });
+    }, [color, initial, onSave, title, url]);
 
     return (
         <Modal onClose={onClose} ariaLabel="Tool editor">
@@ -283,6 +297,25 @@ const ToolModal = memo(function ToolModal({ initial, onClose, onSave }) {
                                 )}
                             </div>
                         )}
+                    </div>
+
+                    <div className="field-line">
+                        <label>Button color</label>
+                        <div className="tool-color-picker" role="radiogroup" aria-label="Button color">
+                            {TOOL_COLOR_OPTIONS.map((option) => (
+                                <button
+                                    key={option.value}
+                                    type="button"
+                                    className={`tool-color-swatch tool-color-swatch--${option.value}${color === option.value ? " is-selected" : ""}`}
+                                    onClick={() => handleColorSelect(option.value)}
+                                    role="radio"
+                                    aria-checked={color === option.value}
+                                    title={option.label}
+                                >
+                                    <span className="sr-only">{option.label}</span>
+                                </button>
+                            ))}
+                        </div>
                     </div>
 
                     {url && (

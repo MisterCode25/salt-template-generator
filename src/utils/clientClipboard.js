@@ -69,6 +69,7 @@ const CLIENT_FIELD_GROUPS = [
                     payload?.client?.activation_date,
                     payload?.client?.activation,
                     payload?.client?.dateActivation,
+                    payload?.offer?.activationDate,
                     payload?.contact?.activationDate,
                     payload?.healthcheck?.activationDate
                 ])
@@ -98,6 +99,21 @@ const CLIENT_FIELD_GROUPS = [
                 label: "Contact eligibility",
                 path: "contact.eligibilitySource",
                 aliases: ["contactEligibilitySource", "contactEligibility"]
+            },
+            {
+                label: "Eligibility ordering",
+                path: "contact.eligibilityOrdering",
+                aliases: ["eligibilityOrdering", "contactEligibilityOrdering"]
+            },
+            {
+                label: "Public ID",
+                path: "contact.publicId",
+                aliases: ["publicId", "publicID", "contactPublicId"]
+            },
+            {
+                label: "Fixed number",
+                path: "contact.fixedNumber",
+                aliases: ["fixedNumber", "fixedPhone", "voipNumber", "voip"]
             },
             {
                 label: "Contact record",
@@ -589,6 +605,7 @@ export function getClientSummaryFields(payload) {
                 client.activation_date,
                 client.activation,
                 client.dateActivation,
+                payload?.offer?.activationDate,
                 contact.activationDate,
                 healthcheck.activationDate
             ])

@@ -69,6 +69,64 @@ function buildTokenMatches(queryValue, tokenSearchIndex = []) {
     return matches;
 }
 
+function getTokenCategory(tokenDef = {}) {
+    if (tokenDef.createLabel) return { id: "create", title: "Create" };
+
+    const token = String(tokenDef.token || "").toLowerCase();
+    const label = String(tokenDef.label || "").toLowerCase();
+    const key = String(tokenDef.key || "").toLowerCase();
+    const haystack = `${token} ${label} ${key}`;
+
+    if (
+        haystack.includes("agent_")
+        || haystack.includes("agent ")
+        || haystack.includes("external_")
+        || haystack.includes("external id")
+        || haystack.includes("so_")
+        || haystack.includes("superoffice")
+        || haystack.includes("ticket")
+    ) {
+        return { id: "custom-data", title: "Custom Data" };
+    }
+    if (
+        tokenDef.system
+        || haystack.includes("client")
+        || haystack.includes("customer")
+        || haystack.includes("contractor")
+        || haystack.includes("mobile")
+        || haystack.includes("oto")
+        || haystack.includes("port")
+        || haystack.includes("activation")
+    ) {
+        return { id: "client", title: "Client Data" };
+    }
+
+    return { id: "custom-tokens", title: "Custom Tokens" };
+}
+
+function groupTokenMatches(matches = []) {
+    const groups = [];
+    const byId = new Map();
+    const order = new Map([
+        ["client", 0],
+        ["custom-data", 1],
+        ["custom-tokens", 2],
+        ["create", 3]
+    ]);
+
+    matches.forEach((item, index) => {
+        const category = getTokenCategory(item);
+        if (!byId.has(category.id)) {
+            const group = { ...category, items: [] };
+            byId.set(category.id, group);
+            groups.push(group);
+        }
+        byId.get(category.id).items.push({ item, index });
+    });
+
+    return groups.sort((a, b) => (order.get(a.id) ?? 99) - (order.get(b.id) ?? 99));
+}
+
 function RichTextEditor({
     value,
     onChange,
@@ -91,6 +149,7 @@ function RichTextEditor({
         () => menuOpen ? buildTokenMatches(slashQuery, tokenSearchIndex) : [],
         [menuOpen, slashQuery, tokenSearchIndex]
     );
+    const tokenMatchGroups = useMemo(() => groupTokenMatches(tokenMatches), [tokenMatches]);
 
     useEffect(() => {
         const el = editorRef.current;
@@ -399,20 +458,27 @@ function RichTextEditor({
                     <kbd>Space</kbd>
                 </div>
                 <div className="rich-token-menu__list">
-                    {tokenMatches.map((item, index) => (
-                        <button
-                            key={item.id || item.token}
-                            type="button"
-                            className={`${index === activeIndex ? "is-active" : ""}${item.createLabel ? " create-token" : ""}`.trim()}
-                            onMouseEnter={() => setActiveIndex(index)}
-                            onMouseDown={(event) => {
-                                event.preventDefault();
-                                insertToken(item);
-                            }}
-                        >
-                            <span>{item.label || tokenName(item.token)}</span>
-                            <small>{item.token}</small>
-                        </button>
+                    {tokenMatchGroups.map((group) => (
+                        <section key={group.id} className="rich-token-menu__group">
+                            <h4>{group.title}</h4>
+                            <div className="rich-token-menu__group-items">
+                                {group.items.map(({ item, index }) => (
+                                    <button
+                                        key={item.id || item.token}
+                                        type="button"
+                                        className={`${index === activeIndex ? "is-active" : ""}${item.createLabel ? " create-token" : ""}`.trim()}
+                                        onMouseEnter={() => setActiveIndex(index)}
+                                        onMouseDown={(event) => {
+                                            event.preventDefault();
+                                            insertToken(item);
+                                        }}
+                                    >
+                                        <span>{item.label || tokenName(item.token)}</span>
+                                        <small>{item.token}</small>
+                                    </button>
+                                ))}
+                            </div>
+                        </section>
                     ))}
                 </div>
             </div>

@@ -1,12 +1,18 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Copy } from "lucide-react";
 import { loadTokens, saveTokens } from "../services/tokenService.js";
 import { loadTemplateTreeData, saveTemplateTreeData } from "../services/templateTreeService.js";
 import { clearAppIndexedDB } from "../services/indexedDbService.js";
 import { buildConfigPayload, validateImportedConfig } from "../services/configService.js";
-import { showToast } from "../services/clipboardService.js";
+import { copyText, showToast } from "../services/clipboardService.js";
 import { getStorageInfo, requestPersistentStorage } from "../services/storageInfoService.js";
 import { AGENT_PROFILE_FIELDS, loadAgentProfile, saveAgentProfile } from "../services/agentProfileService.js";
+import {
+    formatTestImportPayload,
+    TEST_SO_IMPORT_PAYLOAD,
+    TEST_VTI_IMPORT_PAYLOAD
+} from "../data/testImportPayloads.js";
 import Modal from "../components/Modal.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
 
@@ -136,6 +142,15 @@ export default function Settings({ embedded = false, onClose = null }) {
         showToast("Agent profile saved", "success");
     }, [agentProfile]);
 
+    const copyTestData = useCallback((kind) => {
+        const isVti = kind === "vti";
+        const payload = isVti ? TEST_VTI_IMPORT_PAYLOAD : TEST_SO_IMPORT_PAYLOAD;
+        copyText(formatTestImportPayload(payload), {
+            message: `${isVti ? "VTI" : "SO"} test JSON copied`,
+            variant: "success"
+        });
+    }, []);
+
     const resetStorage = useCallback(async () => {
         setConfirmReset(false);
         const keysToDelete = [];
@@ -220,6 +235,29 @@ export default function Settings({ embedded = false, onClose = null }) {
                         <div className="flex-row gap-sm flex-wrap">
                             <button className="secondary-btn" onClick={importConfig}>Import configuration</button>
                             <button className="secondary-btn" onClick={startExport}>Export configuration</button>
+                        </div>
+                    </div>
+
+                    <div className="popup-card settings-test-data-card">
+                        <label>Test data</label>
+                        <p className="hint">Copies ready-to-import JSON for quick VTI/SO tests.</p>
+                        <div className="settings-test-data-actions">
+                            <button
+                                type="button"
+                                className="settings-test-data-btn settings-test-data-btn--vti"
+                                onClick={() => copyTestData("vti")}
+                            >
+                                <Copy size={15} strokeWidth={2} aria-hidden="true" />
+                                <span>VTI data</span>
+                            </button>
+                            <button
+                                type="button"
+                                className="settings-test-data-btn settings-test-data-btn--so"
+                                onClick={() => copyTestData("so")}
+                            >
+                                <Copy size={15} strokeWidth={2} aria-hidden="true" />
+                                <span>SO data</span>
+                            </button>
                         </div>
                     </div>
 

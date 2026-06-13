@@ -27,7 +27,7 @@ function ManageTokensPage() {
 function ExternalGeneratorPage() {
     return (
         <>
-            <PageHeader title="External Generator" />
+            <PageHeader title="Generate external ID" />
             <ExternalGenerator />
         </>
     );

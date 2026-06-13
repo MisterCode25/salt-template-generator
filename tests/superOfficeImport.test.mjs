@@ -1,5 +1,12 @@
 import assert from "node:assert/strict";
-import { parseSuperOfficeInfoPayload } from "../src/utils/superOfficeImport.js";
+import {
+  groupSuperOfficeImageAttachmentsByDate,
+  parseSuperOfficeInfoPayload
+} from "../src/utils/superOfficeImport.js";
+import {
+  applyExternalIdSourceCorrections,
+  getExternalIdSourceConflicts
+} from "../src/utils/externalIdConflicts.js";
 
 {
   const result = parseSuperOfficeInfoPayload(JSON.stringify({
@@ -9,12 +16,37 @@ import { parseSuperOfficeInfoPayload } from "../src/utils/superOfficeImport.js";
 
   assert.equal(result.ok, true);
   assert.equal(result.ticketId, "232");
+  assert.equal(result.sourceTicketId, "232");
   assert.equal(result.externalIdValid, true);
   assert.equal(result.ignoredExternalId, false);
   assert.equal(result.tokenValues["{so_ticket_num}"], "232");
   assert.equal(result.tokenValues["{external_partner}"], "EWB");
   assert.equal(result.tokenValues["{external_partner_ticket_number}"], "ABC");
   assert.equal(result.tokenValues["{external_comment}"], undefined);
+}
+
+{
+  const result = parseSuperOfficeInfoPayload({
+    ticketId: "31436062",
+    externalTicketId: "VALID//26.02.2026//99999999//SO-WRONG//Lost//Fiber Off//Other//X6//EWB//ABC//L1//OLT//1//BOK|BOF//Comment"
+  });
+  const conflicts = getExternalIdSourceConflicts(result, {
+    client: {
+      contractorNumber: "31447756"
+    }
+  });
+
+  assert.equal(conflicts.length, 2);
+  assert.equal(conflicts[0].field, "customer");
+  assert.equal(conflicts[0].externalValue, "99999999");
+  assert.equal(conflicts[0].expectedValue, "31447756");
+  assert.equal(conflicts[1].field, "soTicket");
+  assert.equal(conflicts[1].externalValue, "SO-WRONG");
+  assert.equal(conflicts[1].expectedValue, "31436062");
+
+  const corrected = applyExternalIdSourceCorrections(result.tokenValues, conflicts);
+  assert.equal(corrected["{external_customer}"], "31447756");
+  assert.equal(corrected["{so_ticket_num}"], "31436062");
 }
 
 {
@@ -41,6 +73,56 @@ import { parseSuperOfficeInfoPayload } from "../src/utils/superOfficeImport.js";
   const result = parseSuperOfficeInfoPayload({ externalTicketId: "bad format" });
   assert.equal(result.ok, false);
   assert.equal(result.error, "EMPTY_SUPER_OFFICE_DATA");
+}
+
+{
+  const result = parseSuperOfficeInfoPayload({
+    ticketId: "31436062",
+    attachments: [
+      {
+        name: "photo-a.jpg",
+        url: "https://example.test/photo-a.jpg",
+        type: "image",
+        size: "2.3MB",
+        messageId: 10,
+        messageDate: "13.06.2026 14:45"
+      },
+      {
+        name: "document.pdf",
+        url: "https://example.test/document.pdf",
+        type: "pdf",
+        date: "2026-06-12"
+      },
+      {
+        name: "photo-b.png",
+        url: "https://example.test/photo-b.png",
+        createdAt: "2026-06-12T10:00:00Z"
+      }
+    ]
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.attachments.length, 3);
+  assert.equal(result.imageAttachments.length, 2);
+  assert.equal(result.imageAttachments[0].date, "13.06.2026 14:45");
+
+  const groups = groupSuperOfficeImageAttachmentsByDate(result.attachments);
+  assert.equal(groups.length, 2);
+  assert.equal(groups[0].dateKey, "2026-06-13");
+  assert.equal(groups[0].attachments[0].galleryIndex, 0);
+  assert.equal(groups[1].dateKey, "2026-06-12");
+}
+
+{
+  const result = parseSuperOfficeInfoPayload({
+    attachments: [
+      { name: "photo-only.webp", url: "https://example.test/photo-only.webp", type: "image" }
+    ]
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.tokenValues["{so_ticket_num}"], undefined);
+  assert.equal(result.imageAttachments.length, 1);
 }
 
 console.log("superOfficeImport tests passed");

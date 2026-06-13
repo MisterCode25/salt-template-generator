@@ -21,13 +21,18 @@ const sampleClientJSON = {
     address: "67 Avenue de Gilamont, 1800 Vevey",
     email: "pierremb@gmail.com",
     communicationLanguage: "FR",
-    activationDate: "2026-06-20",
     eligibilitySource: "ALO",
     contactRecordId: "50895045"
+  },
+  offer: {
+    activationDate: "2026-06-20"
   },
   contact: {
     communicationLanguage: "FR",
     eligibilitySource: "ALO",
+    eligibilityOrdering: "35",
+    publicId: "28453061",
+    fixedNumber: "41788451664",
     contactRecordId: "50895045",
     error: ""
   },
@@ -104,11 +109,15 @@ ${JSON.stringify(sampleClientJSON, null, 2)}`);
 {
   const sections = getClientInfoSections(sampleClientJSON);
   const client = sections.find((section) => section.id === "client");
+  const contact = sections.find((section) => section.id === "contact");
   const technical = sections.find((section) => section.id === "technical");
   const crossConnection = sections.find((section) => section.id === "crossConnection");
 
   assert.ok(client.fields.some((field) => field.label === "Full name" && field.value === "Peter manuel BILLIG"));
   assert.ok(client.fields.some((field) => field.label === "Activation date" && field.value === "2026-06-20"));
+  assert.ok(contact.fields.some((field) => field.label === "Eligibility ordering" && field.value === "35"));
+  assert.ok(contact.fields.some((field) => field.label === "Public ID" && field.value === "28453061"));
+  assert.ok(contact.fields.some((field) => field.label === "Fixed number" && field.value === "41788451664"));
   assert.ok(technical.fields.some((field) => field.label === "OTO ID" && field.value === "B.111.783.391.7"));
   assert.ok(crossConnection.fields.some((field) => field.label === "Port" && field.value === "23"));
 }

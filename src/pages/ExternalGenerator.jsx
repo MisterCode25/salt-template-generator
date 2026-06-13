@@ -131,7 +131,7 @@ function PromptModal({ state, onCancel, onSubmit }) {
                     <div className="prompt-dialog__body">
                         <input
                             autoFocus
-                            type="text"
+                            type={displayState.inputType || "text"}
                             className="prompt-dialog__input"
                             placeholder={displayState.placeholder || ""}
                             value={inputValue}
@@ -242,7 +242,13 @@ function isBlank(value) {
     return String(value ?? "").trim() === "";
 }
 
-export default function ExternalGenerator({ embedded = false, onClose, clientPayload = null }) {
+export default function ExternalGenerator({
+    embedded = false,
+    flowOnly = false,
+    startField = null,
+    onClose,
+    clientPayload = null
+}) {
     const navigate = useNavigate();
     const [fields, setFields] = useState(() => ({
         ...EXTERNAL_DEFAULT_FIELDS,
@@ -254,12 +260,14 @@ export default function ExternalGenerator({ embedded = false, onClose, clientPay
     const [vtiEmptyFieldErrors, setVtiEmptyFieldErrors] = useState({});
     const [storedClientPayload, setStoredClientPayload] = useState(() => clientPayload || loadActiveClientPayload());
     const [promptState, setPromptState] = useState(null);
+    const [externalTokenSyncReady, setExternalTokenSyncReady] = useState(false);
     const promptResolverRef = useRef(null);
     const hasMountedRef = useRef(false);
     const externalIdFieldRef = useRef(null);
     const fieldsRef = useRef(fields);
     const appliedClientSignatureRef = useRef("");
     const externalTokenSyncReadyRef = useRef(false);
+    const flowOnlyStartedRef = useRef(false);
 
     useEffect(() => {
         const tick = () => {
@@ -340,6 +348,7 @@ export default function ExternalGenerator({ embedded = false, onClose, clientPay
             const stored = localStorage.getItem("input_" + SO_TICKET_NUM_TOKEN);
             const storedExternalFields = readExternalFieldsFromStoredTokens();
             externalTokenSyncReadyRef.current = true;
+            setExternalTokenSyncReady(true);
             if (Object.keys(storedExternalFields).length > 0 || (stored !== null && stored.trim() !== "")) {
                 setFields(prev => ({
                     ...prev,
@@ -367,6 +376,7 @@ export default function ExternalGenerator({ embedded = false, onClose, clientPay
                 title,
                 placeholder,
                 initialValue,
+                inputType: extra.inputType || "text",
                 showBack: !!extra.showBack
             });
         });
@@ -691,7 +701,7 @@ export default function ExternalGenerator({ embedded = false, onClose, clientPay
 
         if (!result.ok) {
             if (notify) showToast("No active customer data", "error");
-            return;
+            return null;
         }
 
         const computedNext = mergeExternalFields(fieldsRef.current, result.fields);
@@ -710,6 +720,7 @@ export default function ExternalGenerator({ embedded = false, onClose, clientPay
             }
         }
         if (notify) showToast("Customer data refreshed", "info");
+        return computedNext;
     };
 
     useEffect(() => {
@@ -833,6 +844,7 @@ export default function ExternalGenerator({ embedded = false, onClose, clientPay
 
     const FIELD_POPUP_CONFIG = {
         flagging: { type: "choice", options: FLAGGING_OPTIONS, title: "Flagging" },
+        data: { type: "input", inputType: "date", title: "Date", placeholder: "YYYY-MM-DD" },
         SignalStatus: { type: "choice", options: SIGNAL_OPTIONS_ESCALATION, title: "Signal Status" },
         LedStatus: { type: "choice", options: LED_OPTIONS, title: "LED Status" },
         treatmentStep: { type: "choice", options: TREATMENT_STEP_OPTIONS, title: "Treatment Step" },
@@ -848,42 +860,45 @@ export default function ExternalGenerator({ embedded = false, onClose, clientPay
         bokBof: { type: "input", title: "BOK|BOF", placeholder: "BOK|BOF|Fiber" },
     };
 
-    const handleFieldClick = async (fieldId) => {
-        if (promptState) return;
-        if (fieldId === "data") return;
+    const handleFieldClick = async (fieldId, sourceFields = fieldsRef.current) => {
+        if (promptState) return false;
 
         const config = FIELD_POPUP_CONFIG[fieldId];
-        if (!config) return;
+        if (!config) return false;
+
+        const currentFields = sourceFields || fieldsRef.current;
 
         let value;
         if (config.type === "choice") {
-            value = await askChoice(config.title, optionsOf(config.options), { currentValue: fields[fieldId] });
+            value = await askChoice(config.title, optionsOf(config.options), { currentValue: currentFields[fieldId] });
         } else if (config.type === "search") {
             value = await askChoice(
                 config.title,
                 config.options.map((v) => ({ label: v, value: v })),
-                { searchable: true, searchPlaceholder: config.searchPlaceholder || "Search...", currentValue: fields[fieldId] }
+                { searchable: true, searchPlaceholder: config.searchPlaceholder || "Search...", currentValue: currentFields[fieldId] }
             );
         } else if (config.type === "custom-note") {
             value = await askChoice(
                 config.title,
                 config.options.map((v) => ({ label: v, value: v })),
-                { customNote: true, currentValue: fields[fieldId] }
+                { customNote: true, currentValue: currentFields[fieldId] }
             );
         } else {
-            value = await askInput(config.title, config.placeholder || "", fields[fieldId] || "");
+            value = await askInput(config.title, config.placeholder || "", currentFields[fieldId] || "", {
+                inputType: config.inputType || "text"
+            });
         }
 
-        if (value === null) return;
+        if (value === null) return false;
         const cleaned = String(value).trim();
-        if (!cleaned) return;
+        if (!cleaned) return false;
 
         // When modifying a branching field, clear its downstream fields so the wizard
         // re-asks for them in the correct context rather than skipping them.
         const downstreamFields = WIZARD_DOWNSTREAM_FIELDS[fieldId] || [];
         const clearPatch = downstreamFields.reduce((acc, f) => ({ ...acc, [f]: "" }), {});
 
-        const updatedFields = { ...fieldsRef.current, [fieldId]: cleaned, ...clearPatch };
+        const updatedFields = { ...currentFields, [fieldId]: cleaned, ...clearPatch };
         setFields(updatedFields);
         setVtiEmptyFieldErrors((prev) => {
             const next = { ...prev };
@@ -896,7 +911,35 @@ export default function ExternalGenerator({ embedded = false, onClose, clientPay
         await new Promise((r) => setTimeout(r, 0));
 
         await runPostVtiCompletionFlow(updatedFields, inferMetaFromFields(updatedFields));
+        return true;
     };
+
+    useEffect(() => {
+        if (!flowOnly || !externalTokenSyncReady || flowOnlyStartedRef.current) return;
+
+        let cancelled = false;
+        flowOnlyStartedRef.current = true;
+
+        (async () => {
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            const seededFields = await applyActiveClientData({ runFlow: false, notify: false }) || fieldsRef.current;
+            if (cancelled) return;
+
+            if (typeof startField === "string" && startField) {
+                await handleFieldClick(startField, seededFields);
+            } else {
+                await runPostVtiCompletionFlow(seededFields, inferMetaFromFields(seededFields));
+            }
+
+            if (!cancelled) onClose?.();
+        })();
+
+        return () => {
+            cancelled = true;
+            flowOnlyStartedRef.current = false;
+            closePrompt(null);
+        };
+    }, [flowOnly, externalTokenSyncReady, startField]);
 
     const InputField = ({ id, label, type = "text" }) => {
         const isPopupField = id !== "data";
@@ -924,7 +967,7 @@ export default function ExternalGenerator({ embedded = false, onClose, clientPay
                 <div className="variant-editor-head">
                     <div>
                         <p className="eyebrow">HCAMP</p>
-                        <h2>External Generator</h2>
+                        <h2>Generate external ID</h2>
                     </div>
                     {!embedded && (
                         <div className="flex-row gap-sm flex-wrap">
@@ -1015,6 +1058,16 @@ export default function ExternalGenerator({ embedded = false, onClose, clientPay
                 </div>
             </div>
     );
+
+    if (flowOnly) {
+        return (
+            <PromptModal
+                state={promptState}
+                onCancel={() => closePrompt(null)}
+                onSubmit={(value) => closePrompt(value)}
+            />
+        );
+    }
 
     return (
         <>
