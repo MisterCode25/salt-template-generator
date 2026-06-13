@@ -63,6 +63,7 @@ function normalizeStoredTicketPayload(payload) {
     return {
         ticketId: String(payload.ticketId || "").trim(),
         sourceTicketId: String(payload.sourceTicketId || "").trim(),
+        createdAt: String(payload.createdAt || payload.created || payload.createdDate || "").trim(),
         externalTicketId: String(payload.externalTicketId || "").trim(),
         importedAt: payload.importedAt || new Date().toISOString(),
         clientSignature,
@@ -76,6 +77,7 @@ export function buildSuperOfficeTicketPayload(importResult, importedAt = new Dat
     return normalizeStoredTicketPayload({
         ticketId: importResult?.ticketId || "",
         sourceTicketId: importResult?.sourceTicketId || "",
+        createdAt: importResult?.createdAt || "",
         externalTicketId: importResult?.externalTicketId || "",
         importedAt: importedAt.toISOString(),
         clientSignature,

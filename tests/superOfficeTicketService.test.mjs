@@ -88,6 +88,7 @@ globalThis.localStorage.clear();
 saveActiveClientPayload(clientA);
 const saved = saveSuperOfficeTicketPayload({
   ticketId: "31436062",
+  createdAt: "6/4/2026 12:07 PM",
   tokenValues: {
     "{so_ticket_num}": "31436062"
   },
@@ -97,8 +98,10 @@ const saved = saveSuperOfficeTicketPayload({
 });
 
 assert.equal(saved.imageAttachments.length, 1);
+assert.equal(saved.createdAt, "6/4/2026 12:07 PM");
 assert.equal(saved.tokenValues["{so_ticket_num}"], "31436062");
 assert.equal(loadSuperOfficeTicketPayload().imageAttachments.length, 1);
+assert.equal(loadSuperOfficeTicketPayload().createdAt, "6/4/2026 12:07 PM");
 
 saveActiveClientPayload(clientB);
 assert.equal(loadSuperOfficeTicketPayload(), null);

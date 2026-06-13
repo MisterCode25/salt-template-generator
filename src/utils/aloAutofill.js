@@ -1,3 +1,4 @@
+import { parseExternalId } from "./externalGenerator.js";
 import { SO_TICKET_NUM_TOKEN } from "./tokenCanonicalization.js";
 
 export const ALO_AUTOFILL_CLIPBOARD_SOURCE = "salt-templater-alo-autofill";
@@ -24,6 +25,116 @@ function firstValue(values) {
     return "";
 }
 
+function formatSwissLocalPhone(value) {
+    const digits = textValue(value).replace(/\D/g, "");
+    if (digits.startsWith("41") && digits.length === 11) return `0${digits.slice(2)}`;
+    if (digits.startsWith("0041") && digits.length === 13) return `0${digits.slice(4)}`;
+    if (digits.startsWith("0") && digits.length === 10) return digits;
+    return textValue(value);
+}
+
+function formatIsoDate(value) {
+    const text = textValue(value);
+    if (!text) return "";
+    const isoMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+    const dotMatch = text.match(/^(\d{2})\.(\d{2})\.(\d{4})/);
+    if (dotMatch) return `${dotMatch[3]}-${dotMatch[2]}-${dotMatch[1]}`;
+    const usSlashMatch = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (usSlashMatch) {
+        return `${usSlashMatch[3]}-${usSlashMatch[1].padStart(2, "0")}-${usSlashMatch[2].padStart(2, "0")}`;
+    }
+    return text;
+}
+
+function formatDisplayDate(value) {
+    const iso = formatIsoDate(value);
+    const match = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) return iso;
+    return `${match[3]}.${match[2]}.${match[1]}`;
+}
+
+function getOfferActivationDate(clientPayload = {}) {
+    return firstValue([
+        clientPayload?.offer?.activationDate,
+        clientPayload?.client?.activationDate,
+        clientPayload?.client?.activation_date,
+        clientPayload?.client?.activation,
+        clientPayload?.client?.dateActivation,
+        clientPayload?.contact?.activationDate,
+        clientPayload?.healthcheck?.activationDate
+    ]);
+}
+
+function resolveAloType(externalFields = {}) {
+    const haystack = [
+        externalFields.SignalStatus,
+        externalFields.LedStatus,
+        externalFields.treatmentStep,
+        externalFields.comment
+    ].join(" ").toLowerCase();
+    if (/(low|bad|rx|tx|performance)/i.test(haystack)) return "lowBadRxTx";
+    return "noSignal";
+}
+
+function resolveAloSignalState(externalFields = {}) {
+    const signal = textValue(externalFields.SignalStatus).toLowerCase();
+    if (signal === "lost") return "lost";
+    if (signal === "never") return "never";
+    return "";
+}
+
+export function buildAloProblemDescription(options = {}) {
+    const aloType = options.aloType === "lowBadRxTx" ? "lowBadRxTx" : "noSignal";
+    const signalState = options.signalState === "never" ? "never" : "lost";
+    const base = aloType === "lowBadRxTx" ? "Bad signal" : "No signal";
+    const date = signalState === "never"
+        ? formatDisplayDate(options.activationDate)
+        : formatDisplayDate(options.disconnectionDate);
+    const label = signalState === "never" ? "Never activated" : "Signal lost";
+    return [base, label, date].filter(Boolean).join(" - ");
+}
+
+export function buildAloPreparationDefaults(clientPayload = {}, superOfficePayload = {}) {
+    const externalId = firstValue([
+        superOfficePayload?.externalTicketId,
+        clientPayload?.externalTicketId,
+        clientPayload?.externalId,
+        clientPayload?.client?.externalTicketId,
+        clientPayload?.client?.externalId,
+        clientPayload?.superOffice?.externalTicketId
+    ]);
+    const parsedExternalId = parseExternalId(externalId);
+    const externalFields = parsedExternalId.ok ? parsedExternalId.fields : {};
+    const aloType = resolveAloType(externalFields);
+    const signalState = resolveAloSignalState(externalFields);
+    const activationDate = formatIsoDate(getOfferActivationDate(clientPayload));
+    const ticketCreatedDate = formatIsoDate(firstValue([
+        superOfficePayload?.createdAt,
+        superOfficePayload?.created,
+        superOfficePayload?.ticketDate,
+        superOfficePayload?.messageDate,
+        superOfficePayload?.importedAt
+    ]));
+    const extRef = firstValue([
+        superOfficePayload?.sourceTicketId,
+        superOfficePayload?.ticketId,
+        superOfficePayload?.tokenValues?.[SO_TICKET_NUM_TOKEN],
+        externalFields.soTicket
+    ]);
+
+    return {
+        externalId,
+        externalFields,
+        aloType,
+        signalState,
+        extRef,
+        disconnectionDate: signalState === "lost" ? ticketCreatedDate : "",
+        activationDate,
+        description: buildAloProblemDescription({ aloType, signalState, disconnectionDate: ticketCreatedDate, activationDate })
+    };
+}
+
 function normalizeAgentProfile(agentProfile = {}) {
     return {
         firstName: textValue(agentProfile.firstName),
@@ -48,7 +159,7 @@ function normalizeSuperOfficePayload(superOfficePayload = {}) {
     };
 }
 
-export function buildAloAutofillFields(clientPayload = {}, agentProfile = {}, superOfficePayload = {}) {
+export function buildAloAutofillFields(clientPayload = {}, agentProfile = {}, superOfficePayload = {}, options = {}) {
     const client = clientPayload?.client || {};
     const contact = clientPayload?.contact || {};
     const healthcheck = clientPayload?.healthcheck || {};
@@ -62,17 +173,22 @@ export function buildAloAutofillFields(clientPayload = {}, agentProfile = {}, su
         client.fixedNumber,
         client.fixedPhone
     ]);
-    const mobilePhone = firstValue([
-        client.mobileRaw,
+    const mobilePhone = formatSwissLocalPhone(firstValue([
         client.mobile,
+        client.mobileRaw,
         client.phone,
         client.telephone,
         contact.mobile,
         contact.phone
+    ]));
+    const preparedProblemDescription = firstValue([
+        options.description,
+        options.signalState ? buildAloProblemDescription(options) : "",
+        ALO_DEFAULT_PROBLEM.problemDescription
     ]);
 
     return {
-        externalReference: superOffice.ticketId,
+        externalReference: firstValue([options.extRef, superOffice.ticketId]),
         socketId: firstValue([healthcheck.otoId, healthcheck.oto_id, healthcheck.oto]),
         plugNr: firstValue([healthcheck.otoPortId, healthcheck.otoPort, healthcheck.oto_port]),
         breakoutCable: firstValue([healthcheck.breakoutCableId, healthcheck.breakoutCable, healthcheck.cable]),
@@ -86,12 +202,14 @@ export function buildAloAutofillFields(clientPayload = {}, agentProfile = {}, su
         ispLastName: agent.lastName,
         ispPhone: agent.phoneNumber,
         ispEmail: agent.email,
-        ...ALO_DEFAULT_PROBLEM
+        ...ALO_DEFAULT_PROBLEM,
+        problemDescription: preparedProblemDescription,
+        problemCode3: options.aloType === "lowBadRxTx" ? "Performance problem" : ALO_DEFAULT_PROBLEM.problemCode3
     };
 }
 
-export function buildAloAutofillPayload(clientPayload = {}, agentProfile = {}, superOfficePayload = {}) {
-    const fields = buildAloAutofillFields(clientPayload, agentProfile, superOfficePayload);
+export function buildAloAutofillPayload(clientPayload = {}, agentProfile = {}, superOfficePayload = {}, options = {}) {
+    const fields = buildAloAutofillFields(clientPayload, agentProfile, superOfficePayload, options);
     const agent = normalizeAgentProfile(agentProfile);
     const superOffice = normalizeSuperOfficePayload(superOfficePayload);
 
@@ -99,6 +217,12 @@ export function buildAloAutofillPayload(clientPayload = {}, agentProfile = {}, s
         source: ALO_AUTOFILL_CLIPBOARD_SOURCE,
         version: ALO_AUTOFILL_VERSION,
         fields,
+        alo: {
+            type: options.aloType || "noSignal",
+            signalState: options.signalState || "",
+            disconnectionDate: options.disconnectionDate || "",
+            activationDate: options.activationDate || ""
+        },
         client: {
             firstName: fields.firstName,
             lastName: fields.lastName,
@@ -117,8 +241,8 @@ export function buildAloAutofillPayload(clientPayload = {}, agentProfile = {}, s
     };
 }
 
-export function formatAloAutofillPayload(clientPayload = {}, agentProfile = {}, superOfficePayload = {}) {
-    return JSON.stringify(buildAloAutofillPayload(clientPayload, agentProfile, superOfficePayload), null, 2);
+export function formatAloAutofillPayload(clientPayload = {}, agentProfile = {}, superOfficePayload = {}, options = {}) {
+    return JSON.stringify(buildAloAutofillPayload(clientPayload, agentProfile, superOfficePayload, options), null, 2);
 }
 
 function aloAutofillBookmarkletRunner(expectedSource) {
@@ -198,7 +322,16 @@ function aloAutofillBookmarkletRunner(expectedSource) {
         var el = findField(id);
         if (!el) return false;
 
-        if ("value" in el) {
+        if (el.tagName === "SELECT") {
+            var target = text(normalized).toLowerCase();
+            for (var i = 0; i < el.options.length; i += 1) {
+                var option = el.options[i];
+                if (text(option.value).toLowerCase() === target || text(option.textContent).toLowerCase() === target) {
+                    el.value = option.value;
+                    break;
+                }
+            }
+        } else if ("value" in el) {
             el.value = normalized;
         } else {
             el.textContent = normalized;

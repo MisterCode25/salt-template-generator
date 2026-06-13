@@ -33,7 +33,7 @@ import {
     useTemplateRuntime,
     VariantModal
 } from "../components/TemplateRuntime.jsx";
-import { getTemplateTextResult } from "../core/tokenEngine.js";
+import { generateFinalText, getTemplateTextResult } from "../core/tokenEngine.js";
 import { loadTemplateTreeData, saveTemplateTreeData } from "../services/templateTreeService.js";
 import { Channel } from "../models/templateTreeModel.js";
 import {
@@ -61,7 +61,11 @@ import {
     hasSuperOfficeTicketPayload,
     loadSuperOfficeTicketPayload
 } from "../services/superOfficeTicketService.js";
-import { formatAloAutofillPayload } from "../utils/aloAutofill.js";
+import {
+    buildAloPreparationDefaults,
+    buildAloProblemDescription,
+    formatAloAutofillPayload
+} from "../utils/aloAutofill.js";
 import { getKeyboardShortcutForEvent } from "../utils/keyboardShortcuts.js";
 
 const ExternalGenerator = lazy(() => import("./ExternalGenerator.jsx"));
@@ -89,6 +93,29 @@ const LANGUAGES = [
     { code: "de", label: "DE" },
     { code: "it", label: "IT" }
 ];
+
+const ALO_TYPE_OPTIONS = [
+    { value: "noSignal", label: "No signal" },
+    { value: "lowBadRxTx", label: "Low / bad RX TX" }
+];
+
+const ALO_SIGNAL_OPTIONS = [
+    { value: "lost", label: "Lost" },
+    { value: "never", label: "Never" }
+];
+
+function plainTextFromTemplate(value) {
+    return String(value || "")
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<\/p>\s*<p[^>]*>/gi, "\n\n")
+        .replace(/<[^>]+>/g, "")
+        .replace(/&nbsp;/g, " ")
+        .replace(/&amp;/g, "&")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+}
 
 const NODE_ICON_MAP = {
     "wifi-off": Wrench,
@@ -329,6 +356,176 @@ const PlaybookSearchBox = memo(function PlaybookSearchBox({
         </label>
     );
 });
+
+function AloPreparationModal({ defaults, templateOptions = [], onCancel, onSubmit }) {
+    const [form, setForm] = useState(() => ({
+        aloType: defaults.aloType || "noSignal",
+        extRef: defaults.extRef || "",
+        signalState: defaults.signalState || "",
+        disconnectionDate: defaults.disconnectionDate || "",
+        activationDate: defaults.activationDate || "",
+        description: defaults.description || ""
+    }));
+    const [descriptionEdited, setDescriptionEdited] = useState(false);
+
+    const inferredType = Boolean(defaults.externalFields?.SignalStatus || defaults.externalFields?.LedStatus || defaults.externalFields?.treatmentStep);
+    const inferredSignalState = Boolean(defaults.signalState);
+    const selectedDate = form.signalState === "never" ? form.activationDate : form.disconnectionDate;
+    const canSubmit = form.extRef.trim() && form.signalState && selectedDate && form.description.trim();
+
+    const updateForm = (patch) => {
+        setForm((current) => {
+            const next = { ...current, ...patch };
+            if (!descriptionEdited && !Object.prototype.hasOwnProperty.call(patch, "description")) {
+                next.description = buildAloProblemDescription(next);
+            }
+            return next;
+        });
+    };
+
+    const updateDescription = (value) => {
+        setDescriptionEdited(true);
+        setForm((current) => ({ ...current, description: value }));
+    };
+
+    const resetDescription = () => {
+        setDescriptionEdited(false);
+        setForm((current) => ({ ...current, description: buildAloProblemDescription(current) }));
+    };
+
+    const importTemplate = (event) => {
+        const option = templateOptions.find((candidate) => candidate.id === event.target.value);
+        if (!option) return;
+        updateDescription(option.text);
+    };
+
+    return (
+        <Modal onClose={onCancel} dialogClassName="popup-box alo-prep-modal" ariaLabel="Prepare ALO fill">
+            <div className="popup-header alo-prep-header">
+                <div>
+                    <p className="eyebrow">ALO fill</p>
+                    <h2>Prepare ticket data</h2>
+                    <p className="hint">Confirm the missing values before copying the data for the ALO shortcut.</p>
+                </div>
+            </div>
+
+            <div className="alo-prep-body">
+                <div className="alo-prep-field">
+                    <span className="alo-prep-label">Type</span>
+                    <div className="alo-prep-segments" role="tablist" aria-label="ALO problem type">
+                        {ALO_TYPE_OPTIONS.map((option) => (
+                            <button
+                                key={option.value}
+                                type="button"
+                                className={`alo-prep-segment${form.aloType === option.value ? " is-active" : ""}`}
+                                onClick={() => updateForm({ aloType: option.value })}
+                                disabled={inferredType}
+                            >
+                                {option.label}
+                            </button>
+                        ))}
+                    </div>
+                    {inferredType && <span className="alo-prep-note">Detected from External ID.</span>}
+                </div>
+
+                <label className="alo-prep-field">
+                    <span className="alo-prep-label">Ext ref field</span>
+                    <input
+                        type="text"
+                        value={form.extRef}
+                        onChange={(event) => updateForm({ extRef: event.target.value })}
+                        placeholder="SO ticket / external reference"
+                    />
+                </label>
+
+                <div className="alo-prep-grid">
+                    <div className="alo-prep-field">
+                        <span className="alo-prep-label">Signal state</span>
+                        <div className="alo-prep-segments" role="tablist" aria-label="ALO signal state">
+                            {ALO_SIGNAL_OPTIONS.map((option) => (
+                                <button
+                                    key={option.value}
+                                    type="button"
+                                    className={`alo-prep-segment${form.signalState === option.value ? " is-active" : ""}`}
+                                    onClick={() => updateForm({ signalState: option.value })}
+                                    disabled={inferredSignalState}
+                                >
+                                    {option.label}
+                                </button>
+                            ))}
+                        </div>
+                        {inferredSignalState && <span className="alo-prep-note">Detected from External ID.</span>}
+                    </div>
+
+                    {form.signalState === "lost" ? (
+                        <label className="alo-prep-field">
+                            <span className="alo-prep-label">Disconnection date</span>
+                            <input
+                                type="date"
+                                value={form.disconnectionDate}
+                                onChange={(event) => updateForm({ disconnectionDate: event.target.value })}
+                            />
+                        </label>
+                    ) : (
+                        <label className="alo-prep-field">
+                            <span className="alo-prep-label">Activation date</span>
+                            <input
+                                type="date"
+                                value={form.activationDate}
+                                onChange={(event) => updateForm({ activationDate: event.target.value })}
+                            />
+                        </label>
+                    )}
+                </div>
+
+                <label className="alo-prep-field">
+                    <span className="alo-prep-label">Problem description</span>
+                    <textarea
+                        value={form.description}
+                        onChange={(event) => updateDescription(event.target.value)}
+                        rows={5}
+                        placeholder="Free text for ALO problem description"
+                    />
+                </label>
+                <div className="alo-prep-description-actions">
+                    <button type="button" className="alo-prep-reset" onClick={resetDescription}>
+                        Reset auto text
+                    </button>
+                    {templateOptions.length > 0 && (
+                        <label className="alo-prep-template-picker">
+                            <span>Import template</span>
+                            <select defaultValue="" onChange={importTemplate}>
+                                <option value="" disabled>Choose template...</option>
+                                {templateOptions.map((option) => (
+                                    <option key={option.id} value={option.id}>{option.label}</option>
+                                ))}
+                            </select>
+                        </label>
+                    )}
+                </div>
+            </div>
+
+            <div className="popup-actions alo-prep-actions">
+                <button type="button" className="secondary-btn" onClick={onCancel}>Cancel</button>
+                <button
+                    type="button"
+                    className="primary-btn"
+                    disabled={!canSubmit}
+                    onClick={() => onSubmit({
+                        aloType: form.aloType,
+                        extRef: form.extRef.trim(),
+                        signalState: form.signalState,
+                        disconnectionDate: form.disconnectionDate,
+                        activationDate: form.activationDate,
+                        description: form.description.trim()
+                    })}
+                >
+                    Copy ALO data
+                </button>
+            </div>
+        </Modal>
+    );
+}
 
 const PlaybookColumn = memo(function PlaybookColumn({
     title,
@@ -638,6 +835,7 @@ export default function Templates() {
     const [superOfficeTicket, setSuperOfficeTicket] = useState(() => loadSuperOfficeTicketPayload());
     const [superOfficeDataPresent, setSuperOfficeDataPresent] = useState(() => hasSuperOfficeTicketPayload());
     const [superOfficeGalleryOpen, setSuperOfficeGalleryOpen] = useState(false);
+    const [aloPreparation, setAloPreparation] = useState(null);
     const configName = localStorage.getItem("local_configName") || "No configuration";
 
     const refreshTreeData = () => {
@@ -679,6 +877,23 @@ export default function Templates() {
         () => new Map(treeTemplates.map((template) => [template.id, template])),
         [treeTemplates]
     );
+    const aloTemplateOptions = useMemo(() => {
+        const options = [];
+        treeTemplates.forEach((template) => {
+            getAvailableTemplateChannels(template).forEach((channel) => {
+                const model = resolveChannelModel(template, channel);
+                if (!model) return;
+                const text = plainTextFromTemplate(generateFinalText(model, runtime.lang, runtime.values));
+                if (!text) return;
+                options.push({
+                    id: `${template.id}:${channel}`,
+                    label: `${template.title || "Untitled"} - ${CHANNEL_LABELS[channel]}`,
+                    text
+                });
+            });
+        });
+        return options.sort((a, b) => a.label.localeCompare(b.label));
+    }, [runtime.lang, runtime.values, treeTemplates]);
     const templateChannelsById = useMemo(
         () => buildTemplateDisplayChannelIndex(treeTemplates),
         [treeTemplates]
@@ -804,10 +1019,22 @@ export default function Templates() {
         const clientPayload = runtimeRef.current.clientPayload;
         if (!clientPayload) return;
 
+        setAloPreparation(buildAloPreparationDefaults(clientPayload, loadSuperOfficeTicketPayload()));
+    }, []);
+
+    const closeAloPreparation = useCallback(() => {
+        setAloPreparation(null);
+    }, []);
+
+    const submitAloPreparation = useCallback(async (options) => {
+        const clientPayload = runtimeRef.current.clientPayload;
+        if (!clientPayload) return;
+
         await copyText(
-            formatAloAutofillPayload(clientPayload, loadAgentProfile(), loadSuperOfficeTicketPayload()),
+            formatAloAutofillPayload(clientPayload, loadAgentProfile(), loadSuperOfficeTicketPayload(), options),
             { message: "ALO fill data copied", variant: "success" }
         );
+        setAloPreparation(null);
     }, []);
 
     const importClientFromPasteAndResetCase = useCallback((text) => {
@@ -1324,6 +1551,15 @@ export default function Templates() {
                     conflicts={runtime.externalIdConflictPrompt.conflicts}
                     onConfirm={runtime.confirmExternalIdConflictCorrection}
                     onCancel={runtime.cancelExternalIdConflictCorrection}
+                />
+            )}
+
+            {aloPreparation && (
+                <AloPreparationModal
+                    defaults={aloPreparation}
+                    templateOptions={aloTemplateOptions}
+                    onCancel={closeAloPreparation}
+                    onSubmit={submitAloPreparation}
                 />
             )}
 

@@ -1853,6 +1853,163 @@ textarea:focus {
     outline-offset: 2px;
 }
 
+.alo-prep-modal {
+    width: min(620px, calc(100vw - 32px));
+    max-width: min(620px, calc(100vw - 32px));
+}
+
+.alo-prep-header {
+    margin-bottom: var(--space-lg);
+}
+
+.alo-prep-body {
+    display: grid;
+    gap: 14px;
+}
+
+.alo-prep-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(190px, 0.72fr);
+    gap: 14px;
+    align-items: start;
+}
+
+.alo-prep-field {
+    display: grid;
+    gap: 7px;
+    min-width: 0;
+}
+
+.alo-prep-label {
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.alo-prep-field input,
+.alo-prep-field textarea {
+    width: 100%;
+    max-width: none;
+    box-sizing: border-box;
+}
+
+.alo-prep-field textarea {
+    resize: vertical;
+    min-height: 112px;
+}
+
+.alo-prep-segments {
+    display: inline-flex;
+    width: fit-content;
+    max-width: 100%;
+    gap: 3px;
+    padding: 3px;
+    border: 1px solid var(--button-secondary-border);
+    border-radius: 9px;
+    background: var(--button-secondary-bg);
+}
+
+.alo-prep-segment {
+    min-width: 86px;
+    height: 29px;
+    padding: 0 11px;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.alo-prep-segment.is-active {
+    background: var(--button-primary-bg);
+    border-color: var(--button-primary-border);
+    color: var(--button-primary-text);
+}
+
+.alo-prep-segment:disabled {
+    cursor: default;
+    opacity: 0.88;
+}
+
+.alo-prep-note {
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.alo-prep-reset {
+    justify-self: start;
+    border: 0;
+    background: transparent;
+    color: var(--color-primary-light);
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+    padding: 0;
+}
+
+.alo-prep-description-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    min-width: 0;
+}
+
+.alo-prep-template-picker {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.alo-prep-template-picker select {
+    width: min(260px, 42vw);
+    max-width: 100%;
+    height: 32px;
+    padding: 0 28px 0 10px;
+    font-size: 12px;
+}
+
+.alo-prep-actions {
+    margin-top: var(--space-xl);
+}
+
+@media (max-width: 680px) {
+    .alo-prep-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .alo-prep-segments {
+        width: 100%;
+    }
+
+    .alo-prep-segment {
+        flex: 1 1 0;
+        min-width: 0;
+    }
+
+    .alo-prep-description-actions {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .alo-prep-template-picker {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .alo-prep-template-picker select {
+        width: 100%;
+    }
+}
+
 .template-result-preview {
     width: 100%;
     max-height: min(46vh, 420px);

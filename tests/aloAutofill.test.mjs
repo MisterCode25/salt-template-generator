@@ -3,6 +3,7 @@ import {
   ALO_AUTOFILL_CLIPBOARD_SOURCE,
   buildAloAutofillBookmarklet,
   buildAloAutofillPayload,
+  buildAloPreparationDefaults,
   formatAloAutofillPayload
 } from "../src/utils/aloAutofill.js";
 import {
@@ -30,7 +31,7 @@ const agentProfile = {
   assert.equal(payload.fields.firstName, "Peter manuel");
   assert.equal(payload.fields.lastName, "BILLIG");
   assert.equal(payload.fields.contactPhone1, "41788451664");
-  assert.equal(payload.fields.contactPhone2, "41789125685");
+  assert.equal(payload.fields.contactPhone2, "0789125685");
   assert.equal(payload.fields.contactEmail, "pierremb@gmail.com");
   assert.equal(payload.fields.ispFirstName, "Samir");
   assert.equal(payload.fields.ispLastName, "Mestari");
@@ -42,9 +43,55 @@ const agentProfile = {
 }
 
 {
+  const payload = buildAloAutofillPayload({
+    ...TEST_VTI_IMPORT_PAYLOAD,
+    client: {
+      ...TEST_VTI_IMPORT_PAYLOAD.client,
+      mobile: "",
+      mobileRaw: "41789125685"
+    }
+  }, agentProfile, TEST_SO_IMPORT_PAYLOAD);
+
+  assert.equal(payload.fields.contactPhone2, "0789125685");
+}
+
+{
   const parsed = JSON.parse(formatAloAutofillPayload(TEST_VTI_IMPORT_PAYLOAD, agentProfile, TEST_SO_IMPORT_PAYLOAD));
   assert.equal(parsed.source, ALO_AUTOFILL_CLIPBOARD_SOURCE);
   assert.equal(parsed.fields.problemDescription, "No signal");
+}
+
+{
+  const defaults = buildAloPreparationDefaults(TEST_VTI_IMPORT_PAYLOAD, TEST_SO_IMPORT_PAYLOAD);
+  assert.equal(defaults.aloType, "noSignal");
+  assert.equal(defaults.signalState, "lost");
+  assert.equal(defaults.extRef, "31436062");
+  assert.equal(defaults.activationDate, "2026-06-20");
+}
+
+{
+  const defaults = buildAloPreparationDefaults(TEST_VTI_IMPORT_PAYLOAD, {
+    ...TEST_SO_IMPORT_PAYLOAD,
+    createdAt: "6/4/2026 12:07 PM"
+  });
+
+  assert.equal(defaults.disconnectionDate, "2026-06-04");
+}
+
+{
+  const payload = buildAloAutofillPayload(TEST_VTI_IMPORT_PAYLOAD, agentProfile, TEST_SO_IMPORT_PAYLOAD, {
+    aloType: "lowBadRxTx",
+    signalState: "never",
+    extRef: "SO-123",
+    activationDate: "2026-06-20",
+    description: "Bad signal - Never activated - 20.06.2026"
+  });
+
+  assert.equal(payload.fields.externalReference, "SO-123");
+  assert.equal(payload.fields.problemDescription, "Bad signal - Never activated - 20.06.2026");
+  assert.equal(payload.fields.problemCode3, "Performance problem");
+  assert.equal(payload.alo.type, "lowBadRxTx");
+  assert.equal(payload.alo.signalState, "never");
 }
 
 {
@@ -57,6 +104,7 @@ const agentProfile = {
   assert.match(bookmarklet, /ticket\.contactPersonIspFirstName/);
   assert.match(bookmarklet, /ticket\.contactPersonIspMail/);
   assert.match(bookmarklet, /ticket\.problemCode3/);
+  assert.match(bookmarklet, /tagName === "SELECT"/);
 }
 
 console.log("aloAutofill tests passed");
