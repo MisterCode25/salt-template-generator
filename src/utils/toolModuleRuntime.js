@@ -709,7 +709,38 @@ function buildCompatibleValues(values = {}, fields = []) {
         if (field.key) assignPathAlias(compatible, field.key, field.value);
         field.aliases.forEach((alias) => assignValueAlias(compatible, alias, field.value));
     });
+    assignCanonicalFieldVariables(compatible, fields);
     return compatible;
+}
+
+const CANONICAL_FIELD_VARIABLES = Object.freeze([
+    {
+        name: "clientName",
+        candidates: ["clientName", "client name", "fullName", "full name", "name", "client.name"]
+    }
+]);
+
+function fieldMatchesCandidate(field, candidate) {
+    const key = normalizeLookupKey(candidate);
+    if (!field || !key) return false;
+    return [field.label, field.token, field.key, ...(field.aliases || [])].some((alias) => normalizeLookupKey(alias) === key);
+}
+
+function findFieldValue(fields = [], candidates = []) {
+    for (const candidate of candidates) {
+        const field = fields.find((entry) => fieldMatchesCandidate(entry, candidate));
+        const value = displayValue(field?.value);
+        if (value !== "") return value;
+    }
+    return "";
+}
+
+function assignCanonicalFieldVariables(target, fields = []) {
+    CANONICAL_FIELD_VARIABLES.forEach(({ name, candidates }) => {
+        if (Object.prototype.hasOwnProperty.call(target, name)) return;
+        const value = findFieldValue(fields, candidates);
+        if (value !== "") target[name] = value;
+    });
 }
 
 function buildFieldIndex(fields = []) {
@@ -791,6 +822,7 @@ function buildRuntimeVariables({ fields = [], tokenValues = {}, environment = {}
         });
     });
 
+    assignCanonicalFieldVariables(variables, fields);
     return variables;
 }
 

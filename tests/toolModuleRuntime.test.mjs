@@ -114,6 +114,15 @@ import {
 }
 
 {
+  const context = buildToolRuntimeContext({
+    clientSummary: [{ label: "Name", value: "Mr. Peter manuel BILLIG" }],
+    clientInfo: [{ id: "client", title: "Client", fields: [{ label: "Full name", value: "Peter manuel BILLIG" }] }]
+  });
+  assert.equal(context.variables.clientName, "Peter manuel BILLIG");
+  assert.equal(context.values.clientName, "Peter manuel BILLIG");
+}
+
+{
   const prompt = buildToolModulePrompt({
     title: "Refund helper",
     prompt: "Calculate a refund and copy a customer message."

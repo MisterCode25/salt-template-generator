@@ -24,14 +24,14 @@ import {
 } from "../services/toolsService.js";
 import { loadTokens } from "../services/tokenService.js";
 import { loadActiveClientPayload } from "../services/activeClientService.js";
-import { getClientInternalTokenData } from "../utils/clientClipboard.js";
+import { getClientInfoSections, getClientInternalTokenData, getClientSummaryFields } from "../utils/clientClipboard.js";
 import { DATA_SHORTCUTS, copyTextFallback } from "../services/shortcutsService.js";
 import { KEYBOARD_SHORTCUTS, formatKeyboardShortcut } from "../utils/keyboardShortcuts.js";
-import { buildToolModulePrompt, buildToolModuleSrcDoc } from "../utils/toolModuleRuntime.js";
+import { buildToolModulePrompt, buildToolModuleSrcDoc, buildToolRuntimeContext } from "../utils/toolModuleRuntime.js";
 import Modal from "../components/Modal.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import EmptyState from "../components/EmptyState.jsx";
-import { showToast } from "../services/clipboardService.js";
+import { copyHtml, copyText, showToast } from "../services/clipboardService.js";
 
 const SELECTIONS = Object.freeze({
     LINK_TOOLS: "link-tools",
@@ -119,13 +119,20 @@ function mergeUniqueTokens(tokenDefs = []) {
     return Array.from(byToken.values());
 }
 
-async function loadToolTokens() {
+async function loadToolRuntimePreviewContext() {
     const configuredTokens = await loadTokens();
     const clientPayload = await loadActiveClientPayload();
-    const clientTokens = clientPayload
-        ? getClientInternalTokenData(clientPayload).tokenDefs
-        : [];
-    return mergeUniqueTokens([...configuredTokens, ...clientTokens]);
+    const clientData = clientPayload
+        ? getClientInternalTokenData(clientPayload)
+        : { tokenDefs: [], values: {} };
+
+    return {
+        tokens: mergeUniqueTokens([...configuredTokens, ...clientData.tokenDefs]),
+        values: clientData.values || {},
+        client: clientPayload || null,
+        clientInfo: clientPayload ? getClientInfoSections(clientPayload) : [],
+        clientSummary: clientPayload ? getClientSummaryFields(clientPayload) : []
+    };
 }
 
 async function writeTextToClipboard(value, message) {
@@ -378,13 +385,144 @@ function LinkToolFields({ draft, onPatch, tokens }) {
     );
 }
 
-function ModuleToolFields({ draft, onPatch }) {
+function isSafeToolPreviewUrl(url) {
+    return /^(https?:|mailto:|tel:)/i.test(String(url || "").trim());
+}
+
+function ModulePreviewFrame({ draft, tokens, runtimePreviewContext }) {
+    const iframeRef = useRef(null);
+    const [frameHeight, setFrameHeight] = useState(360);
+    const previewSrcDoc = useMemo(() => buildToolModuleSrcDoc(draft.html), [draft.html]);
+
+    const reply = useCallback((requestId, payload = null, error = "") => {
+        if (!requestId) return;
+        const target = iframeRef.current?.contentWindow;
+        if (!target) return;
+        target.postMessage({
+            source: "template-tool-host",
+            type: "tool:response",
+            responseTo: requestId,
+            payload,
+            error
+        }, "*");
+    }, []);
+
+    const postContext = useCallback((requestId = "") => {
+        const target = iframeRef.current?.contentWindow;
+        if (!target) return;
+        target.postMessage({
+            source: "template-tool-host",
+            type: requestId ? "tool:response" : "tool:context",
+            responseTo: requestId,
+            payload: buildToolRuntimeContext({
+                tool: draft,
+                values: runtimePreviewContext.values || {},
+                tokens,
+                client: runtimePreviewContext.client || null,
+                clientInfo: runtimePreviewContext.clientInfo || [],
+                clientSummary: runtimePreviewContext.clientSummary || []
+            })
+        }, "*");
+    }, [draft, runtimePreviewContext, tokens]);
+
+    useEffect(() => {
+        const handleMessage = async (event) => {
+            if (event.source !== iframeRef.current?.contentWindow) return;
+            const data = event.data || {};
+            if (data.source !== "template-tool-module") return;
+
+            const { type, requestId, payload = {} } = data;
+
+            try {
+                if (type === "tool:ready") {
+                    postContext();
+                    reply(requestId, { ok: true });
+                    return;
+                }
+
+                if (type === "tool:request-context") {
+                    postContext(requestId);
+                    return;
+                }
+
+                if (type === "tool:resize") {
+                    const nextHeight = Math.min(Math.max(Math.ceil(Number(payload.height) || 0), 180), 620);
+                    if (nextHeight > 0) setFrameHeight(nextHeight);
+                    reply(requestId, { ok: true });
+                    return;
+                }
+
+                if (type === "tool:copy-text") {
+                    await copyText(payload.text || "", {
+                        message: payload.message || "Copied from module preview.",
+                        variant: "success"
+                    });
+                    reply(requestId, { ok: true });
+                    return;
+                }
+
+                if (type === "tool:copy-html") {
+                    await copyHtml(payload.html || "", {
+                        message: payload.message || "Copied from module preview.",
+                        variant: "success"
+                    });
+                    reply(requestId, { ok: true });
+                    return;
+                }
+
+                if (type === "tool:toast") {
+                    showToast(payload.message || "Module preview updated.", payload.variant || "info");
+                    reply(requestId, { ok: true });
+                    return;
+                }
+
+                if (type === "tool:open-url") {
+                    if (!isSafeToolPreviewUrl(payload.url)) {
+                        showToast("Only http, mailto and tel links can be opened by the host.", "warning");
+                        reply(requestId, { ok: false });
+                        return;
+                    }
+                    window.open(payload.url, "_blank", "noopener,noreferrer");
+                    reply(requestId, { ok: true });
+                    return;
+                }
+
+                if (type === "tool:close") {
+                    showToast("Preview close action received.", "info");
+                    reply(requestId, { ok: true });
+                }
+            } catch (error) {
+                reply(requestId, null, error?.message || "Preview request failed.");
+            }
+        };
+
+        window.addEventListener("message", handleMessage);
+        return () => window.removeEventListener("message", handleMessage);
+    }, [postContext, reply]);
+
+    useEffect(() => {
+        setFrameHeight(360);
+    }, [draft.html]);
+
+    return (
+        <iframe
+            ref={iframeRef}
+            className="tools-module-preview-frame"
+            title={`${draft.title || "Tool module"} preview`}
+            sandbox="allow-scripts allow-forms allow-popups allow-modals"
+            srcDoc={previewSrcDoc}
+            style={{ height: `${frameHeight}px` }}
+            onLoad={() => postContext()}
+        />
+    );
+}
+
+function ModuleToolFields({ draft, onPatch, tokens, runtimePreviewContext }) {
     const fileInputRef = useRef(null);
     const buildPrompt = useMemo(
         () => buildToolModulePrompt({ title: draft.title, prompt: draft.prompt }),
         [draft.prompt, draft.title]
     );
-    const previewSrcDoc = useMemo(() => buildToolModuleSrcDoc(draft.html), [draft.html]);
 
     const copyBuildPrompt = useCallback(() => {
         writeTextToClipboard(buildPrompt, "Build prompt copied.");
@@ -481,18 +619,17 @@ function ModuleToolFields({ draft, onPatch }) {
                     <h3>Preview</h3>
                     <p>The final module runs in the same iframe runtime when opened from the tools bar.</p>
                 </div>
-                <iframe
-                    className="tools-module-preview-frame"
-                    title={`${draft.title || "Tool module"} preview`}
-                    sandbox="allow-scripts allow-forms allow-popups allow-modals"
-                    srcDoc={previewSrcDoc}
+                <ModulePreviewFrame
+                    draft={draft}
+                    tokens={tokens}
+                    runtimePreviewContext={runtimePreviewContext}
                 />
             </section>
         </>
     );
 }
 
-function ToolEditorModal({ draft, tokens, onPatch, onSave, onClose }) {
+function ToolEditorModal({ draft, tokens, runtimePreviewContext, onPatch, onSave, onClose }) {
     const toolType = sanitizeToolType(draft.type);
     const isModule = toolType === TOOL_TYPES.MODULE;
 
@@ -525,7 +662,12 @@ function ToolEditorModal({ draft, tokens, onPatch, onSave, onClose }) {
                 </section>
 
                 {isModule ? (
-                    <ModuleToolFields draft={draft} onPatch={onPatch} />
+                    <ModuleToolFields
+                        draft={draft}
+                        tokens={tokens}
+                        runtimePreviewContext={runtimePreviewContext}
+                        onPatch={onPatch}
+                    />
                 ) : (
                     <LinkToolFields draft={draft} onPatch={onPatch} tokens={tokens} />
                 )}
@@ -696,6 +838,12 @@ function KeyboardShortcutsPanel() {
 export default function ManageTools({ embedded = false, onClose = null, initialSection = "tools" }) {
     const [tools, setTools] = useState([]);
     const [tokens, setTokens] = useState([]);
+    const [runtimePreviewContext, setRuntimePreviewContext] = useState({
+        values: {},
+        client: null,
+        clientInfo: [],
+        clientSummary: []
+    });
     const [selection, setSelection] = useState(
         initialSection === "shortcuts" ? SELECTIONS.DATA_SHORTCUTS : SELECTIONS.LINK_TOOLS
     );
@@ -704,11 +852,12 @@ export default function ManageTools({ embedded = false, onClose = null, initialS
 
     useEffect(() => {
         let active = true;
-        Promise.all([loadTools(), loadToolTokens()]).then(([loadedTools, loadedTokens]) => {
+        Promise.all([loadTools(), loadToolRuntimePreviewContext()]).then(([loadedTools, loadedContext]) => {
             if (!active) return;
             const sortedTools = [...loadedTools].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
             setTools(sortedTools);
-            setTokens(loadedTokens);
+            setTokens(loadedContext.tokens);
+            setRuntimePreviewContext(loadedContext);
             setSelection(initialSection === "shortcuts" ? SELECTIONS.DATA_SHORTCUTS : SELECTIONS.LINK_TOOLS);
             setEditorDraft(null);
         });
@@ -896,6 +1045,7 @@ export default function ManageTools({ embedded = false, onClose = null, initialS
                 <ToolEditorModal
                     draft={editorDraft}
                     tokens={tokens}
+                    runtimePreviewContext={runtimePreviewContext}
                     onPatch={patchDraft}
                     onSave={saveDraft}
                     onClose={closeEditor}
