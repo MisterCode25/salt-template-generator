@@ -1,18 +1,70 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+    BookMarked,
+    ClipboardCopy,
+    ExternalLink,
+    Keyboard,
+    Link2,
+    Pencil,
+    Plus,
+    Puzzle,
+    Save,
+    Trash2,
+    Upload
+} from "lucide-react";
+import {
     DEFAULT_TOOL_COLOR,
     TOOL_COLOR_OPTIONS,
+    TOOL_TYPES,
     loadTools,
+    normalizeTool,
     sanitizeToolColor,
+    sanitizeToolType,
     saveTools
 } from "../services/toolsService.js";
 import { loadTokens } from "../services/tokenService.js";
 import { loadActiveClientPayload } from "../services/activeClientService.js";
 import { getClientInternalTokenData } from "../utils/clientClipboard.js";
+import { DATA_SHORTCUTS, copyTextFallback } from "../services/shortcutsService.js";
+import { KEYBOARD_SHORTCUTS, formatKeyboardShortcut } from "../utils/keyboardShortcuts.js";
+import { buildToolModulePrompt, buildToolModuleSrcDoc } from "../utils/toolModuleRuntime.js";
 import Modal from "../components/Modal.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import { showToast } from "../services/clipboardService.js";
+
+const SELECTIONS = Object.freeze({
+    LINK_TOOLS: "link-tools",
+    MODULE_TOOLS: "module-tools",
+    DATA_SHORTCUTS: "data-shortcuts",
+    KEYBOARD_SHORTCUTS: "keyboard-shortcuts"
+});
+
+const KEYBOARD_SHORTCUT_DESCRIPTIONS = Object.freeze({
+    importVti: "Import VTI customer data from the clipboard.",
+    importSo: "Import SuperOffice ticket data from the clipboard.",
+    clearData: "Clear the currently imported customer and ticket data."
+});
+
+function createId() {
+    return globalThis.crypto?.randomUUID?.() || `tool_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+}
+
+function createDraftTool(type = TOOL_TYPES.LINK, order = 1) {
+    const safeType = sanitizeToolType(type);
+    return {
+        id: "",
+        type: safeType,
+        title: safeType === TOOL_TYPES.MODULE ? "New module" : "New link tool",
+        description: "",
+        url: "",
+        prompt: "",
+        html: "",
+        color: DEFAULT_TOOL_COLOR,
+        order,
+        beta: safeType === TOOL_TYPES.MODULE
+    };
+}
 
 function getUrlTokenContext(value, caret) {
     if (caret === null || caret === undefined) return null;
@@ -69,11 +121,25 @@ function mergeUniqueTokens(tokenDefs = []) {
 
 async function loadToolTokens() {
     const configuredTokens = await loadTokens();
-    const clientPayload = loadActiveClientPayload();
+    const clientPayload = await loadActiveClientPayload();
     const clientTokens = clientPayload
         ? getClientInternalTokenData(clientPayload).tokenDefs
         : [];
     return mergeUniqueTokens([...configuredTokens, ...clientTokens]);
+}
+
+async function writeTextToClipboard(value, message) {
+    try {
+        await navigator.clipboard.writeText(value);
+    } catch {
+        copyTextFallback(value);
+    }
+    showToast(message, "success");
+}
+
+function describeTool(tool) {
+    if (tool.type === TOOL_TYPES.MODULE) return tool.description || "HTML module · Beta";
+    return tool.url || "Link tool";
 }
 
 const ToolTokenOption = memo(function ToolTokenOption({
@@ -107,56 +173,96 @@ const ToolTokenOption = memo(function ToolTokenOption({
     );
 });
 
-const ToolRow = memo(function ToolRow({ tool, onEdit, onDelete }) {
-    const handleEdit = useCallback(() => {
-        onEdit(tool);
-    }, [onEdit, tool]);
-
-    const handleDelete = useCallback(() => {
-        onDelete(tool.id);
-    }, [onDelete, tool.id]);
-
+function SidebarSection({ title, action, children }) {
     return (
-        <div className="model-row">
-            <div>
-                <div className="tool-row-title">
-                    <span className={`tool-color-dot tool-color-dot--${sanitizeToolColor(tool.color)}`} aria-hidden="true" />
-                    <strong>{tool.title}</strong>
-                </div>
-                <div className="hint mt-sm" style={{ wordBreak: "break-all" }}>{tool.url}</div>
+        <section className="tools-sidebar-section">
+            <div className="tools-sidebar-section__head">
+                <span>{title}</span>
+                {action}
             </div>
-            <div className="flex-row gap-sm" style={{ marginLeft: "auto" }}>
-                <button className="icon-btn edit-btn" onClick={handleEdit}>
-                    <span className="icon-pencil" aria-hidden="true"></span>
+            <div className="tools-sidebar-list">
+                {children}
+            </div>
+        </section>
+    );
+}
+
+function SidebarButton({ icon, title, subtitle, selected, badge, onClick }) {
+    return (
+        <button
+            type="button"
+            className={`tools-sidebar-item${selected ? " is-selected" : ""}`}
+            onClick={onClick}
+            title={title}
+        >
+            <span className="tools-sidebar-icon" aria-hidden="true">{icon}</span>
+            <span className="tools-sidebar-copy">
+                <strong>{title}</strong>
+                <small>{subtitle}</small>
+            </span>
+            {badge && <span className="tools-sidebar-badge">{badge}</span>}
+        </button>
+    );
+}
+
+function ColorPicker({ color, onChange }) {
+    return (
+        <div className="tool-color-picker" role="radiogroup" aria-label="Button color">
+            {TOOL_COLOR_OPTIONS.map((option) => (
+                <button
+                    key={option.value}
+                    type="button"
+                    className={`tool-color-swatch tool-color-swatch--${option.value}${color === option.value ? " is-selected" : ""}`}
+                    onClick={() => onChange(option.value)}
+                    role="radio"
+                    aria-checked={color === option.value}
+                    title={option.label}
+                >
+                    <span className="sr-only">{option.label}</span>
                 </button>
-                <button className="icon-btn delete-btn" onClick={handleDelete}>
-                    <span className="icon-trash" aria-hidden="true"></span>
-                </button>
+            ))}
+        </div>
+    );
+}
+
+function CommonToolFields({ draft, onPatch }) {
+    return (
+        <div className="tools-form-grid">
+            <label className="tools-field-line">
+                <span>Tool name</span>
+                <input
+                    type="text"
+                    value={draft.title || ""}
+                    onChange={(event) => onPatch({ title: event.target.value })}
+                    placeholder="Ex: Axiros search"
+                />
+            </label>
+            <label className="tools-field-line">
+                <span>Description</span>
+                <input
+                    type="text"
+                    value={draft.description || ""}
+                    onChange={(event) => onPatch({ description: event.target.value })}
+                    placeholder="What this tool does"
+                />
+            </label>
+            <div className="tools-field-line">
+                <span>Button color</span>
+                <ColorPicker
+                    color={sanitizeToolColor(draft.color)}
+                    onChange={(color) => onPatch({ color })}
+                />
             </div>
         </div>
     );
-});
+}
 
-const ToolModal = memo(function ToolModal({ initial, onClose, onSave }) {
-    const [title, setTitle] = useState(initial?.title || "");
-    const [url, setUrl] = useState(initial?.url || "");
-    const [color, setColor] = useState(sanitizeToolColor(initial?.color || DEFAULT_TOOL_COLOR));
-    const [tokens, setTokens] = useState([]);
+function LinkToolFields({ draft, onPatch, tokens }) {
     const [tokenMenu, setTokenMenu] = useState(null);
     const [activeTokenIndex, setActiveTokenIndex] = useState(0);
     const urlRef = useRef(null);
+    const url = draft.url || "";
     const tokenSearchIndex = useMemo(() => buildToolTokenSearchIndex(tokens), [tokens]);
-
-    useEffect(() => {
-        let active = true;
-        loadToolTokens().then((loadedTokens) => {
-            if (active) setTokens(loadedTokens);
-        });
-        return () => {
-            active = false;
-        };
-    }, []);
-
     const filteredTokens = useMemo(
         () => tokenMenu ? filterToolTokenEntries(tokenSearchIndex, tokenMenu.query) : [],
         [tokenMenu, tokenSearchIndex]
@@ -175,28 +281,28 @@ const ToolModal = memo(function ToolModal({ initial, onClose, onSave }) {
     const insertToken = useCallback((token, context = tokenMenu) => {
         const el = urlRef.current;
         if (!el) {
-            setUrl((prev) => prev + token);
+            onPatch({ url: `${url}${token}` });
             setTokenMenu(null);
             return;
         }
         const start = context?.start ?? el.selectionStart ?? url.length;
         const end = context?.end ?? el.selectionEnd ?? url.length;
         const next = url.slice(0, start) + token + url.slice(end);
-        setUrl(next);
+        onPatch({ url: next });
         setTokenMenu(null);
         setActiveTokenIndex(0);
         requestAnimationFrame(() => {
             el.focus();
             el.setSelectionRange(start + token.length, start + token.length);
         });
-    }, [tokenMenu, url]);
+    }, [onPatch, tokenMenu, url]);
 
     const handleUrlChange = useCallback((event) => {
         const nextUrl = event.target.value;
         const caret = event.target.selectionStart ?? nextUrl.length;
-        setUrl(nextUrl);
+        onPatch({ url: nextUrl });
         updateTokenMenu(nextUrl, caret);
-    }, [updateTokenMenu]);
+    }, [onPatch, updateTokenMenu]);
 
     const handleUrlKeyDown = useCallback((event) => {
         if (!tokenMenu) return;
@@ -225,208 +331,584 @@ const ToolModal = memo(function ToolModal({ initial, onClose, onSave }) {
         }
     }, [filteredTokens, insertToken, selectedTokenIndex, tokenMenu]);
 
-    const handleTitleChange = useCallback((event) => {
-        setTitle(event.target.value);
-    }, []);
-
-    const handleColorSelect = useCallback((nextColor) => {
-        setColor(sanitizeToolColor(nextColor));
-    }, []);
-
-    const closeTokenMenuSoon = useCallback(() => {
-        window.setTimeout(() => setTokenMenu(null), 120);
-    }, []);
-
-    const handleTokenOptionHover = useCallback((index) => {
-        setActiveTokenIndex(index);
-    }, []);
-
-    const handleSave = useCallback(() => {
-        const t = title.trim();
-        const u = url.trim();
-        if (!t) { showToast("Title is required.", "error"); return; }
-        if (!u) { showToast("URL is required.", "error"); return; }
-        onSave({ ...initial, title: t, url: u, color });
-    }, [color, initial, onSave, title, url]);
-
     return (
-        <Modal onClose={onClose} ariaLabel="Tool editor">
-            <div className="popup-header">
-                <h2>{initial?.id ? "Edit tool" : "New tool"}</h2>
+        <section className="tools-panel-block">
+            <div className="tools-panel-title">
+                <h3>Link target</h3>
+                <p>Use <code>@</code> to insert app tokens into the URL.</p>
             </div>
-
-            <div className="popup-grid">
-                <div className="popup-card">
-                    <div className="field-line">
-                        <label>Button label</label>
-                        <input
-                            value={title}
-                            onChange={handleTitleChange}
-                            placeholder="Ex: Axiros, NetCracker…"
-                            autoFocus
-                        />
-                    </div>
-
-                    <div className="field-line tools-url-field">
-                        <label>URL</label>
-                        <input
-                            ref={urlRef}
-                            value={url}
-                            onChange={handleUrlChange}
-                            onKeyDown={handleUrlKeyDown}
-                            onSelect={(event) => updateTokenMenu(url, event.target.selectionStart ?? url.length)}
-                            onFocus={(event) => updateTokenMenu(url, event.target.selectionStart ?? url.length)}
-                            onBlur={closeTokenMenuSoon}
-                            placeholder="https://example.com?id=@client"
-                            className="tools-url-input"
-                        />
-                        {tokenMenu && (
-                            <div className="tools-token-menu" role="listbox">
-                                {filteredTokens.length > 0 ? filteredTokens.map((tok, index) => (
-                                    <ToolTokenOption
-                                        key={tok.id}
-                                        token={tok}
-                                        index={index}
-                                        selected={index === selectedTokenIndex}
-                                        context={tokenMenu}
-                                        onHover={handleTokenOptionHover}
-                                        onInsert={insertToken}
-                                    />
-                                )) : (
-                                    <div className="tools-token-menu__empty">No matching token</div>
-                                )}
-                            </div>
+            <label className="tools-field-line tools-url-field">
+                <span>URL</span>
+                <input
+                    ref={urlRef}
+                    value={url}
+                    onChange={handleUrlChange}
+                    onKeyDown={handleUrlKeyDown}
+                    onSelect={(event) => updateTokenMenu(url, event.target.selectionStart ?? url.length)}
+                    onFocus={(event) => updateTokenMenu(url, event.target.selectionStart ?? url.length)}
+                    onBlur={() => window.setTimeout(() => setTokenMenu(null), 120)}
+                    placeholder="https://example.com/search?q=@"
+                    className="tools-url-input"
+                />
+                {tokenMenu && (
+                    <div className="tools-token-menu" role="listbox">
+                        {filteredTokens.length > 0 ? filteredTokens.map((tok, index) => (
+                            <ToolTokenOption
+                                key={tok.id || tok.token}
+                                token={tok}
+                                index={index}
+                                selected={index === selectedTokenIndex}
+                                context={tokenMenu}
+                                onHover={setActiveTokenIndex}
+                                onInsert={insertToken}
+                            />
+                        )) : (
+                            <div className="tools-token-menu__empty">No matching token</div>
                         )}
                     </div>
+                )}
+            </label>
+            {url && (
+                <div className="tools-field-line">
+                    <span>URL preview</span>
+                    <code className="tools-url-preview">{url}</code>
+                </div>
+            )}
+        </section>
+    );
+}
 
-                    <div className="field-line">
-                        <label>Button color</label>
-                        <div className="tool-color-picker" role="radiogroup" aria-label="Button color">
-                            {TOOL_COLOR_OPTIONS.map((option) => (
-                                <button
-                                    key={option.value}
-                                    type="button"
-                                    className={`tool-color-swatch tool-color-swatch--${option.value}${color === option.value ? " is-selected" : ""}`}
-                                    onClick={() => handleColorSelect(option.value)}
-                                    role="radio"
-                                    aria-checked={color === option.value}
-                                    title={option.label}
-                                >
-                                    <span className="sr-only">{option.label}</span>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
+function ModuleToolFields({ draft, onPatch }) {
+    const fileInputRef = useRef(null);
+    const buildPrompt = useMemo(
+        () => buildToolModulePrompt({ title: draft.title, prompt: draft.prompt }),
+        [draft.prompt, draft.title]
+    );
+    const previewSrcDoc = useMemo(() => buildToolModuleSrcDoc(draft.html), [draft.html]);
 
-                    {url && (
-                        <div className="field-line">
-                            <label>URL preview</label>
-                            <code className="tools-url-preview">{url}</code>
-                        </div>
-                    )}
+    const copyBuildPrompt = useCallback(() => {
+        writeTextToClipboard(buildPrompt, "Build prompt copied.");
+    }, [buildPrompt]);
+
+    const openChatGpt = useCallback(() => {
+        window.open("https://chatgpt.com/", "_blank", "noopener,noreferrer");
+    }, []);
+
+    const openHtmlFilePicker = useCallback(() => {
+        fileInputRef.current?.click();
+    }, []);
+
+    const loadHtmlFile = useCallback(async (event) => {
+        const file = event.target.files?.[0] || null;
+        event.target.value = "";
+        if (!file) return;
+
+        const isHtmlFile = /\.html?$/i.test(file.name) || file.type === "text/html";
+        if (!isHtmlFile) {
+            showToast("Choose an .html file.", "error");
+            return;
+        }
+
+        try {
+            const html = await file.text();
+            onPatch({ html });
+            showToast(`${file.name} loaded.`, "success");
+        } catch {
+            showToast("Unable to read this HTML file.", "error");
+        }
+    }, [onPatch]);
+
+    return (
+        <>
+            <section className="tools-panel-block">
+                <div className="tools-panel-title">
+                    <h3>Module prompt</h3>
+                    <p>Describe what the user wants. The build prompt adds the technical rules automatically.</p>
+                </div>
+                <label className="tools-field-line">
+                    <span>User request</span>
+                    <textarea
+                        value={draft.prompt || ""}
+                        onChange={(event) => onPatch({ prompt: event.target.value })}
+                        placeholder="Ex: Build a small refund calculator that copies the final customer message."
+                        rows={6}
+                    />
+                </label>
+                <div className="tools-action-row">
+                    <button type="button" className="settings-action-btn settings-action-btn--import" onClick={copyBuildPrompt}>
+                        <ClipboardCopy size={15} strokeWidth={2} aria-hidden="true" />
+                        Copy build prompt
+                    </button>
+                    <button type="button" className="settings-action-btn" onClick={openChatGpt}>
+                        <ExternalLink size={15} strokeWidth={2} aria-hidden="true" />
+                        Open ChatGPT
+                    </button>
+                </div>
+            </section>
+
+            <section className="tools-panel-block">
+                <div className="tools-panel-title">
+                    <h3>Generated HTML</h3>
+                    <p>Paste the complete single-file HTML returned by ChatGPT, or load the downloaded HTML file.</p>
+                </div>
+                <div className="tools-action-row">
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".html,.htm,text/html"
+                        className="sr-only"
+                        onChange={loadHtmlFile}
+                    />
+                    <button type="button" className="settings-action-btn" onClick={openHtmlFilePicker}>
+                        <Upload size={15} strokeWidth={2} aria-hidden="true" />
+                        Load HTML file
+                    </button>
+                </div>
+                <label className="tools-field-line">
+                    <span>HTML, CSS and JavaScript</span>
+                    <textarea
+                        className="tools-code-textarea"
+                        value={draft.html || ""}
+                        onChange={(event) => onPatch({ html: event.target.value })}
+                        placeholder="<!doctype html>..."
+                        rows={12}
+                    />
+                </label>
+            </section>
+
+            <section className="tools-panel-block">
+                <div className="tools-panel-title">
+                    <h3>Preview</h3>
+                    <p>The final module runs in the same iframe runtime when opened from the tools bar.</p>
+                </div>
+                <iframe
+                    className="tools-module-preview-frame"
+                    title={`${draft.title || "Tool module"} preview`}
+                    sandbox="allow-scripts allow-forms allow-popups allow-modals"
+                    srcDoc={previewSrcDoc}
+                />
+            </section>
+        </>
+    );
+}
+
+function ToolEditorModal({ draft, tokens, onPatch, onSave, onClose }) {
+    const toolType = sanitizeToolType(draft.type);
+    const isModule = toolType === TOOL_TYPES.MODULE;
+
+    return (
+        <Modal
+            onClose={onClose}
+            ariaLabel={isModule ? "Module tool editor" : "Link tool editor"}
+            dialogClassName="popup-box tool-editor-modal"
+        >
+            <div className="tool-editor-modal__header">
+                <span className="tools-detail-icon" aria-hidden="true">
+                    {isModule ? <Puzzle size={26} strokeWidth={1.9} /> : <Link2 size={26} strokeWidth={1.9} />}
+                </span>
+                <div>
+                    <p className="eyebrow">
+                        {isModule ? "Module tool" : "Link tool"} {isModule && <span className="tool-beta-pill">Beta</span>}
+                    </p>
+                    <h2>{draft.id ? `Edit ${draft.title || "tool"}` : (isModule ? "New module" : "New link tool")}</h2>
+                    <p>{isModule ? "Create a local HTML module launched from the tools bar." : "Create an external URL button for the tools bar."}</p>
                 </div>
             </div>
 
-            <div className="popup-actions">
-                <button type="button" className="primary-btn" onClick={handleSave}>Save</button>
+            <div className="tool-editor-modal__body">
+                <section className="tools-panel-block">
+                    <div className="tools-panel-title">
+                        <h3>Tool setup</h3>
+                        <p>Set the label, description and visual color used in the tools bar.</p>
+                    </div>
+                    <CommonToolFields draft={draft} onPatch={onPatch} />
+                </section>
+
+                {isModule ? (
+                    <ModuleToolFields draft={draft} onPatch={onPatch} />
+                ) : (
+                    <LinkToolFields draft={draft} onPatch={onPatch} tokens={tokens} />
+                )}
+            </div>
+
+            <div className="tool-editor-modal__actions">
+                <button type="button" className="settings-action-btn" onClick={onClose}>
+                    Cancel
+                </button>
+                <button type="button" className="settings-action-btn settings-action-btn--save" onClick={onSave}>
+                    <Save size={15} strokeWidth={2} aria-hidden="true" />
+                    Save tool
+                </button>
             </div>
         </Modal>
     );
-});
+}
 
-export default function ManageTools({ embedded = false, onClose = null }) {
+function ToolListPanel({ type, tools, onCreate, onEdit, onDelete }) {
+    const isModule = type === TOOL_TYPES.MODULE;
+    const title = isModule ? "Modules" : "Link tools";
+    const subtitle = isModule
+        ? "HTML modules launched locally from the tools bar."
+        : "External links launched from the tools bar.";
+    const emptyMessage = isModule ? "No modules yet." : "No link tools yet.";
+
+    return (
+        <div className="tools-detail-stack">
+            <section className="tools-detail-hero tools-detail-hero--list">
+                <span className="tools-detail-icon" aria-hidden="true">
+                    {isModule ? <Puzzle size={30} strokeWidth={1.9} /> : <Link2 size={30} strokeWidth={1.9} />}
+                </span>
+                <div className="tools-panel-title">
+                    <p className="eyebrow">Custom tools {isModule && <span className="tool-beta-pill">Beta</span>}</p>
+                    <h2>{title}</h2>
+                    <p>{subtitle}</p>
+                </div>
+                <div className="tools-detail-actions">
+                    <button type="button" className="settings-action-btn settings-action-btn--import" onClick={() => onCreate(type)}>
+                        <Plus size={15} strokeWidth={2} aria-hidden="true" />
+                        {isModule ? "New module" : "New link tool"}
+                        {isModule && <span className="tool-beta-pill">Beta</span>}
+                    </button>
+                </div>
+            </section>
+
+            {tools.length === 0 ? (
+                <section className="tools-panel-block tools-empty-panel">
+                    <EmptyState message={emptyMessage} />
+                </section>
+            ) : (
+                <section className="tools-list-panel">
+                    {tools.map((tool) => (
+                        <article key={tool.id} className="tools-list-row">
+                            <div className="tools-list-row__icon">
+                                <span className={`tool-color-dot tool-color-dot--${sanitizeToolColor(tool.color)}`} aria-hidden="true" />
+                                {isModule ? <Puzzle size={18} strokeWidth={2} /> : <Link2 size={18} strokeWidth={2} />}
+                            </div>
+                            <div className="tools-list-row__copy">
+                                <h3>{tool.title || "Untitled tool"}</h3>
+                                <p>{describeTool(tool)}</p>
+                            </div>
+                            <div className="tools-list-row__actions">
+                                <button type="button" className="settings-action-btn" onClick={() => onEdit(tool)}>
+                                    <Pencil size={15} strokeWidth={2} aria-hidden="true" />
+                                    Edit
+                                </button>
+                                <button type="button" className="settings-action-btn settings-action-btn--danger" onClick={() => onDelete(tool.id)}>
+                                    <Trash2 size={15} strokeWidth={2} aria-hidden="true" />
+                                    Delete
+                                </button>
+                            </div>
+                        </article>
+                    ))}
+                </section>
+            )}
+        </div>
+    );
+}
+
+function DataShortcutsPanel() {
+    const copyBookmarklet = useCallback((shortcut) => {
+        writeTextToClipboard(shortcut.bookmarklet, `${shortcut.buttonLabel} shortcut copied.`);
+    }, []);
+
+    return (
+        <div className="tools-detail-stack">
+            <section className="tools-detail-hero tools-detail-hero--compact">
+                <span className="tools-detail-icon" aria-hidden="true">
+                    <BookMarked size={30} strokeWidth={1.9} />
+                </span>
+                <div>
+                    <p className="eyebrow">Shortcuts</p>
+                    <h2>Data capture shortcuts</h2>
+                    <p>Bookmarklets used to capture VTI, SuperOffice and ALO data.</p>
+                </div>
+            </section>
+
+            <div className="tools-shortcut-grid">
+                {DATA_SHORTCUTS.map((shortcut) => (
+                    <article key={shortcut.id} className="tools-shortcut-card">
+                        <div className="tools-shortcut-card__head">
+                            <div>
+                                <p className="eyebrow">{shortcut.eyebrow}</p>
+                                <h3>{shortcut.title}</h3>
+                                <p>{shortcut.description}</p>
+                            </div>
+                            <a
+                                className={`vti-bookmarklet-button vti-bookmarklet-button--${shortcut.id}`}
+                                href={shortcut.bookmarklet}
+                                title={shortcut.buttonLabel}
+                                aria-label={shortcut.buttonLabel}
+                                onClick={(event) => {
+                                    event.preventDefault();
+                                    showToast("Drag this button to the bookmarks bar.", "info");
+                                }}
+                            >
+                                {shortcut.buttonLabel}
+                            </a>
+                        </div>
+                        <ol className="tools-shortcut-steps">
+                            {shortcut.steps.map((step) => (
+                                <li key={step}>{step}</li>
+                            ))}
+                        </ol>
+                        <button type="button" className="settings-action-btn" onClick={() => copyBookmarklet(shortcut)}>
+                            <ClipboardCopy size={15} strokeWidth={2} aria-hidden="true" />
+                            Copy shortcut
+                        </button>
+                    </article>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function KeyboardShortcutsPanel() {
+    return (
+        <div className="tools-detail-stack">
+            <section className="tools-detail-hero tools-detail-hero--compact">
+                <span className="tools-detail-icon" aria-hidden="true">
+                    <Keyboard size={30} strokeWidth={1.9} />
+                </span>
+                <div>
+                    <p className="eyebrow">Shortcuts</p>
+                    <h2>Keyboard shortcuts</h2>
+                    <p>Global app shortcuts available from the main workspace.</p>
+                </div>
+            </section>
+
+            <section className="tools-panel-block">
+                <div className="tools-keyboard-list">
+                    {KEYBOARD_SHORTCUTS.map((shortcut) => (
+                        <div key={shortcut.id} className="tools-keyboard-row">
+                            <div>
+                                <strong>{shortcut.label}</strong>
+                                <p>{KEYBOARD_SHORTCUT_DESCRIPTIONS[shortcut.id] || "App action shortcut."}</p>
+                            </div>
+                            <kbd>{formatKeyboardShortcut(shortcut)}</kbd>
+                        </div>
+                    ))}
+                </div>
+            </section>
+        </div>
+    );
+}
+
+export default function ManageTools({ embedded = false, onClose = null, initialSection = "tools" }) {
     const [tools, setTools] = useState([]);
-    const [modalTool, setModalTool] = useState(null);
+    const [tokens, setTokens] = useState([]);
+    const [selection, setSelection] = useState(
+        initialSection === "shortcuts" ? SELECTIONS.DATA_SHORTCUTS : SELECTIONS.LINK_TOOLS
+    );
+    const [editorDraft, setEditorDraft] = useState(null);
     const [confirmDelete, setConfirmDelete] = useState(null);
 
     useEffect(() => {
-        loadTools().then(setTools);
-    }, []);
+        let active = true;
+        Promise.all([loadTools(), loadToolTokens()]).then(([loadedTools, loadedTokens]) => {
+            if (!active) return;
+            const sortedTools = [...loadedTools].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+            setTools(sortedTools);
+            setTokens(loadedTokens);
+            setSelection(initialSection === "shortcuts" ? SELECTIONS.DATA_SHORTCUTS : SELECTIONS.LINK_TOOLS);
+            setEditorDraft(null);
+        });
+        return () => {
+            active = false;
+        };
+    }, [initialSection]);
 
     const persist = useCallback(async (next) => {
-        setTools(next);
-        await saveTools(next);
+        const sortedNext = [...next].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+        setTools(sortedNext);
+        await saveTools(sortedNext);
         window.dispatchEvent(new CustomEvent("tools-updated"));
     }, []);
 
-    const onSave = useCallback(async (tool) => {
-        let next;
-        if (tool.id) {
-            next = tools.map((t) => (t.id === tool.id ? tool : t));
-        } else {
-            next = [...tools, { ...tool, id: crypto.randomUUID(), order: tools.length + 1 }];
-        }
-        await persist(next);
-        setModalTool(null);
-    }, [persist, tools]);
-
-    const onDelete = useCallback(async () => {
-        if (!confirmDelete) return;
-        await persist(tools.filter((t) => t.id !== confirmDelete));
-        setConfirmDelete(null);
-    }, [confirmDelete, persist, tools]);
-
-    const openNewTool = useCallback(() => {
-        setModalTool({});
+    const selectDataShortcuts = useCallback(() => {
+        setSelection(SELECTIONS.DATA_SHORTCUTS);
     }, []);
+
+    const selectKeyboardShortcuts = useCallback(() => {
+        setSelection(SELECTIONS.KEYBOARD_SHORTCUTS);
+    }, []);
+
+    const selectLinkTools = useCallback(() => {
+        setSelection(SELECTIONS.LINK_TOOLS);
+    }, []);
+
+    const selectModuleTools = useCallback(() => {
+        setSelection(SELECTIONS.MODULE_TOOLS);
+    }, []);
+
+    const createTool = useCallback((type) => {
+        const nextDraft = createDraftTool(type, tools.length + 1);
+        setEditorDraft(nextDraft);
+    }, [tools.length]);
 
     const editTool = useCallback((tool) => {
-        setModalTool(tool);
+        setEditorDraft(tool);
     }, []);
 
-    const requestToolDelete = useCallback((toolId) => {
+    const closeEditor = useCallback(() => {
+        setEditorDraft(null);
+    }, []);
+
+    const patchDraft = useCallback((patch) => {
+        setEditorDraft((current) => current ? { ...current, ...patch } : current);
+    }, []);
+
+    const saveDraft = useCallback(async () => {
+        if (!editorDraft) return;
+        const normalized = normalizeTool(editorDraft);
+        const title = normalized.title.trim();
+        if (!title) {
+            showToast("Tool name is required.", "error");
+            return;
+        }
+        if (normalized.type === TOOL_TYPES.LINK && !normalized.url.trim()) {
+            showToast("URL is required for link tools.", "error");
+            return;
+        }
+
+        const now = new Date().toISOString();
+        const savedTool = {
+            ...normalized,
+            id: normalized.id || createId(),
+            title,
+            color: sanitizeToolColor(normalized.color),
+            order: normalized.order ?? tools.length + 1,
+            createdAt: normalized.createdAt || now,
+            updatedAt: now
+        };
+        const exists = tools.some((tool) => tool.id === savedTool.id);
+        const next = exists
+            ? tools.map((tool) => (tool.id === savedTool.id ? savedTool : tool))
+            : [...tools, savedTool];
+        await persist(next);
+        setSelection(savedTool.type === TOOL_TYPES.MODULE ? SELECTIONS.MODULE_TOOLS : SELECTIONS.LINK_TOOLS);
+        setEditorDraft(null);
+        showToast("Tool saved.", "success");
+    }, [editorDraft, persist, tools]);
+
+    const requestDelete = useCallback((toolId) => {
+        if (!toolId) return;
         setConfirmDelete(toolId);
     }, []);
 
-    const closeToolModal = useCallback(() => {
-        setModalTool(null);
-    }, []);
+    const deleteTool = useCallback(async () => {
+        if (!confirmDelete) return;
+        const next = tools.filter((tool) => tool.id !== confirmDelete);
+        await persist(next);
+        setConfirmDelete(null);
+        setEditorDraft((current) => current?.id === confirmDelete ? null : current);
+        showToast("Tool deleted.", "success");
+    }, [confirmDelete, persist, tools]);
 
     const cancelDelete = useCallback(() => {
         setConfirmDelete(null);
     }, []);
 
+    const linkToolsCount = tools.filter((tool) => tool.type !== TOOL_TYPES.MODULE).length;
+    const moduleToolsCount = tools.filter((tool) => tool.type === TOOL_TYPES.MODULE).length;
+    const linkTools = useMemo(
+        () => tools.filter((tool) => tool.type !== TOOL_TYPES.MODULE),
+        [tools]
+    );
+    const moduleTools = useMemo(
+        () => tools.filter((tool) => tool.type === TOOL_TYPES.MODULE),
+        [tools]
+    );
+
     return (
-        <main className={embedded ? "management-embedded-page" : "page-container"}>
-            <div className="manage-card">
-                <div className="variant-editor-head">
+        <main className={`tools-manager-page${embedded ? " tools-manager-page--embedded" : ""}`}>
+            <div className="tools-manager-shell">
+                <header className="tools-manager-header">
                     <div>
-                        <p className="eyebrow">Quick tools</p>
-                        <h2>Manage Tools</h2>
+                        <p className="eyebrow">Tools + shortcuts</p>
+                        <h2>Extensions</h2>
                     </div>
-                </div>
+                </header>
 
-                <div className="models-list">
-                    {tools.length === 0 && <EmptyState message="No tools yet." />}
-                    {tools.map((tool) => (
-                        <ToolRow
-                            key={tool.id}
-                            tool={tool}
-                            onEdit={editTool}
-                            onDelete={requestToolDelete}
-                        />
-                    ))}
-                </div>
+                <div className="tools-manager-layout">
+                    <aside className="tools-manager-sidebar" aria-label="Tools and shortcuts">
+                        <SidebarSection title="Tools">
+                            <SidebarButton
+                                icon={<Link2 size={18} strokeWidth={2} />}
+                                title="Link tools"
+                                subtitle={`${linkToolsCount} saved links`}
+                                selected={selection === SELECTIONS.LINK_TOOLS}
+                                onClick={selectLinkTools}
+                            />
+                            <SidebarButton
+                                icon={<Puzzle size={18} strokeWidth={2} />}
+                                title="Modules"
+                                subtitle={`${moduleToolsCount} HTML modules`}
+                                selected={selection === SELECTIONS.MODULE_TOOLS}
+                                badge="Beta"
+                                onClick={selectModuleTools}
+                            />
+                        </SidebarSection>
 
-                <div className="add-btn-container">
-                    <button className="primary-btn" onClick={openNewTool}>+ Add Tool</button>
+                        <SidebarSection title="Shortcuts">
+                            <SidebarButton
+                                icon={<BookMarked size={18} strokeWidth={2} />}
+                                title="Data shortcuts"
+                                subtitle={`${DATA_SHORTCUTS.length} bookmarklets`}
+                                selected={selection === SELECTIONS.DATA_SHORTCUTS}
+                                onClick={selectDataShortcuts}
+                            />
+                            <SidebarButton
+                                icon={<Keyboard size={18} strokeWidth={2} />}
+                                title="Keyboard shortcuts"
+                                subtitle={`${KEYBOARD_SHORTCUTS.length} app shortcuts`}
+                                selected={selection === SELECTIONS.KEYBOARD_SHORTCUTS}
+                                onClick={selectKeyboardShortcuts}
+                            />
+                        </SidebarSection>
+                    </aside>
+
+                    <section className="tools-manager-detail" aria-label="Selected extension detail">
+                        {selection === SELECTIONS.LINK_TOOLS && (
+                            <ToolListPanel
+                                type={TOOL_TYPES.LINK}
+                                tools={linkTools}
+                                onCreate={createTool}
+                                onEdit={editTool}
+                                onDelete={requestDelete}
+                            />
+                        )}
+                        {selection === SELECTIONS.MODULE_TOOLS && (
+                            <ToolListPanel
+                                type={TOOL_TYPES.MODULE}
+                                tools={moduleTools}
+                                onCreate={createTool}
+                                onEdit={editTool}
+                                onDelete={requestDelete}
+                            />
+                        )}
+                        {selection === SELECTIONS.DATA_SHORTCUTS && <DataShortcutsPanel />}
+                        {selection === SELECTIONS.KEYBOARD_SHORTCUTS && <KeyboardShortcutsPanel />}
+                    </section>
                 </div>
             </div>
 
-            {modalTool !== null && (
-                <ToolModal
-                    initial={modalTool.id ? modalTool : null}
-                    onClose={closeToolModal}
-                    onSave={onSave}
+            {editorDraft && (
+                <ToolEditorModal
+                    draft={editorDraft}
+                    tokens={tokens}
+                    onPatch={patchDraft}
+                    onSave={saveDraft}
+                    onClose={closeEditor}
                 />
             )}
+
             {confirmDelete !== null && (
                 <ConfirmDialog
                     title="Delete tool"
                     message="Are you sure you want to delete this tool?"
                     confirmLabel="Delete"
                     variant="danger"
-                    onConfirm={onDelete}
+                    onConfirm={deleteTool}
                     onCancel={cancelDelete}
                 />
             )}

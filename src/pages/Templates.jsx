@@ -843,6 +843,13 @@ export default function Templates() {
     runtimeRef.current = runtime;
     const toolValuesRef = useRef(runtime.values);
     toolValuesRef.current = runtime.values;
+    const toolRuntimeContextRef = useRef({});
+    toolRuntimeContextRef.current = {
+        tokens: runtime.tokens,
+        client: runtime.clientPayload,
+        clientInfo: runtime.clientInfoSections,
+        clientSummary: runtime.clientSummaryFields
+    };
     const [nodes, setNodes] = useState([]);
     const [treeTemplates, setTreeTemplates] = useState([]);
     const [activeNodeId, setActiveNodeId] = useState(null);
@@ -1427,6 +1434,7 @@ export default function Templates() {
 
             <ToolsBar
                 valuesRef={toolValuesRef}
+                runtimeContextRef={toolRuntimeContextRef}
                 onOpenExternalGenerator={openExternalGenerator}
                 hasExternalId={Boolean(runtime.clientExternalId)}
                 onCopyAloAutofillData={copyAloAutofillData}

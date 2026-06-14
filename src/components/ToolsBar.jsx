@@ -1,7 +1,10 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ClipboardPaste, ExternalLink, Image as ImageIcon, Settings2 } from "lucide-react";
-import { loadTools, resolveToolUrl, sanitizeToolColor } from "../services/toolsService.js";
+import { ClipboardPaste, ExternalLink, Image as ImageIcon, Puzzle, Settings2 } from "lucide-react";
+import Modal from "./Modal.jsx";
+import { copyHtml, copyText, showToast } from "../services/clipboardService.js";
+import { isModuleTool, loadTools, resolveToolUrl, sanitizeToolColor } from "../services/toolsService.js";
+import { buildToolModuleSrcDoc, buildToolRuntimeContext } from "../utils/toolModuleRuntime.js";
 
 const ToolButton = memo(function ToolButton({ tool, onOpenTool }) {
     const handleClick = useCallback(() => {
@@ -12,18 +15,182 @@ const ToolButton = memo(function ToolButton({ tool, onOpenTool }) {
         <button
             type="button"
             className={`tools-bar-btn tools-bar-btn--custom tools-bar-btn--${sanitizeToolColor(tool.color)}`}
-            title={tool.url || tool.title}
+            title={isModuleTool(tool) ? `${tool.title} module` : (tool.url || tool.title)}
             onClick={handleClick}
         >
             {tool.title}
-            <ExternalLink size={11} strokeWidth={2} aria-hidden="true" />
+            {isModuleTool(tool)
+                ? <Puzzle size={12} strokeWidth={2} aria-hidden="true" />
+                : <ExternalLink size={11} strokeWidth={2} aria-hidden="true" />}
         </button>
     );
 });
 
+function isSafeOpenUrl(url) {
+    return /^(https?:|mailto:|tel:)/i.test(String(url || "").trim());
+}
+
+function ToolModuleModal({ tool, valuesRef, runtimeContextRef, onClose }) {
+    const iframeRef = useRef(null);
+    const [frameHeight, setFrameHeight] = useState(520);
+    const srcDoc = buildToolModuleSrcDoc(tool.html);
+
+    const postContext = useCallback((requestId = "") => {
+        const target = iframeRef.current?.contentWindow;
+        if (!target) return;
+        const runtimeContext = runtimeContextRef?.current || {};
+        target.postMessage({
+            source: "template-tool-host",
+            type: requestId ? "tool:response" : "tool:context",
+            responseTo: requestId,
+            payload: buildToolRuntimeContext({
+                tool,
+                values: valuesRef.current || {},
+                tokens: runtimeContext.tokens || [],
+                client: runtimeContext.client || null,
+                clientInfo: runtimeContext.clientInfo || [],
+                clientSummary: runtimeContext.clientSummary || []
+            })
+        }, "*");
+    }, [tool, valuesRef, runtimeContextRef]);
+
+    const reply = useCallback((requestId, payload = null, error = "") => {
+        if (!requestId) return;
+        const target = iframeRef.current?.contentWindow;
+        if (!target) return;
+        target.postMessage({
+            source: "template-tool-host",
+            type: "tool:response",
+            responseTo: requestId,
+            payload,
+            error
+        }, "*");
+    }, []);
+
+    useEffect(() => {
+        const handleMessage = async (event) => {
+            if (event.source !== iframeRef.current?.contentWindow) return;
+            const data = event.data || {};
+            if (data.source !== "template-tool-module") return;
+
+            const { type, requestId, payload = {} } = data;
+
+            try {
+                if (type === "tool:ready") {
+                    postContext();
+                    reply(requestId, { ok: true });
+                    return;
+                }
+
+                if (type === "tool:resize") {
+                    const nextHeight = Math.min(Math.max(Math.ceil(Number(payload.height) || 0), 160), 1400);
+                    if (nextHeight > 0) {
+                        setFrameHeight((current) => Math.abs(current - nextHeight) > 4 ? nextHeight : current);
+                    }
+                    reply(requestId, { ok: true });
+                    return;
+                }
+
+                if (type === "tool:request-context") {
+                    postContext(requestId);
+                    return;
+                }
+
+                if (type === "tool:copy-text") {
+                    if (!payload.text) {
+                        showToast("Nothing to copy.", "warning");
+                        reply(requestId, { ok: false });
+                        return;
+                    }
+                    await copyText(payload.text, {
+                        message: payload.message || "Copied from tool.",
+                        variant: "success"
+                    });
+                    reply(requestId, { ok: true });
+                    return;
+                }
+
+                if (type === "tool:copy-html") {
+                    if (!payload.html) {
+                        showToast("Nothing to copy.", "warning");
+                        reply(requestId, { ok: false });
+                        return;
+                    }
+                    await copyHtml(payload.html, {
+                        message: payload.message || "Copied from tool.",
+                        variant: "success"
+                    });
+                    reply(requestId, { ok: true });
+                    return;
+                }
+
+                if (type === "tool:toast") {
+                    showToast(payload.message || "Tool updated.", payload.variant || "info");
+                    reply(requestId, { ok: true });
+                    return;
+                }
+
+                if (type === "tool:open-url") {
+                    if (!isSafeOpenUrl(payload.url)) {
+                        showToast("Only http, mailto and tel links can be opened by the host.", "warning");
+                        reply(requestId, { ok: false });
+                        return;
+                    }
+                    window.open(payload.url, "_blank", "noopener,noreferrer");
+                    reply(requestId, { ok: true });
+                    return;
+                }
+
+                if (type === "tool:close") {
+                    onClose();
+                    return;
+                }
+            } catch (error) {
+                reply(requestId, null, error?.message || "Tool request failed.");
+            }
+        };
+
+        window.addEventListener("message", handleMessage);
+        return () => window.removeEventListener("message", handleMessage);
+    }, [onClose, postContext, reply]);
+
+    useEffect(() => {
+        setFrameHeight(520);
+    }, [tool.id, tool.html]);
+
+    return (
+        <Modal
+            onClose={onClose}
+            ariaLabel={`${tool.title} tool module`}
+            dialogClassName="popup-box tool-module-modal"
+        >
+            <div className="tool-module-modal__header">
+                <div>
+                    <p className="eyebrow">Tool module <span className="tool-beta-pill">Beta</span></p>
+                    <h2>{tool.title}</h2>
+                </div>
+            </div>
+            <div
+                className="tool-module-frame-shell"
+                style={{ "--tool-module-frame-height": `${frameHeight}px` }}
+            >
+                <iframe
+                    ref={iframeRef}
+                    className="tool-module-frame"
+                    title={`${tool.title} module`}
+                    sandbox="allow-scripts allow-forms allow-popups allow-modals"
+                    srcDoc={srcDoc}
+                    onLoad={() => postContext()}
+                />
+            </div>
+        </Modal>
+    );
+}
+
 function ToolsBar({
     values = {},
     valuesRef: externalValuesRef = null,
+    runtimeContextRef: externalRuntimeContextRef = null,
     onOpenExternalGenerator,
     hasExternalId = false,
     onCopyAloAutofillData,
@@ -34,9 +201,12 @@ function ToolsBar({
 }) {
     const navigate = useNavigate();
     const [tools, setTools] = useState([]);
+    const [activeModuleTool, setActiveModuleTool] = useState(null);
     const internalValuesRef = useRef(values);
     internalValuesRef.current = values;
     const valuesRef = externalValuesRef || internalValuesRef;
+    const internalRuntimeContextRef = useRef({});
+    const runtimeContextRef = externalRuntimeContextRef || internalRuntimeContextRef;
 
     const reload = useCallback(() => loadTools().then(setTools), []);
 
@@ -48,9 +218,21 @@ function ToolsBar({
     }, [reload]);
 
     const openTool = useCallback((tool) => {
+        if (isModuleTool(tool)) {
+            setActiveModuleTool(tool);
+            return;
+        }
         const url = resolveToolUrl(tool.url, valuesRef.current);
+        if (!url) {
+            showToast("This tool has no URL.", "warning");
+            return;
+        }
         window.open(url, "_blank", "noopener,noreferrer");
     }, [valuesRef]);
+
+    const closeModuleTool = useCallback(() => {
+        setActiveModuleTool(null);
+    }, []);
 
     const handleManageTools = useCallback(() => {
         if (onManageTools) {
@@ -119,6 +301,14 @@ function ToolsBar({
             >
                 <Settings2 size={15} strokeWidth={1.9} />
             </button>
+            {activeModuleTool && (
+                <ToolModuleModal
+                    tool={activeModuleTool}
+                    valuesRef={valuesRef}
+                    runtimeContextRef={runtimeContextRef}
+                    onClose={closeModuleTool}
+                />
+            )}
         </div>
     );
 }
@@ -130,6 +320,7 @@ export default memo(ToolsBar, (prevProps, nextProps) => {
         : prevProps.values === nextProps.values;
 
     return valuesEqual
+        && prevProps.runtimeContextRef === nextProps.runtimeContextRef
         && prevProps.onOpenExternalGenerator === nextProps.onOpenExternalGenerator
         && prevProps.hasExternalId === nextProps.hasExternalId
         && prevProps.onCopyAloAutofillData === nextProps.onCopyAloAutofillData
