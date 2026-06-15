@@ -3,14 +3,14 @@ import { ArrowRight, Copy } from "lucide-react";
 import { generateFinalText, getTemplateTextByLang } from "../core/tokenEngine.js";
 import {
     CLIENT_INPUT_VALUES_UPDATED_EVENT,
-    MANUAL_CLIENT_INPUTS_KEY,
     clearActiveClientPayload,
     clearStoredInputValues,
     loadActiveClientPayload,
     migrateStoredClientInputValues,
     saveClientInputValue,
     saveClientInputValues,
-    saveActiveClientPayload
+    saveActiveClientPayload,
+    saveImportedExternalId
 } from "../services/activeClientService.js";
 import { copyHtml, formatClipboardHtmlBody, showToast } from "../services/clipboardService.js";
 import { resolveTemplateImagesInHtml } from "../services/templateImageService.js";
@@ -42,9 +42,8 @@ import { formatTokenPreviewHTML } from "../utils/richTextTokens.js";
 import { canonicalizeInputTokenValue } from "../utils/tokenCanonicalization.js";
 import {
     EXTERNAL_FIELD_ORDER,
-    EXTERNAL_SYSTEM_TOKEN_FIELDS,
-    buildExternalCode,
-    buildExternalFieldsFromTokenValues,
+    getImportedExternalIdFromClientPayload,
+    getValidExternalId,
     parseExternalId
 } from "../utils/externalGenerator.js";
 import {
@@ -237,19 +236,7 @@ function getTemplateDisplayTitle(model) {
 }
 
 function getExternalIdFromClientPayload(payload) {
-    const manualInputs = payload?.[MANUAL_CLIENT_INPUTS_KEY];
-    if (!manualInputs || typeof manualInputs !== "object" || Array.isArray(manualInputs)) return "";
-
-    const valuesByToken = {};
-    EXTERNAL_SYSTEM_TOKEN_FIELDS.forEach(({ token }) => {
-        const inputName = token.replace(/^\{|\}$/g, "");
-        if (!Object.prototype.hasOwnProperty.call(manualInputs, inputName)) return;
-        valuesByToken[token] = manualInputs[inputName];
-    });
-
-    const fields = buildExternalFieldsFromTokenValues(valuesByToken);
-    const hasExternalIdFields = Object.keys(fields).some((field) => field !== "soTicket");
-    return hasExternalIdFields ? buildExternalCode(fields) : "";
+    return getImportedExternalIdFromClientPayload(payload);
 }
 
 const EXTERNAL_ID_FIELD_LABELS = {
@@ -1015,12 +1002,16 @@ export function useTemplateRuntime() {
         };
         await saveSuperOfficeTicketPayload(nextResult);
 
+        let nextClientPayload = null;
         if (Object.keys(tokenValues).length > 0) {
             const saved = await saveClientInputValues(tokenValues);
-            if (saved.payload) setClientPayload(saved.payload);
+            if (saved.payload) nextClientPayload = saved.payload;
             setValues((prev) => ({ ...prev, ...tokenValues }));
             inputChangeVersion.current++;
         }
+        const importedExternalIdPayload = await saveImportedExternalId(getValidExternalId(nextResult.externalTicketId));
+        if (importedExternalIdPayload) nextClientPayload = importedExternalIdPayload;
+        if (nextClientPayload) setClientPayload(nextClientPayload);
 
         const message = options.corrected
             ? "External ID corrected and SuperOffice data imported."
@@ -1175,7 +1166,10 @@ export function useTemplateRuntime() {
             activeSuperOfficeTicket = await consumePendingSuperOfficeTicketPayload();
             superOfficeTokenValues = activeSuperOfficeTicket?.tokenValues || {};
         }
-        const nextPayload = savedSuperOfficeValues?.payload || payload;
+        const importedExternalIdPayload = activeSuperOfficeTicket
+            ? await saveImportedExternalId(getValidExternalId(activeSuperOfficeTicket.externalTicketId))
+            : null;
+        const nextPayload = importedExternalIdPayload || savedSuperOfficeValues?.payload || payload;
 
         setClientPayload(nextPayload);
         setClientInternalTokens(internalTokenDefs);

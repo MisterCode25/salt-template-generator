@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { MANUAL_CLIENT_INPUTS_KEY, saveActiveClientPayload } from "../src/services/activeClientService.js";
+import { IMPORTED_EXTERNAL_ID_KEY, MANUAL_CLIENT_INPUTS_KEY, saveActiveClientPayload } from "../src/services/activeClientService.js";
 import {
   consumePendingSuperOfficeTicketPayload,
   getSuperOfficeClientSignature,
@@ -47,6 +47,10 @@ const clientAWithDifferentManualInputs = {
     so_ticket_num: "222"
   }
 };
+const clientAWithImportedExternalId = {
+  ...clientA,
+  [IMPORTED_EXTERNAL_ID_KEY]: "VALID//26.02.2026//123//SO1//Lost//Fiber Off//Other//X6//EWB//ABC//L1//OLT//1//BOK|BOF//Comment"
+};
 const clientB = {
   billingAccount: "BA-2",
   customerName: "Client B"
@@ -55,6 +59,10 @@ const clientB = {
 assert.equal(
   getSuperOfficeClientSignature(clientA),
   getSuperOfficeClientSignature(clientAWithDifferentManualInputs)
+);
+assert.equal(
+  getSuperOfficeClientSignature(clientA),
+  getSuperOfficeClientSignature(clientAWithImportedExternalId)
 );
 assert.equal(
   getSuperOfficeClientSignature({ z: "last", a: "first" }),

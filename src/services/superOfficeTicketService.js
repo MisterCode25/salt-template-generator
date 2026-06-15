@@ -3,6 +3,7 @@ import {
     normalizeSuperOfficeAttachments
 } from "../utils/superOfficeImport.js";
 import {
+    IMPORTED_EXTERNAL_ID_KEY,
     MANUAL_CLIENT_INPUTS_KEY,
     loadActiveClientPayload
 } from "./activeClientService.js";
@@ -15,7 +16,11 @@ export const SUPER_OFFICE_TICKET_UPDATED_EVENT = "super-office-ticket-updated";
 
 function stripManualClientInputs(payload) {
     if (!payload || typeof payload !== "object" || Array.isArray(payload)) return payload;
-    const { [MANUAL_CLIENT_INPUTS_KEY]: _manualInputs, ...clientIdentityPayload } = payload;
+    const {
+        [MANUAL_CLIENT_INPUTS_KEY]: _manualInputs,
+        [IMPORTED_EXTERNAL_ID_KEY]: _importedExternalId,
+        ...clientIdentityPayload
+    } = payload;
     return clientIdentityPayload;
 }
 

@@ -13,6 +13,7 @@ import {
 const ACTIVE_CLIENT_KEY = "active_client_payload";
 export { STORED_INPUT_PREFIX } from "./tokenInputValueService.js";
 export const MANUAL_CLIENT_INPUTS_KEY = "__templateInputs";
+export const IMPORTED_EXTERNAL_ID_KEY = "__importedExternalId";
 export const CLIENT_INPUT_VALUES_UPDATED_EVENT = "client-input-values-updated";
 
 function normalizeManualInputs(manualInputs) {
@@ -41,16 +42,35 @@ function normalizeActiveClientPayload(payload) {
         return { payload, dirty: false };
     }
 
+    let nextPayload = payload;
+    let payloadDirty = false;
     const { manualInputs, dirty } = normalizeManualInputs(payload[MANUAL_CLIENT_INPUTS_KEY]);
-    if (!dirty) return { payload, dirty: false };
-
-    return {
-        payload: {
-            ...payload,
+    if (dirty) {
+        nextPayload = {
+            ...nextPayload,
             [MANUAL_CLIENT_INPUTS_KEY]: manualInputs
-        },
-        dirty: true
-    };
+        };
+        payloadDirty = true;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(payload, IMPORTED_EXTERNAL_ID_KEY)) {
+        const importedExternalId = String(payload[IMPORTED_EXTERNAL_ID_KEY] ?? "").trim();
+        if (importedExternalId) {
+            if (importedExternalId !== payload[IMPORTED_EXTERNAL_ID_KEY]) {
+                nextPayload = {
+                    ...nextPayload,
+                    [IMPORTED_EXTERNAL_ID_KEY]: importedExternalId
+                };
+                payloadDirty = true;
+            }
+        } else {
+            const { [IMPORTED_EXTERNAL_ID_KEY]: _externalId, ...withoutExternalId } = nextPayload;
+            nextPayload = withoutExternalId;
+            payloadDirty = true;
+        }
+    }
+
+    return { payload: nextPayload, dirty: payloadDirty };
 }
 
 export async function migrateStoredClientInputValues() {
@@ -171,6 +191,27 @@ export async function saveActiveClientPayload(payload) {
         await saveJSON(ACTIVE_CLIENT_KEY, normalizedPayload);
     } catch (error) {
         console.error("saveActiveClientPayload error", error);
+    }
+}
+
+export async function saveImportedExternalId(externalId) {
+    try {
+        const payload = await loadActiveClientPayload();
+        if (!payload) return null;
+
+        const importedExternalId = String(externalId ?? "").trim();
+        const nextPayload = { ...payload };
+        if (importedExternalId) {
+            nextPayload[IMPORTED_EXTERNAL_ID_KEY] = importedExternalId;
+        } else {
+            delete nextPayload[IMPORTED_EXTERNAL_ID_KEY];
+        }
+
+        await saveActiveClientPayload(nextPayload);
+        return nextPayload;
+    } catch (error) {
+        console.error("saveImportedExternalId error", error);
+        return null;
     }
 }
 

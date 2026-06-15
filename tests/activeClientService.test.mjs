@@ -2,12 +2,14 @@ import assert from "node:assert/strict";
 import {
   clearActiveClientPayload,
   clearStoredInputValues,
+  IMPORTED_EXTERNAL_ID_KEY,
   MANUAL_CLIENT_INPUTS_KEY,
   loadActiveClientPayload,
   migrateStoredClientInputValues,
   saveClientInputValue,
   saveClientInputValues,
-  saveActiveClientPayload
+  saveActiveClientPayload,
+  saveImportedExternalId
 } from "../src/services/activeClientService.js";
 import { clearAppIndexedDB } from "../src/services/indexedDbService.js";
 import { loadTokenInputValues } from "../src/services/tokenInputValueService.js";
@@ -61,6 +63,24 @@ function createMemoryStorage(initial = {}) {
 
   await clearActiveClientPayload();
   assert.equal(await loadActiveClientPayload(), null);
+}
+
+{
+  await clearAppIndexedDB();
+  globalThis.localStorage = createMemoryStorage();
+  await saveActiveClientPayload({ client: { firstName: "Peter" } });
+
+  await saveImportedExternalId("  VALID//26.02.2026//123//SO1//Lost//Fiber Off//Other//X6//EWB//ABC//L1//OLT//1//BOK|BOF//Comment  ");
+  assert.equal(
+    (await loadActiveClientPayload())[IMPORTED_EXTERNAL_ID_KEY],
+    "VALID//26.02.2026//123//SO1//Lost//Fiber Off//Other//X6//EWB//ABC//L1//OLT//1//BOK|BOF//Comment"
+  );
+
+  await saveImportedExternalId("");
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(await loadActiveClientPayload(), IMPORTED_EXTERNAL_ID_KEY),
+    false
+  );
 }
 
 {

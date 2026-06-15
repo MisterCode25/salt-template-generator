@@ -1,5 +1,6 @@
 import { SO_TICKET_NUM_TOKEN, SO_TICKET_TOKEN_KEY } from "./tokenCanonicalization.js";
 import { loadTokenInputValues } from "../services/tokenInputValueService.js";
+import { IMPORTED_EXTERNAL_ID_KEY } from "../services/activeClientService.js";
 
 export const EXTERNAL_GENERATOR_PARTNERS = [
     "ALO", "AMB", "ANI", "COMNET", "DANET", "DEK", "DWW", "EBS", "ENERCOM", "ENIWA", "ESAG", "ESI", "EVAL", "EVB", "EVK",
@@ -175,6 +176,16 @@ export function parseExternalId(externalId) {
         next[key] = parts[i] ?? "";
     }
     return { ok: true, fields: next };
+}
+
+export function getValidExternalId(externalId) {
+    const raw = String(externalId ?? "").trim();
+    if (!raw) return "";
+    return parseExternalId(raw).ok ? raw : "";
+}
+
+export function getImportedExternalIdFromClientPayload(payload) {
+    return getValidExternalId(payload?.[IMPORTED_EXTERNAL_ID_KEY]);
 }
 
 function extractValue(rawData, label, contextRegex = "") {

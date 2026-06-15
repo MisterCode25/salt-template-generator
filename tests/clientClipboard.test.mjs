@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { MANUAL_CLIENT_INPUTS_KEY } from "../src/services/activeClientService.js";
+import { IMPORTED_EXTERNAL_ID_KEY, MANUAL_CLIENT_INPUTS_KEY } from "../src/services/activeClientService.js";
 import {
   getClientInternalTokenData,
   getClientLanguageCode,
@@ -213,6 +213,7 @@ ${JSON.stringify(sampleClientJSON, null, 2)}`);
 {
   const payloadWithManualInputs = {
     ...sampleClientJSON,
+    [IMPORTED_EXTERNAL_ID_KEY]: "VALID//26.02.2026//123//SO1//Lost//Fiber Off//Other//X6//EWB//ABC//L1//OLT//1//BOK|BOF//Comment",
     [MANUAL_CLIENT_INPUTS_KEY]: {
       ticket_num: "SO-123",
       so_number: "SO-123"
@@ -232,7 +233,9 @@ ${JSON.stringify(sampleClientJSON, null, 2)}`);
   );
   assert.equal(internal.values["{ticket_num}"], undefined);
   assert.equal(internal.values["{so_number}"], undefined);
+  assert.equal(internal.values["{__imported_external_id}"], undefined);
   assert.equal(Boolean(vtiData?.fields.some((field) => field.label.includes("template Inputs"))), false);
+  assert.equal(Boolean(vtiData?.fields.some((field) => field.value.includes("VALID//26.02.2026"))), false);
 }
 
 console.log("clientClipboard tests passed");

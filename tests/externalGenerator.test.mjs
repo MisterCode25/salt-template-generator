@@ -5,10 +5,13 @@ import {
     buildExternalCode,
     readExternalFieldsFromStoredTokens,
     buildExternalTokenValues,
+    getImportedExternalIdFromClientPayload,
+    getValidExternalId,
     parseExternalId,
     parseVtiClipboard
 } from "../src/utils/externalGenerator.js";
 import { clearAppIndexedDB } from "../src/services/indexedDbService.js";
+import { IMPORTED_EXTERNAL_ID_KEY } from "../src/services/activeClientService.js";
 import { setTokenInputValues } from "../src/services/tokenInputValueService.js";
 
 {
@@ -65,6 +68,29 @@ import { setTokenInputValues } from "../src/services/tokenInputValueService.js";
     assert.equal(parsed.fields.comment, "Comment");
     // Date must be converted from DD.MM.YYYY to YYYY-MM-DD
     assert.equal(parsed.fields.data, "2026-02-26");
+}
+
+{
+    const validExternalId = "VALID//26.02.2026//123//SO1//Lost//Fiber Off//Other//X6//EWB//ABC//L1//OLT//1//BOK|BOF//Comment";
+    assert.equal(getValidExternalId(` ${validExternalId} `), validExternalId);
+    assert.equal(getValidExternalId("nothing useful here"), "");
+    assert.equal(getValidExternalId(""), "");
+    assert.equal(getImportedExternalIdFromClientPayload({
+        [IMPORTED_EXTERNAL_ID_KEY]: validExternalId,
+        __templateInputs: {
+            external_partner: "EWB",
+            external_partner_ticket_number: "ABC"
+        }
+    }), validExternalId);
+    assert.equal(getImportedExternalIdFromClientPayload({
+        __templateInputs: {
+            external_partner: "EWB",
+            external_partner_ticket_number: "ABC"
+        }
+    }), "");
+    assert.equal(getImportedExternalIdFromClientPayload({
+        [IMPORTED_EXTERNAL_ID_KEY]: "bad format"
+    }), "");
 }
 
 {

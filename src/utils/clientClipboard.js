@@ -1,4 +1,4 @@
-import { MANUAL_CLIENT_INPUTS_KEY } from "../services/activeClientService.js";
+import { IMPORTED_EXTERNAL_ID_KEY, MANUAL_CLIENT_INPUTS_KEY } from "../services/activeClientService.js";
 import { canonicalizeInputTokenValue, normalizeTokenName } from "./tokenCanonicalization.js";
 
 const CLIENT_FIELD_GROUPS = [
@@ -370,6 +370,10 @@ function isManualInputPath(path = []) {
     return path[0] === MANUAL_CLIENT_INPUTS_KEY;
 }
 
+function isInternalMetadataPath(path = []) {
+    return isManualInputPath(path) || path[0] === IMPORTED_EXTERNAL_ID_KEY;
+}
+
 function getManualInputEntries(payload) {
     const manualInputs = payload?.[MANUAL_CLIENT_INPUTS_KEY];
     if (!manualInputs || typeof manualInputs !== "object" || Array.isArray(manualInputs)) return [];
@@ -571,7 +575,7 @@ export function getClientInfoSections(payload) {
 
     const dynamicFields = [];
     for (const leaf of getPayloadLeaves(payload)) {
-        if (leaf.value === "" || isManualInputPath(leaf.path)) continue;
+        if (leaf.value === "" || isInternalMetadataPath(leaf.path)) continue;
         if (knownPaths.has(leaf.path.join("."))) continue;
         dynamicFields.push({
             label: formatPathLabel(leaf.path),
@@ -667,7 +671,7 @@ export function buildClientTokenIndex(payload) {
     const index = new Map();
 
     for (const leaf of getPayloadLeaves(payload)) {
-        if (isManualInputPath(leaf.path) || leaf.value === "") continue;
+        if (isInternalMetadataPath(leaf.path) || leaf.value === "") continue;
         const token = formatPathToken(leaf.path);
         if (token) addIndexEntry(index, token, leaf.value);
         addIndexEntry(index, leaf.path.join(" "), leaf.value);
@@ -709,7 +713,7 @@ export function getClientInternalTokenData(payload) {
     const seen = new Set();
 
     for (const leaf of getPayloadLeaves(payload)) {
-        if (isManualInputPath(leaf.path)) continue;
+        if (isInternalMetadataPath(leaf.path)) continue;
         const token = formatPathToken(leaf.path);
         if (!token || seen.has(token)) continue;
         seen.add(token);
