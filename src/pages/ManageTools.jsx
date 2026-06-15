@@ -1,6 +1,9 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     BookMarked,
+    Check,
+    ChevronLeft,
+    ChevronRight,
     ClipboardCopy,
     ExternalLink,
     Keyboard,
@@ -45,6 +48,21 @@ const KEYBOARD_SHORTCUT_DESCRIPTIONS = Object.freeze({
     importSo: "Import SuperOffice ticket data from the clipboard.",
     clearData: "Clear the currently imported customer and ticket data."
 });
+
+const MODULE_WIZARD_STEPS = Object.freeze([
+    {
+        label: "Setup",
+        caption: "Name, color and prompt"
+    },
+    {
+        label: "HTML",
+        caption: "Paste or import code"
+    },
+    {
+        label: "Preview",
+        caption: "Build and finish"
+    }
+]);
 
 function createId() {
     return globalThis.crypto?.randomUUID?.() || `tool_${Date.now()}_${Math.random().toString(36).slice(2)}`;
@@ -517,7 +535,30 @@ function ModulePreviewFrame({ draft, tokens, runtimePreviewContext }) {
     );
 }
 
-function ModuleToolFields({ draft, onPatch, tokens, runtimePreviewContext }) {
+function ModuleWizardStepper({ activeStep }) {
+    return (
+        <ol className="tool-module-stepper" aria-label="Module creation steps">
+            {MODULE_WIZARD_STEPS.map((step, index) => {
+                const statusClass = index === activeStep
+                    ? " is-active"
+                    : (index < activeStep ? " is-complete" : "");
+                return (
+                    <li key={step.label} className={`tool-module-step${statusClass}`} aria-current={index === activeStep ? "step" : undefined}>
+                        <span className="tool-module-step-number" aria-hidden="true">
+                            {index < activeStep ? <Check size={14} strokeWidth={3} /> : index + 1}
+                        </span>
+                        <span className="tool-module-step-copy">
+                            <strong>{step.label}</strong>
+                            <small>{step.caption}</small>
+                        </span>
+                    </li>
+                );
+            })}
+        </ol>
+    );
+}
+
+function ModuleToolStep({ step, draft, onPatch, tokens, runtimePreviewContext }) {
     const fileInputRef = useRef(null);
     const buildPrompt = useMemo(
         () => buildToolModulePrompt({ title: draft.title, prompt: draft.prompt }),
@@ -556,68 +597,88 @@ function ModuleToolFields({ draft, onPatch, tokens, runtimePreviewContext }) {
         }
     }, [onPatch]);
 
+    if (step === 0) {
+        return (
+            <div className="tool-module-step-panel">
+                <section className="tools-panel-block">
+                    <div className="tools-panel-title">
+                        <h3>Module setup</h3>
+                        <p>Set the label, button color and request used to generate the module.</p>
+                    </div>
+                    <CommonToolFields draft={draft} onPatch={onPatch} />
+                </section>
+
+                <section className="tools-panel-block">
+                    <div className="tools-panel-title">
+                        <h3>Build prompt</h3>
+                        <p>The copied prompt includes the module API and runtime rules automatically.</p>
+                    </div>
+                    <label className="tools-field-line">
+                        <span>User request</span>
+                        <textarea
+                            value={draft.prompt || ""}
+                            onChange={(event) => onPatch({ prompt: event.target.value })}
+                            placeholder="Ex: Build a small refund calculator that copies the final customer message."
+                            rows={7}
+                        />
+                    </label>
+                    <div className="tools-action-row">
+                        <button type="button" className="settings-action-btn settings-action-btn--import" onClick={copyBuildPrompt}>
+                            <ClipboardCopy size={15} strokeWidth={2} aria-hidden="true" />
+                            Copy build prompt
+                        </button>
+                        <button type="button" className="settings-action-btn" onClick={openChatGpt}>
+                            <ExternalLink size={15} strokeWidth={2} aria-hidden="true" />
+                            Open ChatGPT
+                        </button>
+                    </div>
+                </section>
+            </div>
+        );
+    }
+
+    if (step === 1) {
+        return (
+            <div className="tool-module-step-panel">
+                <section className="tools-panel-block">
+                    <div className="tools-panel-title">
+                        <h3>Generated HTML</h3>
+                        <p>Paste the complete single-file HTML returned by ChatGPT, or load the downloaded HTML file.</p>
+                    </div>
+                    <div className="tools-action-row">
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept=".html,.htm,text/html"
+                            className="sr-only"
+                            onChange={loadHtmlFile}
+                        />
+                        <button type="button" className="settings-action-btn" onClick={openHtmlFilePicker}>
+                            <Upload size={15} strokeWidth={2} aria-hidden="true" />
+                            Load HTML file
+                        </button>
+                    </div>
+                    <label className="tools-field-line">
+                        <span>HTML, CSS and JavaScript</span>
+                        <textarea
+                            className="tools-code-textarea"
+                            value={draft.html || ""}
+                            onChange={(event) => onPatch({ html: event.target.value })}
+                            placeholder="<!doctype html>..."
+                            rows={16}
+                        />
+                    </label>
+                </section>
+            </div>
+        );
+    }
+
     return (
-        <>
+        <div className="tool-module-step-panel">
             <section className="tools-panel-block">
                 <div className="tools-panel-title">
-                    <h3>Module prompt</h3>
-                    <p>Describe what the user wants. The build prompt adds the technical rules automatically.</p>
-                </div>
-                <label className="tools-field-line">
-                    <span>User request</span>
-                    <textarea
-                        value={draft.prompt || ""}
-                        onChange={(event) => onPatch({ prompt: event.target.value })}
-                        placeholder="Ex: Build a small refund calculator that copies the final customer message."
-                        rows={6}
-                    />
-                </label>
-                <div className="tools-action-row">
-                    <button type="button" className="settings-action-btn settings-action-btn--import" onClick={copyBuildPrompt}>
-                        <ClipboardCopy size={15} strokeWidth={2} aria-hidden="true" />
-                        Copy build prompt
-                    </button>
-                    <button type="button" className="settings-action-btn" onClick={openChatGpt}>
-                        <ExternalLink size={15} strokeWidth={2} aria-hidden="true" />
-                        Open ChatGPT
-                    </button>
-                </div>
-            </section>
-
-            <section className="tools-panel-block">
-                <div className="tools-panel-title">
-                    <h3>Generated HTML</h3>
-                    <p>Paste the complete single-file HTML returned by ChatGPT, or load the downloaded HTML file.</p>
-                </div>
-                <div className="tools-action-row">
-                    <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept=".html,.htm,text/html"
-                        className="sr-only"
-                        onChange={loadHtmlFile}
-                    />
-                    <button type="button" className="settings-action-btn" onClick={openHtmlFilePicker}>
-                        <Upload size={15} strokeWidth={2} aria-hidden="true" />
-                        Load HTML file
-                    </button>
-                </div>
-                <label className="tools-field-line">
-                    <span>HTML, CSS and JavaScript</span>
-                    <textarea
-                        className="tools-code-textarea"
-                        value={draft.html || ""}
-                        onChange={(event) => onPatch({ html: event.target.value })}
-                        placeholder="<!doctype html>..."
-                        rows={12}
-                    />
-                </label>
-            </section>
-
-            <section className="tools-panel-block">
-                <div className="tools-panel-title">
-                    <h3>Preview</h3>
-                    <p>The final module runs in the same iframe runtime when opened from the tools bar.</p>
+                    <h3>Construction and preview</h3>
+                    <p>The module runs here with the same API and iframe runtime used by the tools bar.</p>
                 </div>
                 <ModulePreviewFrame
                     draft={draft}
@@ -625,13 +686,35 @@ function ModuleToolFields({ draft, onPatch, tokens, runtimePreviewContext }) {
                     runtimePreviewContext={runtimePreviewContext}
                 />
             </section>
-        </>
+        </div>
     );
 }
 
 function ToolEditorModal({ draft, tokens, runtimePreviewContext, onPatch, onSave, onClose }) {
     const toolType = sanitizeToolType(draft.type);
     const isModule = toolType === TOOL_TYPES.MODULE;
+    const [moduleStep, setModuleStep] = useState(0);
+
+    useEffect(() => {
+        setModuleStep(0);
+    }, [draft.id, toolType]);
+
+    const goToPreviousModuleStep = useCallback(() => {
+        setModuleStep((current) => Math.max(current - 1, 0));
+    }, []);
+
+    const goToNextModuleStep = useCallback(() => {
+        const title = String(draft.title || "").trim();
+        if (moduleStep === 0 && !title) {
+            showToast("Tool name is required.", "error");
+            return;
+        }
+        if (moduleStep === 1 && !String(draft.html || "").trim()) {
+            showToast("Paste or import the module HTML first.", "error");
+            return;
+        }
+        setModuleStep((current) => Math.min(current + 1, MODULE_WIZARD_STEPS.length - 1));
+    }, [draft.html, draft.title, moduleStep]);
 
     return (
         <Modal
@@ -653,34 +736,56 @@ function ToolEditorModal({ draft, tokens, runtimePreviewContext, onPatch, onSave
             </div>
 
             <div className="tool-editor-modal__body">
-                <section className="tools-panel-block">
-                    <div className="tools-panel-title">
-                        <h3>Tool setup</h3>
-                        <p>Set the label, description and visual color used in the tools bar.</p>
-                    </div>
-                    <CommonToolFields draft={draft} onPatch={onPatch} />
-                </section>
-
                 {isModule ? (
-                    <ModuleToolFields
-                        draft={draft}
-                        tokens={tokens}
-                        runtimePreviewContext={runtimePreviewContext}
-                        onPatch={onPatch}
-                    />
+                    <div className="tool-module-wizard">
+                        <ModuleWizardStepper activeStep={moduleStep} />
+                        <ModuleToolStep
+                            step={moduleStep}
+                            draft={draft}
+                            tokens={tokens}
+                            runtimePreviewContext={runtimePreviewContext}
+                            onPatch={onPatch}
+                        />
+                    </div>
                 ) : (
-                    <LinkToolFields draft={draft} onPatch={onPatch} tokens={tokens} />
+                    <>
+                        <section className="tools-panel-block">
+                            <div className="tools-panel-title">
+                                <h3>Tool setup</h3>
+                                <p>Set the label, description and visual color used in the tools bar.</p>
+                            </div>
+                            <CommonToolFields draft={draft} onPatch={onPatch} />
+                        </section>
+                        <LinkToolFields draft={draft} onPatch={onPatch} tokens={tokens} />
+                    </>
                 )}
             </div>
 
             <div className="tool-editor-modal__actions">
-                <button type="button" className="settings-action-btn" onClick={onClose}>
-                    Cancel
-                </button>
-                <button type="button" className="settings-action-btn settings-action-btn--save" onClick={onSave}>
-                    <Save size={15} strokeWidth={2} aria-hidden="true" />
-                    Save tool
-                </button>
+                <div className="tool-editor-modal__actions-start">
+                    {isModule && moduleStep > 0 && (
+                        <button type="button" className="settings-action-btn" onClick={goToPreviousModuleStep}>
+                            <ChevronLeft size={15} strokeWidth={2} aria-hidden="true" />
+                            Back
+                        </button>
+                    )}
+                </div>
+                <div className="tool-editor-modal__actions-end">
+                    <button type="button" className="settings-action-btn" onClick={onClose}>
+                        Cancel
+                    </button>
+                    {isModule && moduleStep < MODULE_WIZARD_STEPS.length - 1 ? (
+                        <button type="button" className="settings-action-btn settings-action-btn--save" onClick={goToNextModuleStep}>
+                            Next
+                            <ChevronRight size={15} strokeWidth={2} aria-hidden="true" />
+                        </button>
+                    ) : (
+                        <button type="button" className="settings-action-btn settings-action-btn--save" onClick={onSave}>
+                            <Save size={15} strokeWidth={2} aria-hidden="true" />
+                            {isModule ? "Finish" : "Save tool"}
+                        </button>
+                    )}
+                </div>
             </div>
         </Modal>
     );
@@ -916,6 +1021,10 @@ export default function ManageTools({ embedded = false, onClose = null, initialS
         }
         if (normalized.type === TOOL_TYPES.LINK && !normalized.url.trim()) {
             showToast("URL is required for link tools.", "error");
+            return;
+        }
+        if (normalized.type === TOOL_TYPES.MODULE && !normalized.html.trim()) {
+            showToast("HTML is required for module tools.", "error");
             return;
         }
 
