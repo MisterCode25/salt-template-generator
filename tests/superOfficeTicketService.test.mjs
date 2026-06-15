@@ -6,6 +6,7 @@ import {
   loadSuperOfficeTicketPayload,
   saveSuperOfficeTicketPayload
 } from "../src/services/superOfficeTicketService.js";
+import { clearAppIndexedDB } from "../src/services/indexedDbService.js";
 
 function createMemoryStorage() {
   const data = new Map();
@@ -65,7 +66,8 @@ assert.notEqual(
 );
 
 globalThis.localStorage.clear();
-const pending = saveSuperOfficeTicketPayload({
+await clearAppIndexedDB();
+const pending = await saveSuperOfficeTicketPayload({
   ticketId: "31436061",
   tokenValues: {
     "{so_ticket_num}": "31436061"
@@ -76,17 +78,18 @@ const pending = saveSuperOfficeTicketPayload({
 });
 
 assert.equal(pending.clientSignature, "");
-assert.equal(loadSuperOfficeTicketPayload(), null);
+assert.equal(await loadSuperOfficeTicketPayload(), null);
 
-saveActiveClientPayload(clientA);
-const consumed = consumePendingSuperOfficeTicketPayload();
+await saveActiveClientPayload(clientA);
+const consumed = await consumePendingSuperOfficeTicketPayload();
 assert.equal(consumed.ticketId, "31436061");
 assert.equal(consumed.tokenValues["{so_ticket_num}"], "31436061");
-assert.equal(loadSuperOfficeTicketPayload().imageAttachments.length, 1);
+assert.equal((await loadSuperOfficeTicketPayload()).imageAttachments.length, 1);
 
 globalThis.localStorage.clear();
-saveActiveClientPayload(clientA);
-const saved = saveSuperOfficeTicketPayload({
+await clearAppIndexedDB();
+await saveActiveClientPayload(clientA);
+const saved = await saveSuperOfficeTicketPayload({
   ticketId: "31436062",
   createdAt: "6/4/2026 12:07 PM",
   tokenValues: {
@@ -100,10 +103,10 @@ const saved = saveSuperOfficeTicketPayload({
 assert.equal(saved.imageAttachments.length, 1);
 assert.equal(saved.createdAt, "6/4/2026 12:07 PM");
 assert.equal(saved.tokenValues["{so_ticket_num}"], "31436062");
-assert.equal(loadSuperOfficeTicketPayload().imageAttachments.length, 1);
-assert.equal(loadSuperOfficeTicketPayload().createdAt, "6/4/2026 12:07 PM");
+assert.equal((await loadSuperOfficeTicketPayload()).imageAttachments.length, 1);
+assert.equal((await loadSuperOfficeTicketPayload()).createdAt, "6/4/2026 12:07 PM");
 
-saveActiveClientPayload(clientB);
-assert.equal(loadSuperOfficeTicketPayload(), null);
+await saveActiveClientPayload(clientB);
+assert.equal(await loadSuperOfficeTicketPayload(), null);
 
 console.log("superOfficeTicketService tests passed");

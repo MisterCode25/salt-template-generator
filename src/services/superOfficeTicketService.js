@@ -6,11 +6,10 @@ import {
     MANUAL_CLIENT_INPUTS_KEY,
     loadActiveClientPayload
 } from "./activeClientService.js";
+import { deleteJSON, loadJSON, saveJSON } from "./storageService.js";
 
 const SUPER_OFFICE_TICKET_KEY = "super_office_ticket_payload";
-const LOCAL_SUPER_OFFICE_TICKET_KEY = `local_${SUPER_OFFICE_TICKET_KEY}`;
 const PENDING_SUPER_OFFICE_TICKET_KEY = "pending_super_office_ticket_payload";
-const LOCAL_PENDING_SUPER_OFFICE_TICKET_KEY = `local_${PENDING_SUPER_OFFICE_TICKET_KEY}`;
 
 export const SUPER_OFFICE_TICKET_UPDATED_EVENT = "super-office-ticket-updated";
 
@@ -33,7 +32,7 @@ function stableStringify(value) {
     return JSON.stringify(value);
 }
 
-export function getSuperOfficeClientSignature(payload = loadActiveClientPayload()) {
+export function getSuperOfficeClientSignature(payload = null) {
     if (!payload || typeof payload !== "object" || Array.isArray(payload)) return "";
 
     try {
@@ -73,7 +72,7 @@ function normalizeStoredTicketPayload(payload) {
     };
 }
 
-export function buildSuperOfficeTicketPayload(importResult, importedAt = new Date(), clientSignature = getSuperOfficeClientSignature()) {
+export function buildSuperOfficeTicketPayload(importResult, importedAt = new Date(), clientSignature = "") {
     return normalizeStoredTicketPayload({
         ticketId: importResult?.ticketId || "",
         sourceTicketId: importResult?.sourceTicketId || "",
@@ -86,105 +85,95 @@ export function buildSuperOfficeTicketPayload(importResult, importedAt = new Dat
     });
 }
 
-function saveStoredPayload(payload, storage = globalThis.localStorage) {
-    if (!payload || !storage) return;
-
-    const serialized = JSON.stringify(payload);
-    storage.setItem(LOCAL_SUPER_OFFICE_TICKET_KEY, serialized);
-    storage.setItem(SUPER_OFFICE_TICKET_KEY, serialized);
+async function saveStoredPayload(payload) {
+    if (!payload) return;
+    await saveJSON(SUPER_OFFICE_TICKET_KEY, payload);
 }
 
-function savePendingPayload(payload, storage = globalThis.localStorage) {
-    if (!payload || !storage) return;
-
-    const serialized = JSON.stringify(payload);
-    storage.setItem(LOCAL_PENDING_SUPER_OFFICE_TICKET_KEY, serialized);
-    storage.setItem(PENDING_SUPER_OFFICE_TICKET_KEY, serialized);
+async function savePendingPayload(payload) {
+    if (!payload) return;
+    await saveJSON(PENDING_SUPER_OFFICE_TICKET_KEY, payload);
 }
 
-function loadPendingPayload(storage = globalThis.localStorage) {
-    if (!storage) return null;
-
+async function loadPendingPayload() {
     try {
-        const raw = storage.getItem(LOCAL_PENDING_SUPER_OFFICE_TICKET_KEY) || storage.getItem(PENDING_SUPER_OFFICE_TICKET_KEY);
-        if (!raw) return null;
-        return normalizeStoredTicketPayload(JSON.parse(raw));
+        return normalizeStoredTicketPayload(await loadJSON(PENDING_SUPER_OFFICE_TICKET_KEY, null));
     } catch (error) {
         console.error("loadPendingSuperOfficeTicketPayload error", error);
         return null;
     }
 }
 
-export function loadPendingSuperOfficeTicketPayload(storage = globalThis.localStorage) {
-    return loadPendingPayload(storage);
+export function loadPendingSuperOfficeTicketPayload() {
+    return loadPendingPayload();
 }
 
-export function hasSuperOfficeTicketPayload(storage = globalThis.localStorage) {
-    return Boolean(loadSuperOfficeTicketPayload(storage) || loadPendingPayload(storage));
+export async function hasSuperOfficeTicketPayload() {
+    return Boolean(await loadSuperOfficeTicketPayload() || await loadPendingPayload());
 }
 
-function removePendingPayload(storage = globalThis.localStorage) {
-    storage?.removeItem(LOCAL_PENDING_SUPER_OFFICE_TICKET_KEY);
-    storage?.removeItem(PENDING_SUPER_OFFICE_TICKET_KEY);
+function removePendingPayload() {
+    return deleteJSON(PENDING_SUPER_OFFICE_TICKET_KEY);
 }
 
-export function saveSuperOfficeTicketPayload(importResult, storage = globalThis.localStorage) {
-    const payload = buildSuperOfficeTicketPayload(importResult);
+export async function saveSuperOfficeTicketPayload(importResult) {
+    const activeClientPayload = await loadActiveClientPayload();
+    const payload = buildSuperOfficeTicketPayload(
+        importResult,
+        new Date(),
+        getSuperOfficeClientSignature(activeClientPayload)
+    );
     if (!payload) return null;
 
     if (!payload.clientSignature) {
-        removeStoredSuperOfficeTicketPayload(storage);
-        savePendingPayload(payload, storage);
+        await removeStoredSuperOfficeTicketPayload();
+        await savePendingPayload(payload);
         dispatchSuperOfficeTicketUpdated(null);
         return payload;
     }
 
-    saveStoredPayload(payload, storage);
-    removePendingPayload(storage);
+    await saveStoredPayload(payload);
+    await removePendingPayload();
     dispatchSuperOfficeTicketUpdated(payload);
     return payload;
 }
 
-function removeStoredSuperOfficeTicketPayload(storage = globalThis.localStorage) {
-    storage?.removeItem(LOCAL_SUPER_OFFICE_TICKET_KEY);
-    storage?.removeItem(SUPER_OFFICE_TICKET_KEY);
+function removeStoredSuperOfficeTicketPayload() {
+    return deleteJSON(SUPER_OFFICE_TICKET_KEY);
 }
 
-export function consumePendingSuperOfficeTicketPayload(storage = globalThis.localStorage) {
-    const pendingPayload = loadPendingPayload(storage);
-    const clientSignature = getSuperOfficeClientSignature();
+export async function consumePendingSuperOfficeTicketPayload() {
+    const pendingPayload = await loadPendingPayload();
+    const clientSignature = getSuperOfficeClientSignature(await loadActiveClientPayload());
     if (!pendingPayload || !clientSignature) return null;
 
     const payload = {
         ...pendingPayload,
         clientSignature
     };
-    saveStoredPayload(payload, storage);
-    removePendingPayload(storage);
+    await saveStoredPayload(payload);
+    await removePendingPayload();
     dispatchSuperOfficeTicketUpdated(payload);
     return payload;
 }
 
-export function loadSuperOfficeTicketPayload(storage = globalThis.localStorage) {
-    if (!storage) return null;
-
+export async function loadSuperOfficeTicketPayload() {
     try {
-        const raw = storage.getItem(LOCAL_SUPER_OFFICE_TICKET_KEY) || storage.getItem(SUPER_OFFICE_TICKET_KEY);
-        if (!raw) return null;
+        const storedPayload = await loadJSON(SUPER_OFFICE_TICKET_KEY, null);
+        if (!storedPayload) return null;
 
-        const activeClientSignature = getSuperOfficeClientSignature();
+        const activeClientSignature = getSuperOfficeClientSignature(await loadActiveClientPayload());
         if (!activeClientSignature) {
-            removeStoredSuperOfficeTicketPayload(storage);
+            await removeStoredSuperOfficeTicketPayload();
             return null;
         }
 
-        const parsed = JSON.parse(raw);
-        if (parsed?.clientSignature !== activeClientSignature) {
-            removeStoredSuperOfficeTicketPayload(storage);
+        if (storedPayload?.clientSignature !== activeClientSignature) {
+            await removeStoredSuperOfficeTicketPayload();
             return null;
         }
 
-        const payload = normalizeStoredTicketPayload(parsed);
+        const payload = normalizeStoredTicketPayload(storedPayload);
         if (!payload) return null;
 
         return payload;
@@ -194,8 +183,8 @@ export function loadSuperOfficeTicketPayload(storage = globalThis.localStorage) 
     }
 }
 
-export function clearSuperOfficeTicketPayload(storage = globalThis.localStorage) {
-    removeStoredSuperOfficeTicketPayload(storage);
-    removePendingPayload(storage);
+export async function clearSuperOfficeTicketPayload() {
+    await removeStoredSuperOfficeTicketPayload();
+    await removePendingPayload();
     dispatchSuperOfficeTicketUpdated(null);
 }

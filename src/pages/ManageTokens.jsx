@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { loadTokens, saveTokens } from "../services/tokenService.js";
 import { renameTokenInTemplateTree } from "../services/templateTreeService.js";
 import Modal from "../components/Modal.jsx";
@@ -129,19 +129,38 @@ const TokenRow = memo(function TokenRow({ token, onEdit, onDelete }) {
     );
 });
 
-export default function ManageTokens({ embedded = false, onClose = null }) {
+export default function ManageTokens({
+    embedded = false,
+    onClose = null,
+    customOnly = false,
+    hideHeader = false,
+    onTokensChange = null
+}) {
     const [tokens, setTokens] = useState([]);
     const [modalToken, setModalToken] = useState(null);
     const [confirmDelete, setConfirmDelete] = useState(null);
 
     useEffect(() => {
-        loadTokens().then(setTokens);
-    }, []);
+        let active = true;
+        loadTokens().then((loadedTokens) => {
+            if (!active) return;
+            setTokens(loadedTokens);
+            onTokensChange?.(loadedTokens);
+        });
+        return () => {
+            active = false;
+        };
+    }, [onTokensChange]);
+
+    const visibleTokens = useMemo(() => (
+        customOnly ? tokens.filter((tokenDef) => !tokenDef.system && !tokenDef.internal) : tokens
+    ), [customOnly, tokens]);
 
     const persist = useCallback(async (next) => {
         setTokens(next);
+        onTokensChange?.(next);
         await saveTokens(next);
-    }, []);
+    }, [onTokensChange]);
 
     const onDelete = useCallback((id) => {
         setConfirmDelete(id);
@@ -188,16 +207,18 @@ export default function ManageTokens({ embedded = false, onClose = null }) {
     return (
         <main className={embedded ? "management-embedded-page" : "page-container"}>
             <div className="manage-card">
-                <div className="variant-editor-head">
-                    <div>
-                        <p className="eyebrow">Data tokens</p>
-                        <h2>Manage Tokens</h2>
+                {!hideHeader && (
+                    <div className="variant-editor-head">
+                        <div>
+                            <p className="eyebrow">Data tokens</p>
+                            <h2>Manage Tokens</h2>
+                        </div>
                     </div>
-                </div>
+                )}
 
                 <div id="tokens-list" className="models-list">
-                    {tokens.length === 0 && <EmptyState message="No tokens yet." />}
-                    {tokens.map(t => (
+                    {visibleTokens.length === 0 && <EmptyState message="No custom tokens yet." />}
+                    {visibleTokens.map(t => (
                         <TokenRow
                             key={t.id}
                             token={t}

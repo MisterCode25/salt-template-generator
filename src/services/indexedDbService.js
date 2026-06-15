@@ -2,6 +2,7 @@ const DB_NAME = "salt-template-generator";
 const DB_VERSION = 1;
 const STORE_NAME = "appData";
 let databasePromise = null;
+const memoryStore = new Map();
 
 function hasIndexedDB() {
     return typeof indexedDB !== "undefined";
@@ -78,7 +79,9 @@ async function withStore(mode, action) {
 }
 
 export async function loadIndexedJSON(key, fallback = null) {
-    if (!hasIndexedDB()) return fallback;
+    if (!hasIndexedDB()) {
+        return memoryStore.has(key) ? memoryStore.get(key) : fallback;
+    }
 
     try {
         return await withStore("readonly", (store) => {
@@ -95,7 +98,10 @@ export async function loadIndexedJSON(key, fallback = null) {
 }
 
 export async function saveIndexedJSON(key, value) {
-    if (!hasIndexedDB()) return false;
+    if (!hasIndexedDB()) {
+        memoryStore.set(key, value);
+        return true;
+    }
 
     try {
         await withStore("readwrite", (store) => {
@@ -109,7 +115,9 @@ export async function saveIndexedJSON(key, value) {
 }
 
 export async function deleteIndexedJSON(key) {
-    if (!hasIndexedDB()) return false;
+    if (!hasIndexedDB()) {
+        return memoryStore.delete(key);
+    }
 
     try {
         await withStore("readwrite", (store) => {
@@ -123,7 +131,10 @@ export async function deleteIndexedJSON(key) {
 }
 
 export async function clearAppIndexedDB() {
-    if (!hasIndexedDB()) return false;
+    if (!hasIndexedDB()) {
+        memoryStore.clear();
+        return true;
+    }
 
     try {
         await withStore("readwrite", (store) => {

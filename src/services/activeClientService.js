@@ -3,9 +3,15 @@ import {
     canonicalizeTokenDefinition,
     normalizeTokenName
 } from "../utils/tokenCanonicalization.js";
+import { deleteJSON, loadJSON, saveJSON } from "./storageService.js";
+import {
+    clearTokenInputValues,
+    loadTokenInputValues,
+    setTokenInputValues
+} from "./tokenInputValueService.js";
 
 const ACTIVE_CLIENT_KEY = "active_client_payload";
-export const STORED_INPUT_PREFIX = "input_";
+export { STORED_INPUT_PREFIX } from "./tokenInputValueService.js";
 export const MANUAL_CLIENT_INPUTS_KEY = "__templateInputs";
 export const CLIENT_INPUT_VALUES_UPDATED_EVENT = "client-input-values-updated";
 
@@ -47,31 +53,9 @@ function normalizeActiveClientPayload(payload) {
     };
 }
 
-export function migrateStoredClientInputValues(storage = globalThis.localStorage) {
-    if (!storage) return 0;
-
-    let migrated = 0;
-    const inputEntries = [];
-    for (let index = 0; index < storage.length; index++) {
-        const key = storage.key(index);
-        if (!key?.startsWith(STORED_INPUT_PREFIX)) continue;
-        inputEntries.push([key, storage.getItem(key)]);
-    }
-
-    inputEntries.forEach(([key, value]) => {
-        const token = key.slice(STORED_INPUT_PREFIX.length);
-        const canonicalToken = canonicalizeInputTokenValue(token);
-        const canonicalKey = `${STORED_INPUT_PREFIX}${canonicalToken}`;
-        if (!canonicalToken || canonicalKey === key) return;
-
-        if (storage.getItem(canonicalKey) === null && value !== null) {
-            storage.setItem(canonicalKey, value);
-        }
-        storage.removeItem(key);
-        migrated++;
-    });
-
-    return migrated;
+export async function migrateStoredClientInputValues() {
+    await loadTokenInputValues();
+    return 0;
 }
 
 function dispatchClientInputValuesUpdated(values) {
@@ -99,7 +83,7 @@ function normalizeClientInputEntry(tokenDef, value) {
     return { token: canonicalToken, name: canonicalName, value: valueText };
 }
 
-function saveClientInputEntries(entries, storage = globalThis.localStorage) {
+async function saveClientInputEntries(entries) {
     const normalizedEntries = [];
     const valuesByToken = {};
 
@@ -110,21 +94,17 @@ function saveClientInputEntries(entries, storage = globalThis.localStorage) {
         valuesByToken[entry.token] = entry.value;
     }
 
+    const currentValues = await loadTokenInputValues();
     const changedValuesByToken = {};
-    if (storage) {
-        for (const token in valuesByToken) {
-            if (!Object.prototype.hasOwnProperty.call(valuesByToken, token)) continue;
-            const value = valuesByToken[token];
-            const storageKey = `${STORED_INPUT_PREFIX}${token}`;
-            if (storage.getItem(storageKey) === value) continue;
-            storage.setItem(storageKey, value);
-            changedValuesByToken[token] = value;
-        }
-    } else {
-        Object.assign(changedValuesByToken, valuesByToken);
+    for (const token in valuesByToken) {
+        if (!Object.prototype.hasOwnProperty.call(valuesByToken, token)) continue;
+        const value = valuesByToken[token];
+        if (currentValues[token] === value) continue;
+        changedValuesByToken[token] = value;
     }
+    await setTokenInputValues(valuesByToken);
 
-    const payload = loadActiveClientPayload();
+    const payload = await loadActiveClientPayload();
     if (!payload) {
         dispatchClientInputValuesUpdated(changedValuesByToken);
         return { inputTokens: Object.keys(valuesByToken), payload: null, values: valuesByToken };
@@ -154,33 +134,30 @@ function saveClientInputEntries(entries, storage = globalThis.localStorage) {
             [MANUAL_CLIENT_INPUTS_KEY]: manualInputs
         }
         : payload;
-    if (payloadDirty) saveActiveClientPayload(nextPayload);
+    if (payloadDirty) await saveActiveClientPayload(nextPayload);
     dispatchClientInputValuesUpdated(changedValuesByToken);
     return { inputTokens: Object.keys(valuesByToken), payload: nextPayload, values: valuesByToken };
 }
 
-export function saveClientInputValue(tokenDef, value, storage = globalThis.localStorage) {
-    return saveClientInputEntries([{ tokenDef, value }], storage);
+export function saveClientInputValue(tokenDef, value) {
+    return saveClientInputEntries([{ tokenDef, value }]);
 }
 
-export function saveClientInputValues(valuesByToken = {}, storage = globalThis.localStorage) {
+export function saveClientInputValues(valuesByToken = {}) {
     return saveClientInputEntries(
         Object.entries(valuesByToken).map(([token, value]) => ({
             tokenDef: { token },
             value
-        })),
-        storage
+        }))
     );
 }
 
-export function loadActiveClientPayload() {
+export async function loadActiveClientPayload() {
     try {
-        const raw = localStorage.getItem(`local_${ACTIVE_CLIENT_KEY}`) || localStorage.getItem(ACTIVE_CLIENT_KEY);
-        if (!raw) return null;
-
-        const parsed = JSON.parse(raw);
+        const parsed = await loadJSON(ACTIVE_CLIENT_KEY, null);
+        if (!parsed) return null;
         const normalized = normalizeActiveClientPayload(parsed);
-        if (normalized.dirty) saveActiveClientPayload(normalized.payload);
+        if (normalized.dirty) await saveActiveClientPayload(normalized.payload);
         return normalized.payload;
     } catch (error) {
         console.error("loadActiveClientPayload error", error);
@@ -188,31 +165,19 @@ export function loadActiveClientPayload() {
     }
 }
 
-export function saveActiveClientPayload(payload) {
+export async function saveActiveClientPayload(payload) {
     try {
         const { payload: normalizedPayload } = normalizeActiveClientPayload(payload);
-        const serialized = JSON.stringify(normalizedPayload);
-        localStorage.setItem(`local_${ACTIVE_CLIENT_KEY}`, serialized);
-        localStorage.setItem(ACTIVE_CLIENT_KEY, serialized);
+        await saveJSON(ACTIVE_CLIENT_KEY, normalizedPayload);
     } catch (error) {
         console.error("saveActiveClientPayload error", error);
     }
 }
 
 export function clearActiveClientPayload() {
-    localStorage.removeItem(`local_${ACTIVE_CLIENT_KEY}`);
-    localStorage.removeItem(ACTIVE_CLIENT_KEY);
+    return deleteJSON(ACTIVE_CLIENT_KEY);
 }
 
-export function clearStoredInputValues(storage = globalThis.localStorage) {
-    if (!storage) return 0;
-
-    const keysToRemove = [];
-    for (let index = 0; index < storage.length; index++) {
-        const key = storage.key(index);
-        if (key?.startsWith(STORED_INPUT_PREFIX)) keysToRemove.push(key);
-    }
-
-    keysToRemove.forEach((key) => storage.removeItem(key));
-    return keysToRemove.length;
+export function clearStoredInputValues() {
+    return clearTokenInputValues();
 }

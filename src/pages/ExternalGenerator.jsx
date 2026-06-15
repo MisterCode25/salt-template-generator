@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import Modal from "../components/Modal.jsx";
 import { copyText, showToast } from "../services/clipboardService.js";
 import { loadActiveClientPayload, saveClientInputValues } from "../services/activeClientService.js";
+import { loadTokenInputValues } from "../services/tokenInputValueService.js";
 import { loadTokens, saveTokens } from "../services/tokenService.js";
 import { SO_TICKET_NUM_TOKEN, SO_TICKET_TOKEN_KEY } from "../utils/tokenCanonicalization.js";
 import {
@@ -258,7 +259,7 @@ export default function ExternalGenerator({
     const [externalIdFieldValue, setExternalIdFieldValue] = useState("");
     const [externalIdEditing, setExternalIdEditing] = useState(false);
     const [vtiEmptyFieldErrors, setVtiEmptyFieldErrors] = useState({});
-    const [storedClientPayload, setStoredClientPayload] = useState(() => clientPayload || loadActiveClientPayload());
+    const [storedClientPayload, setStoredClientPayload] = useState(clientPayload);
     const [promptState, setPromptState] = useState(null);
     const [externalTokenSyncReady, setExternalTokenSyncReady] = useState(false);
     const promptResolverRef = useRef(null);
@@ -278,7 +279,15 @@ export default function ExternalGenerator({
     }, []);
 
     useEffect(() => {
-        setStoredClientPayload(clientPayload || loadActiveClientPayload());
+        let cancelled = false;
+        const refreshStoredClientPayload = async () => {
+            const payload = clientPayload || await loadActiveClientPayload();
+            if (!cancelled) setStoredClientPayload(payload);
+        };
+        refreshStoredClientPayload();
+        return () => {
+            cancelled = true;
+        };
     }, [clientPayload]);
 
     const generatedCode = useMemo(() => buildExternalCode(fields), [fields]);
@@ -320,8 +329,8 @@ export default function ExternalGenerator({
         setFields((prev) => mergeExternalFields(prev, patch));
     };
 
-    const syncExternalTokenValues = (nextFields) => {
-        saveClientInputValues(buildExternalTokenValues(nextFields));
+    const syncExternalTokenValues = async (nextFields) => {
+        await saveClientInputValues(buildExternalTokenValues(nextFields));
     };
 
     // Auto-fill soTicket from the canonical token linked via key === SO_TICKET_TOKEN_KEY.
@@ -345,8 +354,9 @@ export default function ExternalGenerator({
                 }
             }
 
-            const stored = localStorage.getItem("input_" + SO_TICKET_NUM_TOKEN);
-            const storedExternalFields = readExternalFieldsFromStoredTokens();
+            const storedTokenValues = await loadTokenInputValues();
+            const stored = storedTokenValues[SO_TICKET_NUM_TOKEN] ?? null;
+            const storedExternalFields = await readExternalFieldsFromStoredTokens();
             externalTokenSyncReadyRef.current = true;
             setExternalTokenSyncReady(true);
             if (Object.keys(storedExternalFields).length > 0 || (stored !== null && stored.trim() !== "")) {
@@ -358,7 +368,7 @@ export default function ExternalGenerator({
                         : storedExternalFields.soTicket || prev.soTicket
                 }));
             } else {
-                syncExternalTokenValues(fieldsRef.current);
+                await syncExternalTokenValues(fieldsRef.current);
             }
         })();
     }, []); // runs once on mount — ExternalGenerator unmounts on close so re-opens always re-read
@@ -696,7 +706,7 @@ export default function ExternalGenerator({
     };
 
     const applyActiveClientData = async ({ runFlow = false, notify = false } = {}) => {
-        const payload = clientPayload || storedClientPayload || loadActiveClientPayload();
+        const payload = clientPayload || storedClientPayload || await loadActiveClientPayload();
         const result = buildExternalFieldsFromClientPayload(payload);
 
         if (!result.ok) {
@@ -724,13 +734,20 @@ export default function ExternalGenerator({
     };
 
     useEffect(() => {
-        const payload = clientPayload || storedClientPayload || loadActiveClientPayload();
-        if (!payload) return;
+        let cancelled = false;
+        const applyStoredPayload = async () => {
+            const payload = clientPayload || storedClientPayload || await loadActiveClientPayload();
+            if (cancelled || !payload) return;
 
-        const signature = JSON.stringify(payload);
-        if (appliedClientSignatureRef.current === signature) return;
-        appliedClientSignatureRef.current = signature;
-        applyActiveClientData({ runFlow: false, notify: false });
+            const signature = JSON.stringify(payload);
+            if (appliedClientSignatureRef.current === signature) return;
+            appliedClientSignatureRef.current = signature;
+            applyActiveClientData({ runFlow: false, notify: false });
+        };
+        applyStoredPayload();
+        return () => {
+            cancelled = true;
+        };
     }, [clientPayload, storedClientPayload]);
 
     const copyCode = async () => {

@@ -8,6 +8,8 @@ import {
     parseExternalId,
     parseVtiClipboard
 } from "../src/utils/externalGenerator.js";
+import { clearAppIndexedDB } from "../src/services/indexedDbService.js";
+import { setTokenInputValues } from "../src/services/tokenInputValueService.js";
 
 {
     const partnerTicketToken = EXTERNAL_SYSTEM_TOKENS.find((tokenDef) => tokenDef.token === "{external_partner_ticket_number}");
@@ -29,14 +31,13 @@ import {
     assert.equal(values["{external_partner_ticket_number}"], "ABC");
     assert.equal(values["{external_comment}"], undefined);
 
-    const storage = new Map(Object.entries({
-        "input_{external_date}": "26.02.2026",
-        "input_{external_partner_ticket_number}": "ABC",
-        "input_{external_comment}": "ignored"
-    }));
-    const fields = readExternalFieldsFromStoredTokens({
-        getItem: (key) => storage.has(key) ? storage.get(key) : null
+    await clearAppIndexedDB();
+    await setTokenInputValues({
+        "{external_date}": "26.02.2026",
+        "{external_partner_ticket_number}": "ABC",
+        "{external_comment}": "ignored"
     });
+    const fields = await readExternalFieldsFromStoredTokens();
     assert.equal(fields.data, "2026-02-26");
     assert.equal(fields.partnerTicketNumber, "ABC");
     assert.equal(fields.comment, undefined);

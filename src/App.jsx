@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect } from "react";
 import { Routes, Route } from "react-router-dom";
 import PageHeader from "./components/PageHeader.jsx";
-import { applyTheme, getInitialTheme } from "./utils/theme.js";
+import { applyTheme, loadThemePreference, watchSystemThemePreference } from "./utils/theme.js";
 
 const Templates = lazy(() => import("./pages/Templates.jsx"));
 const ManageNodes = lazy(() => import("./pages/ManageNodes.jsx"));
@@ -9,7 +9,6 @@ const ManageTokens = lazy(() => import("./pages/ManageTokens.jsx"));
 const ManageTools = lazy(() => import("./pages/ManageTools.jsx"));
 const Settings = lazy(() => import("./pages/Settings.jsx"));
 const ExternalGenerator = lazy(() => import("./pages/ExternalGenerator.jsx"));
-const VtiBookmarklet = lazy(() => import("./pages/VtiBookmarklet.jsx"));
 
 function ManageNodesPage() {
     return <ManageNodes />;
@@ -18,8 +17,8 @@ function ManageNodesPage() {
 function ManageTokensPage() {
     return (
         <>
-            <PageHeader title="Manage Tokens" />
-            <ManageTokens />
+            <PageHeader title="Custom Tokens" />
+            <ManageTokens customOnly />
         </>
     );
 }
@@ -36,8 +35,8 @@ function ExternalGeneratorPage() {
 function VtiBookmarkletPage() {
     return (
         <>
-            <PageHeader title="Data Shortcuts" />
-            <VtiBookmarklet />
+            <PageHeader title="Tools + Shortcuts" />
+            <ManageTools initialSection="shortcuts" />
         </>
     );
 }
@@ -45,7 +44,7 @@ function VtiBookmarkletPage() {
 function ManageToolsPage() {
     return (
         <>
-            <PageHeader title="Manage Tools" />
+            <PageHeader title="Tools + Shortcuts" />
             <ManageTools />
         </>
     );
@@ -53,7 +52,17 @@ function ManageToolsPage() {
 
 export default function App() {
     useEffect(() => {
-        applyTheme(getInitialTheme());
+        let cancelled = false;
+        const applyStoredTheme = async () => {
+            const preference = await loadThemePreference();
+            if (!cancelled) applyTheme(preference, { persist: false });
+        };
+        applyStoredTheme();
+        const unsubscribe = watchSystemThemePreference(applyStoredTheme);
+        return () => {
+            cancelled = true;
+            unsubscribe();
+        };
     }, []);
 
     return (

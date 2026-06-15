@@ -8,6 +8,8 @@ import {
   saveAgentProfileTokenValue,
   syncAgentProfileInputValues
 } from "../src/services/agentProfileService.js";
+import { clearAppIndexedDB } from "../src/services/indexedDbService.js";
+import { loadTokenInputValues } from "../src/services/tokenInputValueService.js";
 
 function createMemoryStorage(initial = {}) {
   const map = new Map(Object.entries(initial));
@@ -40,35 +42,38 @@ function createMemoryStorage(initial = {}) {
 }
 
 {
-  const storage = createMemoryStorage();
-  const profile = saveAgentProfile({
+  await clearAppIndexedDB();
+  globalThis.localStorage = createMemoryStorage();
+  const profile = await saveAgentProfile({
     firstName: "Samir",
     lastName: "Mestari",
     email: "samir@example.com",
     phoneNumber: "+410000000"
-  }, storage);
+  });
 
-  assert.deepEqual(loadAgentProfile(storage), profile);
-  assert.equal(storage.getItem("input_{agent_firstName}"), "Samir");
-  assert.equal(storage.getItem("input_{agent_email}"), "samir@example.com");
+  assert.deepEqual(await loadAgentProfile(), profile);
+  const tokenInputValues = await loadTokenInputValues();
+  assert.equal(tokenInputValues["{agent_firstName}"], "Samir");
+  assert.equal(tokenInputValues["{agent_email}"], "samir@example.com");
   assert.equal(getAgentProfileTokenValues(profile)["{agent_phoneNumber}"], "+410000000");
 }
 
 {
-  const storage = createMemoryStorage({
+  await clearAppIndexedDB();
+  globalThis.localStorage = createMemoryStorage({
     local_agent_profile: JSON.stringify({ firstName: "Old", lastName: "", email: "", phoneNumber: "" }),
     "input_{agent_firstName}": "Old"
   });
 
-  const result = saveAgentProfileTokenValue("{agent_firstName}", "New", storage);
+  const result = await saveAgentProfileTokenValue("{agent_firstName}", "New");
 
   assert.equal(result.token, "{agent_firstName}");
   assert.equal(result.value, "New");
-  assert.equal(loadAgentProfile(storage).firstName, "New");
-  assert.equal(storage.getItem("input_{agent_firstName}"), "New");
+  assert.equal((await loadAgentProfile()).firstName, "New");
+  assert.equal((await loadTokenInputValues())["{agent_firstName}"], "New");
 
-  syncAgentProfileInputValues({ firstName: "", lastName: "", email: "", phoneNumber: "" }, storage);
-  assert.equal(storage.getItem("input_{agent_firstName}"), null);
+  await syncAgentProfileInputValues({ firstName: "", lastName: "", email: "", phoneNumber: "" });
+  assert.equal((await loadTokenInputValues())["{agent_firstName}"], undefined);
 }
 
 console.log("agentProfileService tests passed");

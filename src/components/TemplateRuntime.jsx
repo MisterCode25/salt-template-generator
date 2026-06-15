@@ -1,4 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowRight, Copy } from "lucide-react";
 import { generateFinalText, getTemplateTextByLang } from "../core/tokenEngine.js";
 import {
     CLIENT_INPUT_VALUES_UPDATED_EVENT,
@@ -15,6 +16,12 @@ import { copyHtml, formatClipboardHtmlBody, showToast } from "../services/clipbo
 import { resolveTemplateImagesInHtml } from "../services/templateImageService.js";
 import { stripImagesFromHtml } from "../utils/templateImages.js";
 import { loadTokens } from "../services/tokenService.js";
+import { deleteJSON, loadJSON, saveJSON } from "../services/storageService.js";
+import {
+    loadTokenInputValues,
+    removeTokenInputValues,
+    setTokenInputValues
+} from "../services/tokenInputValueService.js";
 import {
     AGENT_PROFILE_UPDATED_EVENT,
     getAgentProfileTokenValues,
@@ -67,9 +74,9 @@ function clientBarFieldKey(scope, label) {
     return `${scope}:${String(label || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "_")}`;
 }
 
-function loadClientBarFieldKeys() {
+async function loadClientBarFieldKeys() {
     try {
-        const parsed = JSON.parse(localStorage.getItem(CLIENT_BAR_FIELDS_KEY) || "null");
+        const parsed = await loadJSON(CLIENT_BAR_FIELDS_KEY, null);
         return Array.isArray(parsed) ? parsed.filter((key) => typeof key === "string") : null;
     } catch {
         return null;
@@ -77,7 +84,7 @@ function loadClientBarFieldKeys() {
 }
 
 function saveClientBarFieldKeys(keys) {
-    localStorage.setItem(CLIENT_BAR_FIELDS_KEY, JSON.stringify(keys));
+    return saveJSON(CLIENT_BAR_FIELDS_KEY, keys);
 }
 
 function buildClientBarFieldGroups(summaryFields = [], sections = []) {
@@ -426,13 +433,15 @@ export const TemplateResultModal = memo(function TemplateResultModal({
                 data-placeholder="No content."
                 dangerouslySetInnerHTML={{ __html: formatTokenPreviewHTML(formatClipboardHtmlBody(result.html || "")) }}
             />
-            <div className="popup-actions">
-                <button type="button" className="primary-btn" onClick={onCopy}>
+            <div className="popup-actions template-result-actions">
+                <button type="button" className="template-result-action-btn template-result-copy-btn" onClick={onCopy}>
+                    <Copy size={14} aria-hidden="true" />
                     Copy again
                 </button>
                 {showChannelControls && (
-                    <button type="button" className="primary-btn template-result-next-btn" onClick={onNextChannel}>
+                    <button type="button" className="template-result-action-btn template-result-next-btn" onClick={onNextChannel}>
                         Next
+                        <ArrowRight size={14} aria-hidden="true" />
                     </button>
                 )}
             </div>
@@ -872,27 +881,56 @@ export function useTemplateRuntime() {
     const [clientPasteOpen, setClientPasteOpen] = useState(false);
     const [clientPasteInitialError, setClientPasteInitialError] = useState("");
     const [clientImportErrorModal, setClientImportErrorModal] = useState(null);
-    const [clientBarFieldKeys, setClientBarFieldKeys] = useState(() => loadClientBarFieldKeys());
+    const [clientBarFieldKeys, setClientBarFieldKeys] = useState(null);
     const [clientBarCustomizeOpen, setClientBarCustomizeOpen] = useState(false);
     const [externalIdConflictPrompt, setExternalIdConflictPrompt] = useState(null);
 
     useEffect(() => {
-        migrateStoredClientInputValues();
-        loadTokens().then(setTokens);
-        const applyAgentProfile = (profile = loadAgentProfile()) => {
-            syncAgentProfileInputValues(profile);
-            setValues((prev) => ({ ...prev, ...getAgentProfileTokenValues(profile) }));
+        let cancelled = false;
+
+        const applyAgentProfile = async (profile = null) => {
+            const effectiveProfile = profile || await loadAgentProfile();
+            await syncAgentProfileInputValues(effectiveProfile);
+            if (cancelled) return;
+            setValues((prev) => ({ ...prev, ...getAgentProfileTokenValues(effectiveProfile) }));
             inputChangeVersion.current++;
         };
-        applyAgentProfile();
+
+        const initializeRuntimeStorage = async () => {
+            await migrateStoredClientInputValues();
+            const [
+                loadedTokens,
+                tokenInputValues,
+                storedClient,
+                barKeys
+            ] = await Promise.all([
+                loadTokens(),
+                loadTokenInputValues(),
+                loadActiveClientPayload(),
+                loadClientBarFieldKeys()
+            ]);
+            if (cancelled) return;
+            setTokens(loadedTokens);
+            setValues((prev) => ({ ...prev, ...tokenInputValues }));
+            setClientBarFieldKeys(barKeys);
+            await applyAgentProfile();
+            if (cancelled) return;
+            if (storedClient) {
+                setClientPayload(storedClient);
+                setClientImportStatus({ type: "success", message: "" });
+            }
+        };
+
+        initializeRuntimeStorage();
+
         const handleAgentProfileUpdated = (event) => {
             applyAgentProfile(event.detail?.profile);
         };
-        const handleClientInputValuesUpdated = (event) => {
+        const handleClientInputValuesUpdated = async (event) => {
             const nextValues = event.detail?.values;
             if (!nextValues || typeof nextValues !== "object") return;
             setValues((prev) => ({ ...prev, ...nextValues }));
-            const latestClientPayload = loadActiveClientPayload();
+            const latestClientPayload = await loadActiveClientPayload();
             if (latestClientPayload) {
                 setClientPayload(latestClientPayload);
             }
@@ -901,12 +939,8 @@ export function useTemplateRuntime() {
         window.addEventListener(AGENT_PROFILE_UPDATED_EVENT, handleAgentProfileUpdated);
         window.addEventListener(CLIENT_INPUT_VALUES_UPDATED_EVENT, handleClientInputValuesUpdated);
 
-        const storedClient = loadActiveClientPayload();
-        if (storedClient) {
-            setClientPayload(storedClient);
-            setClientImportStatus({ type: "success", message: "" });
-        }
         return () => {
+            cancelled = true;
             window.removeEventListener(AGENT_PROFILE_UPDATED_EVENT, handleAgentProfileUpdated);
             window.removeEventListener(CLIENT_INPUT_VALUES_UPDATED_EVENT, handleClientInputValuesUpdated);
         };
@@ -945,15 +979,7 @@ export function useTemplateRuntime() {
 
     const resetClientBarSelection = () => {
         setClientBarFieldKeys(null);
-        localStorage.removeItem(CLIENT_BAR_FIELDS_KEY);
-    };
-
-    const readStoredInputValue = (token) => {
-        try {
-            return localStorage.getItem("input_" + token);
-        } catch {
-            return null;
-        }
+        deleteJSON(CLIENT_BAR_FIELDS_KEY);
     };
 
     const getTokenValue = (tokenDef) => {
@@ -967,10 +993,6 @@ export function useTemplateRuntime() {
         for (const candidateToken of candidateTokens) {
             const stateValue = values[candidateToken];
             if (stateValue !== undefined && stateValue !== null) return stateValue;
-        }
-        for (const candidateToken of candidateTokens) {
-            const storedValue = readStoredInputValue(candidateToken);
-            if (storedValue !== null) return storedValue;
         }
         return typeof tokenDef === "object" ? tokenDef?.default ?? "" : "";
     };
@@ -986,15 +1008,15 @@ export function useTemplateRuntime() {
         };
     };
 
-    const completeSuperOfficeImport = (importResult, tokenValues = importResult?.tokenValues || {}, options = {}) => {
+    const completeSuperOfficeImport = async (importResult, tokenValues = importResult?.tokenValues || {}, options = {}) => {
         const nextResult = {
             ...importResult,
             tokenValues
         };
-        saveSuperOfficeTicketPayload(nextResult);
+        await saveSuperOfficeTicketPayload(nextResult);
 
         if (Object.keys(tokenValues).length > 0) {
-            const saved = saveClientInputValues(tokenValues);
+            const saved = await saveClientInputValues(tokenValues);
             if (saved.payload) setClientPayload(saved.payload);
             setValues((prev) => ({ ...prev, ...tokenValues }));
             inputChangeVersion.current++;
@@ -1019,9 +1041,9 @@ export function useTemplateRuntime() {
         return true;
     };
 
-    const confirmExternalIdConflictCorrection = () => {
+    const confirmExternalIdConflictCorrection = async () => {
         if (!externalIdConflictPrompt) return;
-        completeSuperOfficeImport(
+        await completeSuperOfficeImport(
             externalIdConflictPrompt.importResult,
             externalIdConflictPrompt.correctedTokenValues,
             { corrected: true }
@@ -1054,25 +1076,28 @@ export function useTemplateRuntime() {
         [...internalMatchedTokens, ...matchedTokens].forEach((match) => {
             tokensToClear.set(match.token, match);
         });
+        const valuesToPersist = {};
         tokensToClear.forEach(({ token, value }) => {
-            localStorage.setItem("input_" + token, value);
+            valuesToPersist[token] = value;
         });
+        setTokenInputValues(valuesToPersist);
 
         setClientInternalTokens(internalTokenDefs);
         setClientMatchedTokens(Array.from(tokensToClear.values()));
         setValues((prev) => ({ ...prev, ...nextValues }));
     }, [clientPayload, clientInternalTokens.length, tokens]);
 
-    const clearClientInfo = () => {
-        clearSuperOfficeTicketPayload();
-        clearStoredInputValues();
-        const agentValues = getAgentProfileTokenValues(loadAgentProfile());
-        syncAgentProfileInputValues();
+    const clearClientInfo = async () => {
+        await clearSuperOfficeTicketPayload();
+        await clearStoredInputValues();
+        const agentProfile = await loadAgentProfile();
+        const agentValues = getAgentProfileTokenValues(agentProfile);
+        await syncAgentProfileInputValues(agentProfile);
         setValues(agentValues);
         setClientPayload(null);
         setClientMatchedTokens([]);
         setClientInternalTokens([]);
-        clearActiveClientPayload();
+        await clearActiveClientPayload();
         setClientDetailsExpanded(false);
         setClientPasteOpen(false);
         setClientPasteInitialError("");
@@ -1086,12 +1111,13 @@ export function useTemplateRuntime() {
         inputChangeVersion.current++;
     };
 
-    const loadClientFromText = (text) => {
+    const loadClientFromText = async (text) => {
         const payload = parseClientClipboardJSON(text);
-        const currentClientSignature = getSuperOfficeClientSignature(loadActiveClientPayload());
+        const currentClientPayload = await loadActiveClientPayload();
+        const currentClientSignature = getSuperOfficeClientSignature(currentClientPayload);
         const nextClientSignature = getSuperOfficeClientSignature(payload);
         if (currentClientSignature && currentClientSignature !== nextClientSignature) {
-            clearSuperOfficeTicketPayload();
+            await clearSuperOfficeTicketPayload();
         }
         const {
             tokenDefs: internalTokenDefs,
@@ -1112,17 +1138,20 @@ export function useTemplateRuntime() {
             tokensToClear.set(match.token, match);
         });
 
-        clearStoredInputValues();
-        const agentValues = getAgentProfileTokenValues(loadAgentProfile());
-        syncAgentProfileInputValues();
+        await clearStoredInputValues();
+        const agentProfile = await loadAgentProfile();
+        const agentValues = getAgentProfileTokenValues(agentProfile);
+        await syncAgentProfileInputValues(agentProfile);
+        const valuesToPersist = {};
         tokensToClear.forEach(({ token, value }) => {
-            localStorage.setItem("input_" + token, value);
+            valuesToPersist[token] = value;
         });
+        await setTokenInputValues(valuesToPersist);
 
-        saveActiveClientPayload(payload);
-        const pendingSuperOfficeTicket = loadPendingSuperOfficeTicketPayload();
+        await saveActiveClientPayload(payload);
+        const pendingSuperOfficeTicket = await loadPendingSuperOfficeTicketPayload();
         const storedSuperOfficeTicket = currentClientSignature === nextClientSignature
-            ? loadSuperOfficeTicketPayload()
+            ? await loadSuperOfficeTicketPayload()
             : null;
         const candidateSuperOfficeTicket = pendingSuperOfficeTicket || storedSuperOfficeTicket;
         let activeSuperOfficeTicket = candidateSuperOfficeTicket;
@@ -1137,13 +1166,13 @@ export function useTemplateRuntime() {
                 activeSuperOfficeTicket = null;
             } else {
                 if (pendingSuperOfficeTicket) {
-                    activeSuperOfficeTicket = consumePendingSuperOfficeTicketPayload();
+                    activeSuperOfficeTicket = await consumePendingSuperOfficeTicketPayload();
                     superOfficeTokenValues = activeSuperOfficeTicket?.tokenValues || {};
                 }
-                savedSuperOfficeValues = saveClientInputValues(superOfficeTokenValues);
+                savedSuperOfficeValues = await saveClientInputValues(superOfficeTokenValues);
             }
         } else if (pendingSuperOfficeTicket) {
-            activeSuperOfficeTicket = consumePendingSuperOfficeTicketPayload();
+            activeSuperOfficeTicket = await consumePendingSuperOfficeTicketPayload();
             superOfficeTokenValues = activeSuperOfficeTicket?.tokenValues || {};
         }
         const nextPayload = savedSuperOfficeValues?.payload || payload;
@@ -1169,7 +1198,7 @@ export function useTemplateRuntime() {
             window.focus();
             event?.currentTarget?.focus?.();
             const clipboardText = await readClipboardText();
-            loadClientFromText(clipboardText);
+            await loadClientFromText(clipboardText);
             return true;
         } catch (error) {
             const message = error?.message || "Unable to read customer data from clipboard.";
@@ -1194,7 +1223,7 @@ export function useTemplateRuntime() {
                 throw new Error("Clipboard does not contain SuperOffice data.");
             }
 
-            if (openExternalIdConflictPrompt(result, loadActiveClientPayload())) {
+            if (openExternalIdConflictPrompt(result, await loadActiveClientPayload())) {
                 return false;
             }
 
@@ -1210,8 +1239,8 @@ export function useTemplateRuntime() {
         }
     };
 
-    const importClientFromPaste = (text) => {
-        loadClientFromText(text);
+    const importClientFromPaste = async (text) => {
+        await loadClientFromText(text);
         setClientPasteOpen(false);
         setClientPasteInitialError("");
     };
@@ -1405,27 +1434,27 @@ export function useTemplateRuntime() {
             const next = { ...prev };
             tokenDefs.forEach(({ token }) => {
                 delete next[token];
-                localStorage.removeItem("input_" + token);
             });
             return next;
         });
+        removeTokenInputValues(tokenDefs.map(({ token }) => token));
     };
 
-    const persistTokenPromptValues = (tokenDefs, filledValues) => {
+    const persistTokenPromptValues = async (tokenDefs, filledValues) => {
         const persistedValues = {};
-        tokenDefs.forEach((tokenDef) => {
+        for (const tokenDef of tokenDefs) {
             const value = filledValues[tokenDef.token] ?? getTokenValue(tokenDef);
             if (isAgentProfileToken(tokenDef.token)) {
-                const result = saveAgentProfileTokenValue(tokenDef.token, value);
+                const result = await saveAgentProfileTokenValue(tokenDef.token, value);
                 persistedValues[result.token] = result.value;
-                return;
+                continue;
             }
 
-            const { inputTokens } = saveClientInputValue(tokenDef, value);
+            const { inputTokens } = await saveClientInputValue(tokenDef, value);
             inputTokens.forEach((token) => {
                 persistedValues[token] = value;
             });
-        });
+        }
 
         if (Object.keys(persistedValues).length > 0) {
             setValues((prev) => ({ ...prev, ...persistedValues }));
@@ -1443,7 +1472,7 @@ export function useTemplateRuntime() {
             return;
         }
         const { effectiveModel, sectionKey, tokenDefs } = tokenPrompt;
-        persistTokenPromptValues(tokenDefs, filled);
+        await persistTokenPromptValues(tokenDefs, filled);
         setTokenPrompt(null);
         setPromptMissingTokens([]);
         if (tokenPrompt.mode === "fill") return;

@@ -238,7 +238,7 @@ assert.deepEqual(migratedLegacyTemplate.contentByChannel.email.variants.map((var
 assert.equal(migratedLegacyTemplate.contentByChannel.email.variants[0].text_fr, "Relance legacy");
 assert.equal(indexedDB.data.get(TEMPLATE_NODE_KEY).length, 4);
 assert.equal(indexedDB.data.get(NODE_TEMPLATE_KEY).length, 1);
-assert.equal(JSON.parse(localStorage.getItem(`local_${LEGACY_TEMPLATE_MIGRATION_KEY}`)).completed, true);
+assert.equal(indexedDB.data.get(LEGACY_TEMPLATE_MIGRATION_KEY).completed, true);
 
 localStorage.clear();
 indexedDB.data.clear();

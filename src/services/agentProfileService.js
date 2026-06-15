@@ -1,6 +1,10 @@
+import { loadJSON, saveJSON } from "./storageService.js";
+import {
+    removeTokenInputValues,
+    setTokenInputValues
+} from "./tokenInputValueService.js";
+
 const AGENT_PROFILE_KEY = "agent_profile";
-const LOCAL_AGENT_PROFILE_KEY = `local_${AGENT_PROFILE_KEY}`;
-const INPUT_VALUE_PREFIX = "input_";
 
 export const AGENT_PROFILE_UPDATED_EVENT = "agent-profile-updated";
 
@@ -52,18 +56,6 @@ function normalizeAgentProfile(profile = {}) {
     return normalized;
 }
 
-function writeStorageValue(storage, key, value) {
-    if (storage.getItem(key) === value) return false;
-    storage.setItem(key, value);
-    return true;
-}
-
-function removeStorageValue(storage, key) {
-    if (storage.getItem(key) === null) return false;
-    storage.removeItem(key);
-    return true;
-}
-
 export function isAgentProfileToken(token = "") {
     return AGENT_PROFILE_TOKEN_SET.has(token);
 }
@@ -72,19 +64,16 @@ function fieldForToken(token = "") {
     return AGENT_PROFILE_FIELD_BY_TOKEN.get(token) || null;
 }
 
-export function loadAgentProfile(storage = globalThis.localStorage) {
-    if (!storage) return normalizeAgentProfile();
-
+export async function loadAgentProfile() {
     try {
-        const raw = storage.getItem(LOCAL_AGENT_PROFILE_KEY) || storage.getItem(AGENT_PROFILE_KEY);
-        return normalizeAgentProfile(raw ? JSON.parse(raw) : {});
+        return normalizeAgentProfile(await loadJSON(AGENT_PROFILE_KEY, {}));
     } catch (error) {
         console.error("loadAgentProfile error", error);
         return normalizeAgentProfile();
     }
 }
 
-export function getAgentProfileTokenValues(profile = loadAgentProfile()) {
+export function getAgentProfileTokenValues(profile = {}) {
     const normalized = normalizeAgentProfile(profile);
     const values = {};
     for (const field of AGENT_PROFILE_FIELDS) {
@@ -93,34 +82,30 @@ export function getAgentProfileTokenValues(profile = loadAgentProfile()) {
     return values;
 }
 
-export function syncAgentProfileInputValues(profile = loadAgentProfile(), storage = globalThis.localStorage) {
-    if (!storage) return false;
-
-    let changed = false;
+export async function syncAgentProfileInputValues(profile = {}) {
     const normalized = normalizeAgentProfile(profile);
+    const valuesToSet = {};
+    const valuesToRemove = [];
     for (const field of AGENT_PROFILE_FIELDS) {
         const value = normalized[field.key];
-        const key = `${INPUT_VALUE_PREFIX}${field.token}`;
         if (value === "") {
-            changed = removeStorageValue(storage, key) || changed;
+            valuesToRemove.push(field.token);
         } else {
-            changed = writeStorageValue(storage, key, value) || changed;
+            valuesToSet[field.token] = value;
         }
     }
-    return changed;
+    if (Object.keys(valuesToSet).length > 0) await setTokenInputValues(valuesToSet);
+    if (valuesToRemove.length > 0) await removeTokenInputValues(valuesToRemove);
+    return true;
 }
 
-export function saveAgentProfile(profile, storage = globalThis.localStorage) {
+export async function saveAgentProfile(profile) {
     const normalized = normalizeAgentProfile(profile);
-    if (!storage) return normalized;
 
     try {
-        const serialized = JSON.stringify(normalized);
-        const localProfileChanged = writeStorageValue(storage, LOCAL_AGENT_PROFILE_KEY, serialized);
-        const legacyProfileChanged = writeStorageValue(storage, AGENT_PROFILE_KEY, serialized);
-        const profileChanged = localProfileChanged || legacyProfileChanged;
-        const inputChanged = syncAgentProfileInputValues(normalized, storage);
-        if ((profileChanged || inputChanged) && typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
+        await saveJSON(AGENT_PROFILE_KEY, normalized);
+        await syncAgentProfileInputValues(normalized);
+        if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
             window.dispatchEvent(new CustomEvent(AGENT_PROFILE_UPDATED_EVENT, { detail: { profile: normalized } }));
         }
     } catch (error) {
@@ -129,13 +114,13 @@ export function saveAgentProfile(profile, storage = globalThis.localStorage) {
     return normalized;
 }
 
-export function saveAgentProfileTokenValue(token, value, storage = globalThis.localStorage) {
+export async function saveAgentProfileTokenValue(token, value) {
     const field = fieldForToken(token);
     if (!field) return { token, value };
 
-    const profile = loadAgentProfile(storage);
+    const profile = await loadAgentProfile();
     profile[field.key] = value === null || value === undefined ? "" : String(value);
-    const savedProfile = saveAgentProfile(profile, storage);
+    const savedProfile = await saveAgentProfile(profile);
     return {
         token: field.token,
         value: savedProfile[field.key],

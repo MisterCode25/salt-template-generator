@@ -1,5 +1,5 @@
 import { loadIndexedJSON, saveIndexedJSON } from "./indexedDbService.js";
-import { loadJSON, saveJSON } from "./storageService.js";
+import { loadJSON, readLegacyStorageValue, removeLegacyStorageValue, saveJSON } from "./storageService.js";
 import { CHANNEL_VALUES, normalizeNode, normalizeTemplate } from "../models/templateTreeModel.js";
 import { migrateLegacyModelsToTemplateTree } from "../utils/legacyTemplateMigration.js";
 import { canonicalizeTemplateTokensInText } from "../utils/tokenCanonicalization.js";
@@ -184,12 +184,10 @@ async function migrateCanonicalTemplateTokens({ nodes = [], templates = [] } = {
 }
 
 async function loadStoredLegacyModels() {
-    const [indexedModels, localModels] = await Promise.all([
-        loadIndexedJSON(LEGACY_MODEL_KEY, null),
-        loadJSON(LEGACY_MODEL_KEY, null)
-    ]);
+    const indexedModels = await loadIndexedJSON(LEGACY_MODEL_KEY, null);
+    const legacyModels = readLegacyStorageValue(LEGACY_MODEL_KEY);
     const indexedList = Array.isArray(indexedModels) ? indexedModels : [];
-    const localList = Array.isArray(localModels) ? localModels : [];
+    const localList = Array.isArray(legacyModels.value) ? legacyModels.value : [];
 
     // The legacy app stored templates in localStorage. Prefer that non-empty
     // source over an empty IndexedDB value that may have been created later.
@@ -209,6 +207,7 @@ async function migrateStoredLegacyTemplates({ nodes = [], templates = [] } = {})
     if (migrated.nodes.length === 0 && migrated.templates.length === 0) return null;
 
     await saveTemplateTreeData(migrated);
+    removeLegacyStorageValue(LEGACY_MODEL_KEY);
     await saveJSON(LEGACY_TEMPLATE_MIGRATION_KEY, {
         completed: true,
         migratedAt: Date.now(),

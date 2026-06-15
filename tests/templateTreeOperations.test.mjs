@@ -13,8 +13,11 @@ const {
   getIndexedChildNodes,
   getIndexedTemplatesForNode,
   getTemplatesForNode,
+  linkTemplateToNode,
   moveNode,
+  moveNodeToParentAtIndex,
   moveTemplateToNode,
+  moveTemplateToNodeAtIndex,
   removeNodeCascade,
   removeTemplate,
   reorderNode,
@@ -49,6 +52,17 @@ assert.equal(nodes.find((node) => node.id === "grand-child-a").parentId, "child-
 
 nodes = reorderNode(nodes, "child-a", "up");
 assert.equal(getChildNodes(nodes, null)[1].id, "child-a");
+assert.throws(
+  () => moveNodeToParentAtIndex(nodes, "child-a", "grand-child-a", 0),
+  /Invalid node move/
+);
+
+nodes = moveNodeToParentAtIndex(nodes, "grand-child-a", null, 1);
+assert.equal(nodes.find((node) => node.id === "grand-child-a").parentId, null);
+assert.deepEqual(getChildNodes(nodes, null).map((node) => node.id), ["root-a", "grand-child-a", "child-a", "root-b"]);
+
+nodes = moveNodeToParentAtIndex(nodes, "grand-child-a", "child-a", 0);
+assert.equal(nodes.find((node) => node.id === "grand-child-a").parentId, "child-a");
 
 let templates = [
   createTemplateForNode("child-a", {
@@ -69,16 +83,31 @@ let templates = [
         variants: []
       }
     }
-  }),
+  }, nodes),
   createTemplateForNode("grand-child-a", {
     id: "tpl-deep",
     title: "Nested template",
     channels: ["email"]
-  })
+  }, nodes)
 ];
 
 assert.deepEqual(getTemplatesForNode(templates, "child-a").map((template) => template.id), ["tpl-a"]);
 assert.deepEqual(getIndexedTemplatesForNode(buildTemplateNodeIndex(templates), "child-a").map((template) => template.id), ["tpl-a"]);
+
+const mixedChild = createNodeForParent(nodes, "child-a", { id: "mixed-child", title: "Mixed child" }, templates);
+nodes = [...nodes, mixedChild];
+assert.equal(nodes.find((node) => node.id === "mixed-child").parentId, "child-a");
+
+templates = linkTemplateToNode(templates, "tpl-deep", "child-a", nodes);
+assert.deepEqual(getTemplatesForNode(templates, "child-a").map((template) => template.id), ["tpl-a", "tpl-deep"]);
+
+templates = moveTemplateToNodeAtIndex(templates, "tpl-deep", "child-a", "root-b", 0, nodes);
+const movedTemplate = templates.find((template) => template.id === "tpl-deep");
+assert.equal(movedTemplate.parentNodeId, "root-b");
+assert.deepEqual(movedTemplate.nodeIds, ["root-b", "grand-child-a"]);
+assert.deepEqual(getTemplatesForNode(templates, "root-b").map((template) => template.id), ["tpl-deep"]);
+
+templates = linkTemplateToNode(templates, "tpl-deep", "child-a", nodes);
 
 const tplDeepBeforeUpdate = templates.find((template) => template.id === "tpl-deep");
 templates = updateTemplate(templates, "tpl-a", { title: "Customer unreachable updated", channels: ["email"] });
@@ -90,6 +119,9 @@ templates = updateTemplate(templates, "tpl-a", { title: "Customer unreachable", 
 
 templates = moveTemplateToNode(templates, "tpl-a", "root-b", nodes);
 assert.equal(templates.find((template) => template.id === "tpl-a").parentNodeId, "root-b");
+
+templates = moveTemplateToNodeAtIndex(templates, "tpl-a", "root-b", "root-b", 1, nodes);
+assert.deepEqual(getTemplatesForNode(templates, "root-b").map((template) => template.id), ["tpl-deep", "tpl-a"]);
 
 const tplDeepBeforeDuplicate = templates.find((template) => template.id === "tpl-deep");
 templates = duplicateTemplate(templates, "tpl-a");
@@ -108,7 +140,9 @@ assert.equal(templates.find((template) => template.id === "tpl-deep"), tplDeepBe
 const removed = removeNodeCascade(nodes, templates, "child-a");
 assert.equal(removed.nodes.some((node) => node.id === "child-a"), false);
 assert.equal(removed.nodes.some((node) => node.id === "grand-child-a"), false);
-assert.equal(removed.templates.some((template) => template.id === "tpl-deep"), false);
+const survivingDeepTemplate = removed.templates.find((template) => template.id === "tpl-deep");
+assert.ok(survivingDeepTemplate);
+assert.deepEqual(survivingDeepTemplate.nodeIds, ["root-b"]);
 assert.equal(removed.templates.some((template) => template.title === "Customer unreachable copy"), true);
 
 assert.throws(

@@ -57,7 +57,7 @@ import {
     TEMPLATE_IMAGES_UPDATED_EVENT
 } from "../utils/templateImages.js";
 import { loadTemplateImageMap } from "../services/templateImageService.js";
-import { applyTheme, getInitialTheme } from "../utils/theme.js";
+import { loadConfigName } from "../services/appConfigService.js";
 import ToolsBar from "../components/ToolsBar.jsx";
 import SuperOfficePhotoGallery from "../components/SuperOfficePhotoGallery.jsx";
 import { copyText } from "../services/clipboardService.js";
@@ -76,10 +76,8 @@ import { getKeyboardShortcutForEvent } from "../utils/keyboardShortcuts.js";
 
 const ExternalGenerator = lazy(() => import("./ExternalGenerator.jsx"));
 const ManageNodes = lazy(() => import("./ManageNodes.jsx"));
-const ManageTokens = lazy(() => import("./ManageTokens.jsx"));
 const ManageTools = lazy(() => import("./ManageTools.jsx"));
 const SettingsPage = lazy(() => import("./Settings.jsx"));
-const VtiBookmarklet = lazy(() => import("./VtiBookmarklet.jsx"));
 
 const CHANNEL_LABELS = {
     [Channel.EMAIL]: "Email",
@@ -257,6 +255,20 @@ function EmptyColumnState({ message }) {
     );
 }
 
+function PlaybookColumnGroup({ title, count, children }) {
+    return (
+        <div className="templates-column-group">
+            <div className="templates-column-group-head">
+                <span>{title}</span>
+                <span>{count}</span>
+            </div>
+            <div className="templates-column-group-list">
+                {children}
+            </div>
+        </div>
+    );
+}
+
 const PlaybookNodeRow = memo(function PlaybookNodeRow({
     node,
     summary,
@@ -274,7 +286,7 @@ const PlaybookNodeRow = memo(function PlaybookNodeRow({
         >
             <IconBadge Icon={Icon} tone={toneForValue(node.icon || node.title)} />
             <span className="templates-column-copy">
-                <strong>{node.title || "Untitled section"}</strong>
+                <strong>{node.title || "Untitled topic"}</strong>
             </span>
             {totalCount > 0 && <span className="templates-column-count">{totalCount}</span>}
             <ChevronRight className="templates-column-chevron" size={19} aria-hidden="true" />
@@ -547,6 +559,7 @@ function AloPreparationModal({ defaults, templateOptions = [], onCancel, onSubmi
 
 const PlaybookColumn = memo(function PlaybookColumn({
     title,
+    nodeGroupTitle = "Topics",
     nodes: columnNodes,
     templates: columnTemplates,
     nodeSummaryById,
@@ -558,35 +571,56 @@ const PlaybookColumn = memo(function PlaybookColumn({
     emptyMessage
 }) {
     const hasItems = columnNodes.length > 0 || columnTemplates.length > 0;
+    const showNodeGroup = columnNodes.length > 0;
+    const showTemplateGroup = columnTemplates.length > 0;
 
     return (
         <section className="templates-column" aria-label={title || "Playbook column"}>
+            {title && (
+                <div className="templates-column-head">
+                    <h2>{title}</h2>
+                </div>
+            )}
             <div className="templates-column-list">
                 {hasItems ? (
                     <>
-                        {columnNodes.map((node) => {
-                            const summary = nodeSummaryById.get(node.id) || EMPTY_NODE_SUMMARY;
-                            return (
-                                <PlaybookNodeRow
-                                    key={node.id}
-                                    node={node}
-                                    summary={summary}
-                                    selected={activeNodeId === node.id}
-                                    onOpenNode={onOpenNode}
-                                />
-                            );
-                        })}
-                        {columnTemplates.map((template) => {
-                            return (
-                                <PlaybookTemplateRow
-                                    key={template.id}
-                                    template={template}
-                                    channels={templateChannelsById.get(template.id) || template.channels}
-                                    selected={activeTemplateId === template.id}
-                                    onOpenTemplate={onOpenTemplate}
-                                />
-                            );
-                        })}
+                        {showNodeGroup && (
+                            <PlaybookColumnGroup
+                                title={nodeGroupTitle}
+                                count={columnNodes.length}
+                            >
+                                {columnNodes.map((node) => {
+                                    const summary = nodeSummaryById.get(node.id) || EMPTY_NODE_SUMMARY;
+                                    return (
+                                        <PlaybookNodeRow
+                                            key={node.id}
+                                            node={node}
+                                            summary={summary}
+                                            selected={activeNodeId === node.id}
+                                            onOpenNode={onOpenNode}
+                                        />
+                                    );
+                                })}
+                            </PlaybookColumnGroup>
+                        )}
+                        {showTemplateGroup && (
+                            <PlaybookColumnGroup
+                                title="Templates"
+                                count={columnTemplates.length}
+                            >
+                                {columnTemplates.map((template) => {
+                                    return (
+                                        <PlaybookTemplateRow
+                                            key={template.id}
+                                            template={template}
+                                            channels={templateChannelsById.get(template.id) || template.channels}
+                                            selected={activeTemplateId === template.id}
+                                            onOpenTemplate={onOpenTemplate}
+                                        />
+                                    );
+                                })}
+                            </PlaybookColumnGroup>
+                        )}
                     </>
                 ) : (
                     <EmptyColumnState message={emptyMessage || "No item here."} />
@@ -858,16 +892,15 @@ export default function Templates() {
     const [query, setQuery] = useState("");
     const [searchResetSignal, setSearchResetSignal] = useState(0);
     const [dropdownOpen, setDropdownOpen] = useState(false);
-    const [theme, setTheme] = useState(() => getInitialTheme());
     const [activeWorkspace, setActiveWorkspace] = useState(null);
     const [externalGeneratorOpen, setExternalGeneratorOpen] = useState(false);
     const [externalGeneratorStartField, setExternalGeneratorStartField] = useState(null);
-    const [superOfficeTicket, setSuperOfficeTicket] = useState(() => loadSuperOfficeTicketPayload());
-    const [superOfficeDataPresent, setSuperOfficeDataPresent] = useState(() => hasSuperOfficeTicketPayload());
+    const [superOfficeTicket, setSuperOfficeTicket] = useState(null);
+    const [superOfficeDataPresent, setSuperOfficeDataPresent] = useState(false);
     const [superOfficeGalleryOpen, setSuperOfficeGalleryOpen] = useState(false);
     const [aloPreparation, setAloPreparation] = useState(null);
     const [templateImageMap, setTemplateImageMap] = useState(() => new Map());
-    const configName = localStorage.getItem("local_configName") || "No configuration";
+    const [configName, setConfigName] = useState("No configuration");
 
     const refreshTreeData = () => {
         return loadTemplateTreeData().then((treeData) => {
@@ -878,7 +911,19 @@ export default function Templates() {
 
     useEffect(() => {
         refreshTreeData();
+        loadConfigName().then(setConfigName);
     }, []);
+
+    const refreshSuperOfficeState = useCallback(async (payload = undefined) => {
+        const nextTicket = payload === undefined ? await loadSuperOfficeTicketPayload() : payload;
+        setSuperOfficeTicket(nextTicket || null);
+        setSuperOfficeDataPresent(await hasSuperOfficeTicketPayload());
+        return nextTicket;
+    }, []);
+
+    useEffect(() => {
+        refreshSuperOfficeState();
+    }, [refreshSuperOfficeState]);
 
     useEffect(() => {
         let cancelled = false;
@@ -896,17 +941,12 @@ export default function Templates() {
     }, []);
 
     useEffect(() => {
-        applyTheme(theme);
-    }, [theme]);
-
-    useEffect(() => {
         const handler = (event) => {
-            setSuperOfficeTicket(event.detail?.payload || loadSuperOfficeTicketPayload());
-            setSuperOfficeDataPresent(hasSuperOfficeTicketPayload());
+            refreshSuperOfficeState(event.detail?.payload);
         };
         window.addEventListener(SUPER_OFFICE_TICKET_UPDATED_EVENT, handler);
         return () => window.removeEventListener(SUPER_OFFICE_TICKET_UPDATED_EVENT, handler);
-    }, []);
+    }, [refreshSuperOfficeState]);
 
     useEffect(() => {
         const handler = (event) => {
@@ -1033,10 +1073,11 @@ export default function Templates() {
         resetSearchQuery();
     }, [resetSearchQuery]);
 
-    const clearClientAndResetCase = useCallback(() => {
-        runtimeRef.current.clearClientInfo();
+    const clearClientAndResetCase = useCallback(async () => {
+        await runtimeRef.current.clearClientInfo();
+        await refreshSuperOfficeState(null);
         resetCaseNavigation();
-    }, [resetCaseNavigation]);
+    }, [refreshSuperOfficeState, resetCaseNavigation]);
 
     const importClientFromClipboardAndResetCase = useCallback(async (event) => {
         const imported = await runtimeRef.current.readClientClipboard(event);
@@ -1046,16 +1087,15 @@ export default function Templates() {
     const importSuperOfficeFromClipboardAndResetCase = useCallback(async (event) => {
         const imported = await runtimeRef.current.readSuperOfficeClipboard(event);
         if (imported) {
-            setSuperOfficeTicket(loadSuperOfficeTicketPayload());
-            setSuperOfficeDataPresent(hasSuperOfficeTicketPayload());
+            await refreshSuperOfficeState();
             resetCaseNavigation();
         }
-    }, [resetCaseNavigation]);
+    }, [refreshSuperOfficeState, resetCaseNavigation]);
 
-    const openSuperOfficeGallery = useCallback(() => {
-        setSuperOfficeTicket(loadSuperOfficeTicketPayload());
+    const openSuperOfficeGallery = useCallback(async () => {
+        await refreshSuperOfficeState();
         setSuperOfficeGalleryOpen(true);
-    }, []);
+    }, [refreshSuperOfficeState]);
 
     const closeSuperOfficeGallery = useCallback(() => {
         setSuperOfficeGalleryOpen(false);
@@ -1065,7 +1105,7 @@ export default function Templates() {
         const clientPayload = runtimeRef.current.clientPayload;
         if (!clientPayload) return;
 
-        setAloPreparation(buildAloPreparationDefaults(clientPayload, loadSuperOfficeTicketPayload()));
+        setAloPreparation(buildAloPreparationDefaults(clientPayload, await loadSuperOfficeTicketPayload()));
     }, []);
 
     const closeAloPreparation = useCallback(() => {
@@ -1077,14 +1117,19 @@ export default function Templates() {
         if (!clientPayload) return;
 
         await copyText(
-            formatAloAutofillPayload(clientPayload, loadAgentProfile(), loadSuperOfficeTicketPayload(), options),
+            formatAloAutofillPayload(
+                clientPayload,
+                await loadAgentProfile(),
+                await loadSuperOfficeTicketPayload(),
+                options
+            ),
             { message: "ALO fill data copied", variant: "success" }
         );
         setAloPreparation(null);
     }, []);
 
-    const importClientFromPasteAndResetCase = useCallback((text) => {
-        runtimeRef.current.importClientFromPaste(text);
+    const importClientFromPasteAndResetCase = useCallback(async (text) => {
+        await runtimeRef.current.importClientFromPaste(text);
         resetCaseNavigation();
     }, [resetCaseNavigation]);
 
@@ -1274,14 +1319,12 @@ export default function Templates() {
         switch (activeWorkspace) {
             case "nodes":
                 return <ManageNodes embedded onClose={closeWorkspace} />;
-            case "tokens":
-                return <ManageTokens embedded onClose={closeWorkspace} />;
             case "tools":
                 return <ManageTools embedded onClose={closeWorkspace} />;
             case "settings":
                 return <SettingsPage embedded onClose={closeWorkspace} />;
             case "vti":
-                return <VtiBookmarklet embedded onClose={closeWorkspace} />;
+                return <ManageTools embedded onClose={closeWorkspace} initialSection="shortcuts" />;
             default:
                 return null;
         }
@@ -1294,6 +1337,7 @@ export default function Templates() {
             return [{
                 id: "search",
                 title: "Search results",
+                nodeGroupTitle: "Topics",
                 nodes: searchResults.nodes,
                 templates: searchResults.templates,
                 emptyMessage: "No result found."
@@ -1302,19 +1346,21 @@ export default function Templates() {
 
         const columns = [{
             id: "root",
-            title: "Sections",
+            title: "Topics",
+            nodeGroupTitle: "Topics",
             nodes: rootNodes,
             templates: [],
-            emptyMessage: "No section yet."
+            emptyMessage: "No topics yet."
         }];
 
         activeNodePath.forEach((node) => {
             columns.push({
                 id: node.id,
-                title: node.title || "Untitled section",
+                title: node.title || "Untitled topic",
+                nodeGroupTitle: "Subtopics",
                 nodes: getIndexedChildNodes(childrenByParent, node.id),
                 templates: getIndexedTemplatesForNode(templatesByNode, node.id),
-                emptyMessage: "No section or template here."
+                emptyMessage: "No subtopics or templates here."
             });
         });
 
@@ -1336,31 +1382,31 @@ export default function Templates() {
     );
 
     useEffect(() => {
-        const handleKeyboardShortcut = (event) => {
+        const handleKeyboardShortcut = async (event) => {
             const shortcut = getKeyboardShortcutForEvent(event);
             if (!shortcut || shortcutModalOpen || runtimeRef.current.clientImportLoading) return;
 
             const hasVtiData = Boolean(runtimeRef.current.clientPayload);
-            const hasSoData = hasSuperOfficeTicketPayload();
+            const hasSoData = await hasSuperOfficeTicketPayload();
 
             if (shortcut.id === "importVti") {
                 if (hasVtiData) return;
                 event.preventDefault();
-                importClientFromClipboardAndResetCase(event);
+                await importClientFromClipboardAndResetCase(event);
                 return;
             }
 
             if (shortcut.id === "importSo") {
                 if (hasSoData) return;
                 event.preventDefault();
-                importSuperOfficeFromClipboardAndResetCase(event);
+                await importSuperOfficeFromClipboardAndResetCase(event);
                 return;
             }
 
             if (shortcut.id === "clearData") {
                 if (!hasVtiData && !hasSoData) return;
                 event.preventDefault();
-                clearClientAndResetCase();
+                await clearClientAndResetCase();
             }
         };
 
@@ -1392,19 +1438,11 @@ export default function Templates() {
                                 <div className="dropdown-section">
                                     <div className="dropdown-title">Management</div>
                                     <button type="button" role="menuitem" onClick={() => openWorkspace("nodes")} className="dropdown-reset">Manage playbook</button>
-                                    <button type="button" role="menuitem" onClick={() => openWorkspace("tokens")} className="dropdown-reset">Manage tokens</button>
                                     <button type="button" role="menuitem" onClick={() => openWorkspace("settings")} className="dropdown-reset">Settings</button>
                                 </div>
                                 <div className="dropdown-section">
                                     <div className="dropdown-title">Tools</div>
-                                    <button type="button" role="menuitem" onClick={() => openWorkspace("tools")} className="dropdown-reset">Manage tools</button>
-                                    <button type="button" role="menuitem" onClick={() => openWorkspace("vti")} className="dropdown-reset">Data shortcuts</button>
-                                </div>
-                                <div className="dropdown-section">
-                                    <div className="dropdown-title">Theme</div>
-                                    <button type="button" role="menuitem" className={`dropdown-reset${theme === "dark" ? " is-active" : ""}`} onClick={() => { setTheme("dark"); setDropdownOpen(false); }}>Dark</button>
-                                    <button type="button" role="menuitem" className={`dropdown-reset${theme === "light" ? " is-active" : ""}`} onClick={() => { setTheme("light"); setDropdownOpen(false); }}>Clear</button>
-                                    <button type="button" role="menuitem" className={`dropdown-reset${theme === "salt" ? " is-active" : ""}`} onClick={() => { setTheme("salt"); setDropdownOpen(false); }}>Salt</button>
+                                    <button type="button" role="menuitem" onClick={() => openWorkspace("tools")} className="dropdown-reset">Tools + shortcuts</button>
                                 </div>
                             </div>
                         )}
@@ -1478,6 +1516,7 @@ export default function Templates() {
                             <PlaybookColumn
                                 key={column.id}
                                 title={column.title}
+                                nodeGroupTitle={column.nodeGroupTitle}
                                 nodes={column.nodes}
                                 templates={column.templates}
                                 nodeSummaryById={nodeSummaryById}

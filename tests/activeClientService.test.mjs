@@ -9,6 +9,8 @@ import {
   saveClientInputValues,
   saveActiveClientPayload
 } from "../src/services/activeClientService.js";
+import { clearAppIndexedDB } from "../src/services/indexedDbService.js";
+import { loadTokenInputValues } from "../src/services/tokenInputValueService.js";
 
 function createMemoryStorage(initial = {}) {
   const map = new Map(Object.entries(initial));
@@ -32,55 +34,60 @@ function createMemoryStorage(initial = {}) {
 }
 
 {
-  const storage = createMemoryStorage({
+  await clearAppIndexedDB();
+  globalThis.localStorage = createMemoryStorage({
     "input_{client_first_name}": "Peter",
     "input_{ticket_num}": "SO-123",
     theme_pref: "dark",
     active_client_payload: "{}"
   });
 
-  const removed = clearStoredInputValues(storage);
+  const removed = await clearStoredInputValues();
 
   assert.equal(removed, 2);
-  assert.equal(storage.getItem("input_{client_first_name}"), null);
-  assert.equal(storage.getItem("input_{ticket_num}"), null);
-  assert.equal(storage.getItem("theme_pref"), "dark");
-  assert.equal(storage.getItem("active_client_payload"), "{}");
+  assert.equal(localStorage.getItem("input_{client_first_name}"), null);
+  assert.equal(localStorage.getItem("input_{ticket_num}"), null);
+  assert.equal(localStorage.getItem("theme_pref"), "dark");
+  assert.equal(localStorage.getItem("active_client_payload"), "{}");
 }
 
 {
+  await clearAppIndexedDB();
   globalThis.localStorage = createMemoryStorage();
   const payload = { client: { firstName: "Peter" } };
 
-  saveActiveClientPayload(payload);
-  assert.deepEqual(loadActiveClientPayload(), payload);
+  await saveActiveClientPayload(payload);
+  assert.deepEqual(await loadActiveClientPayload(), payload);
 
-  clearActiveClientPayload();
-  assert.equal(loadActiveClientPayload(), null);
+  await clearActiveClientPayload();
+  assert.equal(await loadActiveClientPayload(), null);
 }
 
 {
+  await clearAppIndexedDB();
   globalThis.localStorage = createMemoryStorage();
-  saveActiveClientPayload({ client: { firstName: "Peter" } });
+  await saveActiveClientPayload({ client: { firstName: "Peter" } });
 
-  const { inputTokens } = saveClientInputValue({
+  const { inputTokens } = await saveClientInputValue({
     token: "{ticket_num}",
     label: "SO number",
     key: "soTicket"
   }, "31436062");
 
   assert.deepEqual(inputTokens, ["{so_ticket_num}"]);
-  assert.equal(localStorage.getItem("input_{ticket_num}"), null);
-  assert.equal(localStorage.getItem("input_{so_number}"), null);
-  assert.equal(localStorage.getItem("input_{so_ticket_num}"), "31436062");
-  assert.equal(loadActiveClientPayload()[MANUAL_CLIENT_INPUTS_KEY].so_ticket_num, "31436062");
+  const tokenInputValues = await loadTokenInputValues();
+  assert.equal(tokenInputValues["{ticket_num}"], undefined);
+  assert.equal(tokenInputValues["{so_number}"], undefined);
+  assert.equal(tokenInputValues["{so_ticket_num}"], "31436062");
+  assert.equal((await loadActiveClientPayload())[MANUAL_CLIENT_INPUTS_KEY].so_ticket_num, "31436062");
 }
 
 {
+  await clearAppIndexedDB();
   globalThis.localStorage = createMemoryStorage();
-  saveActiveClientPayload({ client: { firstName: "Peter" } });
+  await saveActiveClientPayload({ client: { firstName: "Peter" } });
 
-  const { inputTokens, values } = saveClientInputValues({
+  const { inputTokens, values } = await saveClientInputValues({
     "{external_partner}": "EWB",
     "{external_partner_ticket_number}": "ABC-123"
   });
@@ -90,22 +97,24 @@ function createMemoryStorage(initial = {}) {
     "{external_partner}": "EWB",
     "{external_partner_ticket_number}": "ABC-123"
   });
-  assert.equal(localStorage.getItem("input_{external_partner_ticket_number}"), "ABC-123");
-  assert.equal(loadActiveClientPayload()[MANUAL_CLIENT_INPUTS_KEY].external_partner_ticket_number, "ABC-123");
+  assert.equal((await loadTokenInputValues())["{external_partner_ticket_number}"], "ABC-123");
+  assert.equal((await loadActiveClientPayload())[MANUAL_CLIENT_INPUTS_KEY].external_partner_ticket_number, "ABC-123");
 }
 
 {
-  const storage = createMemoryStorage({
+  await clearAppIndexedDB();
+  globalThis.localStorage = createMemoryStorage({
     "input_{ticket_num}": "SO-123",
     "input_{customer_name}": "Peter"
   });
 
-  const migrated = migrateStoredClientInputValues(storage);
+  await migrateStoredClientInputValues();
+  const migratedValues = await loadTokenInputValues();
 
-  assert.equal(migrated, 1);
-  assert.equal(storage.getItem("input_{ticket_num}"), null);
-  assert.equal(storage.getItem("input_{so_ticket_num}"), "SO-123");
-  assert.equal(storage.getItem("input_{customer_name}"), "Peter");
+  assert.equal(localStorage.getItem("input_{ticket_num}"), null);
+  assert.equal(localStorage.getItem("input_{customer_name}"), null);
+  assert.equal(migratedValues["{so_ticket_num}"], "SO-123");
+  assert.equal(migratedValues["{customer_name}"], "Peter");
 }
 
 console.log("activeClientService tests passed");

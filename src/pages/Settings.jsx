@@ -1,11 +1,27 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Copy } from "lucide-react";
+import {
+    Copy,
+    Database,
+    Download,
+    FileJson,
+    HardDrive,
+    Monitor,
+    Moon,
+    Palette,
+    ShieldCheck,
+    Sun,
+    Tags,
+    TestTube2,
+    Upload,
+    UserRound
+} from "lucide-react";
 import { loadTokens, saveTokens } from "../services/tokenService.js";
 import { loadTemplateTreeData, saveTemplateTreeData } from "../services/templateTreeService.js";
 import { clearAppIndexedDB } from "../services/indexedDbService.js";
 import { loadTemplateImages, saveTemplateImages } from "../services/templateImageService.js";
 import { buildConfigPayload, validateImportedConfig } from "../services/configService.js";
+import { loadConfigName, saveConfigName } from "../services/appConfigService.js";
 import { copyText, showToast } from "../services/clipboardService.js";
 import { getStorageInfo, requestPersistentStorage } from "../services/storageInfoService.js";
 import { AGENT_PROFILE_FIELDS, loadAgentProfile, saveAgentProfile } from "../services/agentProfileService.js";
@@ -16,6 +32,15 @@ import {
 } from "../data/testImportPayloads.js";
 import Modal from "../components/Modal.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
+import ManageTokens from "./ManageTokens.jsx";
+import {
+    applyTheme,
+    getInitialTheme,
+    getResolvedTheme,
+    loadThemePreference,
+    THEME_UPDATED_EVENT,
+    watchSystemThemePreference
+} from "../utils/theme.js";
 
 const AgentProfileField = memo(function AgentProfileField({ field, value, onChange }) {
     const handleChange = useCallback((event) => {
@@ -40,21 +65,108 @@ const AgentProfileField = memo(function AgentProfileField({ field, value, onChan
     );
 });
 
+const SETTINGS_SECTIONS = [
+    {
+        id: "agent",
+        label: "Agent profile",
+        summary: "Agent tokens",
+        icon: UserRound
+    },
+    {
+        id: "tokens",
+        label: "Custom tokens",
+        summary: "User tokens",
+        icon: Tags
+    },
+    {
+        id: "theme",
+        label: "Theme",
+        summary: "Appearance",
+        icon: Palette
+    },
+    {
+        id: "configuration",
+        label: "Configuration",
+        summary: "Import / export",
+        icon: FileJson
+    },
+    {
+        id: "testData",
+        label: "Test data",
+        summary: "VTI and SO",
+        icon: TestTube2
+    },
+    {
+        id: "storage",
+        label: "Storage",
+        summary: "Browser data",
+        icon: HardDrive
+    }
+];
+
+const THEME_OPTIONS = [
+    {
+        id: "system",
+        label: "System",
+        summary: "Follow macOS/browser",
+        icon: Monitor
+    },
+    {
+        id: "dark",
+        label: "Dark",
+        summary: "Dark interface",
+        icon: Moon
+    },
+    {
+        id: "light",
+        label: "Light",
+        summary: "Clear interface",
+        icon: Sun
+    },
+    {
+        id: "salt",
+        label: "Salt",
+        summary: "Green accent mode",
+        icon: Palette
+    }
+];
+
 export default function Settings({ embedded = false, onClose = null }) {
     const navigate = useNavigate();
     const fileInputRef = useRef(null);
     const [tokens, setTokens] = useState([]);
     const [treeData, setTreeData] = useState({ nodes: [], templates: [] });
-    const [configName, setConfigName] = useState(localStorage.getItem("local_configName") || "No configuration");
+    const [configName, setConfigName] = useState("No configuration");
     const [confirmReset, setConfirmReset] = useState(false);
     const [exportNameOpen, setExportNameOpen] = useState(false);
     const [exportNameValue, setExportNameValue] = useState("");
     const [storageInfo, setStorageInfo] = useState(null);
-    const [agentProfile, setAgentProfile] = useState(() => loadAgentProfile());
+    const [agentProfile, setAgentProfile] = useState({});
+    const [activeSection, setActiveSection] = useState("agent");
+    const [themePreference, setThemePreference] = useState(() => getInitialTheme());
+    const [resolvedTheme, setResolvedTheme] = useState(() => getResolvedTheme(getInitialTheme()));
     useEffect(() => {
         loadTokens().then(setTokens);
         loadTemplateTreeData().then(setTreeData);
+        loadConfigName().then(setConfigName);
+        loadAgentProfile().then(setAgentProfile);
         getStorageInfo().then(setStorageInfo).catch(() => setStorageInfo(null));
+    }, []);
+
+    useEffect(() => {
+        const syncThemeState = async (event = null) => {
+            const nextPreference = event?.detail?.preference || await loadThemePreference();
+            const nextResolved = event?.detail?.resolvedTheme || getResolvedTheme(nextPreference);
+            setThemePreference(nextPreference);
+            setResolvedTheme(nextResolved);
+        };
+        const unsubscribeSystemTheme = watchSystemThemePreference(syncThemeState);
+        window.addEventListener(THEME_UPDATED_EVENT, syncThemeState);
+        syncThemeState();
+        return () => {
+            unsubscribeSystemTheme();
+            window.removeEventListener(THEME_UPDATED_EVENT, syncThemeState);
+        };
     }, []);
 
     const refreshStorageInfo = useCallback(() => {
@@ -79,7 +191,7 @@ export default function Settings({ embedded = false, onClose = null }) {
         const nextName = exportNameValue.trim() || configName;
         setExportNameOpen(false);
         setConfigName(nextName);
-        localStorage.setItem("local_configName", nextName);
+        await saveConfigName(nextName);
         const payload = buildConfigPayload(
             nextName,
             tokens.filter((tokenDef) => !tokenDef.system),
@@ -126,8 +238,7 @@ export default function Settings({ embedded = false, onClose = null }) {
             setTreeData(normalizedTreeData);
             refreshStorageInfo();
             const name = importedName || "Imported configuration";
-            localStorage.setItem("local_configName", name);
-            setConfigName(name);
+            setConfigName(await saveConfigName(name));
             showToast("Configuration imported", "info");
             navigate("/");
         } catch (err) {
@@ -144,8 +255,24 @@ export default function Settings({ embedded = false, onClose = null }) {
         setAgentProfile((prev) => ({ ...prev, [key]: value }));
     }, []);
 
-    const saveAgentSettings = useCallback(() => {
-        const savedProfile = saveAgentProfile(agentProfile);
+    const handleTokensChange = useCallback((nextTokens) => {
+        setTokens(nextTokens);
+    }, []);
+
+    const changeThemePreference = useCallback((nextTheme) => {
+        const result = applyTheme(nextTheme);
+        setThemePreference(result.preference);
+        setResolvedTheme(result.resolvedTheme);
+        showToast(
+            result.preference === "system"
+                ? `Theme follows system (${result.resolvedTheme})`
+                : `Theme set to ${result.preference}`,
+            "success"
+        );
+    }, []);
+
+    const saveAgentSettings = useCallback(async () => {
+        const savedProfile = await saveAgentProfile(agentProfile);
         setAgentProfile(savedProfile);
         showToast("Agent profile saved", "success");
     }, [agentProfile]);
@@ -163,18 +290,25 @@ export default function Settings({ embedded = false, onClose = null }) {
         setConfirmReset(false);
         const keysToDelete = [];
         const appScopedLegacyKeys = new Set(["tokens", "models", "theme_pref", "active_client_payload", "agent_profile"]);
-        for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (!key) continue;
-            if (
-                key.startsWith("local_")
-                || key.startsWith("input_")
-                || appScopedLegacyKeys.has(key)
-            ) {
-                keysToDelete.push(key);
+        try {
+            const storage = globalThis.localStorage || null;
+            if (storage) {
+                for (let i = 0; i < storage.length; i++) {
+                    const key = storage.key(i);
+                    if (!key) continue;
+                    if (
+                        key.startsWith("local_")
+                        || key.startsWith("input_")
+                        || appScopedLegacyKeys.has(key)
+                    ) {
+                        keysToDelete.push(key);
+                    }
+                }
+                keysToDelete.forEach((key) => storage.removeItem(key));
             }
+        } catch {
+            // Best-effort cleanup for pre-migration browser keys.
         }
-        keysToDelete.forEach((key) => localStorage.removeItem(key));
         await clearAppIndexedDB();
         showToast("Local data reset", "warning");
         window.location.href = "/";
@@ -196,85 +330,110 @@ export default function Settings({ embedded = false, onClose = null }) {
         setConfirmReset(false);
     }, []);
 
-    const content = (
-        <>
-            <input
-                ref={fileInputRef}
-                type="file"
-                accept=".templageConfig,application/json"
-                style={{ display: "none" }}
-                onChange={handleFile}
-            />
-            <div className="manage-card">
-                <div className="variant-editor-head">
-                    <div>
-                        <p className="eyebrow">App</p>
-                        <h2>Settings <span className="settings-version-tag">V2.5</span></h2>
-                    </div>
-                    {!embedded && (
-                        <button className="secondary-btn" onClick={() => navigate("/")}>
-                            Back
-                        </button>
-                    )}
-                </div>
+    const activeSectionConfig = SETTINGS_SECTIONS.find((section) => section.id === activeSection) || SETTINGS_SECTIONS[0];
+    const ActiveSectionIcon = activeSectionConfig.icon;
+    const customTokenCount = tokens.filter((tokenDef) => !tokenDef.system && !tokenDef.internal).length;
 
-                <div className="popup-grid mt-md">
-                    <div className="popup-card settings-agent-card">
-                        <label>Agent profile</label>
-                        <p className="hint">Used by the hard-coded agent tokens in templates and tool URLs.</p>
-                        <div className="settings-agent-grid">
-                            {AGENT_PROFILE_FIELDS.map((field) => (
-                                <AgentProfileField
-                                    key={field.key}
-                                    field={field}
-                                    value={agentProfile[field.key] || ""}
-                                    onChange={updateAgentProfileField}
-                                />
-                            ))}
+    const renderSettingsDetail = () => {
+        switch (activeSection) {
+            case "tokens":
+                return (
+                    <div className="settings-detail-stack">
+                        <div className="settings-info-card">
+                            <span>Managed here</span>
+                            <strong>{customTokenCount} custom token{customTokenCount === 1 ? "" : "s"}</strong>
                         </div>
-                        <div className="flex-row gap-sm flex-wrap mt-md">
-                            <button className="primary-btn" onClick={saveAgentSettings}>Save agent profile</button>
+                        <div className="settings-token-manager">
+                            <ManageTokens
+                                embedded
+                                customOnly
+                                hideHeader
+                                onTokensChange={handleTokensChange}
+                            />
                         </div>
                     </div>
-
-                    <div className="popup-card">
-                        <label>Configuration</label>
-                        <p className="hint">Import or export your tokens and templates.</p>
-                        <div className="flex-row gap-sm flex-wrap">
-                            <button className="secondary-btn" onClick={importConfig}>Import configuration</button>
-                            <button className="secondary-btn" onClick={startExport}>Export configuration</button>
+                );
+            case "theme":
+                return (
+                    <div className="settings-detail-stack">
+                        <div className="settings-theme-grid" role="radiogroup" aria-label="Theme preference">
+                            {THEME_OPTIONS.map((option) => {
+                                const Icon = option.icon;
+                                const selected = themePreference === option.id;
+                                return (
+                                    <button
+                                        key={option.id}
+                                        type="button"
+                                        role="radio"
+                                        aria-checked={selected}
+                                        className={`settings-theme-option${selected ? " is-selected" : ""}`}
+                                        onClick={() => changeThemePreference(option.id)}
+                                    >
+                                        <span className="settings-theme-icon"><Icon size={20} aria-hidden="true" /></span>
+                                        <span>
+                                            <strong>{option.label}</strong>
+                                            <small>{option.summary}</small>
+                                        </span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        <div className="settings-info-card">
+                            <span>Active appearance</span>
+                            <strong>
+                                {themePreference === "system"
+                                    ? `System (${resolvedTheme === "light" ? "Light" : "Dark"})`
+                                    : THEME_OPTIONS.find((option) => option.id === themePreference)?.label || "Dark"}
+                            </strong>
                         </div>
                     </div>
-
-                    <div className="popup-card settings-test-data-card">
-                        <label>Test data</label>
-                        <p className="hint">Copies ready-to-import JSON for quick VTI/SO tests.</p>
-                        <div className="settings-test-data-actions">
+                );
+            case "configuration":
+                return (
+                    <div className="settings-detail-stack">
+                        <div className="settings-info-card">
+                            <span>Current configuration</span>
+                            <strong>{configName}</strong>
+                        </div>
+                        <div className="settings-action-grid">
+                            <button type="button" className="settings-action-btn settings-action-btn--import" onClick={importConfig}>
+                                <Upload size={16} aria-hidden="true" />
+                                <span>Import configuration</span>
+                            </button>
+                            <button type="button" className="settings-action-btn settings-action-btn--export" onClick={startExport}>
+                                <Download size={16} aria-hidden="true" />
+                                <span>Export configuration</span>
+                            </button>
+                        </div>
+                    </div>
+                );
+            case "testData":
+                return (
+                    <div className="settings-detail-stack">
+                        <div className="settings-action-grid">
                             <button
                                 type="button"
-                                className="settings-test-data-btn settings-test-data-btn--vti"
+                                className="settings-action-btn settings-action-btn--vti"
                                 onClick={() => copyTestData("vti")}
                             >
-                                <Copy size={15} strokeWidth={2} aria-hidden="true" />
+                                <Copy size={16} strokeWidth={2} aria-hidden="true" />
                                 <span>VTI data</span>
                             </button>
                             <button
                                 type="button"
-                                className="settings-test-data-btn settings-test-data-btn--so"
+                                className="settings-action-btn settings-action-btn--so"
                                 onClick={() => copyTestData("so")}
                             >
-                                <Copy size={15} strokeWidth={2} aria-hidden="true" />
+                                <Copy size={16} strokeWidth={2} aria-hidden="true" />
                                 <span>SO data</span>
                             </button>
                         </div>
                     </div>
-
-                    <div className="popup-card">
-                        <label>Storage</label>
-                        <p className="hint">
-                            Local browser data. Templates are stored in IndexedDB.
-                        </p>
-                        <div className="storage-info-grid">
+                );
+            case "storage":
+                return (
+                    <div className="settings-detail-stack">
+                        <div className="storage-info-grid settings-storage-grid">
                             <div>
                                 <span className="client-info-label">Used</span>
                                 <strong>{storageInfo?.usageLabel || "Unknown"}</strong>
@@ -288,15 +447,108 @@ export default function Settings({ embedded = false, onClose = null }) {
                                 <strong>{storageInfo?.persisted ? "Yes" : "No"}</strong>
                             </div>
                         </div>
-                        <div className="flex-row gap-sm flex-wrap mt-md">
-                            <button className="secondary-btn" onClick={requestPersist}>Protect storage</button>
-                            <button className="reset-fields-btn settings-reset-btn" onClick={triggerReset}>
-                                Reset local data
+                        <div className="settings-action-grid">
+                            <button type="button" className="settings-action-btn settings-action-btn--protect" onClick={requestPersist}>
+                                <ShieldCheck size={16} aria-hidden="true" />
+                                <span>Protect storage</span>
+                            </button>
+                            <button type="button" className="settings-action-btn settings-action-btn--danger" onClick={triggerReset}>
+                                <Database size={16} aria-hidden="true" />
+                                <span>Reset local data</span>
                             </button>
                         </div>
                     </div>
+                );
+            case "agent":
+            default:
+                return (
+                    <div className="settings-detail-stack">
+                        <div className="settings-agent-grid">
+                            {AGENT_PROFILE_FIELDS.map((field) => (
+                                <AgentProfileField
+                                    key={field.key}
+                                    field={field}
+                                    value={agentProfile[field.key] || ""}
+                                    onChange={updateAgentProfileField}
+                                />
+                            ))}
+                        </div>
+                        <div className="settings-detail-actions">
+                            <button type="button" className="settings-action-btn settings-action-btn--save" onClick={saveAgentSettings}>
+                                <ShieldCheck size={16} aria-hidden="true" />
+                                <span>Save agent profile</span>
+                            </button>
+                        </div>
+                    </div>
+                );
+        }
+    };
 
+    const content = (
+        <>
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept=".templageConfig,application/json"
+                style={{ display: "none" }}
+                onChange={handleFile}
+            />
+            <div className="settings-shell">
+                <header className="settings-header">
+                    <div>
+                        <p className="eyebrow">App</p>
+                        <h2>Settings <span className="settings-version-tag">V2.5</span></h2>
+                    </div>
+                    {!embedded && (
+                        <button type="button" className="secondary-btn" onClick={() => navigate("/")}>
+                            Back
+                        </button>
+                    )}
+                </header>
 
+                <div className="settings-layout">
+                    <aside className="settings-sidebar" aria-label="Settings sections">
+                        {SETTINGS_SECTIONS.map((section) => {
+                            const Icon = section.icon;
+                            const selected = activeSection === section.id;
+                            const sidebarMeta = section.id === "configuration"
+                                ? configName
+                                : section.id === "storage"
+                                    ? storageInfo?.usageLabel || section.summary
+                                    : section.id === "tokens"
+                                        ? `${customTokenCount} custom`
+                                        : section.id === "theme"
+                                            ? themePreference === "system" ? `System (${resolvedTheme})` : themePreference
+                                            : section.summary;
+
+                            return (
+                                <button
+                                    key={section.id}
+                                    type="button"
+                                    className={`settings-sidebar-item${selected ? " is-selected" : ""}`}
+                                    onClick={() => setActiveSection(section.id)}
+                                    aria-current={selected ? "page" : undefined}
+                                >
+                                    <span className="settings-sidebar-icon"><Icon size={19} aria-hidden="true" /></span>
+                                    <span className="settings-sidebar-copy">
+                                        <strong>{section.label}</strong>
+                                        <small>{sidebarMeta}</small>
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </aside>
+
+                    <section className="settings-detail-panel" aria-labelledby={`settings-${activeSectionConfig.id}-title`}>
+                        <div className="settings-detail-hero">
+                            <span className="settings-detail-icon"><ActiveSectionIcon size={28} aria-hidden="true" /></span>
+                            <div>
+                                <h3 id={`settings-${activeSectionConfig.id}-title`}>{activeSectionConfig.label}</h3>
+                                <p>{activeSectionConfig.summary}</p>
+                            </div>
+                        </div>
+                        {renderSettingsDetail()}
+                    </section>
                 </div>
             </div>
             {exportNameOpen && (

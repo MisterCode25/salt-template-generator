@@ -1,4 +1,5 @@
 import { SO_TICKET_NUM_TOKEN, SO_TICKET_TOKEN_KEY } from "./tokenCanonicalization.js";
+import { loadTokenInputValues } from "../services/tokenInputValueService.js";
 
 export const EXTERNAL_GENERATOR_PARTNERS = [
     "ALO", "AMB", "ANI", "COMNET", "DANET", "DEK", "DWW", "EBS", "ENERCOM", "ENIWA", "ESAG", "ESI", "EVAL", "EVB", "EVK",
@@ -134,13 +135,13 @@ export function buildExternalFieldsFromTokenValues(valuesByToken = {}) {
     return fields;
 }
 
-export function readExternalFieldsFromStoredTokens(storage = globalThis.localStorage) {
-    if (!storage) return {};
-
+export async function readExternalFieldsFromStoredTokens() {
+    const storedValues = await loadTokenInputValues();
     const valuesByToken = {};
     EXTERNAL_SYSTEM_TOKEN_FIELDS.forEach(({ token }) => {
-        const value = storage.getItem(`input_${token}`);
-        if (value !== null) valuesByToken[token] = value;
+        if (Object.prototype.hasOwnProperty.call(storedValues, token)) {
+            valuesByToken[token] = storedValues[token];
+        }
     });
     return buildExternalFieldsFromTokenValues(valuesByToken);
 }

@@ -16,6 +16,11 @@ function sortByTitle(a, b) {
     return (a.title || "").localeCompare(b.title || "");
 }
 
+function clampInsertIndex(index, length) {
+    if (!Number.isFinite(index)) return length;
+    return Math.max(0, Math.min(length, index));
+}
+
 export function getChildNodes(nodes = [], parentId = null) {
     const normalizedParentId = normalizeParentId(parentId);
     const children = [];
@@ -115,9 +120,6 @@ function nodeExists(nodes = [], nodeId) {
 
 export function createNodeForParent(nodes = [], parentId = null, fields = {}, templates = []) {
     const normalizedParentId = normalizeParentId(parentId);
-    if (normalizedParentId && nodeHasTemplates(templates, normalizedParentId)) {
-        throw new Error("This node already has templates — a node can hold either sub-nodes or templates, not both.");
-    }
     return createNode({
         ...fields,
         parentId: normalizedParentId,
@@ -144,6 +146,35 @@ export function moveNode(nodes = [], nodeId, parentId = null) {
         node.id === nodeId
             ? normalizeNode({ ...node, parentId: normalizedParentId, order: nextOrder })
             : node
+    ));
+}
+
+export function moveNodeToParentAtIndex(nodes = [], nodeId, parentId = null, targetIndex = 0) {
+    const normalizedParentId = normalizeParentId(parentId);
+    const node = nodes.find((candidate) => candidate.id === nodeId);
+    if (!node || !canMoveNode(nodes, nodeId, normalizedParentId)) {
+        throw new Error("Invalid node move");
+    }
+
+    const targetSiblings = getChildNodes(nodes, normalizedParentId)
+        .filter((candidate) => candidate.id !== nodeId);
+    const insertIndex = clampInsertIndex(targetIndex, targetSiblings.length);
+    const orderedSiblingIds = targetSiblings.map((candidate) => candidate.id);
+    orderedSiblingIds.splice(insertIndex, 0, nodeId);
+
+    const orderById = new Map();
+    for (let index = 0; index < orderedSiblingIds.length; index++) {
+        orderById.set(orderedSiblingIds[index], index + 1);
+    }
+
+    return nodes.map((candidate) => (
+        orderById.has(candidate.id)
+            ? normalizeNode({
+                ...candidate,
+                parentId: candidate.id === nodeId ? normalizedParentId : candidate.parentId,
+                order: orderById.get(candidate.id)
+            })
+            : normalizeNode(candidate)
     ));
 }
 
@@ -250,9 +281,6 @@ export function getIndexedTemplatesForNode(templatesByNode, nodeId) {
 }
 
 export function createTemplateForNode(nodeId, fields = {}, nodes = [], templates = []) {
-    if (nodeHasChildren(nodes, nodeId)) {
-        throw new Error("This node has sub-nodes — only leaf nodes can hold templates.");
-    }
     return createTemplate({
         ...fields,
         nodeIds: [nodeId]
@@ -279,12 +307,62 @@ export function moveTemplateToNode(templates = [], templateId, targetNodeId, nod
     ));
 }
 
+export function moveTemplateToNodeAtIndex(
+    templates = [],
+    templateId,
+    sourceNodeId,
+    targetNodeId,
+    targetIndex = 0,
+    nodes = []
+) {
+    if (!nodeExists(nodes, targetNodeId)) {
+        throw new Error("Template target node does not exist");
+    }
+
+    const template = templates.find((candidate) => candidate.id === templateId);
+    if (!template) return templates.map(normalizeTemplate);
+
+    const targetTemplates = getTemplatesForNode(templates, targetNodeId)
+        .filter((candidate) => candidate.id !== templateId);
+    const insertIndex = clampInsertIndex(targetIndex, targetTemplates.length);
+    const orderedTemplateIds = targetTemplates.map((candidate) => candidate.id);
+    orderedTemplateIds.splice(insertIndex, 0, templateId);
+
+    const orderById = new Map();
+    for (let index = 0; index < orderedTemplateIds.length; index++) {
+        orderById.set(orderedTemplateIds[index], index + 1);
+    }
+
+    let nextNodeIds = Array.isArray(template.nodeIds) ? [...template.nodeIds] : [];
+    if (sourceNodeId && sourceNodeId !== targetNodeId) {
+        nextNodeIds = removeNodeId(nextNodeIds, sourceNodeId);
+    }
+    nextNodeIds = appendUniqueNodeId(nextNodeIds, targetNodeId);
+    if (nextNodeIds[0] !== targetNodeId) {
+        nextNodeIds = [
+            targetNodeId,
+            ...nextNodeIds.filter((nodeId) => nodeId !== targetNodeId)
+        ];
+    }
+
+    return templates.map((candidate) => {
+        if (candidate.id === templateId) {
+            return normalizeTemplate({
+                ...candidate,
+                nodeIds: nextNodeIds,
+                order: orderById.get(candidate.id) || candidate.order || 0
+            });
+        }
+        if (orderById.has(candidate.id)) {
+            return normalizeTemplate({ ...candidate, order: orderById.get(candidate.id) });
+        }
+        return normalizeTemplate(candidate);
+    });
+}
+
 export function linkTemplateToNode(templates = [], templateId, nodeId, nodes = []) {
     if (!nodeExists(nodes, nodeId)) {
         throw new Error("Template target node does not exist");
-    }
-    if (nodeHasChildren(nodes, nodeId)) {
-        throw new Error("This node has sub-nodes — only leaf nodes can hold templates.");
     }
 
     return templates.map((template) => (
