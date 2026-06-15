@@ -20,7 +20,7 @@ import { loadTokens, saveTokens } from "../services/tokenService.js";
 import { loadTemplateTreeData, saveTemplateTreeData } from "../services/templateTreeService.js";
 import { clearAppIndexedDB } from "../services/indexedDbService.js";
 import { loadTemplateImages, saveTemplateImages } from "../services/templateImageService.js";
-import { buildConfigPayload, validateImportedConfig } from "../services/configService.js";
+import { buildConfigPayload, mergeConfigData, validateImportedConfig } from "../services/configService.js";
 import { loadConfigName, saveConfigName } from "../services/appConfigService.js";
 import { copyText, showToast } from "../services/clipboardService.js";
 import { getStorageInfo, requestPersistentStorage } from "../services/storageInfoService.js";
@@ -131,13 +131,16 @@ const THEME_OPTIONS = [
     }
 ];
 
+const DEFAULT_CONFIG_NAME = "No configuration";
+
 export default function Settings({ embedded = false, onClose = null }) {
     const navigate = useNavigate();
     const fileInputRef = useRef(null);
     const [tokens, setTokens] = useState([]);
     const [treeData, setTreeData] = useState({ nodes: [], templates: [] });
-    const [configName, setConfigName] = useState("No configuration");
+    const [configName, setConfigName] = useState(DEFAULT_CONFIG_NAME);
     const [confirmReset, setConfirmReset] = useState(false);
+    const [pendingImportConfig, setPendingImportConfig] = useState(null);
     const [exportNameOpen, setExportNameOpen] = useState(false);
     const [exportNameValue, setExportNameValue] = useState("");
     const [storageInfo, setStorageInfo] = useState(null);
@@ -227,9 +230,49 @@ export default function Settings({ embedded = false, onClose = null }) {
                 templateImages: importedTemplateImages,
                 configName: importedName
             } = validateImportedConfig(json);
-            await saveTokens(importedTokens);
-            await saveTemplateTreeData({ nodes: importedNodes, templates: importedTemplates });
-            await saveTemplateImages(importedTemplateImages);
+            setPendingImportConfig({
+                fileName: file.name,
+                tokens: importedTokens,
+                nodes: importedNodes,
+                templates: importedTemplates,
+                templateImages: importedTemplateImages,
+                configName: importedName || "Imported configuration"
+            });
+        } catch (err) {
+            console.error(err);
+            showToast("Import failed", "error");
+        }
+    }, []);
+
+    const closeImportModeModal = useCallback(() => {
+        setPendingImportConfig(null);
+    }, []);
+
+    const applyPendingImport = useCallback(async (mode) => {
+        if (!pendingImportConfig) return;
+
+        try {
+            const currentTemplateImages = await loadTemplateImages();
+            const currentConfig = {
+                tokens: tokens.filter((tokenDef) => !tokenDef.system && !tokenDef.internal),
+                nodes: treeData.nodes,
+                templates: treeData.templates,
+                templateImages: currentTemplateImages
+            };
+            const importedConfig = {
+                tokens: pendingImportConfig.tokens,
+                nodes: pendingImportConfig.nodes,
+                templates: pendingImportConfig.templates,
+                templateImages: pendingImportConfig.templateImages
+            };
+            const nextConfig = mode === "merge"
+                ? mergeConfigData(currentConfig, importedConfig)
+                : importedConfig;
+
+            await saveTokens(nextConfig.tokens);
+            await saveTemplateTreeData({ nodes: nextConfig.nodes, templates: nextConfig.templates });
+            await saveTemplateImages(nextConfig.templateImages);
+
             const [normalizedTokens, normalizedTreeData] = await Promise.all([
                 loadTokens(),
                 loadTemplateTreeData()
@@ -237,15 +280,20 @@ export default function Settings({ embedded = false, onClose = null }) {
             setTokens(normalizedTokens);
             setTreeData(normalizedTreeData);
             refreshStorageInfo();
-            const name = importedName || "Imported configuration";
-            setConfigName(await saveConfigName(name));
-            showToast("Configuration imported", "info");
+
+            const importedName = pendingImportConfig.configName || "Imported configuration";
+            const nextName = mode === "merge" && configName && configName !== DEFAULT_CONFIG_NAME
+                ? configName
+                : importedName;
+            setConfigName(await saveConfigName(nextName));
+            setPendingImportConfig(null);
+            showToast(mode === "merge" ? "Configuration merged" : "Configuration replaced", "success");
             navigate("/");
         } catch (err) {
             console.error(err);
             showToast("Import failed", "error");
         }
-    }, [navigate, refreshStorageInfo]);
+    }, [configName, navigate, pendingImportConfig, refreshStorageInfo, tokens, treeData]);
 
     const triggerReset = useCallback(() => {
         setConfirmReset(true);
@@ -582,6 +630,30 @@ export default function Settings({ embedded = false, onClose = null }) {
                     onConfirm={resetStorage}
                     onCancel={cancelReset}
                 />
+            )}
+            {pendingImportConfig && (
+                <Modal onClose={closeImportModeModal} ariaLabel="Import configuration mode">
+                    <div className="popup-header">
+                        <h2>Import configuration</h2>
+                    </div>
+                    <div className="confirm-dialog-body">
+                        <p>
+                            Choose how to import
+                            {" "}
+                            <strong>{pendingImportConfig.configName}</strong>.
+                        </p>
+                        <p className="hint">
+                            Merge keeps existing content, adds new imported items, and updates matching
+                            tokens or IDs. Replace removes existing templates, tokens and images before
+                            importing this configuration.
+                        </p>
+                    </div>
+                    <div className="popup-actions">
+                        <button type="button" className="secondary-btn" onClick={closeImportModeModal}>Cancel</button>
+                        <button type="button" className="secondary-btn" onClick={() => applyPendingImport("replace")}>Replace</button>
+                        <button type="button" className="primary-btn" onClick={() => applyPendingImport("merge")}>Merge</button>
+                    </div>
+                </Modal>
             )}
         </>
     );

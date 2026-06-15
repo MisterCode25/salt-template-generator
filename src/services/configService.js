@@ -79,3 +79,32 @@ export function validateImportedConfig(raw = {}) {
 
     return { tokens, nodes, templates, templateImages, configName };
 }
+
+function mergeUniqueByKey(current = [], imported = [], getKey) {
+    const byKey = new Map();
+    const merged = [];
+
+    const put = (item, fallbackPrefix, index) => {
+        if (!item) return;
+        const key = getKey(item) || `${fallbackPrefix}:${index}`;
+        if (byKey.has(key)) {
+            merged[byKey.get(key)] = item;
+            return;
+        }
+        byKey.set(key, merged.length);
+        merged.push(item);
+    };
+
+    current.forEach((item, index) => put(item, "current", index));
+    imported.forEach((item, index) => put(item, "imported", index));
+    return merged;
+}
+
+export function mergeConfigData(current = {}, imported = {}) {
+    return {
+        tokens: mergeUniqueByKey(current.tokens, imported.tokens, (tokenDef) => tokenDef?.token || tokenDef?.id),
+        nodes: mergeUniqueByKey(current.nodes, imported.nodes, (node) => node?.id),
+        templates: mergeUniqueByKey(current.templates, imported.templates, (template) => template?.id),
+        templateImages: mergeUniqueByKey(current.templateImages, imported.templateImages, (image) => image?.id)
+    };
+}

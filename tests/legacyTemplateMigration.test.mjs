@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 
 const { migrateLegacyModelsToTemplateTree } = await import("../src/utils/legacyTemplateMigration.js");
-const { validateImportedConfig } = await import("../src/services/configService.js");
+const { mergeConfigData, validateImportedConfig } = await import("../src/services/configService.js");
 
 const legacyModels = [
   {
@@ -93,5 +93,31 @@ assert.equal(imported.configName, "Legacy config");
 assert.equal(imported.tokens[0].token, "{customer}");
 assert.equal(imported.nodes.length, migrated.nodes.length);
 assert.equal(imported.templates.length, migrated.templates.length);
+
+const merged = mergeConfigData(
+  {
+    tokens: [
+      { token: "{existing}", label: "Existing" },
+      { token: "{shared}", label: "Local shared" }
+    ],
+    nodes: [{ id: "local-node", title: "Local" }],
+    templates: [{ id: "shared-template", title: "Local template" }],
+    templateImages: [{ id: "local-image", name: "Local image" }]
+  },
+  {
+    tokens: [
+      { token: "{shared}", label: "Imported shared" },
+      { token: "{imported}", label: "Imported" }
+    ],
+    nodes: [{ id: "imported-node", title: "Imported" }],
+    templates: [{ id: "shared-template", title: "Imported template" }],
+    templateImages: [{ id: "imported-image", name: "Imported image" }]
+  }
+);
+assert.deepEqual(merged.tokens.map((tokenDef) => tokenDef.token), ["{existing}", "{shared}", "{imported}"]);
+assert.equal(merged.tokens.find((tokenDef) => tokenDef.token === "{shared}").label, "Imported shared");
+assert.deepEqual(merged.nodes.map((node) => node.id), ["local-node", "imported-node"]);
+assert.equal(merged.templates.find((template) => template.id === "shared-template").title, "Imported template");
+assert.deepEqual(merged.templateImages.map((image) => image.id), ["local-image", "imported-image"]);
 
 console.log("legacyTemplateMigration tests passed");
