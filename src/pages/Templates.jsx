@@ -73,6 +73,7 @@ import {
     formatAloAutofillPayload
 } from "../utils/aloAutofill.js";
 import { getKeyboardShortcutForEvent } from "../utils/keyboardShortcuts.js";
+import { buildCaseProfile } from "../utils/caseProfile.js";
 
 const ExternalGenerator = lazy(() => import("./ExternalGenerator.jsx"));
 const ManageNodes = lazy(() => import("./ManageNodes.jsx"));
@@ -878,12 +879,6 @@ export default function Templates() {
     const toolValuesRef = useRef(runtime.values);
     toolValuesRef.current = runtime.values;
     const toolRuntimeContextRef = useRef({});
-    toolRuntimeContextRef.current = {
-        tokens: runtime.tokens,
-        client: runtime.clientPayload,
-        clientInfo: runtime.clientInfoSections,
-        clientSummary: runtime.clientSummaryFields
-    };
     const [nodes, setNodes] = useState([]);
     const [treeTemplates, setTreeTemplates] = useState([]);
     const [activeNodeId, setActiveNodeId] = useState(null);
@@ -901,6 +896,19 @@ export default function Templates() {
     const [aloPreparation, setAloPreparation] = useState(null);
     const [templateImageMap, setTemplateImageMap] = useState(() => new Map());
     const [configName, setConfigName] = useState("No configuration");
+    const caseProfile = useMemo(() => buildCaseProfile({
+        clientPayload: runtime.clientPayload,
+        superOfficePayload: superOfficeTicket,
+        tokenValues: runtime.values
+    }), [runtime.clientPayload, runtime.values, superOfficeTicket]);
+
+    toolRuntimeContextRef.current = {
+        tokens: runtime.tokens,
+        client: runtime.clientPayload,
+        clientInfo: runtime.clientInfoSections,
+        clientSummary: runtime.clientSummaryFields,
+        profile: caseProfile
+    };
 
     const refreshTreeData = () => {
         return loadTemplateTreeData().then((treeData) => {

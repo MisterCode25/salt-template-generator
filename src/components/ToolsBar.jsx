@@ -49,7 +49,8 @@ function ToolModuleModal({ tool, valuesRef, runtimeContextRef, onClose }) {
                 tokens: runtimeContext.tokens || [],
                 client: runtimeContext.client || null,
                 clientInfo: runtimeContext.clientInfo || [],
-                clientSummary: runtimeContext.clientSummary || []
+                clientSummary: runtimeContext.clientSummary || [],
+                profile: runtimeContext.profile || null
             })
         }, "*");
     }, [tool, valuesRef, runtimeContextRef]);

@@ -16,6 +16,7 @@ import {
   assert.match(srcDoc, /TemplateAPI/);
   assert.match(srcDoc, /describeApi/);
   assert.match(srcDoc, /getVar/);
+  assert.match(srcDoc, /getProfile/);
   assert.match(srcDoc, /listVariables/);
   assert.match(srcDoc, /template-tool-host-style/);
   assert.match(srcDoc, /<main>Tool body<\/main>/);
@@ -24,8 +25,10 @@ import {
 {
   assert.equal(TOOL_MODULE_API_REFERENCE.version, TOOL_MODULE_API_VERSION);
   assert.ok(TOOL_MODULE_API_REFERENCE.globals.TemplateVars);
+  assert.ok(TOOL_MODULE_API_REFERENCE.globals.TemplateProfile);
   assert.ok(TOOL_MODULE_API_REFERENCE.globals.TemplateAPI);
   assert.equal(TOOL_MODULE_API_REFERENCE.functions["TemplateTool.getContext()"], "Promise<TemplateContext>");
+  assert.equal(TOOL_MODULE_API_REFERENCE.functions["TemplateTool.getProfile()"], "Promise<TemplateProfile>");
   assert.equal(TOOL_MODULE_API_REFERENCE.functions["TemplateTool.getVar(name, fallback = '')"], "Promise<string>");
   assert.ok(TOOL_MODULE_API_REFERENCE.variables.examples.includes("TemplateVars.clientName"));
   const apiPromptReference = formatToolModuleApiReferenceForPrompt();
@@ -62,7 +65,26 @@ import {
     ],
     client: { client: { name: "Samir", birthDate: "1989-04-12" } },
     clientInfo: [{ id: "client", title: "Client", fields: [{ label: "Birth date", value: "1989-04-12" }] }],
-    clientSummary: [{ label: "Name", value: "Samir" }]
+    clientSummary: [{ label: "Name", value: "Samir" }],
+    profile: {
+      clientName: "Samir",
+      contractorNumber: "31447756",
+      soTicketNum: "SO-1",
+      vars: {
+        clientName: "Samir",
+        contractorNumber: "31447756",
+        soTicketNum: "SO-1"
+      },
+      tokenValues: {
+        "{contractor_number}": "31447756",
+        "{so_ticket_num}": "SO-1"
+      },
+      availableFields: [
+        { key: "contractorNumber", label: "Contractor", value: "31447756" }
+      ],
+      photos: [],
+      attachments: []
+    }
   });
   assert.equal(context.apiVersion, TOOL_MODULE_API_VERSION);
   assert.deepEqual(context.tool, { id: "tool-1", title: "Refund", description: "Calculator" });
@@ -72,16 +94,26 @@ import {
   assert.equal(context.values.client.birthDate, "1989-04-12");
   assert.equal(context.values.birthDate, "1989-04-12");
   assert.equal(context.values.dob, "1989-04-12");
-  assert.deepEqual(context.tokenValues, { "{client_name}": "Samir", "{client_birth_date}": "1989-04-12" });
+  assert.deepEqual(context.tokenValues, {
+    "{contractor_number}": "31447756",
+    "{so_ticket_num}": "SO-1",
+    "{client_name}": "Samir",
+    "{client_birth_date}": "1989-04-12"
+  });
   assert.equal(context.variables.clientName, "Samir");
+  assert.equal(context.variables.contractorNumber, "31447756");
+  assert.equal(context.variables.soTicketNum, "SO-1");
   assert.equal(context.variables.fullName, "Samir");
   assert.equal(context.variables.client.name, "Samir");
   assert.equal(context.variables.clientBirthDate, "1989-04-12");
   assert.equal(context.variables.birthDate, "1989-04-12");
   assert.equal(context.variables.dob, "1989-04-12");
   assert.equal(context.variables.byToken["{client_birth_date}"], "1989-04-12");
+  assert.equal(context.variables.byToken["{contractor_number}"], "31447756");
   assert.equal(context.variables.byKey["client.birthDate"], "1989-04-12");
+  assert.equal(context.variables.byKey.contractorNumber, "31447756");
   assert.equal(context.variables.byLabel["Birth date"], "1989-04-12");
+  assert.equal(context.variables.byLabel.Contractor, "31447756");
   assert.equal(context.variables.env.toolTitle, "Refund");
   assert.equal(context.environment.toolTitle, "Refund");
   assert.deepEqual(context.tokens, [
@@ -105,8 +137,11 @@ import {
     }
   ]);
   assert.ok(context.fields.some((field) => field.label === "Birth date" && field.value === "1989-04-12"));
+  assert.ok(context.fields.some((field) => field.label === "Contractor" && field.value === "31447756" && field.source === "profile"));
   assert.equal(context.fieldIndex.birthdate.value, "1989-04-12");
+  assert.equal(context.fieldIndex.contractor.value, "31447756");
   assert.equal(context.fieldIndex.dob.value, "1989-04-12");
+  assert.equal(context.profile.contractorNumber, "31447756");
   assert.deepEqual(context.client, { client: { name: "Samir", birthDate: "1989-04-12" } });
   assert.deepEqual(context.clientInfo, [{ id: "client", title: "Client", fields: [{ label: "Birth date", value: "1989-04-12" }] }]);
   assert.deepEqual(context.clientSummary, [{ label: "Name", value: "Samir" }]);
@@ -145,8 +180,10 @@ import {
   assert.match(prompt, /TemplateVars/);
   assert.match(prompt, /TemplateEnv/);
   assert.match(prompt, /TemplateContext/);
+  assert.match(prompt, /TemplateProfile/);
   assert.match(prompt, /TemplateFields/);
   assert.match(prompt, /TemplateAPI/);
+  assert.match(prompt, /TemplateTool\.getProfile/);
   assert.match(prompt, /TemplateTool\.describeApi/);
   assert.match(prompt, /TemplateTool\.getVars/);
   assert.match(prompt, /TemplateTool\.getVar/);

@@ -27,10 +27,13 @@ import {
 } from "../services/toolsService.js";
 import { loadTokens } from "../services/tokenService.js";
 import { loadActiveClientPayload } from "../services/activeClientService.js";
+import { loadTokenInputValues } from "../services/tokenInputValueService.js";
+import { loadSuperOfficeTicketPayload } from "../services/superOfficeTicketService.js";
 import { getClientInfoSections, getClientInternalTokenData, getClientSummaryFields } from "../utils/clientClipboard.js";
 import { DATA_SHORTCUTS, copyTextFallback } from "../services/shortcutsService.js";
 import { KEYBOARD_SHORTCUTS, formatKeyboardShortcut } from "../utils/keyboardShortcuts.js";
 import { buildToolModulePrompt, buildToolModuleSrcDoc, buildToolRuntimeContext } from "../utils/toolModuleRuntime.js";
+import { buildCaseProfile } from "../utils/caseProfile.js";
 import Modal from "../components/Modal.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import EmptyState from "../components/EmptyState.jsx";
@@ -138,18 +141,38 @@ function mergeUniqueTokens(tokenDefs = []) {
 }
 
 async function loadToolRuntimePreviewContext() {
-    const configuredTokens = await loadTokens();
-    const clientPayload = await loadActiveClientPayload();
+    const [
+        configuredTokens,
+        clientPayload,
+        superOfficePayload,
+        storedTokenValues
+    ] = await Promise.all([
+        loadTokens(),
+        loadActiveClientPayload(),
+        loadSuperOfficeTicketPayload(),
+        loadTokenInputValues()
+    ]);
     const clientData = clientPayload
         ? getClientInternalTokenData(clientPayload)
         : { tokenDefs: [], values: {} };
+    const values = {
+        ...(clientData.values || {}),
+        ...(superOfficePayload?.tokenValues || {}),
+        ...(storedTokenValues || {})
+    };
+    const profile = buildCaseProfile({
+        clientPayload,
+        superOfficePayload,
+        tokenValues: values
+    });
 
     return {
         tokens: mergeUniqueTokens([...configuredTokens, ...clientData.tokenDefs]),
-        values: clientData.values || {},
+        values,
         client: clientPayload || null,
         clientInfo: clientPayload ? getClientInfoSections(clientPayload) : [],
-        clientSummary: clientPayload ? getClientSummaryFields(clientPayload) : []
+        clientSummary: clientPayload ? getClientSummaryFields(clientPayload) : [],
+        profile
     };
 }
 
@@ -438,7 +461,8 @@ function ModulePreviewFrame({ draft, tokens, runtimePreviewContext }) {
                 tokens,
                 client: runtimePreviewContext.client || null,
                 clientInfo: runtimePreviewContext.clientInfo || [],
-                clientSummary: runtimePreviewContext.clientSummary || []
+                clientSummary: runtimePreviewContext.clientSummary || [],
+                profile: runtimePreviewContext.profile || null
             })
         }, "*");
     }, [draft, runtimePreviewContext, tokens]);

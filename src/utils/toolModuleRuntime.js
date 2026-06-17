@@ -12,6 +12,10 @@ export const TOOL_MODULE_API_REFERENCE = Object.freeze({
             type: "object",
             description: "Runtime variables with safe JavaScript property names, populated after TemplateTool.getContext()."
         },
+        TemplateProfile: {
+            type: "object",
+            description: "Normalized customer profile with easy fields, variables, tokens, photos and attachments."
+        },
         TemplateEnv: {
             type: "object",
             description: "Execution metadata for the current module."
@@ -37,6 +41,7 @@ export const TOOL_MODULE_API_REFERENCE = Object.freeze({
             "TemplateVars.contractor",
             "TemplateVars.activationDate",
             "TemplateVars.otoId",
+            "TemplateVars.soTicketNum",
             "TemplateVars.byToken['{client_first_name}']",
             "TemplateVars.byKey['client.firstName']",
             "TemplateVars.byLabel['Full name']"
@@ -47,6 +52,7 @@ export const TOOL_MODULE_API_REFERENCE = Object.freeze({
         apiVersion: "string",
         tool: "{ id: string, title: string, description: string }",
         environment: "{ apiVersion, toolId, toolTitle, toolDescription, generatedAt }",
+        profile: "normalized customer profile with fields, vars, tokenValues, photos and attachments",
         variables: "TemplateVars object",
         values: "token values plus compatibility aliases",
         tokenValues: "original token-keyed values",
@@ -60,6 +66,7 @@ export const TOOL_MODULE_API_REFERENCE = Object.freeze({
     },
     functions: {
         "TemplateTool.getContext()": "Promise<TemplateContext>",
+        "TemplateTool.getProfile()": "Promise<TemplateProfile>",
         "TemplateTool.getVars()": "Promise<TemplateVars>",
         "TemplateTool.getVar(name, fallback = '')": "Promise<string>",
         "TemplateTool.hasVariable(name)": "Promise<boolean>",
@@ -249,6 +256,9 @@ const TOOL_MODULE_BRIDGE = `
             generatedAt: safeContext.generatedAt || ""
         };
         window.TemplateFields = Array.isArray(safeContext.fields) ? safeContext.fields : [];
+        window.TemplateProfile = safeContext.profile && typeof safeContext.profile === "object"
+            ? safeContext.profile
+            : {};
         window.TemplateVars = safeContext.variables && typeof safeContext.variables === "object"
             ? safeContext.variables
             : {};
@@ -355,6 +365,11 @@ const TOOL_MODULE_BRIDGE = `
         getVars: function () {
             return this.getContext().then(function () {
                 return window.TemplateVars || {};
+            });
+        },
+        getProfile: function () {
+            return this.getContext().then(function () {
+                return window.TemplateProfile || {};
             });
         },
         getVar: function (name, fallback) {
@@ -630,7 +645,7 @@ function makeField(field) {
     return normalized;
 }
 
-function buildRuntimeFields({ tokens = [], clientInfo = [], clientSummary = [] } = {}) {
+function buildRuntimeFields({ tokens = [], clientInfo = [], clientSummary = [], profile = null } = {}) {
     const fields = [];
     const seen = new Set();
     const addField = (field) => {
@@ -672,6 +687,18 @@ function buildRuntimeFields({ tokens = [], clientInfo = [], clientSummary = [] }
             });
         });
     });
+
+    if (profile && typeof profile === "object") {
+        (Array.isArray(profile.availableFields) ? profile.availableFields : []).forEach((field) => {
+            addField({
+                label: field.label,
+                value: field.value,
+                key: field.key,
+                aliases: field.aliases,
+                source: "profile"
+            });
+        });
+    }
 
     return fields;
 }
@@ -789,7 +816,22 @@ function assignVariablePath(variables, path, value) {
     }
 }
 
-function buildRuntimeVariables({ fields = [], tokenValues = {}, environment = {} } = {}) {
+function assignProfileVariables(variables, profile = null) {
+    if (!profile || typeof profile !== "object") return;
+    const profileVariables = profile.vars && typeof profile.vars === "object"
+        ? profile.vars
+        : profile.variables && typeof profile.variables === "object"
+            ? profile.variables
+            : {};
+
+    Object.entries(profileVariables).forEach(([name, value]) => {
+        const display = displayValue(value);
+        if (display === "") return;
+        assignVariableAlias(variables, name, display);
+    });
+}
+
+function buildRuntimeVariables({ fields = [], tokenValues = {}, environment = {}, profile = null } = {}) {
     const variables = {
         env: environment,
         raw: tokenValues,
@@ -805,6 +847,8 @@ function buildRuntimeVariables({ fields = [], tokenValues = {}, environment = {}
         assignVariableAlias(variables, token, display);
         assignVariableAlias(variables, token.replace(/[{}]/g, ""), display);
     });
+
+    assignProfileVariables(variables, profile);
 
     fields.forEach((field) => {
         const value = displayValue(field.value);
@@ -832,16 +876,26 @@ export function buildToolRuntimeContext({
     tokens = [],
     client = null,
     clientInfo = [],
-    clientSummary = []
+    clientSummary = [],
+    profile = null
 } = {}) {
     const safeValues = values && typeof values === "object" ? values : {};
+    const safeProfile = profile && typeof profile === "object" ? profile : null;
+    const profileTokenValues = safeProfile?.tokenValues && typeof safeProfile.tokenValues === "object"
+        ? safeProfile.tokenValues
+        : {};
+    const mergedValues = {
+        ...safeValues,
+        ...profileTokenValues
+    };
     const safeClientInfo = Array.isArray(clientInfo) ? clientInfo : [];
     const safeClientSummary = Array.isArray(clientSummary) ? clientSummary : [];
-    const normalizedTokens = normalizeToolTokens(tokens, safeValues);
+    const normalizedTokens = normalizeToolTokens(tokens, mergedValues);
     const fields = buildRuntimeFields({
         tokens: normalizedTokens,
         clientInfo: safeClientInfo,
-        clientSummary: safeClientSummary
+        clientSummary: safeClientSummary,
+        profile: safeProfile
     });
     const generatedAt = new Date().toISOString();
     const environment = {
@@ -859,15 +913,17 @@ export function buildToolRuntimeContext({
             title: tool.title || "",
             description: tool.description || ""
         },
-        values: buildCompatibleValues(safeValues, fields),
-        tokenValues: safeValues,
+        profile: safeProfile || null,
+        values: buildCompatibleValues(mergedValues, fields),
+        tokenValues: mergedValues,
         tokens: normalizedTokens,
         fields,
         fieldIndex: buildFieldIndex(fields),
         variables: buildRuntimeVariables({
             fields,
-            tokenValues: safeValues,
-            environment
+            tokenValues: mergedValues,
+            environment,
+            profile: safeProfile
         }),
         environment,
         client: client && typeof client === "object" ? client : null,
@@ -898,12 +954,13 @@ Runtime:
 - The file runs inside an iframe.
 - The host app injects window.TemplateTool before your script runs.
 - Use await window.TemplateTool.getContext() to read the current app context.
-- Context shape: { apiVersion, tool: { id, title, description }, values, tokenValues, variables, environment, tokens, fields, fieldIndex, client, clientInfo, clientSummary, generatedAt }.
+- Context shape: { apiVersion, tool: { id, title, description }, profile, values, tokenValues, variables, environment, tokens, fields, fieldIndex, client, clientInfo, clientSummary, generatedAt }.
+- profile is the simplest normalized customer object. Read it with await window.TemplateTool.getProfile() or context.profile. Common fields: profile.clientName, profile.contractorNumber, profile.mobile, profile.activationDate, profile.otoId, profile.routerSerialNumber, profile.soTicketNum, profile.externalId, profile.photos, profile.attachments, profile.vars and profile.tokenValues.
 - tokenValues is the original object keyed by token strings, for example tokenValues["{client_first_name}"].
 - values keeps those token keys and also includes host-generated aliases such as values.client.firstName, values.firstName and values.clientFirstName when they come from real data.
-- variables is the easiest API for module JavaScript. It is also exposed globally as window.TemplateVars and contains safe JS property names such as TemplateVars.clientName, TemplateVars.mobile, TemplateVars.contractor, TemplateVars.activationDate, TemplateVars.otoId, plus TemplateVars.byToken, TemplateVars.byKey, TemplateVars.byLabel and TemplateVars.raw.
+- variables is the easiest API for module JavaScript. It is also exposed globally as window.TemplateVars and contains safe JS property names from the profile such as TemplateVars.clientName, TemplateVars.contractorNumber, TemplateVars.mobile, TemplateVars.activationDate, TemplateVars.otoId, TemplateVars.soTicketNum, plus TemplateVars.byToken, TemplateVars.byKey, TemplateVars.byLabel and TemplateVars.raw.
 - environment is also exposed globally as window.TemplateEnv and contains { apiVersion, toolId, toolTitle, toolDescription, generatedAt }.
-- The full context is exposed globally as window.TemplateContext, and normalized fields are exposed as window.TemplateFields.
+- The normalized profile is exposed globally as window.TemplateProfile, the full context as window.TemplateContext, and normalized fields as window.TemplateFields.
 - The API reference is exposed globally as window.TemplateAPI and through window.TemplateTool.describeApi().
 - tokens is an array of available variables: [{ token, label, key, inputType, value, internal, aliases }].
 - fields is the preferred normalized list for generated modules: [{ label, value, source, token, key, section, aliases }].
@@ -913,6 +970,7 @@ Runtime:
 - clientSummary is the compact client bar data: [{ label, value }].
 - Prefer await window.TemplateTool.findField(["birth date", "date de naissance", "dob"]) for user-facing data lookup.
 - Use await window.TemplateTool.getFieldValue(["mobile", "phone"], "") when only the string value is needed.
+- Use await window.TemplateTool.getProfile() when you want the normalized customer profile object.
 - Use await window.TemplateTool.getVars() or window.TemplateVars after getContext() when you want variable-style access.
 - Use await window.TemplateTool.getVar("clientName", "") for a single variable.
 - Use await window.TemplateTool.listVariables() when you need to discover the variable names available in the current context.
@@ -926,7 +984,7 @@ Runtime:
 
 Available data rules:
 - Never invent variable names or sample values. Read the actual context returned by getContext().
-- Prefer TemplateVars, TemplateTool.getVars(), TemplateTool.findField, context.fields, context.fieldIndex and context.clientInfo for user-facing data because they describe the available variables.
+- Prefer context.profile, TemplateProfile, TemplateTool.getProfile(), TemplateVars, TemplateTool.getVars(), TemplateTool.findField, context.fields, context.fieldIndex and context.clientInfo for user-facing data because they describe the available variables.
 - Do not rely only on semantic object paths like context.values.client.birthDate. Use the field helpers first, then tokenValues when an exact token is known, then context.client last for raw nested data.
 - Use context.client only when structured raw data is needed.
 - If a required field is missing from context.tokens, context.clientInfo and context.client, show a clear missing-data state instead of guessing.
