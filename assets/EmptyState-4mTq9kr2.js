@@ -1,1 +1,0 @@
-import{j as e}from"./index-CATfsceB.js";function i({icon:t,message:n,action:s}){return e.jsxs("div",{className:"empty-state-inline",children:[t&&e.jsx("span",{className:"empty-state-inline__icon",children:t}),e.jsx("p",{className:"empty-state-inline__text",children:n}),s&&s]})}export{i as E};
