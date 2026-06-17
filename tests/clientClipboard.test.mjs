@@ -238,4 +238,39 @@ ${JSON.stringify(sampleClientJSON, null, 2)}`);
   assert.equal(Boolean(vtiData?.fields.some((field) => field.value.includes("VALID//26.02.2026"))), false);
 }
 
+{
+  const payloadWithImportedExternalIdOnly = {
+    client: {
+      firstName: "Peter"
+    },
+    [IMPORTED_EXTERNAL_ID_KEY]: "VALID//26.02.2026//12345678//SO1//Lost//Fiber Off//Other//X6//EWB//ABC//L1//OLT//1//BOK|BOF//Comment"
+  };
+  const summary = getClientSummaryFields(payloadWithImportedExternalIdOnly);
+  const sections = getClientInfoSections(payloadWithImportedExternalIdOnly);
+  const contractorSummary = summary.find((field) => field.label === "Contractor");
+  const contractorField = sections
+    .find((section) => section.id === "client")
+    ?.fields.find((field) => field.label === "Contractor");
+
+  assert.equal(contractorSummary.value, "12345678");
+  assert.equal(contractorField.value, "12345678");
+}
+
+{
+  const payloadWithVtiAndImportedExternalId = {
+    client: {
+      contractorNumber: "31447756"
+    },
+    [IMPORTED_EXTERNAL_ID_KEY]: "VALID//26.02.2026//99999999//SO1//Lost//Fiber Off//Other//X6//EWB//ABC//L1//OLT//1//BOK|BOF//Comment"
+  };
+  const contractorSummary = getClientSummaryFields(payloadWithVtiAndImportedExternalId)
+    .find((field) => field.label === "Contractor");
+  const contractorField = getClientInfoSections(payloadWithVtiAndImportedExternalId)
+    .find((section) => section.id === "client")
+    ?.fields.find((field) => field.label === "Contractor");
+
+  assert.equal(contractorSummary.value, "31447756");
+  assert.equal(contractorField.value, "31447756");
+}
+
 console.log("clientClipboard tests passed");

@@ -1,5 +1,6 @@
 import { IMPORTED_EXTERNAL_ID_KEY, MANUAL_CLIENT_INPUTS_KEY } from "../services/activeClientService.js";
 import { canonicalizeInputTokenValue, normalizeTokenName } from "./tokenCanonicalization.js";
+import { parseExternalId } from "./externalGenerator.js";
 
 const CLIENT_FIELD_GROUPS = [
     {
@@ -14,6 +15,12 @@ const CLIENT_FIELD_GROUPS = [
             {
                 label: "Contractor",
                 path: "client.contractorNumber",
+                compute: (payload) => firstValue([
+                    payload?.client?.contractorNumber,
+                    payload?.client?.contractor,
+                    payload?.healthcheck?.customerId,
+                    getImportedExternalIdCustomer(payload)
+                ]),
                 aliases: ["contractor", "contractorNo", "contractorNumber", "contractor_number", "numContractor"]
             },
             {
@@ -401,6 +408,14 @@ function firstValue(values) {
     return "";
 }
 
+function getImportedExternalIdCustomer(payload) {
+    const importedExternalId = displayValue(payload?.[IMPORTED_EXTERNAL_ID_KEY]);
+    if (!importedExternalId) return "";
+
+    const parsed = parseExternalId(importedExternalId);
+    return parsed.ok ? parsed.fields.customer : "";
+}
+
 function valueForField(payload, field) {
     if (field.compute) return displayValue(field.compute(payload));
     return displayValue(readPath(payload, field.path));
@@ -616,7 +631,12 @@ export function getClientSummaryFields(payload) {
         },
         {
             label: "Contractor",
-            value: firstValue([client.contractorNumber, client.contractor, healthcheck.customerId])
+            value: firstValue([
+                client.contractorNumber,
+                client.contractor,
+                healthcheck.customerId,
+                getImportedExternalIdCustomer(payload)
+            ])
         },
         {
             label: "Activation",
