@@ -8,11 +8,6 @@ export const TOOL_TYPES = Object.freeze({
     MODULE: "module"
 });
 export const DEFAULT_TOOL_TYPE = TOOL_TYPES.LINK;
-export const TOOL_OPEN_MODES = Object.freeze({
-    FOREGROUND: "foreground",
-    BACKGROUND: "background"
-});
-export const DEFAULT_TOOL_OPEN_MODE = TOOL_OPEN_MODES.FOREGROUND;
 
 export const TOOL_COLOR_OPTIONS = [
     { value: "blue", label: "Blue" },
@@ -26,7 +21,6 @@ export const TOOL_COLOR_OPTIONS = [
 
 const TOOL_COLOR_VALUES = new Set(TOOL_COLOR_OPTIONS.map((option) => option.value));
 const TOOL_TYPE_VALUES = new Set(Object.values(TOOL_TYPES));
-const TOOL_OPEN_MODE_VALUES = new Set(Object.values(TOOL_OPEN_MODES));
 
 export function sanitizeToolColor(color) {
     return TOOL_COLOR_VALUES.has(color) ? color : DEFAULT_TOOL_COLOR;
@@ -34,10 +28,6 @@ export function sanitizeToolColor(color) {
 
 export function sanitizeToolType(type) {
     return TOOL_TYPE_VALUES.has(type) ? type : DEFAULT_TOOL_TYPE;
-}
-
-export function sanitizeToolOpenMode(openMode) {
-    return TOOL_OPEN_MODE_VALUES.has(openMode) ? openMode : DEFAULT_TOOL_OPEN_MODE;
 }
 
 function normalizeOrder(order) {
@@ -55,7 +45,6 @@ export function normalizeTool(tool) {
         type,
         title: String(tool.title || "").trim(),
         url: type === TOOL_TYPES.LINK ? String(tool.url || "").trim() : "",
-        openMode: type === TOOL_TYPES.LINK ? sanitizeToolOpenMode(tool.openMode) : DEFAULT_TOOL_OPEN_MODE,
         description: String(tool.description || "").trim(),
         prompt: String(tool.prompt || ""),
         html: String(tool.html || ""),

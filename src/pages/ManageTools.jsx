@@ -17,14 +17,11 @@ import {
 } from "lucide-react";
 import {
     DEFAULT_TOOL_COLOR,
-    DEFAULT_TOOL_OPEN_MODE,
     TOOL_COLOR_OPTIONS,
-    TOOL_OPEN_MODES,
     TOOL_TYPES,
     loadTools,
     normalizeTool,
     sanitizeToolColor,
-    sanitizeToolOpenMode,
     sanitizeToolType,
     saveTools
 } from "../services/toolsService.js";
@@ -82,7 +79,6 @@ function createDraftTool(type = TOOL_TYPES.LINK, order = 1) {
         title: safeType === TOOL_TYPES.MODULE ? "New module" : "New link tool",
         description: "",
         url: "",
-        openMode: DEFAULT_TOOL_OPEN_MODE,
         prompt: "",
         html: "",
         color: DEFAULT_TOOL_COLOR,
@@ -191,8 +187,7 @@ async function writeTextToClipboard(value, message) {
 
 function describeTool(tool) {
     if (tool.type === TOOL_TYPES.MODULE) return tool.description || "HTML module · Beta";
-    const mode = sanitizeToolOpenMode(tool.openMode) === TOOL_OPEN_MODES.BACKGROUND ? " · background tab" : "";
-    return `${tool.url || "Link tool"}${mode}`;
+    return tool.url || "Link tool";
 }
 
 const ToolTokenOption = memo(function ToolTokenOption({
@@ -427,19 +422,6 @@ function LinkToolFields({ draft, onPatch, tokens }) {
                     <code className="tools-url-preview">{url}</code>
                 </div>
             )}
-            <label className="tools-toggle-line">
-                <input
-                    type="checkbox"
-                    checked={sanitizeToolOpenMode(draft.openMode) === TOOL_OPEN_MODES.BACKGROUND}
-                    onChange={(event) => onPatch({
-                        openMode: event.target.checked ? TOOL_OPEN_MODES.BACKGROUND : TOOL_OPEN_MODES.FOREGROUND
-                    })}
-                />
-                <span className="tools-toggle-copy">
-                    <strong>Open in background tab</strong>
-                    <small>Requires the local Chrome or Edge extension.</small>
-                </span>
-            </label>
         </section>
     );
 }

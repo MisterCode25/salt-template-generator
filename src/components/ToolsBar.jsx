@@ -3,26 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { ClipboardPaste, ExternalLink, Image as ImageIcon, Puzzle, Settings2 } from "lucide-react";
 import Modal from "./Modal.jsx";
 import { copyHtml, copyText, showToast } from "../services/clipboardService.js";
-import { TOOL_OPEN_MODES, isModuleTool, loadTools, resolveToolUrl, sanitizeToolColor } from "../services/toolsService.js";
+import { isModuleTool, loadTools, resolveToolUrl, sanitizeToolColor } from "../services/toolsService.js";
 import { buildToolModuleSrcDoc, buildToolRuntimeContext } from "../utils/toolModuleRuntime.js";
 
-const BACKGROUND_TAB_APP_SOURCE = "template-generator";
-const BACKGROUND_TAB_EXTENSION_SOURCE = "template-generator-background-tab-opener";
-
-function getPostMessageTargetOrigin() {
-    const origin = window.location?.origin;
-    return origin && origin !== "null" ? origin : "*";
-}
-
-function isPlainLeftClick(event) {
-    return event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
-}
-
-function isSafeBackgroundTabUrl(url) {
-    return /^https?:/i.test(String(url || "").trim());
-}
-
-const ToolButton = memo(function ToolButton({ tool, valuesRef, onOpenModule, onOpenBackgroundTab }) {
+const ToolButton = memo(function ToolButton({ tool, valuesRef, onOpenModule }) {
     const linkRef = useRef(null);
     const moduleTool = isModuleTool(tool);
 
@@ -45,16 +29,10 @@ const ToolButton = memo(function ToolButton({ tool, valuesRef, onOpenModule, onO
 
     const handleLinkClick = useCallback((event) => {
         const href = refreshHref();
-        if (href) {
-            if (tool.openMode === TOOL_OPEN_MODES.BACKGROUND && isPlainLeftClick(event)) {
-                event.preventDefault();
-                onOpenBackgroundTab(href);
-            }
-            return;
-        }
+        if (href) return;
         event.preventDefault();
         showToast("This tool has no URL.", "warning");
-    }, [onOpenBackgroundTab, refreshHref, tool.openMode]);
+    }, [refreshHref]);
 
     if (!moduleTool) {
         const href = resolveHref();
@@ -66,7 +44,6 @@ const ToolButton = memo(function ToolButton({ tool, valuesRef, onOpenModule, onO
                 target="_blank"
                 rel="noopener noreferrer"
                 className={`tools-bar-btn tools-bar-btn--custom tools-bar-btn--${sanitizeToolColor(tool.color)}`}
-                data-open-mode={tool.openMode === TOOL_OPEN_MODES.BACKGROUND ? "background" : undefined}
                 title={tool.url || tool.title}
                 onPointerDown={refreshHref}
                 onFocus={refreshHref}
@@ -269,9 +246,6 @@ function ToolsBar({
     const navigate = useNavigate();
     const [tools, setTools] = useState([]);
     const [activeModuleTool, setActiveModuleTool] = useState(null);
-    const [backgroundTabOpenerReady, setBackgroundTabOpenerReady] = useState(false);
-    const backgroundTabRequestCounterRef = useRef(0);
-    const backgroundTabRequestTimeoutsRef = useRef(new Map());
     const internalValuesRef = useRef(values);
     internalValuesRef.current = values;
     const valuesRef = externalValuesRef || internalValuesRef;
@@ -286,68 +260,6 @@ function ToolsBar({
         window.addEventListener("tools-updated", handler);
         return () => window.removeEventListener("tools-updated", handler);
     }, [reload]);
-
-    useEffect(() => {
-        const handleBackgroundTabMessage = (event) => {
-            if (event.source !== window) return;
-            const data = event.data || {};
-            if (data.source !== BACKGROUND_TAB_EXTENSION_SOURCE) return;
-
-            if (data.type === "ready") {
-                setBackgroundTabOpenerReady(true);
-                return;
-            }
-
-            if (data.type === "open-result") {
-                const requestId = data.requestId || "";
-                const timeoutId = backgroundTabRequestTimeoutsRef.current.get(requestId);
-                if (timeoutId) {
-                    clearTimeout(timeoutId);
-                    backgroundTabRequestTimeoutsRef.current.delete(requestId);
-                }
-                showToast(data.ok ? "Background tab opened." : (data.error || "Background tab failed."), data.ok ? "success" : "warning");
-            }
-        };
-
-        window.addEventListener("message", handleBackgroundTabMessage);
-        window.postMessage({
-            source: BACKGROUND_TAB_APP_SOURCE,
-            type: "background-tab-ping"
-        }, getPostMessageTargetOrigin());
-
-        return () => {
-            window.removeEventListener("message", handleBackgroundTabMessage);
-            backgroundTabRequestTimeoutsRef.current.forEach((timeoutId) => clearTimeout(timeoutId));
-            backgroundTabRequestTimeoutsRef.current.clear();
-        };
-    }, []);
-
-    const openBackgroundTab = useCallback((url) => {
-        if (!isSafeBackgroundTabUrl(url)) {
-            showToast("Background tab mode only supports http links.", "warning");
-            return;
-        }
-
-        if (!backgroundTabOpenerReady) {
-            showToast("Background tab mode requires the browser extension.", "warning");
-            return;
-        }
-
-        const requestId = `background_tab_${Date.now()}_${backgroundTabRequestCounterRef.current + 1}`;
-        backgroundTabRequestCounterRef.current += 1;
-        const timeoutId = window.setTimeout(() => {
-            backgroundTabRequestTimeoutsRef.current.delete(requestId);
-            showToast("No response from the background tab extension.", "warning");
-        }, 1800);
-        backgroundTabRequestTimeoutsRef.current.set(requestId, timeoutId);
-
-        window.postMessage({
-            source: BACKGROUND_TAB_APP_SOURCE,
-            type: "open-background-tab",
-            requestId,
-            url
-        }, getPostMessageTargetOrigin());
-    }, [backgroundTabOpenerReady]);
 
     const openModuleTool = useCallback((tool) => {
         setActiveModuleTool(tool);
@@ -413,7 +325,6 @@ function ToolsBar({
                         tool={tool}
                         valuesRef={valuesRef}
                         onOpenModule={openModuleTool}
-                        onOpenBackgroundTab={openBackgroundTab}
                     />
                 ))}
             </div>
