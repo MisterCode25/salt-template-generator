@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import {
   formatClipboardHtmlBody,
-  formatClipboardPlainText
+  formatClipboardPlainText,
+  formatToastMessage
 } from "../src/services/clipboardService.js";
 
 {
@@ -19,6 +20,12 @@ import {
 
 {
   assert.equal(formatClipboardPlainText("  A\n\n\nB &amp; C  "), "A\n\nB & C");
+}
+
+{
+  assert.equal(formatToastMessage("  Data   imported  "), "Data imported");
+  assert.equal(formatToastMessage("x".repeat(120)).length, 92);
+  assert.equal(formatToastMessage("x".repeat(120)).endsWith("..."), true);
 }
 
 console.log("clipboardService tests passed");

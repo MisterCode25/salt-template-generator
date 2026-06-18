@@ -15,6 +15,8 @@ const HTML_BREAK_PATTERN = /<br\s*\/?>/gi;
 const HTML_PARAGRAPH_END_PATTERN = /<\/p>/gi;
 const HTML_TAG_STRIP_PATTERN = /<[^>]+>/g;
 const EXCESS_NEWLINE_PATTERN = /\n{3,}/g;
+const TOAST_MAX_MESSAGE_LENGTH = 92;
+const TOAST_DISPLAY_MS = 2600;
 
 function normalizePlainText(value = "") {
     return decodeHtmlEntities(String(value || "")
@@ -32,6 +34,12 @@ function stripHtmlToPlainText(value = "") {
             .replace(HTML_PARAGRAPH_END_PATTERN, "\n\n")
             .replace(HTML_TAG_STRIP_PATTERN, "")
     );
+}
+
+export function formatToastMessage(message = "") {
+    const text = String(message || "").replace(/\s+/g, " ").trim();
+    if (text.length <= TOAST_MAX_MESSAGE_LENGTH) return text;
+    return `${text.slice(0, TOAST_MAX_MESSAGE_LENGTH - 3).trim()}...`;
 }
 
 export function formatClipboardHtmlBody(html) {
@@ -111,12 +119,20 @@ export async function copyHtml(html, opts = {}) {
 }
 
 export function showToast(message, variant = "info") {
+    const fullMessage = String(message || "").replace(/\s+/g, " ").trim();
+    if (!fullMessage) return;
+
+    document.querySelectorAll("[data-app-toast='true']").forEach((node) => node.remove());
+
     const toast = document.createElement("div");
-    toast.textContent = message;
+    const displayMessage = formatToastMessage(fullMessage);
+    toast.dataset.appToast = "true";
+    toast.textContent = displayMessage;
+    if (displayMessage !== fullMessage) toast.title = fullMessage;
     toast.style.position = "fixed";
-    toast.style.bottom = "30px";
+    toast.style.top = "18px";
     toast.style.left = "50%";
-    toast.style.transform = "translateX(-50%)";
+    toast.style.transform = "translate(-50%, -8px)";
     const palette = {
         info: { bg: "white", fg: "black" },
         success: { bg: "#15803d", fg: "#f0fdf4" },
@@ -126,18 +142,29 @@ export function showToast(message, variant = "info") {
     const { bg, fg } = palette[variant] || palette.info;
     toast.style.background = bg;
     toast.style.color = fg;
-    toast.style.padding = "12px 18px";
+    toast.style.padding = "10px 14px";
     toast.style.borderRadius = "8px";
-    toast.style.fontSize = "14px";
+    toast.style.fontSize = "15.5px";
+    toast.style.fontWeight = "650";
+    toast.style.lineHeight = "1.35";
+    toast.style.maxWidth = "min(460px, calc(100vw - 32px))";
+    toast.style.textAlign = "center";
+    toast.style.overflow = "hidden";
+    toast.style.textOverflow = "ellipsis";
+    toast.style.whiteSpace = "nowrap";
     toast.style.zIndex = "9999";
     toast.style.opacity = "0";
-    toast.style.transition = "opacity 0.3s ease";
-    toast.style.boxShadow = "0 8px 20px rgba(0,0,0,0.35)";
+    toast.style.transition = "opacity 0.22s ease, transform 0.22s ease";
+    toast.style.boxShadow = "0 10px 28px rgba(0,0,0,0.38)";
 
     document.body.appendChild(toast);
-    setTimeout(() => { toast.style.opacity = "1"; }, 10);
+    setTimeout(() => {
+        toast.style.opacity = "1";
+        toast.style.transform = "translate(-50%, 0)";
+    }, 10);
     setTimeout(() => {
         toast.style.opacity = "0";
-        setTimeout(() => toast.remove(), 300);
-    }, 1400);
+        toast.style.transform = "translate(-50%, -8px)";
+        setTimeout(() => toast.remove(), 260);
+    }, TOAST_DISPLAY_MS);
 }
