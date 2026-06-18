@@ -1,0 +1,1 @@
+import{z as i,N as s}from"./tokenService-CHE0m2u-.js";const n="configName",o="No configuration";async function N(){const t=await i(n,o);return typeof t=="string"&&t.trim()?t:o}async function e(t){const a=typeof t=="string"&&t.trim()?t.trim():o;return await s(n,a),a}export{N as l,e as s};
