@@ -1261,6 +1261,12 @@ export function useTemplateRuntime() {
         setClientPasteInitialError("");
     };
 
+    const saveClientExternalId = async (externalId) => {
+        const nextPayload = await saveImportedExternalId(getValidExternalId(externalId));
+        if (nextPayload) setClientPayload(nextPayload);
+        return nextPayload;
+    };
+
     const collectInputValues = (requiredTokens) => {
         const vals = {};
         const missing = [];
@@ -1533,6 +1539,7 @@ export function useTemplateRuntime() {
         clientPasteInitialError,
         setClientPasteInitialError,
         importClientFromPaste,
+        saveClientExternalId,
         copyPreview,
         setCopyPreview,
         copyTemplateResultAgain,

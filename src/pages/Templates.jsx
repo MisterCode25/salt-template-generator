@@ -1355,6 +1355,10 @@ export default function Templates() {
         setExternalGeneratorStartField(null);
     };
 
+    const saveExternalGeneratorResult = useCallback((externalId) => {
+        return runtimeRef.current.saveClientExternalId(externalId);
+    }, []);
+
     const openWorkspace = useCallback((workspace) => {
         setActiveWorkspace(workspace);
         setDropdownOpen(false);
@@ -1711,6 +1715,7 @@ export default function Templates() {
                         flowOnly
                         startField={externalGeneratorStartField}
                         onClose={closeExternalGenerator}
+                        onExternalIdSaved={saveExternalGeneratorResult}
                         clientPayload={runtime.clientPayload}
                     />
                 </Suspense>

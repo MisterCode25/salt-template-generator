@@ -248,6 +248,7 @@ export default function ExternalGenerator({
     flowOnly = false,
     startField = null,
     onClose,
+    onExternalIdSaved,
     clientPayload = null
 }) {
     const navigate = useNavigate();
@@ -426,6 +427,13 @@ export default function ExternalGenerator({
         }
     };
 
+    const saveCopiedExternalId = async (externalId) => {
+        if (!onExternalIdSaved) return;
+        const text = String(externalId ?? "").trim();
+        if (!parseExternalId(text).ok) return;
+        await onExternalIdSaved(text);
+    };
+
     const runPostVtiCompletionFlow = async (initialFields, initialMeta = null) => {
         let draft = { ...initialFields };
         let meta = initialMeta || {
@@ -587,6 +595,7 @@ export default function ExternalGenerator({
                 document.execCommand("copy");
                 document.body.removeChild(ta);
             }
+            await saveCopiedExternalId(code);
             showToast("External ID copied!", "success");
         };
 
@@ -756,6 +765,7 @@ export default function ExternalGenerator({
             return;
         }
         await copyText(generatedCode, { message: "Code copied", variant: "info" });
+        await saveCopiedExternalId(generatedCode);
     };
 
     const fillFromExternalIdValue = (value, { silent = false } = {}) => {
