@@ -593,11 +593,7 @@ export const ClientInfoPanel = memo(function ClientInfoPanel({
 }) {
     const hasInfo = sections.length > 0;
     const isError = status.type === "error";
-    const vtiButtonClassName = `client-import-status-btn client-import-status-btn--vti${hasVtiData ? " is-loaded" : " is-missing"}`;
-    const soButtonClassName = `client-import-status-btn client-import-status-btn--so${hasSuperOfficeData ? " is-loaded" : " is-missing"}`;
     const hasAnyImportedData = hasVtiData || hasSuperOfficeData;
-    const vtiImportDisabled = loading || hasVtiData;
-    const soImportDisabled = loading || hasSuperOfficeData;
     const externalIdSegments = useMemo(() => buildExternalIdSegments(externalId), [externalId]);
     const copyExternalId = async () => {
         try {
@@ -611,28 +607,30 @@ export const ClientInfoPanel = memo(function ClientInfoPanel({
     return (
         <section className="client-info-panel" aria-label="Client information">
             <div className="client-import-status-row" aria-label="Data imports">
-                <button
-                    type="button"
-                    className={vtiButtonClassName}
-                    onClick={onReadClipboard}
-                    disabled={vtiImportDisabled}
-                    aria-pressed={hasVtiData}
-                    title={hasVtiData ? "VTI data loaded. Use Clear to import another VTI JSON." : "Import missing VTI data. Alt+Q"}
-                >
-                    <span>{loading ? "Importing..." : "VTI"}</span>
-                    <small>{hasVtiData ? "Loaded" : "Missing"}</small>
-                </button>
-                <button
-                    type="button"
-                    className={soButtonClassName}
-                    onClick={onReadSuperOffice}
-                    disabled={soImportDisabled}
-                    aria-pressed={hasSuperOfficeData}
-                    title={hasSuperOfficeData ? "SO data loaded. Use Clear to import another SO JSON." : "Import missing SO data. Alt+W"}
-                >
-                    <span>SO</span>
-                    <small>{hasSuperOfficeData ? "Loaded" : "Missing"}</small>
-                </button>
+                {!hasVtiData && (
+                    <button
+                        type="button"
+                        className="client-import-status-btn client-import-status-btn--vti is-missing"
+                        onClick={onReadClipboard}
+                        disabled={loading}
+                        title="Import missing VTI data. Alt+Q"
+                    >
+                        <span>{loading ? "Importing..." : "VTI"}</span>
+                        <small>Missing</small>
+                    </button>
+                )}
+                {!hasSuperOfficeData && (
+                    <button
+                        type="button"
+                        className="client-import-status-btn client-import-status-btn--so is-missing"
+                        onClick={onReadSuperOffice}
+                        disabled={loading}
+                        title="Import missing SO data. Alt+W"
+                    >
+                        <span>SO</span>
+                        <small>Missing</small>
+                    </button>
+                )}
                 <button
                     type="button"
                     className="client-import-clear-btn"
