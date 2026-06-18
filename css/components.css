@@ -9451,6 +9451,10 @@ textarea::placeholder,
     white-space: nowrap;
 }
 
+a.tools-bar-btn {
+    text-decoration: none;
+}
+
 .tools-bar-btn:hover {
     background: var(--button-secondary-bg-hover);
     border-color: var(--control-border-hover);

@@ -6,22 +6,65 @@ import { copyHtml, copyText, showToast } from "../services/clipboardService.js";
 import { isModuleTool, loadTools, resolveToolUrl, sanitizeToolColor } from "../services/toolsService.js";
 import { buildToolModuleSrcDoc, buildToolRuntimeContext } from "../utils/toolModuleRuntime.js";
 
-const ToolButton = memo(function ToolButton({ tool, onOpenTool }) {
-    const handleClick = useCallback(() => {
-        onOpenTool(tool);
-    }, [onOpenTool, tool]);
+const ToolButton = memo(function ToolButton({ tool, valuesRef, onOpenModule }) {
+    const linkRef = useRef(null);
+    const moduleTool = isModuleTool(tool);
+
+    const resolveHref = useCallback(() => (
+        moduleTool ? "" : resolveToolUrl(tool.url, valuesRef?.current || {})
+    ), [moduleTool, tool.url, valuesRef]);
+
+    const refreshHref = useCallback(() => {
+        const href = resolveHref();
+        if (linkRef.current) {
+            if (href) linkRef.current.setAttribute("href", href);
+            else linkRef.current.removeAttribute("href");
+        }
+        return href;
+    }, [resolveHref]);
+
+    const handleModuleClick = useCallback(() => {
+        onOpenModule(tool);
+    }, [onOpenModule, tool]);
+
+    const handleLinkClick = useCallback((event) => {
+        const href = refreshHref();
+        if (href) return;
+        event.preventDefault();
+        showToast("This tool has no URL.", "warning");
+    }, [refreshHref]);
+
+    if (!moduleTool) {
+        const href = resolveHref();
+
+        return (
+            <a
+                ref={linkRef}
+                href={href || undefined}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`tools-bar-btn tools-bar-btn--custom tools-bar-btn--${sanitizeToolColor(tool.color)}`}
+                title={tool.url || tool.title}
+                onPointerDown={refreshHref}
+                onFocus={refreshHref}
+                onClick={handleLinkClick}
+                onAuxClick={handleLinkClick}
+            >
+                {tool.title}
+                <ExternalLink size={11} strokeWidth={2} aria-hidden="true" />
+            </a>
+        );
+    }
 
     return (
         <button
             type="button"
             className={`tools-bar-btn tools-bar-btn--custom tools-bar-btn--${sanitizeToolColor(tool.color)}`}
-            title={isModuleTool(tool) ? `${tool.title} module` : (tool.url || tool.title)}
-            onClick={handleClick}
+            title={`${tool.title} module`}
+            onClick={handleModuleClick}
         >
             {tool.title}
-            {isModuleTool(tool)
-                ? <Puzzle size={12} strokeWidth={2} aria-hidden="true" />
-                : <ExternalLink size={11} strokeWidth={2} aria-hidden="true" />}
+            <Puzzle size={12} strokeWidth={2} aria-hidden="true" />
         </button>
     );
 });
@@ -218,18 +261,9 @@ function ToolsBar({
         return () => window.removeEventListener("tools-updated", handler);
     }, [reload]);
 
-    const openTool = useCallback((tool) => {
-        if (isModuleTool(tool)) {
-            setActiveModuleTool(tool);
-            return;
-        }
-        const url = resolveToolUrl(tool.url, valuesRef.current);
-        if (!url) {
-            showToast("This tool has no URL.", "warning");
-            return;
-        }
-        window.open(url, "_blank", "noopener,noreferrer");
-    }, [valuesRef]);
+    const openModuleTool = useCallback((tool) => {
+        setActiveModuleTool(tool);
+    }, []);
 
     const closeModuleTool = useCallback(() => {
         setActiveModuleTool(null);
@@ -289,7 +323,8 @@ function ToolsBar({
                     <ToolButton
                         key={tool.id}
                         tool={tool}
-                        onOpenTool={openTool}
+                        valuesRef={valuesRef}
+                        onOpenModule={openModuleTool}
                     />
                 ))}
             </div>
