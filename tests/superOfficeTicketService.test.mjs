@@ -5,6 +5,7 @@ import {
   getSuperOfficeClientSignature,
   loadDisplaySuperOfficeTicketPayload,
   loadSuperOfficeTicketPayload,
+  saveDisplaySuperOfficeExternalId,
   saveSuperOfficeTicketPayload
 } from "../src/services/superOfficeTicketService.js";
 import { clearAppIndexedDB } from "../src/services/indexedDbService.js";
@@ -56,6 +57,8 @@ const clientB = {
   billingAccount: "BA-2",
   customerName: "Client B"
 };
+const pendingExternalId = "VALID//26.02.2026//123//SO1//Lost//Fiber Off//Other//X6//EWB//ABC//L1//OLT//1//BOK|BOF//Pending comment";
+const storedExternalId = "MINFO//27.02.2026//456//SO2//Never//Fiber Red//FLL Ticket//W7//SGSW//DEF//L2//OLT2//2//BOK2|BOF2//Stored comment";
 
 assert.equal(
   getSuperOfficeClientSignature(clientA),
@@ -90,10 +93,17 @@ assert.equal(pending.clientSignature, "");
 assert.equal(await loadSuperOfficeTicketPayload(), null);
 assert.equal((await loadDisplaySuperOfficeTicketPayload()).ticketId, "31436061");
 
+const updatedPending = await saveDisplaySuperOfficeExternalId(pendingExternalId);
+assert.equal(updatedPending.externalTicketId, pendingExternalId);
+assert.equal((await loadDisplaySuperOfficeTicketPayload()).externalTicketId, pendingExternalId);
+assert.equal((await loadDisplaySuperOfficeTicketPayload()).tokenValues["{external_customer}"], "123");
+assert.equal((await loadDisplaySuperOfficeTicketPayload()).tokenValues["{external_bok_bof}"], "BOK|BOF");
+
 await saveActiveClientPayload(clientA);
 const consumed = await consumePendingSuperOfficeTicketPayload();
 assert.equal(consumed.ticketId, "31436061");
-assert.equal(consumed.tokenValues["{so_ticket_num}"], "31436061");
+assert.equal(consumed.tokenValues["{so_ticket_num}"], "SO1");
+assert.equal(consumed.externalTicketId, pendingExternalId);
 assert.equal((await loadSuperOfficeTicketPayload()).imageAttachments.length, 1);
 
 globalThis.localStorage.clear();
@@ -115,6 +125,12 @@ assert.equal(saved.createdAt, "6/4/2026 12:07 PM");
 assert.equal(saved.tokenValues["{so_ticket_num}"], "31436062");
 assert.equal((await loadSuperOfficeTicketPayload()).imageAttachments.length, 1);
 assert.equal((await loadSuperOfficeTicketPayload()).createdAt, "6/4/2026 12:07 PM");
+
+const updatedStored = await saveDisplaySuperOfficeExternalId(storedExternalId);
+assert.equal(updatedStored.externalTicketId, storedExternalId);
+assert.equal((await loadSuperOfficeTicketPayload()).externalTicketId, storedExternalId);
+assert.equal((await loadSuperOfficeTicketPayload()).tokenValues["{external_customer}"], "456");
+assert.equal((await loadSuperOfficeTicketPayload()).tokenValues["{external_bok_bof}"], "BOK2|BOF2");
 
 await saveActiveClientPayload(clientB);
 assert.equal(await loadSuperOfficeTicketPayload(), null);

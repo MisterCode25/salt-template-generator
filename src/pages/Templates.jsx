@@ -66,7 +66,8 @@ import {
     SUPER_OFFICE_TICKET_UPDATED_EVENT,
     hasSuperOfficeTicketPayload,
     loadDisplaySuperOfficeTicketPayload,
-    loadSuperOfficeTicketPayload
+    loadSuperOfficeTicketPayload,
+    saveDisplaySuperOfficeExternalId
 } from "../services/superOfficeTicketService.js";
 import {
     buildAloPreparationDefaults,
@@ -1355,8 +1356,14 @@ export default function Templates() {
         setExternalGeneratorStartField(null);
     };
 
-    const saveExternalGeneratorResult = useCallback((externalId) => {
-        return runtimeRef.current.saveClientExternalId(externalId);
+    const saveExternalGeneratorResult = useCallback(async (externalId) => {
+        const nextClientPayload = await runtimeRef.current.saveClientExternalId(externalId);
+        const nextTicket = await saveDisplaySuperOfficeExternalId(externalId);
+        if (nextTicket) {
+            setSuperOfficeTicket(nextTicket);
+            setSuperOfficeDataPresent(true);
+        }
+        return nextClientPayload || nextTicket;
     }, []);
 
     const openWorkspace = useCallback((workspace) => {
@@ -1716,6 +1723,7 @@ export default function Templates() {
                         startField={externalGeneratorStartField}
                         onClose={closeExternalGenerator}
                         onExternalIdSaved={saveExternalGeneratorResult}
+                        initialExternalId={displayClientExternalId}
                         clientPayload={runtime.clientPayload}
                     />
                 </Suspense>

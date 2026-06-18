@@ -3,6 +3,11 @@ import {
     normalizeSuperOfficeAttachments
 } from "../utils/superOfficeImport.js";
 import {
+    buildExternalTokenValues,
+    getValidExternalId,
+    parseExternalId
+} from "../utils/externalGenerator.js";
+import {
     IMPORTED_EXTERNAL_ID_KEY,
     MANUAL_CLIENT_INPUTS_KEY,
     loadActiveClientPayload
@@ -145,6 +150,38 @@ export async function saveSuperOfficeTicketPayload(importResult) {
     await removePendingPayload();
     dispatchSuperOfficeTicketUpdated(payload);
     return payload;
+}
+
+export async function saveDisplaySuperOfficeExternalId(externalId) {
+    const validExternalId = getValidExternalId(externalId);
+    if (!validExternalId) return null;
+
+    const storedPayload = await loadSuperOfficeTicketPayload();
+    const pendingPayload = storedPayload ? null : await loadPendingPayload();
+    const currentPayload = storedPayload || pendingPayload;
+    if (!currentPayload) return null;
+
+    const parsed = parseExternalId(validExternalId);
+    const nextTokenValues = parsed.ok
+        ? {
+            ...(currentPayload.tokenValues || {}),
+            ...buildExternalTokenValues(parsed.fields)
+        }
+        : currentPayload.tokenValues || {};
+    const nextPayload = normalizeStoredTicketPayload({
+        ...currentPayload,
+        externalTicketId: validExternalId,
+        tokenValues: nextTokenValues
+    });
+    if (!nextPayload) return null;
+
+    if (nextPayload.clientSignature) {
+        await saveStoredPayload(nextPayload);
+    } else {
+        await savePendingPayload(nextPayload);
+    }
+    dispatchSuperOfficeTicketUpdated(nextPayload);
+    return nextPayload;
 }
 
 function removeStoredSuperOfficeTicketPayload() {

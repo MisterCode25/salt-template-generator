@@ -249,6 +249,7 @@ export default function ExternalGenerator({
     startField = null,
     onClose,
     onExternalIdSaved,
+    initialExternalId = "",
     clientPayload = null
 }) {
     const navigate = useNavigate();
@@ -358,15 +359,21 @@ export default function ExternalGenerator({
             const storedTokenValues = await loadTokenInputValues();
             const stored = storedTokenValues[SO_TICKET_NUM_TOKEN] ?? null;
             const storedExternalFields = await readExternalFieldsFromStoredTokens();
+            const parsedInitialExternalId = parseExternalId(initialExternalId);
+            const initialExternalFields = parsedInitialExternalId.ok ? parsedInitialExternalId.fields : {};
+            const hasInitialExternalFields = Object.keys(initialExternalFields).length > 0;
             externalTokenSyncReadyRef.current = true;
             setExternalTokenSyncReady(true);
-            if (Object.keys(storedExternalFields).length > 0 || (stored !== null && stored.trim() !== "")) {
+            if (hasInitialExternalFields || Object.keys(storedExternalFields).length > 0 || (stored !== null && stored.trim() !== "")) {
                 setFields(prev => ({
                     ...prev,
                     ...storedExternalFields,
-                    soTicket: stored !== null && stored.trim() !== ""
-                        ? stored.trim()
-                        : storedExternalFields.soTicket || prev.soTicket
+                    ...initialExternalFields,
+                    soTicket: hasInitialExternalFields
+                        ? initialExternalFields.soTicket || ""
+                        : (stored !== null && stored.trim() !== ""
+                            ? stored.trim()
+                            : storedExternalFields.soTicket || prev.soTicket)
                 }));
             } else {
                 await syncExternalTokenValues(fieldsRef.current);
