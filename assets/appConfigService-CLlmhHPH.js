@@ -1,0 +1,1 @@
+import{w as i,K as s}from"./tokenService-D05V1yuF.js";const n="configName",o="No configuration";async function e(){const t=await i(n,o);return typeof t=="string"&&t.trim()?t:o}async function N(t){const a=typeof t=="string"&&t.trim()?t.trim():o;return await s(n,a),a}export{e as l,N as s};
