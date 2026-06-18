@@ -6,12 +6,14 @@ import {
     buildExternalTokenValues,
     parseExternalId
 } from "./externalGenerator.js";
+import { buildClientTokenIndex, normalizeClientTokenName } from "./clientClipboard.js";
 
 export const EXTERNAL_CUSTOMER_TOKEN = "{external_customer}";
 const CONTRACTOR_TOKENS = ["{contractor}", "{contractor_number}", "{client_contractor_number}"];
 const EXTERNAL_TOKEN_BY_FIELD = Object.freeze(Object.fromEntries(
     EXTERNAL_SYSTEM_TOKEN_FIELDS.map(({ field, token }) => [field, token])
 ));
+const EXTERNAL_SYSTEM_TOKEN_SET = new Set(EXTERNAL_SYSTEM_TOKEN_FIELDS.map(({ token }) => token));
 const VTI_EXTERNAL_FIELD_CONFLICTS = Object.freeze([
     { field: "customer", label: "Contractor", sourceLabel: "VTI customer data", token: EXTERNAL_CUSTOMER_TOKEN },
     { field: "boxType", label: "Box type", sourceLabel: "VTI router data", token: EXTERNAL_TOKEN_BY_FIELD.boxType },
@@ -42,6 +44,7 @@ function addConflict(conflicts, conflict) {
     const externalValue = textValue(conflict.externalValue);
     if (!externalValue) return;
     if (valuesMatch(externalValue, expectedValue)) return;
+    if (conflict.clientKey && conflicts.some((entry) => entry.clientKey === conflict.clientKey)) return;
 
     conflicts.push({
         ...conflict,
@@ -64,11 +67,70 @@ function getExternalFields(importResult = {}) {
     return parsed.ok ? parsed.fields : null;
 }
 
+function rawTokenName(token = "") {
+    return String(token ?? "").trim().replace(/[{}]/g, "");
+}
+
+function tokenClientKeyCandidates(token = "") {
+    const rawName = rawTokenName(token);
+    const normalized = normalizeClientTokenName(rawName);
+    const candidates = new Set([normalized]);
+    const prefixPattern = /^(external|so|superoffice|super_office|vti|client|customer)(.+)$/;
+    const normalizedPrefixMatch = normalized.match(prefixPattern);
+    if (normalizedPrefixMatch?.[2]) candidates.add(normalizedPrefixMatch[2]);
+
+    const parts = rawName
+        .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+        .split(/[^a-zA-Z0-9]+/)
+        .filter(Boolean);
+    if (parts.length > 1) {
+        const firstPart = normalizeClientTokenName(parts[0]);
+        if (["external", "so", "superoffice", "vti", "client", "customer"].includes(firstPart)) {
+            candidates.add(normalizeClientTokenName(parts.slice(1).join(" ")));
+        }
+    }
+
+    return Array.from(candidates).filter(Boolean);
+}
+
+function findClientTokenMatch(clientIndex, token = "") {
+    for (const candidate of tokenClientKeyCandidates(token)) {
+        if (clientIndex.has(candidate)) {
+            return {
+                clientKey: candidate,
+                value: clientIndex.get(candidate)
+            };
+        }
+    }
+    return null;
+}
+
+function formatTokenConflictLabel(token = "") {
+    const rawName = rawTokenName(token)
+        .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+        .replace(/[_-]+/g, " ")
+        .trim();
+    const withoutSourcePrefix = rawName.replace(/^(external|so|super office|superoffice|vti)\s+/i, "");
+    const label = withoutSourcePrefix || rawName || "Field";
+    return label
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((word) => word.length <= 3 ? word.toUpperCase() : `${word.charAt(0).toUpperCase()}${word.slice(1)}`)
+        .join(" ");
+}
+
+function shouldSkipGenericTokenConflict(token = "", externalFields = null) {
+    if (token === SO_TICKET_NUM_TOKEN) return true;
+    if (EXTERNAL_SYSTEM_TOKEN_SET.has(token)) return true;
+    return Boolean(externalFields?.customer && CONTRACTOR_TOKENS.includes(token));
+}
+
 export function getExternalIdSourceConflicts(importResult = {}, clientPayload = null) {
     const conflicts = [];
     const tokenValues = importResult?.tokenValues || {};
     const externalFields = getExternalFields(importResult);
     const vtiFields = getVtiExternalFields(clientPayload);
+    const clientIndex = buildClientTokenIndex(clientPayload);
 
     VTI_EXTERNAL_FIELD_CONFLICTS.forEach(({ field, label, sourceLabel, token }) => {
         addConflict(conflicts, {
@@ -76,6 +138,7 @@ export function getExternalIdSourceConflicts(importResult = {}, clientPayload = 
             token,
             label,
             sourceLabel,
+            clientKey: normalizeClientTokenName(field === "customer" ? "contractor" : field),
             externalValue: externalFields?.[field] ?? tokenValues[token],
             expectedValue: vtiFields[field]
         });
@@ -88,6 +151,21 @@ export function getExternalIdSourceConflicts(importResult = {}, clientPayload = 
         sourceLabel: "SO ticket JSON",
         externalValue: externalFields?.soTicket ?? tokenValues[SO_TICKET_NUM_TOKEN],
         expectedValue: importResult?.sourceTicketId
+    });
+
+    Object.entries(tokenValues).forEach(([token, value]) => {
+        if (shouldSkipGenericTokenConflict(token, externalFields)) return;
+        const clientMatch = findClientTokenMatch(clientIndex, token);
+        if (!clientMatch) return;
+        addConflict(conflicts, {
+            field: rawTokenName(token),
+            token,
+            label: formatTokenConflictLabel(token),
+            sourceLabel: "VTI client data",
+            clientKey: clientMatch.clientKey,
+            externalValue: value,
+            expectedValue: clientMatch.value
+        });
     });
 
     return conflicts;

@@ -824,11 +824,11 @@ export function ClientPasteModal({ onClose, onImport, initialError = "" }) {
 
 export function ExternalIdConflictModal({ conflicts = [], onKeepSourceValues, onKeepExternalIdValues, onCancel }) {
     return (
-        <Modal onClose={onCancel} dialogClassName="popup-box external-id-conflict-modal" ariaLabel="External ID conflict">
+        <Modal onClose={onCancel} dialogClassName="popup-box external-id-conflict-modal" ariaLabel="Import data conflict">
             <div className="popup-header">
                 <div>
-                    <h2>VTI / SO data conflict</h2>
-                    <p className="hint">Some External ID values do not match the imported VTI or SO ticket data. Choose which values to keep.</p>
+                    <h2>Import data conflict</h2>
+                    <p className="hint">Some SuperOffice import values do not match the current VTI/client data. Choose which values to keep.</p>
                 </div>
             </div>
             <div className="external-id-conflict-list">
@@ -840,7 +840,7 @@ export function ExternalIdConflictModal({ conflicts = [], onKeepSourceValues, on
                         </div>
                         <div className="external-id-conflict-values">
                             <div>
-                                <span>External ID</span>
+                                <span>SO import</span>
                                 <code>{conflict.externalValue || "Empty"}</code>
                             </div>
                             <div className="external-id-conflict-arrow" aria-hidden="true">→</div>
@@ -854,8 +854,8 @@ export function ExternalIdConflictModal({ conflicts = [], onKeepSourceValues, on
             </div>
             <div className="popup-actions">
                 <button type="button" className="secondary-btn" onClick={onCancel}>Cancel import</button>
-                <button type="button" className="secondary-btn" onClick={onKeepExternalIdValues}>Keep External ID</button>
-                <button type="button" className="primary-btn" onClick={onKeepSourceValues}>Keep VTI / SO data</button>
+                <button type="button" className="secondary-btn" onClick={onKeepExternalIdValues}>Keep SO import</button>
+                <button type="button" className="primary-btn" onClick={onKeepSourceValues}>Keep VTI/client data</button>
             </div>
         </Modal>
     );
@@ -1044,9 +1044,9 @@ export function useTemplateRuntime() {
         }
 
         const message = options.corrected
-            ? "VTI / SO values kept and SuperOffice data imported."
+            ? "VTI/client values kept and SuperOffice data imported."
             : options.keptExternalId
-                ? "External ID values kept and SuperOffice data imported."
+                ? "SuperOffice import values kept."
                 : nextResult.ignoredExternalId
                     ? "SO ticket imported. External ID ignored because its format is invalid."
                     : "SuperOffice data imported.";
@@ -1062,7 +1062,7 @@ export function useTemplateRuntime() {
         if (!prompt) return false;
         setExternalIdConflictPrompt(prompt);
         setClientImportStatus({ type: "idle", message: "" });
-        showToast("External ID conflict detected.", "warning");
+        showToast("Import data conflict detected.", "warning");
         return true;
     };
 
@@ -1198,7 +1198,7 @@ export function useTemplateRuntime() {
             const conflictPrompt = buildExternalIdConflictPrompt(candidateSuperOfficeTicket, payload);
             if (conflictPrompt) {
                 setExternalIdConflictPrompt(conflictPrompt);
-                showToast("External ID conflict detected.", "warning");
+                showToast("Import data conflict detected.", "warning");
                 superOfficeTokenValues = {};
                 activeSuperOfficeTicket = null;
             } else {

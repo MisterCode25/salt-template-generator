@@ -1,4 +1,4 @@
-import { SO_TICKET_NUM_TOKEN } from "./tokenCanonicalization.js";
+import { canonicalizeInputTokenValue, SO_TICKET_NUM_TOKEN } from "./tokenCanonicalization.js";
 import { buildExternalTokenValues, parseExternalId } from "./externalGenerator.js";
 
 const IMAGE_ATTACHMENT_PATTERN = /\.(jpe?g|png|webp|gif|bmp|avif)(?:$|[?#])/i;
@@ -144,6 +144,42 @@ function assignContractorTokenValues(tokenValues, contractorNumber) {
     });
 }
 
+function isPlainObject(value) {
+    return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function addTokenValueEntry(entries, rawName, rawValue) {
+    const token = canonicalizeInputTokenValue(rawName);
+    const value = valueOf(rawValue);
+    if (!token || !value) return;
+    entries.push([token, value]);
+}
+
+function collectTokenValueEntries(source, path = []) {
+    const entries = [];
+    if (!isPlainObject(source)) return entries;
+
+    Object.entries(source).forEach(([key, value]) => {
+        if (isPlainObject(value)) {
+            entries.push(...collectTokenValueEntries(value, [...path, key]));
+            return;
+        }
+        addTokenValueEntry(entries, [...path, key].join("."), value);
+    });
+
+    return entries;
+}
+
+function getExplicitSuperOfficeTokenValues(payload = {}) {
+    const explicitValues = {};
+    ["tokenValues", "values", "variables", "fields"].forEach((containerKey) => {
+        collectTokenValueEntries(payload[containerKey]).forEach(([token, value]) => {
+            explicitValues[token] = value;
+        });
+    });
+    return explicitValues;
+}
+
 export function normalizeSuperOfficeAttachments(attachments = []) {
     if (!Array.isArray(attachments)) return [];
 
@@ -228,6 +264,8 @@ export function parseSuperOfficeInfoPayload(input) {
             Object.assign(tokenValues, buildExternalTokenValues(parsedExternalId.fields));
         }
     }
+
+    Object.assign(tokenValues, getExplicitSuperOfficeTokenValues(payload));
 
     const contractorNumber = externalFields?.customer || payloadContractorNumber;
     if (contractorNumber && (externalIdValid || sourceTicketId || attachments.length > 0)) {

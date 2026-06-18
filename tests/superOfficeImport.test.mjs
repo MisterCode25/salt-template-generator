@@ -90,6 +90,59 @@ import { parseExternalId } from "../src/utils/externalGenerator.js";
 
 {
   const result = parseSuperOfficeInfoPayload({
+    ticketId: "SO-2",
+    tokenValues: {
+      "{client_mobile}": "079 111 22 33"
+    },
+    values: {
+      healthcheck: {
+        lexId: "LEX-SO"
+      }
+    },
+    variables: {
+      client: {
+        firstName: "Sofia"
+      }
+    }
+  });
+  const conflicts = getExternalIdSourceConflicts(result, {
+    client: {
+      firstName: "Peter",
+      mobile: "078 912 56 85"
+    },
+    healthcheck: {
+      lexId: "LEX-VTI"
+    }
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.tokenValues["{client_mobile}"], "079 111 22 33");
+  assert.equal(result.tokenValues["{healthcheck_lex_id}"], "LEX-SO");
+  assert.equal(result.tokenValues["{client_first_name}"], "Sofia");
+  assert.deepEqual(conflicts.map((conflict) => conflict.token), [
+    "{client_mobile}",
+    "{healthcheck_lex_id}",
+    "{client_first_name}"
+  ]);
+  assert.deepEqual(conflicts.map((conflict) => conflict.expectedValue), [
+    "078 912 56 85",
+    "LEX-VTI",
+    "Peter"
+  ]);
+
+  const correctedResult = applyExternalIdSourceCorrectionsToImportResult(result, conflicts);
+  assert.equal(correctedResult.tokenValues["{client_mobile}"], "078 912 56 85");
+  assert.equal(correctedResult.tokenValues["{healthcheck_lex_id}"], "LEX-VTI");
+  assert.equal(correctedResult.tokenValues["{client_first_name}"], "Peter");
+
+  const keptImportResult = applyExternalIdValuesToImportResult(result);
+  assert.equal(keptImportResult.tokenValues["{client_mobile}"], "079 111 22 33");
+  assert.equal(keptImportResult.tokenValues["{healthcheck_lex_id}"], "LEX-SO");
+  assert.equal(keptImportResult.tokenValues["{client_first_name}"], "Sofia");
+}
+
+{
+  const result = parseSuperOfficeInfoPayload({
     ticketId: "SO-1",
     externalTicketId: "VALID//26.02.2026//31447756//SO-1//Lost//Fiber Off//Other//X6//EWB//ABC//LEX-SO//OLT-SO//BOARD-SO//BOK-SO|1//Comment"
   });
