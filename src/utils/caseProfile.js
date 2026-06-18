@@ -584,3 +584,100 @@ export function buildCaseProfile({
 
     return finalizeProfile(profile, tokenValues);
 }
+
+function profileField(profile, key, label = "") {
+    const value = displayValue(profile?.[key] ?? profile?.fields?.[key]);
+    return value ? { label: label || FIELD_LABELS[key] || humanizeName(key), value } : null;
+}
+
+function fieldFromValue(label, value) {
+    const text = displayValue(value);
+    return text ? { label, value: text } : null;
+}
+
+function compactFields(fields = []) {
+    const seen = new Set();
+    return fields.filter(Boolean).filter((field) => {
+        const key = `${normalizeName(field.label)}:${field.value}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+}
+
+function section(id, title, fields = []) {
+    const compact = compactFields(fields);
+    return compact.length > 0 ? { id, title, fields: compact } : null;
+}
+
+export function getCaseProfileSummaryFields(profile = null) {
+    if (!profile || typeof profile !== "object") return [];
+
+    return compactFields([
+        fieldFromValue("Name", profile.clientName),
+        fieldFromValue("Mobile", firstValue(profile.mobile, profile.mobileRaw, profile.phone)),
+        fieldFromValue("Contractor", firstValue(profile.contractorNumber, profile.externalCustomer, profile.customerId)),
+        fieldFromValue("Activation", profile.activationDate),
+        fieldFromValue("OTO ID", profile.otoId),
+        fieldFromValue("Port", firstValue(profile.otoPortId, profile.crossConnectionPort)),
+        fieldFromValue("SO ticket", profile.soTicketNum)
+    ]);
+}
+
+export function getCaseProfileInfoSections(profile = null) {
+    if (!profile || typeof profile !== "object") return [];
+
+    return [
+        section("caseClient", "Client", [
+            profileField(profile, "clientName", "Full name"),
+            profileField(profile, "contractorNumber", "Contractor"),
+            profileField(profile, "title"),
+            profileField(profile, "firstName"),
+            profileField(profile, "lastName"),
+            profileField(profile, "mobile"),
+            profileField(profile, "mobileRaw", "Mobile raw"),
+            profileField(profile, "phone"),
+            profileField(profile, "email"),
+            profileField(profile, "address"),
+            profileField(profile, "communicationLanguage", "Language"),
+            profileField(profile, "activationDate", "Activation date")
+        ]),
+        section("caseSuperOffice", "SuperOffice", [
+            profileField(profile, "soTicketNum", "SO ticket"),
+            profileField(profile, "ticketCreatedAt", "Created at"),
+            profileField(profile, "externalId", "External ID"),
+            profileField(profile, "externalPartner", "Partner"),
+            profileField(profile, "externalPartnerTicketNumber", "Partner ticket")
+        ]),
+        section("caseExternalId", "External ID fields", [
+            profileField(profile, "externalFlagging", "Flagging"),
+            profileField(profile, "externalDate", "Date"),
+            profileField(profile, "externalCustomer", "Contractor"),
+            profileField(profile, "externalSignalStatus", "Signal"),
+            profileField(profile, "externalLedStatus", "LED"),
+            profileField(profile, "externalTreatmentStep", "Treatment"),
+            profileField(profile, "externalBoxType", "Box"),
+            profileField(profile, "externalLexId", "LEX ID"),
+            profileField(profile, "externalOltName", "OLT"),
+            profileField(profile, "externalOltBoard", "Board"),
+            profileField(profile, "externalBokBof", "BOK/BOF"),
+            profileField(profile, "externalComment", "Comment")
+        ]),
+        section("caseTechnical", "Technical", [
+            profileField(profile, "fllRecordId", "FLL record"),
+            profileField(profile, "otoId", "OTO ID"),
+            profileField(profile, "otoPortId", "OTO port"),
+            profileField(profile, "routerSerialNumber", "Router serial"),
+            profileField(profile, "oldRouterSerialNumber", "Old router serial"),
+            profileField(profile, "lexId", "LEX ID"),
+            profileField(profile, "oltName", "OLT"),
+            profileField(profile, "oltBoard", "OLT board"),
+            profileField(profile, "ponPort", "PON port"),
+            profileField(profile, "breakoutCableId", "Breakout cable"),
+            profileField(profile, "fiberNumber", "Fiber number"),
+            profileField(profile, "lineState", "Line state"),
+            profileField(profile, "routerStatus", "Router status"),
+            profileField(profile, "crossConnectionPort", "Cross connection port")
+        ])
+    ].filter(Boolean);
+}

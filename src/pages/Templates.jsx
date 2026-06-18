@@ -73,7 +73,11 @@ import {
     formatAloAutofillPayload
 } from "../utils/aloAutofill.js";
 import { getKeyboardShortcutForEvent } from "../utils/keyboardShortcuts.js";
-import { buildCaseProfile } from "../utils/caseProfile.js";
+import {
+    buildCaseProfile,
+    getCaseProfileInfoSections,
+    getCaseProfileSummaryFields
+} from "../utils/caseProfile.js";
 
 const ExternalGenerator = lazy(() => import("./ExternalGenerator.jsx"));
 const ManageNodes = lazy(() => import("./ManageNodes.jsx"));
@@ -120,6 +124,36 @@ function plainTextFromTemplate(value) {
         .replace(/&gt;/g, ">")
         .replace(/\n{3,}/g, "\n\n")
         .trim();
+}
+
+function normalizeDisplayFieldKey(label = "", value = "") {
+    return `${String(label || "").trim().toLowerCase()}:${String(value || "").trim()}`;
+}
+
+function mergeDisplayInfoSections(primarySections = [], fallbackSections = []) {
+    if (!Array.isArray(primarySections) || primarySections.length === 0) return fallbackSections;
+    if (!Array.isArray(fallbackSections) || fallbackSections.length === 0) return primarySections;
+
+    const seen = new Set();
+    primarySections.forEach((sectionItem) => {
+        (sectionItem?.fields || []).forEach((field) => {
+            seen.add(normalizeDisplayFieldKey(field.label, field.value));
+        });
+    });
+
+    const nextFallbackSections = fallbackSections
+        .map((sectionItem) => ({
+            ...sectionItem,
+            fields: (sectionItem.fields || []).filter((field) => {
+                const key = normalizeDisplayFieldKey(field.label, field.value);
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            })
+        }))
+        .filter((sectionItem) => sectionItem.fields.length > 0);
+
+    return [...primarySections, ...nextFallbackSections];
 }
 
 const NODE_ICON_MAP = {
@@ -901,12 +935,23 @@ export default function Templates() {
         superOfficePayload: superOfficeTicket,
         tokenValues: runtime.values
     }), [runtime.clientPayload, runtime.values, superOfficeTicket]);
+    const caseProfileInfoSections = useMemo(() => getCaseProfileInfoSections(caseProfile), [caseProfile]);
+    const caseProfileSummaryFields = useMemo(() => getCaseProfileSummaryFields(caseProfile), [caseProfile]);
+    const displayClientInfoSections = useMemo(
+        () => mergeDisplayInfoSections(runtime.clientInfoSections, caseProfileInfoSections),
+        [caseProfileInfoSections, runtime.clientInfoSections]
+    );
+    const displayClientSummaryFields = runtime.clientPayload
+        ? runtime.clientSummaryFields
+        : caseProfileSummaryFields;
+    const displayClientExternalId = runtime.clientExternalId || caseProfile.externalId || "";
+    const canCustomizeClientBar = runtime.clientBarFieldGroups.length > 0;
 
     toolRuntimeContextRef.current = {
         tokens: runtime.tokens,
         client: runtime.clientPayload,
-        clientInfo: runtime.clientInfoSections,
-        clientSummary: runtime.clientSummaryFields,
+        clientInfo: displayClientInfoSections,
+        clientSummary: displayClientSummaryFields,
         profile: caseProfile
     };
 
@@ -1459,9 +1504,9 @@ export default function Templates() {
             </header>
 
             <ClientInfoPanel
-                sections={runtime.clientInfoSections}
-                summaryFields={runtime.clientSummaryFields}
-                externalId={runtime.clientExternalId}
+                sections={displayClientInfoSections}
+                summaryFields={displayClientSummaryFields}
+                externalId={displayClientExternalId}
                 status={runtime.clientImportStatus}
                 loading={runtime.clientImportLoading}
                 detailsExpanded={runtime.clientDetailsExpanded}
@@ -1473,7 +1518,7 @@ export default function Templates() {
                 onReadSuperOffice={importSuperOfficeFromClipboardAndResetCase}
                 onOpenPaste={openClientPasteModal}
                 onClearClient={clearClientAndResetCase}
-                onCustomizeBar={() => runtimeRef.current.setClientBarCustomizeOpen(true)}
+                onCustomizeBar={canCustomizeClientBar ? () => runtimeRef.current.setClientBarCustomizeOpen(true) : null}
                 onExternalIdFieldClick={openExternalGenerator}
                 onToggleDetails={toggleClientDetails}
             />
@@ -1482,7 +1527,7 @@ export default function Templates() {
                 valuesRef={toolValuesRef}
                 runtimeContextRef={toolRuntimeContextRef}
                 onOpenExternalGenerator={openExternalGenerator}
-                hasExternalId={Boolean(runtime.clientExternalId)}
+                hasExternalId={Boolean(displayClientExternalId)}
                 onCopyAloAutofillData={copyAloAutofillData}
                 hasAloAutofillData={Boolean(runtime.clientPayload)}
                 onOpenSuperOfficePhotos={openSuperOfficeGallery}
@@ -1630,7 +1675,7 @@ export default function Templates() {
                 />
             )}
 
-            {runtime.clientBarCustomizeOpen && (
+            {runtime.clientBarCustomizeOpen && canCustomizeClientBar && (
                 <ClientBarCustomizeModal
                     groups={runtime.clientBarFieldGroups}
                     selectedKeys={runtime.clientBarFieldKeys}

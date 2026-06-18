@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { MANUAL_CLIENT_INPUTS_KEY } from "../src/services/activeClientService.js";
-import { buildCaseProfile, CASE_PROFILE_VERSION } from "../src/utils/caseProfile.js";
+import {
+  buildCaseProfile,
+  CASE_PROFILE_VERSION,
+  getCaseProfileInfoSections,
+  getCaseProfileSummaryFields
+} from "../src/utils/caseProfile.js";
 
 const importedExternalId = "FLAG//26.02.2026//777001//SO-777//Lost//Off//Check OTO//X6//EWB//ABC-123//LEX-SO//OLT-SO//B1//BOK|7//Inline note";
 
@@ -64,6 +69,20 @@ const importedExternalId = "FLAG//26.02.2026//777001//SO-777//Lost//Off//Check O
   assert.equal(profile.soTicketNum, "SO-777");
   assert.equal(profile.tokenValues["{external_date}"], "26.02.2026");
   assert.equal(profile.vars.externalPartnerTicketNumber, "ABC-123");
+
+  const summary = getCaseProfileSummaryFields(profile);
+  assert.ok(summary.some((field) => field.label === "Contractor" && field.value === "777001"));
+  assert.ok(summary.some((field) => field.label === "SO ticket" && field.value === "SO-777"));
+
+  const sections = getCaseProfileInfoSections(profile);
+  assert.ok(sections.some((section) =>
+    section.title === "SuperOffice"
+    && section.fields.some((field) => field.label === "External ID" && field.value === importedExternalId)
+  ));
+  assert.ok(sections.some((section) =>
+    section.title === "External ID fields"
+    && section.fields.some((field) => field.label === "Contractor" && field.value === "777001")
+  ));
 }
 
 {
