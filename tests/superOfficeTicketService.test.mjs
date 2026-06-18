@@ -3,6 +3,7 @@ import { IMPORTED_EXTERNAL_ID_KEY, MANUAL_CLIENT_INPUTS_KEY, saveActiveClientPay
 import {
   consumePendingSuperOfficeTicketPayload,
   getSuperOfficeClientSignature,
+  loadDisplaySuperOfficeTicketPayload,
   loadSuperOfficeTicketPayload,
   saveSuperOfficeTicketPayload
 } from "../src/services/superOfficeTicketService.js";
@@ -87,6 +88,7 @@ const pending = await saveSuperOfficeTicketPayload({
 
 assert.equal(pending.clientSignature, "");
 assert.equal(await loadSuperOfficeTicketPayload(), null);
+assert.equal((await loadDisplaySuperOfficeTicketPayload()).ticketId, "31436061");
 
 await saveActiveClientPayload(clientA);
 const consumed = await consumePendingSuperOfficeTicketPayload();

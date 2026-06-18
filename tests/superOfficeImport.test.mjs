@@ -21,7 +21,11 @@ import {
   assert.equal(result.createdAt, "6/4/2026 12:07 PM");
   assert.equal(result.externalIdValid, true);
   assert.equal(result.ignoredExternalId, false);
+  assert.equal(result.contractorNumber, "123");
   assert.equal(result.tokenValues["{so_ticket_num}"], "232");
+  assert.equal(result.tokenValues["{contractor}"], "123");
+  assert.equal(result.tokenValues["{contractor_number}"], "123");
+  assert.equal(result.tokenValues["{client_contractor_number}"], "123");
   assert.equal(result.tokenValues["{external_partner}"], "EWB");
   assert.equal(result.tokenValues["{external_partner_ticket_number}"], "ABC");
   assert.equal(result.tokenValues["{external_comment}"], undefined);
@@ -48,7 +52,22 @@ import {
 
   const corrected = applyExternalIdSourceCorrections(result.tokenValues, conflicts);
   assert.equal(corrected["{external_customer}"], "31447756");
+  assert.equal(corrected["{contractor}"], "31447756");
+  assert.equal(corrected["{contractor_number}"], "31447756");
+  assert.equal(corrected["{client_contractor_number}"], "31447756");
   assert.equal(corrected["{so_ticket_num}"], "31436062");
+}
+
+{
+  const result = parseSuperOfficeInfoPayload({
+    ticketId: "31436062",
+    contractorNumber: "31447756"
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.contractorNumber, "31447756");
+  assert.equal(result.tokenValues["{contractor}"], "31447756");
+  assert.equal(result.tokenValues["{contractor_number}"], "31447756");
 }
 
 {

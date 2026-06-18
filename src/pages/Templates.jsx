@@ -65,6 +65,7 @@ import { loadAgentProfile } from "../services/agentProfileService.js";
 import {
     SUPER_OFFICE_TICKET_UPDATED_EVENT,
     hasSuperOfficeTicketPayload,
+    loadDisplaySuperOfficeTicketPayload,
     loadSuperOfficeTicketPayload
 } from "../services/superOfficeTicketService.js";
 import {
@@ -968,7 +969,7 @@ export default function Templates() {
     }, []);
 
     const refreshSuperOfficeState = useCallback(async (payload = undefined) => {
-        const nextTicket = payload === undefined ? await loadSuperOfficeTicketPayload() : payload;
+        const nextTicket = payload === undefined ? await loadDisplaySuperOfficeTicketPayload() : payload;
         setSuperOfficeTicket(nextTicket || null);
         setSuperOfficeDataPresent(await hasSuperOfficeTicketPayload());
         return nextTicket;
@@ -995,7 +996,7 @@ export default function Templates() {
 
     useEffect(() => {
         const handler = (event) => {
-            refreshSuperOfficeState(event.detail?.payload);
+            refreshSuperOfficeState(event.detail?.payload ?? undefined);
         };
         window.addEventListener(SUPER_OFFICE_TICKET_UPDATED_EVENT, handler);
         return () => window.removeEventListener(SUPER_OFFICE_TICKET_UPDATED_EVENT, handler);

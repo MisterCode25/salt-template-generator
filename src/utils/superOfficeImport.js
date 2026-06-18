@@ -3,6 +3,7 @@ import { buildExternalTokenValues, parseExternalId } from "./externalGenerator.j
 
 const IMAGE_ATTACHMENT_PATTERN = /\.(jpe?g|png|webp|gif|bmp|avif)(?:$|[?#])/i;
 const PDF_ATTACHMENT_PATTERN = /\.pdf(?:$|[?#])/i;
+const CONTRACTOR_TOKENS = ["{contractor}", "{contractor_number}", "{client_contractor_number}"];
 
 function valueOf(...values) {
     for (const value of values) {
@@ -135,6 +136,14 @@ function getAttachmentDateMeta(attachment = {}) {
     };
 }
 
+function assignContractorTokenValues(tokenValues, contractorNumber) {
+    const text = valueOf(contractorNumber);
+    if (!text) return;
+    CONTRACTOR_TOKENS.forEach((token) => {
+        tokenValues[token] = text;
+    });
+}
+
 export function normalizeSuperOfficeAttachments(attachments = []) {
     if (!Array.isArray(attachments)) return [];
 
@@ -196,6 +205,15 @@ export function parseSuperOfficeInfoPayload(input) {
         payload.externalID,
         payload.hcampExternalId
     );
+    const payloadContractorNumber = valueOf(
+        payload.contractorNumber,
+        payload.contractor,
+        payload.contractorNo,
+        payload.customerId,
+        payload.customer,
+        payload.client?.contractorNumber,
+        payload.client?.contractor
+    );
     const tokenValues = {};
     let externalFields = null;
     let externalIdValid = false;
@@ -209,6 +227,11 @@ export function parseSuperOfficeInfoPayload(input) {
             externalFields = parsedExternalId.fields;
             Object.assign(tokenValues, buildExternalTokenValues(parsedExternalId.fields));
         }
+    }
+
+    const contractorNumber = externalFields?.customer || payloadContractorNumber;
+    if (contractorNumber && (externalIdValid || sourceTicketId || attachments.length > 0)) {
+        assignContractorTokenValues(tokenValues, contractorNumber);
     }
 
     const soTicket = sourceTicketId || externalFields?.soTicket || "";
@@ -231,6 +254,7 @@ export function parseSuperOfficeInfoPayload(input) {
         sourceTicketId,
         createdAt,
         externalTicketId,
+        contractorNumber,
         externalIdValid,
         externalFields,
         tokenValues,

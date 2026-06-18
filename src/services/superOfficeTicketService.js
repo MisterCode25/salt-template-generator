@@ -113,8 +113,12 @@ export function loadPendingSuperOfficeTicketPayload() {
     return loadPendingPayload();
 }
 
+export async function loadDisplaySuperOfficeTicketPayload() {
+    return await loadSuperOfficeTicketPayload() || await loadPendingPayload();
+}
+
 export async function hasSuperOfficeTicketPayload() {
-    return Boolean(await loadSuperOfficeTicketPayload() || await loadPendingPayload());
+    return Boolean(await loadDisplaySuperOfficeTicketPayload());
 }
 
 function removePendingPayload() {
