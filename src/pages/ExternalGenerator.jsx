@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Modal from "../components/Modal.jsx";
 import { copyText, showToast } from "../services/clipboardService.js";
-import { loadActiveClientPayload, saveClientInputValues } from "../services/activeClientService.js";
+import { loadActiveClientPayload, saveClientInputValues, saveImportedExternalId } from "../services/activeClientService.js";
 import { loadTokenInputValues } from "../services/tokenInputValueService.js";
 import { loadTokens, saveTokens } from "../services/tokenService.js";
 import { SO_TICKET_NUM_TOKEN, SO_TICKET_TOKEN_KEY } from "../utils/tokenCanonicalization.js";
@@ -435,10 +435,10 @@ export default function ExternalGenerator({
     };
 
     const saveCopiedExternalId = async (externalId) => {
-        if (!onExternalIdSaved) return;
         const text = String(externalId ?? "").trim();
         if (!parseExternalId(text).ok) return;
-        await onExternalIdSaved(text);
+        await saveImportedExternalId(text);
+        await onExternalIdSaved?.(text);
     };
 
     const runPostVtiCompletionFlow = async (initialFields, initialMeta = null) => {

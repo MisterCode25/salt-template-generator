@@ -15,6 +15,7 @@ export { STORED_INPUT_PREFIX } from "./tokenInputValueService.js";
 export const MANUAL_CLIENT_INPUTS_KEY = "__templateInputs";
 export const IMPORTED_EXTERNAL_ID_KEY = "__importedExternalId";
 export const CLIENT_INPUT_VALUES_UPDATED_EVENT = "client-input-values-updated";
+export const ACTIVE_CLIENT_PAYLOAD_UPDATED_EVENT = "active-client-payload-updated";
 
 function normalizeManualInputs(manualInputs) {
     if (!manualInputs || typeof manualInputs !== "object" || Array.isArray(manualInputs)) {
@@ -82,6 +83,13 @@ function dispatchClientInputValuesUpdated(values) {
     if (typeof window === "undefined" || !hasRecordValues(values)) return;
     window.dispatchEvent(new CustomEvent(CLIENT_INPUT_VALUES_UPDATED_EVENT, {
         detail: { values }
+    }));
+}
+
+function dispatchActiveClientPayloadUpdated(payload) {
+    if (typeof window === "undefined") return;
+    window.dispatchEvent(new CustomEvent(ACTIVE_CLIENT_PAYLOAD_UPDATED_EVENT, {
+        detail: { payload }
     }));
 }
 
@@ -208,6 +216,7 @@ export async function saveImportedExternalId(externalId) {
         }
 
         await saveActiveClientPayload(nextPayload);
+        dispatchActiveClientPayloadUpdated(nextPayload);
         return nextPayload;
     } catch (error) {
         console.error("saveImportedExternalId error", error);

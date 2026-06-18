@@ -2,6 +2,7 @@ import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, Copy } from "lucide-react";
 import { generateFinalText, getTemplateTextByLang } from "../core/tokenEngine.js";
 import {
+    ACTIVE_CLIENT_PAYLOAD_UPDATED_EVENT,
     CLIENT_INPUT_VALUES_UPDATED_EVENT,
     clearActiveClientPayload,
     clearStoredInputValues,
@@ -935,12 +936,20 @@ export function useTemplateRuntime() {
             }
             inputChangeVersion.current++;
         };
+        const handleActiveClientPayloadUpdated = (event) => {
+            const nextPayload = event.detail?.payload;
+            if (nextPayload && typeof nextPayload === "object") {
+                setClientPayload(nextPayload);
+            }
+        };
         window.addEventListener(AGENT_PROFILE_UPDATED_EVENT, handleAgentProfileUpdated);
+        window.addEventListener(ACTIVE_CLIENT_PAYLOAD_UPDATED_EVENT, handleActiveClientPayloadUpdated);
         window.addEventListener(CLIENT_INPUT_VALUES_UPDATED_EVENT, handleClientInputValuesUpdated);
 
         return () => {
             cancelled = true;
             window.removeEventListener(AGENT_PROFILE_UPDATED_EVENT, handleAgentProfileUpdated);
+            window.removeEventListener(ACTIVE_CLIENT_PAYLOAD_UPDATED_EVENT, handleActiveClientPayloadUpdated);
             window.removeEventListener(CLIENT_INPUT_VALUES_UPDATED_EVENT, handleClientInputValuesUpdated);
         };
     }, []);
