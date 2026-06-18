@@ -1719,6 +1719,7 @@ export default function Templates() {
             {superOfficeGalleryOpen && (
                 <SuperOfficePhotoGallery
                     ticket={superOfficeTicket}
+                    profile={caseProfile}
                     onClose={closeSuperOfficeGallery}
                 />
             )}

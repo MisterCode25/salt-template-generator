@@ -20,6 +20,19 @@ const VIEWER_MIN_ZOOM = 1;
 const VIEWER_MAX_ZOOM = 5;
 const VIEWER_ZOOM_STEP = 0.35;
 
+function displayValue(value) {
+    if (value === null || value === undefined) return "";
+    return String(value).trim();
+}
+
+function firstValue(...values) {
+    for (const value of values) {
+        const text = displayValue(value);
+        if (text) return text;
+    }
+    return "";
+}
+
 function imageKey(image) {
     return `${image?.name || ""}|${image?.url || ""}`;
 }
@@ -30,6 +43,65 @@ function clamp(value, min, max) {
 
 function getDefaultViewerTransform() {
     return { scale: 1, x: 0, y: 0 };
+}
+
+function inferRouterModelFromSerial(serial = "") {
+    const value = displayValue(serial).toUpperCase();
+    if (value.startsWith("GFAB")) return "X6";
+    if (value.startsWith("GFAC")) return "W7";
+    if (value.startsWith("SFAA")) return "Arc";
+    return "";
+}
+
+function buildPhotoContextBadges(profile = null) {
+    if (!profile || typeof profile !== "object") return [];
+
+    const vars = profile.vars || profile.variables || {};
+    const routerSerial = firstValue(
+        profile.routerSerialNumber,
+        profile.oldRouterSerialNumber,
+        vars.routerSerialNumber,
+        vars.healthcheckRouterSerialNumber
+    );
+    const routerModel = firstValue(
+        profile.routerModel,
+        profile.boxType,
+        profile.externalBoxType,
+        vars.routerModel,
+        vars.boxType,
+        vars.externalBoxType,
+        inferRouterModelFromSerial(routerSerial)
+    );
+
+    return [
+        {
+            key: "oto",
+            label: "Prise optique",
+            value: firstValue(profile.otoId, vars.otoId, vars.healthcheckOtoId)
+        },
+        {
+            key: "port",
+            label: "Port",
+            value: firstValue(
+                profile.otoPortId,
+                profile.crossConnectionPort,
+                vars.otoPortId,
+                vars.healthcheckOtoPortId,
+                vars.crossConnectionPort,
+                vars.healthcheckCrossConnexionPort
+            )
+        },
+        {
+            key: "routerSerial",
+            label: "N° série routeur",
+            value: routerSerial
+        },
+        {
+            key: "routerModel",
+            label: "Modèle routeur",
+            value: routerModel
+        }
+    ].filter((badge) => badge.value);
 }
 
 function normalizeZoom(value) {
@@ -98,12 +170,13 @@ function SuperOfficePhotoThumb({ image, onOpen, hasFailed, onImageError }) {
     );
 }
 
-export default function SuperOfficePhotoGallery({ ticket, onClose }) {
+export default function SuperOfficePhotoGallery({ ticket, profile = null, onClose }) {
     const sourceAttachments = useMemo(() => (
         ticket?.attachments?.length ? ticket.attachments : ticket?.imageAttachments || []
     ), [ticket]);
     const images = useMemo(() => getSuperOfficeImageAttachments(sourceAttachments), [sourceAttachments]);
     const groups = useMemo(() => groupSuperOfficeImageAttachmentsByDate(images), [images]);
+    const contextBadges = useMemo(() => buildPhotoContextBadges(profile), [profile]);
     const [activeIndex, setActiveIndex] = useState(null);
     const [annotatorOpen, setAnnotatorOpen] = useState(false);
     const [annotationsByImage, setAnnotationsByImage] = useState({});
@@ -358,49 +431,61 @@ export default function SuperOfficePhotoGallery({ ticket, onClose }) {
                 <div className="so-photo-viewer" role="dialog" aria-modal="true" aria-label={activeImage.name} onMouseDown={closeImage}>
                     <div className="so-photo-viewer__stage" onMouseDown={(event) => event.stopPropagation()}>
                         <div className="so-photo-viewer__meta">
-                            <strong>{activeImage.name}</strong>
-                            <div className="so-photo-viewer__meta-actions">
-                                <div className="so-photo-viewer__zoom-controls" role="group" aria-label="Zoom image">
+                            <div className="so-photo-viewer__meta-main">
+                                <strong>{activeImage.name}</strong>
+                                <div className="so-photo-viewer__meta-actions">
+                                    <div className="so-photo-viewer__zoom-controls" role="group" aria-label="Zoom image">
+                                        <button
+                                            type="button"
+                                            onClick={() => zoomViewerBy(-1)}
+                                            disabled={activeImageFailed || viewerTransform.scale <= VIEWER_MIN_ZOOM}
+                                            title="Zoom arrière"
+                                            aria-label="Zoom arrière"
+                                        >
+                                            <ZoomOut size={15} aria-hidden="true" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={resetViewerZoom}
+                                            disabled={activeImageFailed || viewerTransform.scale <= VIEWER_MIN_ZOOM}
+                                            title="Réinitialiser le zoom"
+                                            aria-label="Réinitialiser le zoom"
+                                        >
+                                            <RotateCcw size={14} aria-hidden="true" />
+                                            <span>{viewerZoomPercent}%</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => zoomViewerBy(1)}
+                                            disabled={activeImageFailed || viewerTransform.scale >= VIEWER_MAX_ZOOM}
+                                            title="Zoom avant"
+                                            aria-label="Zoom avant"
+                                        >
+                                            <ZoomIn size={15} aria-hidden="true" />
+                                        </button>
+                                    </div>
                                     <button
                                         type="button"
-                                        onClick={() => zoomViewerBy(-1)}
-                                        disabled={activeImageFailed || viewerTransform.scale <= VIEWER_MIN_ZOOM}
-                                        title="Zoom arrière"
-                                        aria-label="Zoom arrière"
+                                        onClick={() => setAnnotatorOpen(true)}
+                                        title="Annoter"
+                                        aria-label="Annoter l'image"
                                     >
-                                        <ZoomOut size={15} aria-hidden="true" />
+                                        <Edit3 size={15} aria-hidden="true" />
+                                        <span>Annoter</span>
                                     </button>
-                                    <button
-                                        type="button"
-                                        onClick={resetViewerZoom}
-                                        disabled={activeImageFailed || viewerTransform.scale <= VIEWER_MIN_ZOOM}
-                                        title="Réinitialiser le zoom"
-                                        aria-label="Réinitialiser le zoom"
-                                    >
-                                        <RotateCcw size={14} aria-hidden="true" />
-                                        <span>{viewerZoomPercent}%</span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => zoomViewerBy(1)}
-                                        disabled={activeImageFailed || viewerTransform.scale >= VIEWER_MAX_ZOOM}
-                                        title="Zoom avant"
-                                        aria-label="Zoom avant"
-                                    >
-                                        <ZoomIn size={15} aria-hidden="true" />
-                                    </button>
+                                    <span>{activeIndex + 1} / {images.length}</span>
                                 </div>
-                                <button
-                                    type="button"
-                                    onClick={() => setAnnotatorOpen(true)}
-                                    title="Annoter"
-                                    aria-label="Annoter l'image"
-                                >
-                                    <Edit3 size={15} aria-hidden="true" />
-                                    <span>Annoter</span>
-                                </button>
-                                <span>{activeIndex + 1} / {images.length}</span>
                             </div>
+                            {contextBadges.length > 0 && (
+                                <div className="so-photo-viewer__context-badges" aria-label="Contexte technique client">
+                                    {contextBadges.map((badge) => (
+                                        <span key={badge.key} className="so-photo-viewer__context-badge" title={`${badge.label}: ${badge.value}`}>
+                                            <small>{badge.label}</small>
+                                            <strong>{badge.value}</strong>
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                         <div className="so-photo-viewer__image-shell">
                             <button
