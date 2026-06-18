@@ -9472,6 +9472,10 @@ a.tools-bar-btn {
     opacity: 0.72;
 }
 
+.tools-bar-btn[data-open-mode="background"] svg {
+    opacity: 0.95;
+}
+
 .tools-bar-btn--system,
 .tools-bar-btn--custom {
     --tool-accent: #5b7cfa;
@@ -10929,6 +10933,47 @@ a.tools-bar-btn {
     line-height: 1.5;
 }
 
+.tools-toggle-line {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--control-border);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--bg-surface) 78%, transparent);
+}
+
+.tools-toggle-line input {
+    flex: 0 0 auto;
+    width: 16px;
+    height: 16px;
+    margin: 2px 0 0;
+    accent-color: var(--color-primary);
+}
+
+.tools-toggle-copy {
+    min-width: 0;
+    display: grid;
+    gap: 3px;
+}
+
+.tools-toggle-copy strong,
+.tools-toggle-copy small {
+    display: block;
+    line-height: 1.35;
+}
+
+.tools-toggle-copy strong {
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 750;
+}
+
+.tools-toggle-copy small {
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
 .tools-code-textarea {
     min-height: 260px;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
@@ -11276,6 +11321,7 @@ a.tools-bar-btn {
 .light-theme .tools-detail-hero p,
 .light-theme .tools-panel-title p,
 .light-theme .tools-field-line span,
+.light-theme .tools-toggle-copy small,
 .light-theme .tools-shortcut-card p,
 .light-theme .tools-shortcut-steps,
 .light-theme .tools-keyboard-row p {

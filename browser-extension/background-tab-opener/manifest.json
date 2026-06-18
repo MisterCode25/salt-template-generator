@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "Template Generator Background Tab Opener",
+  "description": "Allows Template Generator link tools to open HTTP links in inactive Chrome or Edge tabs.",
+  "version": "0.1.0",
+  "permissions": [
+    "tabs"
+  ],
+  "host_permissions": [
+    "http://localhost/*",
+    "http://127.0.0.1/*",
+    "https://localhost/*",
+    "https://127.0.0.1/*",
+    "file:///*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "http://localhost/*",
+        "http://127.0.0.1/*",
+        "https://localhost/*",
+        "https://127.0.0.1/*",
+        "file:///*"
+      ],
+      "js": [
+        "content-script.js"
+      ],
+      "run_at": "document_start"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  }
+}

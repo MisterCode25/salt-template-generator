@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
 import {
   DEFAULT_TOOL_COLOR,
+  DEFAULT_TOOL_OPEN_MODE,
+  TOOL_OPEN_MODES,
   TOOL_TYPES,
   isModuleTool,
   normalizeTool,
   resolveToolUrl,
+  sanitizeToolOpenMode,
   sanitizeToolType
 } from "../src/services/toolsService.js";
 
@@ -19,7 +22,19 @@ import {
   assert.equal(tool.title, "Customer search");
   assert.equal(tool.url, "https://example.com?q={client_name}");
   assert.equal(tool.color, DEFAULT_TOOL_COLOR);
+  assert.equal(tool.openMode, DEFAULT_TOOL_OPEN_MODE);
   assert.equal(isModuleTool(tool), false);
+}
+
+{
+  const tool = normalizeTool({
+    title: "  Customer search  ",
+    url: "https://example.com",
+    openMode: TOOL_OPEN_MODES.BACKGROUND
+  });
+
+  assert.equal(tool.type, TOOL_TYPES.LINK);
+  assert.equal(tool.openMode, TOOL_OPEN_MODES.BACKGROUND);
 }
 
 {
@@ -33,6 +48,7 @@ import {
   assert.equal(tool.title, "Refund helper");
   assert.equal(tool.url, "");
   assert.equal(tool.html, "<button>Copy</button>");
+  assert.equal(tool.openMode, DEFAULT_TOOL_OPEN_MODE);
   assert.equal(tool.beta, true);
   assert.equal(isModuleTool(tool), true);
 }
@@ -40,6 +56,8 @@ import {
 {
   assert.equal(sanitizeToolType("module"), TOOL_TYPES.MODULE);
   assert.equal(sanitizeToolType("bad"), TOOL_TYPES.LINK);
+  assert.equal(sanitizeToolOpenMode("background"), TOOL_OPEN_MODES.BACKGROUND);
+  assert.equal(sanitizeToolOpenMode("bad"), DEFAULT_TOOL_OPEN_MODE);
 }
 
 {
