@@ -4,9 +4,12 @@ import {
   parseSuperOfficeInfoPayload
 } from "../src/utils/superOfficeImport.js";
 import {
+  applyExternalIdValuesToImportResult,
   applyExternalIdSourceCorrections,
+  applyExternalIdSourceCorrectionsToImportResult,
   getExternalIdSourceConflicts
 } from "../src/utils/externalIdConflicts.js";
+import { parseExternalId } from "../src/utils/externalGenerator.js";
 
 {
   const result = parseSuperOfficeInfoPayload(JSON.stringify({
@@ -56,6 +59,21 @@ import {
   assert.equal(corrected["{contractor_number}"], "31447756");
   assert.equal(corrected["{client_contractor_number}"], "31447756");
   assert.equal(corrected["{so_ticket_num}"], "31436062");
+
+  const correctedResult = applyExternalIdSourceCorrectionsToImportResult(result, conflicts);
+  const correctedExternalId = parseExternalId(correctedResult.externalTicketId);
+  assert.equal(correctedExternalId.ok, true);
+  assert.equal(correctedExternalId.fields.customer, "31447756");
+  assert.equal(correctedExternalId.fields.soTicket, "31436062");
+  assert.equal(correctedResult.tokenValues["{external_customer}"], "31447756");
+  assert.equal(correctedResult.tokenValues["{so_ticket_num}"], "31436062");
+
+  const externalIdResult = applyExternalIdValuesToImportResult(result);
+  assert.equal(externalIdResult.tokenValues["{external_customer}"], "99999999");
+  assert.equal(externalIdResult.tokenValues["{contractor}"], "99999999");
+  assert.equal(externalIdResult.tokenValues["{contractor_number}"], "99999999");
+  assert.equal(externalIdResult.tokenValues["{client_contractor_number}"], "99999999");
+  assert.equal(externalIdResult.tokenValues["{so_ticket_num}"], "SO-WRONG");
 }
 
 {
@@ -72,8 +90,28 @@ import {
 
 {
   const result = parseSuperOfficeInfoPayload({
+    ticketId: "31436062"
+  });
+  const conflicts = getExternalIdSourceConflicts(result, {
+    client: {
+      contractorNumber: "31447756"
+    }
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.externalTicketId, "");
+  assert.equal(conflicts.length, 0);
+}
+
+{
+  const result = parseSuperOfficeInfoPayload({
     ticketId: "31436062",
     externalTicketId: "nothing useful here"
+  });
+  const conflicts = getExternalIdSourceConflicts(result, {
+    client: {
+      contractorNumber: "31447756"
+    }
   });
 
   assert.equal(result.ok, true);
@@ -82,6 +120,7 @@ import {
   assert.deepEqual(result.tokenValues, {
     "{so_ticket_num}": "31436062"
   });
+  assert.equal(conflicts.length, 0);
 }
 
 {

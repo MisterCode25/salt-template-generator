@@ -48,7 +48,8 @@ import {
     parseExternalId
 } from "../utils/externalGenerator.js";
 import {
-    applyExternalIdSourceCorrections,
+    applyExternalIdValuesToImportResult,
+    applyExternalIdSourceCorrectionsToImportResult,
     getExternalIdSourceConflicts
 } from "../utils/externalIdConflicts.js";
 import { parseSuperOfficeInfoPayload } from "../utils/superOfficeImport.js";
@@ -128,11 +129,21 @@ function getDefaultClientBarFieldKeys(summaryFields = []) {
         .map((field) => clientBarFieldKey("summary", field.label));
 }
 
+function expandLegacyClientBarFieldKeys(keys = []) {
+    return keys.flatMap((key) => (
+        key === "summary:name"
+            ? ["summary:title", "summary:first_name", "summary:last_name"]
+            : [key]
+    ));
+}
+
 function resolveClientBarSummaryFields(groups = [], selectedKeys, fallbackSummaryFields = []) {
     const allFields = flattenClientBarFieldGroups(groups);
     if (allFields.length === 0) return fallbackSummaryFields;
     const fallbackKeys = getDefaultClientBarFieldKeys(fallbackSummaryFields);
-    const activeKeys = Array.isArray(selectedKeys) && selectedKeys.length > 0 ? selectedKeys : fallbackKeys;
+    const activeKeys = Array.isArray(selectedKeys) && selectedKeys.length > 0
+        ? expandLegacyClientBarFieldKeys(selectedKeys)
+        : fallbackKeys;
     const byKey = new Map(allFields.map((field) => [field.key, field]));
     const selected = activeKeys
         .map((key) => byKey.get(key))
@@ -823,13 +834,13 @@ export function ClientPasteModal({ onClose, onImport, initialError = "" }) {
     );
 }
 
-export function ExternalIdConflictModal({ conflicts = [], onConfirm, onCancel }) {
+export function ExternalIdConflictModal({ conflicts = [], onKeepSourceValues, onKeepExternalIdValues, onCancel }) {
     return (
         <Modal onClose={onCancel} dialogClassName="popup-box external-id-conflict-modal" ariaLabel="External ID conflict">
             <div className="popup-header">
                 <div>
-                    <h2>External ID conflict</h2>
-                    <p className="hint">Some External ID values do not match the trusted import sources.</p>
+                    <h2>VTI / SO data conflict</h2>
+                    <p className="hint">Some External ID values do not match the imported VTI or SO ticket data. Choose which values to keep.</p>
                 </div>
             </div>
             <div className="external-id-conflict-list">
@@ -846,7 +857,7 @@ export function ExternalIdConflictModal({ conflicts = [], onConfirm, onCancel })
                             </div>
                             <div className="external-id-conflict-arrow" aria-hidden="true">→</div>
                             <div>
-                                <span>Correct value</span>
+                                <span>{conflict.sourceLabel}</span>
                                 <code>{conflict.expectedValue}</code>
                             </div>
                         </div>
@@ -855,7 +866,8 @@ export function ExternalIdConflictModal({ conflicts = [], onConfirm, onCancel })
             </div>
             <div className="popup-actions">
                 <button type="button" className="secondary-btn" onClick={onCancel}>Cancel import</button>
-                <button type="button" className="primary-btn" onClick={onConfirm}>Correct and import</button>
+                <button type="button" className="secondary-btn" onClick={onKeepExternalIdValues}>Keep External ID</button>
+                <button type="button" className="primary-btn" onClick={onKeepSourceValues}>Keep VTI / SO data</button>
             </div>
         </Modal>
     );
@@ -1012,7 +1024,8 @@ export function useTemplateRuntime() {
         return {
             importResult,
             conflicts,
-            correctedTokenValues: applyExternalIdSourceCorrections(importResult.tokenValues || {}, conflicts)
+            externalIdImportResult: applyExternalIdValuesToImportResult(importResult),
+            correctedImportResult: applyExternalIdSourceCorrectionsToImportResult(importResult, conflicts)
         };
     };
 
@@ -1043,12 +1056,14 @@ export function useTemplateRuntime() {
         }
 
         const message = options.corrected
-            ? "External ID corrected and SuperOffice data imported."
-            : nextResult.ignoredExternalId
-                ? "SO ticket imported. External ID ignored because its format is invalid."
-                : "SuperOffice data imported.";
+            ? "VTI / SO values kept and SuperOffice data imported."
+            : options.keptExternalId
+                ? "External ID values kept and SuperOffice data imported."
+                : nextResult.ignoredExternalId
+                    ? "SO ticket imported. External ID ignored because its format is invalid."
+                    : "SuperOffice data imported.";
         setClientImportStatus({ type: "success", message: "" });
-        if (!contractorNumber || nextResult.ignoredExternalId || options.corrected) {
+        if (!contractorNumber || nextResult.ignoredExternalId || options.corrected || options.keptExternalId) {
             showToast(message, nextResult.ignoredExternalId ? "warning" : "success");
         }
         return true;
@@ -1063,12 +1078,24 @@ export function useTemplateRuntime() {
         return true;
     };
 
-    const confirmExternalIdConflictCorrection = async () => {
+    const keepExternalIdSourceValues = async () => {
         if (!externalIdConflictPrompt) return;
+        const correctedImportResult = externalIdConflictPrompt.correctedImportResult;
         await completeSuperOfficeImport(
-            externalIdConflictPrompt.importResult,
-            externalIdConflictPrompt.correctedTokenValues,
+            correctedImportResult,
+            correctedImportResult?.tokenValues || {},
             { corrected: true }
+        );
+        setExternalIdConflictPrompt(null);
+    };
+
+    const keepExternalIdValues = async () => {
+        if (!externalIdConflictPrompt) return;
+        const importResult = externalIdConflictPrompt.externalIdImportResult;
+        await completeSuperOfficeImport(
+            importResult,
+            importResult?.tokenValues || {},
+            { keptExternalId: true }
         );
         setExternalIdConflictPrompt(null);
     };
@@ -1538,7 +1565,8 @@ export function useTemplateRuntime() {
         saveClientBarSelection,
         resetClientBarSelection,
         externalIdConflictPrompt,
-        confirmExternalIdConflictCorrection,
+        keepExternalIdSourceValues,
+        keepExternalIdValues,
         cancelExternalIdConflictCorrection,
         readClientClipboard,
         readSuperOfficeClipboard,

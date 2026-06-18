@@ -1701,7 +1701,8 @@ export default function Templates() {
             {runtime.externalIdConflictPrompt && (
                 <ExternalIdConflictModal
                     conflicts={runtime.externalIdConflictPrompt.conflicts}
-                    onConfirm={runtime.confirmExternalIdConflictCorrection}
+                    onKeepSourceValues={runtime.keepExternalIdSourceValues}
+                    onKeepExternalIdValues={runtime.keepExternalIdValues}
                     onCancel={runtime.cancelExternalIdConflictCorrection}
                 />
             )}

@@ -615,15 +615,18 @@ export function getClientSummaryFields(payload) {
     const client = payload.client || {};
     const contact = payload.contact || {};
     const healthcheck = payload.healthcheck || {};
-    const fullName = [client.title, client.firstName, client.lastName]
-        .map(displayValue)
-        .filter(Boolean)
-        .join(" ");
-
     return [
         {
-            label: "Name",
-            value: fullName || firstValue([client.firstName, client.lastName])
+            label: "Title",
+            value: client.title
+        },
+        {
+            label: "First name",
+            value: client.firstName
+        },
+        {
+            label: "Last name",
+            value: client.lastName
         },
         {
             label: "Mobile",

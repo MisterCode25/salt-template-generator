@@ -1,5 +1,10 @@
 import { SO_TICKET_NUM_TOKEN } from "./tokenCanonicalization.js";
-import { buildExternalFieldsFromClientPayload } from "./externalGenerator.js";
+import {
+    buildExternalCode,
+    buildExternalFieldsFromClientPayload,
+    buildExternalTokenValues,
+    parseExternalId
+} from "./externalGenerator.js";
 
 export const EXTERNAL_CUSTOMER_TOKEN = "{external_customer}";
 const CONTRACTOR_TOKENS = ["{contractor}", "{contractor_number}", "{client_contractor_number}"];
@@ -23,6 +28,7 @@ function addConflict(conflicts, conflict) {
     if (!expectedValue) return;
 
     const externalValue = textValue(conflict.externalValue);
+    if (!externalValue) return;
     if (valuesMatch(externalValue, expectedValue)) return;
 
     conflicts.push({
@@ -37,17 +43,26 @@ function getVtiContractor(payload) {
     return result.ok ? textValue(result.fields.customer) : "";
 }
 
+function getExternalFields(importResult = {}) {
+    if (importResult?.externalFields && typeof importResult.externalFields === "object" && !Array.isArray(importResult.externalFields)) {
+        return importResult.externalFields;
+    }
+
+    const parsed = parseExternalId(importResult?.externalTicketId);
+    return parsed.ok ? parsed.fields : null;
+}
+
 export function getExternalIdSourceConflicts(importResult = {}, clientPayload = null) {
     const conflicts = [];
     const tokenValues = importResult?.tokenValues || {};
-    const externalFields = importResult?.externalFields || {};
+    const externalFields = getExternalFields(importResult);
 
     addConflict(conflicts, {
         field: "customer",
         token: EXTERNAL_CUSTOMER_TOKEN,
         label: "Contractor",
         sourceLabel: "VTI customer data",
-        externalValue: externalFields.customer ?? tokenValues[EXTERNAL_CUSTOMER_TOKEN],
+        externalValue: externalFields?.customer ?? tokenValues[EXTERNAL_CUSTOMER_TOKEN],
         expectedValue: getVtiContractor(clientPayload)
     });
 
@@ -56,7 +71,7 @@ export function getExternalIdSourceConflicts(importResult = {}, clientPayload = 
         token: SO_TICKET_NUM_TOKEN,
         label: "SO ticket number",
         sourceLabel: "SO ticket JSON",
-        externalValue: externalFields.soTicket ?? tokenValues[SO_TICKET_NUM_TOKEN],
+        externalValue: externalFields?.soTicket ?? tokenValues[SO_TICKET_NUM_TOKEN],
         expectedValue: importResult?.sourceTicketId
     });
 
@@ -76,4 +91,64 @@ export function applyExternalIdSourceCorrections(tokenValues = {}, conflicts = [
         }
     });
     return corrected;
+}
+
+export function applyExternalIdSourceCorrectionsToImportResult(importResult = {}, conflicts = []) {
+    const correctedTokenValues = applyExternalIdSourceCorrections(importResult.tokenValues || {}, conflicts);
+    const externalFields = getExternalFields(importResult);
+    if (!externalFields) {
+        return {
+            ...importResult,
+            tokenValues: correctedTokenValues
+        };
+    }
+
+    const correctedExternalFields = { ...externalFields };
+    conflicts.forEach((conflict) => {
+        if (!conflict?.field || !Object.prototype.hasOwnProperty.call(correctedExternalFields, conflict.field)) return;
+        correctedExternalFields[conflict.field] = textValue(conflict.expectedValue);
+    });
+
+    return {
+        ...importResult,
+        externalTicketId: buildExternalCode(correctedExternalFields),
+        externalIdValid: true,
+        ignoredExternalId: false,
+        externalFields: correctedExternalFields,
+        contractorNumber: correctedExternalFields.customer || importResult.contractorNumber || "",
+        tokenValues: {
+            ...buildExternalTokenValues(correctedExternalFields),
+            ...correctedTokenValues
+        }
+    };
+}
+
+export function applyExternalIdValuesToImportResult(importResult = {}) {
+    const externalFields = getExternalFields(importResult);
+    if (!externalFields) {
+        return {
+            ...importResult,
+            tokenValues: importResult.tokenValues || {}
+        };
+    }
+
+    const tokenValues = {
+        ...(importResult.tokenValues || {}),
+        ...buildExternalTokenValues(externalFields)
+    };
+    const contractorNumber = textValue(externalFields.customer);
+    if (contractorNumber) {
+        CONTRACTOR_TOKENS.forEach((token) => {
+            tokenValues[token] = contractorNumber;
+        });
+    }
+
+    return {
+        ...importResult,
+        externalFields,
+        externalIdValid: true,
+        ignoredExternalId: false,
+        contractorNumber: contractorNumber || importResult.contractorNumber || "",
+        tokenValues
+    };
 }
