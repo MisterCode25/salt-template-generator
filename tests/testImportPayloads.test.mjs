@@ -29,9 +29,21 @@ import { getExternalIdSourceConflicts } from "../src/utils/externalIdConflicts.j
   assert.equal(groups[0].dateKey, "2026-06-13");
 
   const conflicts = getExternalIdSourceConflicts(result, TEST_VTI_IMPORT_PAYLOAD);
-  assert.equal(conflicts.length, 2);
-  assert.equal(conflicts[0].expectedValue, "31447756");
-  assert.equal(conflicts[1].expectedValue, "31436062");
+  assert.equal(conflicts.length, 5);
+  assert.deepEqual(conflicts.map((conflict) => conflict.field), [
+    "customer",
+    "oltName",
+    "oltBoard",
+    "bokBof",
+    "soTicket"
+  ]);
+  assert.deepEqual(conflicts.map((conflict) => conflict.expectedValue), [
+    "31447756",
+    "1",
+    "2",
+    "KP100314-C0036|8",
+    "31436062"
+  ]);
 }
 
 console.log("testImportPayloads tests passed");

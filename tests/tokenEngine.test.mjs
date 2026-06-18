@@ -44,6 +44,22 @@ const sampleModel = {
 }
 
 {
+  const titleModel = {
+    text_fr: "Bonjour {client_title} {client_last_name}",
+    text_en: "Hello {client_title} {client_last_name}",
+    text_de: "Guten Tag {client_title} {client_last_name}",
+    text_it: "Buongiorno {client_title} {client_last_name}"
+  };
+  const maleValues = { "{client_title}": "Mr.", "{client_last_name}": "BILLIG" };
+  const femaleValues = { "{client_title}": "Ms.", "{client_last_name}": "BILLIG" };
+
+  assert.equal(generateFinalText(titleModel, "fr", maleValues), "Bonjour M. BILLIG");
+  assert.equal(generateFinalText(titleModel, "de", maleValues), "Guten Tag Herr BILLIG");
+  assert.equal(generateFinalText(titleModel, "de", femaleValues), "Guten Tag Frau BILLIG");
+  assert.equal(generateFinalText(titleModel, "it", femaleValues), "Buongiorno Sig.ra BILLIG");
+}
+
+{
   const frOnlyModel = {
     text_fr: "Bonjour {customer}",
     text_en: "",

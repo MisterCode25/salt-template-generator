@@ -2,12 +2,24 @@ import { SO_TICKET_NUM_TOKEN } from "./tokenCanonicalization.js";
 import {
     buildExternalCode,
     buildExternalFieldsFromClientPayload,
+    EXTERNAL_SYSTEM_TOKEN_FIELDS,
     buildExternalTokenValues,
     parseExternalId
 } from "./externalGenerator.js";
 
 export const EXTERNAL_CUSTOMER_TOKEN = "{external_customer}";
 const CONTRACTOR_TOKENS = ["{contractor}", "{contractor_number}", "{client_contractor_number}"];
+const EXTERNAL_TOKEN_BY_FIELD = Object.freeze(Object.fromEntries(
+    EXTERNAL_SYSTEM_TOKEN_FIELDS.map(({ field, token }) => [field, token])
+));
+const VTI_EXTERNAL_FIELD_CONFLICTS = Object.freeze([
+    { field: "customer", label: "Contractor", sourceLabel: "VTI customer data", token: EXTERNAL_CUSTOMER_TOKEN },
+    { field: "boxType", label: "Box type", sourceLabel: "VTI router data", token: EXTERNAL_TOKEN_BY_FIELD.boxType },
+    { field: "lexId", label: "LEX ID", sourceLabel: "VTI healthcheck data", token: EXTERNAL_TOKEN_BY_FIELD.lexId },
+    { field: "oltName", label: "OLT", sourceLabel: "VTI healthcheck data", token: EXTERNAL_TOKEN_BY_FIELD.oltName },
+    { field: "oltBoard", label: "OLT board", sourceLabel: "VTI healthcheck data", token: EXTERNAL_TOKEN_BY_FIELD.oltBoard },
+    { field: "bokBof", label: "BOK/BOF", sourceLabel: "VTI healthcheck data", token: EXTERNAL_TOKEN_BY_FIELD.bokBof }
+]);
 
 function normalizeComparableValue(value) {
     return String(value ?? "").trim().replace(/\s+/g, "");
@@ -38,9 +50,9 @@ function addConflict(conflicts, conflict) {
     });
 }
 
-function getVtiContractor(payload) {
+function getVtiExternalFields(payload) {
     const result = buildExternalFieldsFromClientPayload(payload);
-    return result.ok ? textValue(result.fields.customer) : "";
+    return result.ok ? result.fields : {};
 }
 
 function getExternalFields(importResult = {}) {
@@ -56,14 +68,17 @@ export function getExternalIdSourceConflicts(importResult = {}, clientPayload = 
     const conflicts = [];
     const tokenValues = importResult?.tokenValues || {};
     const externalFields = getExternalFields(importResult);
+    const vtiFields = getVtiExternalFields(clientPayload);
 
-    addConflict(conflicts, {
-        field: "customer",
-        token: EXTERNAL_CUSTOMER_TOKEN,
-        label: "Contractor",
-        sourceLabel: "VTI customer data",
-        externalValue: externalFields?.customer ?? tokenValues[EXTERNAL_CUSTOMER_TOKEN],
-        expectedValue: getVtiContractor(clientPayload)
+    VTI_EXTERNAL_FIELD_CONFLICTS.forEach(({ field, label, sourceLabel, token }) => {
+        addConflict(conflicts, {
+            field,
+            token,
+            label,
+            sourceLabel,
+            externalValue: externalFields?.[field] ?? tokenValues[token],
+            expectedValue: vtiFields[field]
+        });
     });
 
     addConflict(conflicts, {

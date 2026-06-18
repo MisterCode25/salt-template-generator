@@ -129,21 +129,11 @@ function getDefaultClientBarFieldKeys(summaryFields = []) {
         .map((field) => clientBarFieldKey("summary", field.label));
 }
 
-function expandLegacyClientBarFieldKeys(keys = []) {
-    return keys.flatMap((key) => (
-        key === "summary:name"
-            ? ["summary:title", "summary:first_name", "summary:last_name"]
-            : [key]
-    ));
-}
-
 function resolveClientBarSummaryFields(groups = [], selectedKeys, fallbackSummaryFields = []) {
     const allFields = flattenClientBarFieldGroups(groups);
     if (allFields.length === 0) return fallbackSummaryFields;
     const fallbackKeys = getDefaultClientBarFieldKeys(fallbackSummaryFields);
-    const activeKeys = Array.isArray(selectedKeys) && selectedKeys.length > 0
-        ? expandLegacyClientBarFieldKeys(selectedKeys)
-        : fallbackKeys;
+    const activeKeys = Array.isArray(selectedKeys) && selectedKeys.length > 0 ? selectedKeys : fallbackKeys;
     const byKey = new Map(allFields.map((field) => [field.key, field]));
     const selected = activeKeys
         .map((key) => byKey.get(key))

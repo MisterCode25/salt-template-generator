@@ -1,5 +1,73 @@
 const TOKEN_PATTERN = /\{[^{}]+\}/g;
 const HAS_OWN = Object.prototype.hasOwnProperty;
+const TITLE_TOKEN_NAMES = new Set([
+    "title",
+    "clienttitle",
+    "customertitle",
+    "civilite",
+    "clientcivilite",
+    "customercivilite",
+    "salutation",
+    "clientsalutation",
+    "customersalutation"
+]);
+const TITLE_TRANSLATIONS = Object.freeze({
+    male: Object.freeze({
+        fr: "M.",
+        en: "Mr.",
+        de: "Herr",
+        it: "Sig."
+    }),
+    female: Object.freeze({
+        fr: "Mme",
+        en: "Ms.",
+        de: "Frau",
+        it: "Sig.ra"
+    })
+});
+
+function normalizeTokenName(token = "") {
+    return String(token)
+        .replace(/[{}]/g, "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "");
+}
+
+function titleGender(value) {
+    const normalized = String(value ?? "")
+        .trim()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/[.\s]+/g, "");
+
+    if (["mr", "m", "monsieur", "herr", "sig", "signor"].includes(normalized)) return "male";
+    if (["ms", "mrs", "miss", "mme", "madame", "frau", "sigra", "signora"].includes(normalized)) return "female";
+    return "";
+}
+
+export function translateTitleValue(value, langCode) {
+    const gender = titleGender(value);
+    if (!gender) return value;
+    return TITLE_TRANSLATIONS[gender]?.[langCode] || value;
+}
+
+function translateTitleTokens(values = {}, langCode) {
+    if (!values || typeof values !== "object") return values;
+
+    const translated = {};
+    let dirty = false;
+    Object.entries(values).forEach(([token, value]) => {
+        const nextValue = TITLE_TOKEN_NAMES.has(normalizeTokenName(token))
+            ? translateTitleValue(value, langCode)
+            : value;
+        translated[token] = nextValue;
+        if (nextValue !== value) dirty = true;
+    });
+    return dirty ? translated : values;
+}
 
 export function applyTokens(text, values) {
     if (!text) return "";
@@ -77,6 +145,6 @@ export function getTemplateTextByLang(model, langCode) {
 }
 
 export function generateFinalText(model, lang, tokenValues) {
-    const base = getTemplateTextByLang(model, lang);
-    return applyTokens(base, tokenValues || {});
+    const result = getTemplateTextResult(model, lang);
+    return applyTokens(result.text, translateTitleTokens(tokenValues || {}, result.lang));
 }

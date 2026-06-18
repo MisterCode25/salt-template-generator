@@ -90,6 +90,54 @@ import { parseExternalId } from "../src/utils/externalGenerator.js";
 
 {
   const result = parseSuperOfficeInfoPayload({
+    ticketId: "SO-1",
+    externalTicketId: "VALID//26.02.2026//31447756//SO-1//Lost//Fiber Off//Other//X6//EWB//ABC//LEX-SO//OLT-SO//BOARD-SO//BOK-SO|1//Comment"
+  });
+  const conflicts = getExternalIdSourceConflicts(result, {
+    client: {
+      contractorNumber: "31447756"
+    },
+    healthcheck: {
+      routerSerialNumber: "GFAC12345678",
+      lexId: "LEX-VTI",
+      oltName: "OLT-VTI",
+      oltBoard: "BOARD-VTI",
+      breakoutCableId: "BOK-VTI/BOF-VTI",
+      fiberNumber: "7"
+    }
+  });
+
+  assert.deepEqual(conflicts.map((conflict) => conflict.field), [
+    "boxType",
+    "lexId",
+    "oltName",
+    "oltBoard",
+    "bokBof"
+  ]);
+  assert.deepEqual(conflicts.map((conflict) => conflict.expectedValue), [
+    "W7",
+    "LEX-VTI",
+    "OLT-VTI",
+    "BOARD-VTI",
+    "BOK-VTI|BOF-VTI|7"
+  ]);
+
+  const correctedResult = applyExternalIdSourceCorrectionsToImportResult(result, conflicts);
+  const correctedExternalId = parseExternalId(correctedResult.externalTicketId);
+  assert.equal(correctedExternalId.fields.boxType, "W7");
+  assert.equal(correctedExternalId.fields.lexId, "LEX-VTI");
+  assert.equal(correctedExternalId.fields.oltName, "OLT-VTI");
+  assert.equal(correctedExternalId.fields.oltBoard, "BOARD-VTI");
+  assert.equal(correctedExternalId.fields.bokBof, "BOK-VTI|BOF-VTI|7");
+  assert.equal(correctedResult.tokenValues["{external_box_type}"], "W7");
+  assert.equal(correctedResult.tokenValues["{external_lex_id}"], "LEX-VTI");
+  assert.equal(correctedResult.tokenValues["{external_olt_name}"], "OLT-VTI");
+  assert.equal(correctedResult.tokenValues["{external_olt_board}"], "BOARD-VTI");
+  assert.equal(correctedResult.tokenValues["{external_bok_bof}"], "BOK-VTI|BOF-VTI|7");
+}
+
+{
+  const result = parseSuperOfficeInfoPayload({
     ticketId: "31436062"
   });
   const conflicts = getExternalIdSourceConflicts(result, {
