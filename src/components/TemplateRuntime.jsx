@@ -12,7 +12,7 @@ import {
     saveActiveClientPayload,
     saveImportedExternalId
 } from "../services/activeClientService.js";
-import { copyHtml, formatClipboardHtmlBody, showToast } from "../services/clipboardService.js";
+import { copyHtml, copyText, formatClipboardHtmlBody, showToast } from "../services/clipboardService.js";
 import { resolveTemplateImagesInHtml } from "../services/templateImageService.js";
 import { stripImagesFromHtml } from "../utils/templateImages.js";
 import { loadTokens } from "../services/tokenService.js";
@@ -237,6 +237,18 @@ function getTemplateDisplayTitle(model) {
 
 function getExternalIdFromClientPayload(payload) {
     return getImportedExternalIdFromClientPayload(payload);
+}
+
+function getSuperOfficeContractorNumber(importResult = {}, tokenValues = {}) {
+    return String(
+        importResult?.contractorNumber
+        || tokenValues?.["{contractor}"]
+        || tokenValues?.["{contractor_number}"]
+        || tokenValues?.["{client_contractor_number}"]
+        || tokenValues?.["{external_customer}"]
+        || importResult?.externalFields?.customer
+        || ""
+    ).trim();
 }
 
 const EXTERNAL_ID_FIELD_LABELS = {
@@ -1013,13 +1025,23 @@ export function useTemplateRuntime() {
         if (importedExternalIdPayload) nextClientPayload = importedExternalIdPayload;
         if (nextClientPayload) setClientPayload(nextClientPayload);
 
+        const contractorNumber = getSuperOfficeContractorNumber(nextResult, tokenValues);
+        if (contractorNumber) {
+            await copyText(contractorNumber, {
+                message: "Contractor copied for VTI search.",
+                variant: "success"
+            });
+        }
+
         const message = options.corrected
             ? "External ID corrected and SuperOffice data imported."
             : nextResult.ignoredExternalId
                 ? "SO ticket imported. External ID ignored because its format is invalid."
                 : "SuperOffice data imported.";
         setClientImportStatus({ type: "success", message: "" });
-        showToast(message, nextResult.ignoredExternalId ? "warning" : "success");
+        if (!contractorNumber || nextResult.ignoredExternalId || options.corrected) {
+            showToast(message, nextResult.ignoredExternalId ? "warning" : "success");
+        }
         return true;
     };
 
