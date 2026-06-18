@@ -157,7 +157,7 @@ ${JSON.stringify(sampleClientJSON, null, 2)}`);
   assert.equal(summary.find((field) => field.label === "Language"), undefined);
   assert.equal(summary.find((field) => field.label === "Mobile").value, "078 912 56 85");
   assert.equal(summary.find((field) => field.label === "Contractor").value, "31447756");
-  assert.equal(summary.find((field) => field.label === "Activation").value, "2026-06-20");
+  assert.equal(summary.find((field) => field.label === "Activation").value, "20.06.2026");
   assert.equal(summary.find((field) => field.label === "OTO ID").value, "B.111.783.391.7");
   assert.equal(summary.find((field) => field.label === "Port").value, "3");
   assert.equal(getClientLanguageCode(sampleClientJSON), "fr");

@@ -297,6 +297,25 @@ function displayValue(value) {
     return "";
 }
 
+function formatDateForDisplay(value) {
+    const text = displayValue(value);
+    if (!text) return "";
+
+    const isoMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s].*)?$/);
+    if (isoMatch) return `${isoMatch[3]}.${isoMatch[2]}.${isoMatch[1]}`;
+
+    const slashMatch = text.match(/^(\d{1,2})[/.](\d{1,2})[/.](\d{4})$/);
+    if (slashMatch) {
+        return [
+            slashMatch[1].padStart(2, "0"),
+            slashMatch[2].padStart(2, "0"),
+            slashMatch[3]
+        ].join(".");
+    }
+
+    return text;
+}
+
 function humanizePathSegment(segment = "") {
     return String(segment)
         .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
@@ -640,7 +659,7 @@ export function getClientSummaryFields(payload) {
         },
         {
             label: "Activation",
-            value: firstValue([
+            value: formatDateForDisplay(firstValue([
                 client.activationDate,
                 client.activation_date,
                 client.activation,
@@ -648,7 +667,7 @@ export function getClientSummaryFields(payload) {
                 payload?.offer?.activationDate,
                 contact.activationDate,
                 healthcheck.activationDate
-            ])
+            ]))
         },
         {
             label: "OTO ID",
