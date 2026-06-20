@@ -1441,8 +1441,8 @@ export default function Templates() {
         runtimeApi.clearOnDemandValues(defs);
     }, [closeTemplateWorkflow]);
 
-    const copyRuntimeTemplateResultAgain = useCallback(async () => {
-        const copied = await runtimeRef.current.copyTemplateResultAgain();
+    const copyRuntimeTemplateResultAgain = useCallback(async (htmlOverride = null) => {
+        const copied = await runtimeRef.current.copyTemplateResultAgain(htmlOverride);
         if (copied && activeTemplateId) await markTemplateUsed(activeTemplateId);
     }, [activeTemplateId, markTemplateUsed]);
 
@@ -1808,6 +1808,7 @@ export default function Templates() {
             {runtime.copyPreview && (
                 <TemplateResultModal
                     result={runtime.copyPreview}
+                    tokens={runtime.tokens}
                     channelOptions={resultChannelOptions}
                     currentChannel={activeChannel}
                     onSelectChannel={openResultChannel}

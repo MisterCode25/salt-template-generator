@@ -1086,6 +1086,16 @@ textarea:focus {
         width: 100%;
     }
 
+    .template-result-modal.is-editing {
+        width: 100%;
+        max-height: calc(100dvh - 24px);
+    }
+
+    .template-result-editor .rich-editor__content {
+        min-height: 320px;
+        max-height: 58vh;
+    }
+
     .popup-grid.template-grid {
         grid-template-columns: 1fr;
     }
@@ -1806,6 +1816,11 @@ textarea:focus {
     overflow-x: hidden;
 }
 
+.template-result-modal.is-editing {
+    width: min(1040px, calc(100vw - 24px));
+    max-height: min(96dvh, 940px);
+}
+
 .template-result-header {
     display: flex;
     align-items: flex-start;
@@ -1961,6 +1976,28 @@ textarea:focus {
     white-space: pre-wrap;
 }
 
+.template-result-editor {
+    margin-top: var(--space-lg);
+}
+
+.template-result-editor .rich-editor__content {
+    min-height: clamp(340px, 54vh, 590px);
+    max-height: min(62vh, 640px);
+}
+
+.template-result-editor-fallback {
+    min-height: 340px;
+    margin-top: var(--space-lg);
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    background: rgba(12, 16, 27, 0.62);
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: 700;
+}
+
 .template-result-actions {
     gap: 8px;
 }
@@ -1997,6 +2034,17 @@ textarea:focus {
     color: var(--text-primary);
 }
 
+.template-result-action-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+}
+
+.template-result-action-btn:disabled:hover {
+    background: var(--result-action-bg);
+    border-color: var(--result-action-border);
+    color: var(--result-action-text);
+}
+
 .template-result-action-btn:focus-visible {
     outline: 2px solid var(--control-focus);
     outline-offset: 2px;
@@ -2010,6 +2058,14 @@ textarea:focus {
 
 .template-result-copy-btn {
     --result-action-accent: #21a36a;
+}
+
+.template-result-edit-btn {
+    --result-action-accent: #2f7ff0;
+}
+
+.template-result-reset-btn {
+    --result-action-accent: #d97706;
 }
 
 .template-result-next-btn {
@@ -9390,6 +9446,12 @@ textarea::placeholder,
     color: #172033 !important;
     border-color: #d8e2f0 !important;
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.75) !important;
+}
+
+.light-theme .template-result-editor-fallback {
+    background: #f8fafc !important;
+    color: #64748b !important;
+    border-color: #d8e2f0 !important;
 }
 
 .light-theme .token-prompt-modal .popup-actions {

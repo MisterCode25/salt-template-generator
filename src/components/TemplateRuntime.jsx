@@ -1,5 +1,5 @@
-import { memo, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, Copy } from "lucide-react";
+import { lazy, memo, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowRight, Check, Copy, Edit3, RotateCcw } from "lucide-react";
 import { generateFinalText, getTemplateTextByLang } from "../core/tokenEngine.js";
 import {
     ACTIVE_CLIENT_PAYLOAD_UPDATED_EVENT,
@@ -67,6 +67,7 @@ import Modal from "./Modal.jsx";
 const CLIENT_CLIPBOARD_READ_TIMEOUT_MS = 3500;
 const CLIENT_BAR_FIELDS_KEY = "client_bar_fields";
 const CLIENT_BAR_FIELD_LIMIT = 8;
+const RichTextEditor = lazy(() => import("./RichTextEditor.jsx"));
 
 function sanitizeGeneratedTemplateHtml(model, html = "") {
     return model?.type === "sms" ? stripImagesFromHtml(html) : html;
@@ -321,6 +322,14 @@ const TokenPromptField = memo(function TokenPromptField({
     );
 });
 
+const TemplateResultEditorFallback = memo(function TemplateResultEditorFallback() {
+    return (
+        <div className="template-result-editor-fallback">
+            Loading editor...
+        </div>
+    );
+});
+
 export const TokenPromptModal = memo(function TokenPromptModal({ title, tokenDefs, values, missingTokens, mode = "copy", onChange, onConfirm, onClose }) {
     const isMultiCol = tokenDefs.length > 2;
     const isFillMode = mode === "fill";
@@ -391,6 +400,7 @@ export const VariantModal = memo(function VariantModal({ model, displayTitle, on
 
 export const TemplateResultModal = memo(function TemplateResultModal({
     result,
+    tokens = [],
     channelOptions = [],
     currentChannel = "",
     onSelectChannel,
@@ -398,18 +408,46 @@ export const TemplateResultModal = memo(function TemplateResultModal({
     onCopy,
     onClose
 }) {
+    const [isEditing, setIsEditing] = useState(false);
+    const [draftHtml, setDraftHtml] = useState(result?.html || "");
+
+    useEffect(() => {
+        setDraftHtml(result?.html || "");
+        setIsEditing(false);
+    }, [result?.id]);
+
     if (!result) return null;
     const showChannelControls = channelOptions.length > 1 && onSelectChannel;
+    const sourceHtml = result.html || "";
+    const previewHtml = draftHtml || "";
+    const isDirty = draftHtml !== sourceHtml;
+    const allowImages = result.type !== "sms";
+    const copyStateText = isEditing
+        ? isDirty ? "Local draft" : "Editing"
+        : result.copied ? "✓ Already copied" : "Copying...";
+
+    const resetDraft = () => {
+        setDraftHtml(sourceHtml);
+        setIsEditing(false);
+    };
+
+    const copyDraft = () => {
+        onCopy?.(allowImages ? draftHtml : stripImagesFromHtml(draftHtml));
+    };
 
     return (
-        <Modal onClose={onClose} dialogClassName="popup-box template-result-modal" ariaLabel="Generated template">
+        <Modal
+            onClose={onClose}
+            dialogClassName={`popup-box template-result-modal${isEditing ? " is-editing" : ""}`}
+            ariaLabel="Generated template"
+        >
             <div className="popup-header template-result-header">
                 <div>
-                    <p className="template-result-kicker">Final text</p>
+                    <p className="template-result-kicker">{isEditing ? "Edit final text" : "Final text"}</p>
                     <h2>{result.title || "Template"}</h2>
                 </div>
-                <span className={`template-result-copy-state${result.copied ? " is-copied" : ""}`} aria-live="polite">
-                    {result.copied ? "✓ Already copied" : "Copying..."}
+                <span className={`template-result-copy-state${result.copied && !isDirty && !isEditing ? " is-copied" : ""}`} aria-live="polite">
+                    {copyStateText}
                 </span>
             </div>
             {showChannelControls && (
@@ -430,15 +468,58 @@ export const TemplateResultModal = memo(function TemplateResultModal({
                     </div>
                 </div>
             )}
-            <div
-                className="rich-preview template-result-preview"
-                data-placeholder="No content."
-                dangerouslySetInnerHTML={{ __html: formatTokenPreviewHTML(formatClipboardHtmlBody(result.html || "")) }}
-            />
+            {isEditing ? (
+                <Suspense fallback={<TemplateResultEditorFallback />}>
+                    <RichTextEditor
+                        className="template-result-editor"
+                        value={draftHtml}
+                        onChange={setDraftHtml}
+                        placeholder="Final text"
+                        tokens={tokens}
+                        allowImages={allowImages}
+                    />
+                </Suspense>
+            ) : (
+                <div
+                    className="rich-preview template-result-preview"
+                    data-placeholder="No content."
+                    dangerouslySetInnerHTML={{ __html: formatTokenPreviewHTML(formatClipboardHtmlBody(previewHtml)) }}
+                />
+            )}
             <div className="popup-actions template-result-actions">
-                <button type="button" className="template-result-action-btn template-result-copy-btn" onClick={onCopy}>
+                {isEditing ? (
+                    <>
+                        <button
+                            type="button"
+                            className="template-result-action-btn template-result-reset-btn"
+                            onClick={resetDraft}
+                            disabled={!isDirty}
+                        >
+                            <RotateCcw size={14} aria-hidden="true" />
+                            Reset
+                        </button>
+                        <button
+                            type="button"
+                            className="template-result-action-btn template-result-edit-btn"
+                            onClick={() => setIsEditing(false)}
+                        >
+                            <Check size={14} aria-hidden="true" />
+                            Done
+                        </button>
+                    </>
+                ) : (
+                    <button
+                        type="button"
+                        className="template-result-action-btn template-result-edit-btn"
+                        onClick={() => setIsEditing(true)}
+                    >
+                        <Edit3 size={14} aria-hidden="true" />
+                        Modify
+                    </button>
+                )}
+                <button type="button" className="template-result-action-btn template-result-copy-btn" onClick={copyDraft}>
                     <Copy size={14} aria-hidden="true" />
-                    Copy again
+                    {isDirty ? "Copy draft" : "Copy again"}
                 </button>
                 {showChannelControls && (
                     <button type="button" className="template-result-action-btn template-result-next-btn" onClick={onNextChannel}>
@@ -1448,6 +1529,7 @@ export function useTemplateRuntime() {
         setCopyPreview({
             id,
             title: getTemplateDisplayTitle(effectiveModel),
+            type: effectiveModel?.type || "",
             html: finalText,
             copied: false
         });
@@ -1468,10 +1550,17 @@ export function useTemplateRuntime() {
         return openTemplateResult(effectiveModel, sectionKey);
     };
 
-    const copyTemplateResultAgain = async () => {
-        if (!copyPreview?.html) return false;
+    const copyTemplateResultAgain = async (htmlOverride = null) => {
+        const hasOverride = typeof htmlOverride === "string";
+        if (!copyPreview?.html && !hasOverride) return false;
+        const nextHtml = hasOverride ? htmlOverride : copyPreview.html;
+        const html = copyPreview?.type === "sms" ? stripImagesFromHtml(nextHtml) : nextHtml;
+        if (!html) return false;
         setCopyPreview((prev) => prev ? { ...prev, copied: false } : prev);
-        await copyPreviewHtml(copyPreview.html, copyPreview.id);
+        if (hasOverride) {
+            setCopyPreview((prev) => prev ? { ...prev, html } : prev);
+        }
+        await copyPreviewHtml(html, copyPreview.id);
         return true;
     };
 
