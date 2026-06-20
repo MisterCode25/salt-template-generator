@@ -53,6 +53,12 @@ function getAttachmentDateValue(attachment = {}) {
     ) || null;
 }
 
+function normalizeOptionalInteger(value) {
+    if (value === null || value === undefined || value === "") return null;
+    const number = Number(value);
+    return Number.isInteger(number) && number >= 0 ? number : null;
+}
+
 function normalizeAttachment(attachment, index) {
     if (!attachment || typeof attachment !== "object" || Array.isArray(attachment)) return null;
 
@@ -68,6 +74,7 @@ function normalizeAttachment(attachment, index) {
     ) || `Attachment ${index + 1}`;
     const declaredType = valueOf(attachment.type, attachment.contentType, attachment.mimeType);
     const type = isImageAttachmentType(declaredType) ? "image" : extensionTypeFor(name, url);
+    const messageId = valueOf(attachment.messageId, attachment.messageID, attachment.postId, attachment.message?.id) || null;
 
     return {
         id: valueOf(attachment.id, attachment.attachmentId, attachment.documentId) || `${index}-${name}-${url}`,
@@ -75,7 +82,23 @@ function normalizeAttachment(attachment, index) {
         url,
         type,
         size: valueOf(attachment.size, attachment.sizeText, attachment.fileSize) || null,
-        messageId: valueOf(attachment.messageId, attachment.messageID, attachment.message?.id) || null,
+        messageId,
+        postId: valueOf(attachment.postId, messageId) || null,
+        messageIndex: normalizeOptionalInteger(valueOf(
+            attachment.messageIndex,
+            attachment.messageOrder,
+            attachment.postIndex,
+            attachment.message?.index
+        )),
+        attachmentIndex: normalizeOptionalInteger(valueOf(attachment.attachmentIndex, attachment.fileIndex)),
+        messageAuthor: valueOf(
+            attachment.messageAuthor,
+            attachment.author,
+            attachment.createdBy,
+            attachment.message?.author,
+            attachment.message?.createdBy
+        ) || null,
+        source: valueOf(attachment.source, attachment.origin) || null,
         date: getAttachmentDateValue(attachment)
     };
 }
@@ -96,6 +119,18 @@ function buildDateMeta(date) {
     };
 }
 
+function buildValidDate(year, monthIndex, day, hours = 0, minutes = 0, seconds = 0) {
+    if (monthIndex < 0 || monthIndex > 11 || day < 1 || day > 31) return null;
+    if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59 || seconds < 0 || seconds > 59) return null;
+    const date = new Date(year, monthIndex, day, hours, minutes, seconds);
+    if (
+        date.getFullYear() !== year
+        || date.getMonth() !== monthIndex
+        || date.getDate() !== day
+    ) return null;
+    return date;
+}
+
 function parseAttachmentDate(value) {
     if (value === null || value === undefined || value === "") return null;
 
@@ -107,20 +142,34 @@ function parseAttachmentDate(value) {
     const text = String(value).trim();
     if (!text) return null;
 
-    const dmy = text.match(/\b(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})\b/);
-    if (dmy) {
-        const day = Number(dmy[1]);
-        const month = Number(dmy[2]) - 1;
-        const rawYear = Number(dmy[3]);
-        const year = rawYear < 100 ? 2000 + rawYear : rawYear;
-        const date = new Date(year, month, day);
-        if (!Number.isNaN(date.getTime())) return date;
+    const ymd = text.match(/\b(\d{4})[./-](\d{1,2})[./-](\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?\b/);
+    if (ymd) {
+        const date = buildValidDate(
+            Number(ymd[1]),
+            Number(ymd[2]) - 1,
+            Number(ymd[3]),
+            Number(ymd[4] || 0),
+            Number(ymd[5] || 0),
+            Number(ymd[6] || 0)
+        );
+        if (date) return date;
     }
 
-    const ymd = text.match(/\b(\d{4})[./-](\d{1,2})[./-](\d{1,2})\b/);
-    if (ymd) {
-        const date = new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]));
-        if (!Number.isNaN(date.getTime())) return date;
+    const localDate = text.match(/\b(\d{1,2})([./-])(\d{1,2})\2(\d{2,4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?\b/);
+    if (localDate) {
+        const first = Number(localDate[1]);
+        const separator = localDate[2];
+        const second = Number(localDate[3]);
+        const rawYear = Number(localDate[4]);
+        const year = rawYear < 100 ? 2000 + rawYear : rawYear;
+        const hours = Number(localDate[5] || 0);
+        const minutes = Number(localDate[6] || 0);
+        const seconds = Number(localDate[7] || 0);
+        const monthFirst = separator === "/" && second > 12 && first <= 12;
+        const day = monthFirst ? second : first;
+        const month = (monthFirst ? first : second) - 1;
+        const date = buildValidDate(year, month, day, hours, minutes, seconds);
+        if (date) return date;
     }
 
     const parsed = new Date(text);
@@ -214,6 +263,52 @@ export function groupSuperOfficeImageAttachmentsByDate(attachments = []) {
 
     return Array.from(groups.values())
         .sort((a, b) => b.sortValue - a.sortValue);
+}
+
+function getAttachmentPostKey(attachment = {}) {
+    return valueOf(attachment.postId, attachment.messageId, attachment.messageID, attachment.message?.id);
+}
+
+function buildPostGroupLabel(attachment = {}, fallbackIndex = 0) {
+    const messageNumber = normalizeOptionalInteger(attachment.messageNumber);
+    const messageIndex = normalizeOptionalInteger(attachment.messageIndex);
+    const postNumber = messageNumber || (messageIndex === null ? fallbackIndex + 1 : messageIndex + 1);
+    return `Post ${postNumber}`;
+}
+
+function buildPostGroupMetaLabel(attachment = {}) {
+    const meta = getAttachmentDateMeta(attachment);
+    const author = valueOf(attachment.messageAuthor);
+    if (meta.dateKey === "unknown") return author;
+    return [meta.label, author].filter(Boolean).join(" · ");
+}
+
+export function groupSuperOfficeImageAttachmentsByPost(attachments = []) {
+    const images = getSuperOfficeImageAttachments(attachments);
+    if (!images.some((attachment) => getAttachmentPostKey(attachment))) {
+        return groupSuperOfficeImageAttachmentsByDate(images);
+    }
+
+    const groups = new Map();
+    images.forEach((attachment, index) => {
+        const postKey = getAttachmentPostKey(attachment);
+        const dateMeta = getAttachmentDateMeta(attachment);
+        const groupKey = postKey || `unassigned:${dateMeta.dateKey}`;
+        if (!groups.has(groupKey)) {
+            const fallbackIndex = groups.size;
+            groups.set(groupKey, {
+                dateKey: groupKey,
+                label: postKey ? buildPostGroupLabel(attachment, fallbackIndex) : dateMeta.label,
+                metaLabel: postKey ? buildPostGroupMetaLabel(attachment) : "",
+                sortValue: normalizeOptionalInteger(attachment.messageIndex) ?? index,
+                attachments: []
+            });
+        }
+        groups.get(groupKey).attachments.push({ ...attachment, galleryIndex: index });
+    });
+
+    return Array.from(groups.values())
+        .sort((a, b) => a.sortValue - b.sortValue);
 }
 
 export function parseSuperOfficeInfoPayload(input) {

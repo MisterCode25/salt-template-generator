@@ -13,7 +13,7 @@ import Modal from "./Modal.jsx";
 import SuperOfficeImageAnnotator from "./SuperOfficeImageAnnotator.jsx";
 import {
     getSuperOfficeImageAttachments,
-    groupSuperOfficeImageAttachmentsByDate
+    groupSuperOfficeImageAttachmentsByPost
 } from "../utils/superOfficeImport.js";
 
 const VIEWER_MIN_ZOOM = 1;
@@ -175,7 +175,7 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
         ticket?.attachments?.length ? ticket.attachments : ticket?.imageAttachments || []
     ), [ticket]);
     const images = useMemo(() => getSuperOfficeImageAttachments(sourceAttachments), [sourceAttachments]);
-    const groups = useMemo(() => groupSuperOfficeImageAttachmentsByDate(images), [images]);
+    const groups = useMemo(() => groupSuperOfficeImageAttachmentsByPost(images), [images]);
     const contextBadges = useMemo(() => buildPhotoContextBadges(profile), [profile]);
     const [activeIndex, setActiveIndex] = useState(null);
     const [annotatorOpen, setAnnotatorOpen] = useState(false);
@@ -404,7 +404,10 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
                 {groups.length > 0 ? groups.map((group) => (
                     <section key={group.dateKey} className="so-photo-date-section">
                         <div className="so-photo-date-section__head">
-                            <h3>{group.label}</h3>
+                            <div>
+                                <h3>{group.label}</h3>
+                                {group.metaLabel && <small>{group.metaLabel}</small>}
+                            </div>
                             <span>{group.attachments.length}</span>
                         </div>
                         <div className="so-photo-grid">

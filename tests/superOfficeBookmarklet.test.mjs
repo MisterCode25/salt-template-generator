@@ -55,6 +55,12 @@ function withGlobal(name, value) {
   };
 }
 
+async function flushBookmarkletAsyncWork() {
+  for (let index = 0; index < 40; index += 1) {
+    await Promise.resolve();
+  }
+}
+
 {
   let copiedText = "";
   const restoreGlobals = [
@@ -109,7 +115,7 @@ function withGlobal(name, value) {
   try {
     assert.ok(bookmarklet.startsWith("javascript:"));
     Function(bookmarklet.replace(/^javascript:/, ""))();
-    await Promise.resolve();
+    await flushBookmarkletAsyncWork();
 
     const payload = JSON.parse(copiedText);
     assert.equal(payload.ticketId, "31436062");
@@ -120,11 +126,110 @@ function withGlobal(name, value) {
     assert.equal(inlineImage.url, "https://superoffice.example.test/inline/image?id=42");
     assert.equal(inlineImage.type, "image");
     assert.equal(inlineImage.messageId, "message-1");
+    assert.equal(inlineImage.postId, "message-1");
+    assert.equal(inlineImage.messageIndex, 0);
+    assert.equal(inlineImage.source, "inline");
     assert.equal(inlineImage.date, "13.06.2026 14:45");
+
+    const regularAttachment = payload.attachments.find((attachment) => attachment.name === "regular-attachment.jpg");
+    assert.equal(regularAttachment.messageId, "message-1");
+    assert.equal(regularAttachment.postId, "message-1");
+    assert.equal(regularAttachment.messageIndex, 0);
+    assert.equal(regularAttachment.source, "attachment");
 
     const parsed = parseSuperOfficeInfoPayload(payload);
     assert.equal(parsed.ok, true);
     assert.equal(parsed.imageAttachments.length, 2);
+  } finally {
+    restoreGlobals.reverse().forEach((restore) => restore());
+  }
+}
+
+{
+  let copiedText = "";
+  const events = [];
+  const toggle = {
+    id: "message-toggle-1",
+    className: "HtmlMessages2_toggle toggle-closed",
+    tagName: "IMG",
+    getAttribute(name) {
+      if (name === "aria-expanded") return "false";
+      if (name === "src") return "/graphics/Nine/dropdown_arrow.svg";
+      return null;
+    },
+    closest() {
+      return null;
+    },
+    scrollIntoView() {},
+    click() {
+      events.push("native-click");
+    },
+    dispatchEvent(event) {
+      events.push(event.type);
+      return true;
+    }
+  };
+  const messageRoot = {
+    id: "HtmlMessages2_message_1",
+    className: "HtmlMessages2_message",
+    tagName: "DIV",
+    getAttribute() {
+      return null;
+    },
+    closest() {
+      return null;
+    },
+    querySelectorAll(selector) {
+      return selector.includes("aria-expanded") || selector.includes("toggle") || selector.includes("dropdown_arrow")
+        ? [toggle]
+        : [];
+    }
+  };
+  const restoreGlobals = [
+    withGlobal("window", { HtmlMessages2_data: {} }),
+    withGlobal("document", {
+      body: {
+        innerText: "REQUEST 31436062\nExternal ticket ID:\n",
+        appendChild() {}
+      },
+      createElement() {
+        return {
+          style: {},
+          remove() {}
+        };
+      },
+      querySelectorAll(selector) {
+        if (selector.includes("HtmlMessages2") && !selector.includes("img")) return [messageRoot];
+        return [];
+      }
+    }),
+    withGlobal("location", { origin: "https://superoffice.example.test" }),
+    withGlobal("navigator", {
+      clipboard: {
+        async writeText(text) {
+          copiedText = text;
+        }
+      }
+    }),
+    withGlobal("MouseEvent", class {
+      constructor(type) {
+        this.type = type;
+      }
+    }),
+    withGlobal("requestAnimationFrame", (callback) => callback()),
+    withGlobal("setTimeout", (callback) => {
+      callback();
+      return 0;
+    }),
+    withGlobal("DOMParser", FakeDOMParser)
+  ];
+
+  try {
+    Function(bookmarklet.replace(/^javascript:/, ""))();
+    await flushBookmarkletAsyncWork();
+
+    assert.ok(events.includes("dblclick"));
+    assert.equal(JSON.parse(copiedText).ticketId, "31436062");
   } finally {
     restoreGlobals.reverse().forEach((restore) => restore());
   }

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   groupSuperOfficeImageAttachmentsByDate,
+  groupSuperOfficeImageAttachmentsByPost,
   parseSuperOfficeInfoPayload
 } from "../src/utils/superOfficeImport.js";
 import {
@@ -272,6 +273,59 @@ import { parseExternalId } from "../src/utils/externalGenerator.js";
   assert.equal(groups[0].dateKey, "2026-06-13");
   assert.equal(groups[0].attachments[0].galleryIndex, 0);
   assert.equal(groups[1].dateKey, "2026-06-12");
+}
+
+{
+  const result = parseSuperOfficeInfoPayload({
+    ticketId: "31436062",
+    attachments: [
+      {
+        name: "photo-post-2-a.jpg",
+        url: "https://example.test/photo-post-2-a.jpg",
+        type: "image",
+        messageId: "message-2",
+        postId: "message-2",
+        messageIndex: 1,
+        messageAuthor: "Client",
+        messageDate: "06/18/2026 14:45"
+      },
+      {
+        name: "photo-post-2-b.jpg",
+        url: "https://example.test/photo-post-2-b.jpg",
+        type: "image",
+        messageId: "message-2",
+        postId: "message-2",
+        messageIndex: 1,
+        messageDate: "06/18/2026 14:45"
+      },
+      {
+        name: "photo-post-1.jpg",
+        url: "https://example.test/photo-post-1.jpg",
+        type: "image",
+        messageId: "message-1",
+        postId: "message-1",
+        messageIndex: 0,
+        messageDate: "17.06.2026 12:00"
+      }
+    ]
+  });
+
+  assert.equal(result.ok, true);
+
+  const dateGroups = groupSuperOfficeImageAttachmentsByDate(result.attachments);
+  assert.equal(dateGroups[0].dateKey, "2026-06-18");
+  assert.equal(dateGroups[0].label, "18.06.2026");
+
+  const postGroups = groupSuperOfficeImageAttachmentsByPost(result.attachments);
+  assert.equal(postGroups.length, 2);
+  assert.equal(postGroups[0].label, "Post 1");
+  assert.deepEqual(postGroups[0].attachments.map((attachment) => attachment.name), ["photo-post-1.jpg"]);
+  assert.equal(postGroups[1].label, "Post 2");
+  assert.equal(postGroups[1].metaLabel, "18.06.2026 · Client");
+  assert.deepEqual(postGroups[1].attachments.map((attachment) => attachment.name), [
+    "photo-post-2-a.jpg",
+    "photo-post-2-b.jpg"
+  ]);
 }
 
 {

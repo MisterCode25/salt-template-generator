@@ -9740,6 +9740,15 @@ a.tools-bar-btn {
     letter-spacing: 0;
 }
 
+.so-photo-date-section__head small {
+    display: block;
+    margin-top: 3px;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 650;
+    line-height: 1.25;
+}
+
 .so-photo-date-section__head span {
     color: var(--text-muted);
     font-size: 12px;
