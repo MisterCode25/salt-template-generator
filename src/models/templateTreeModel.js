@@ -1,3 +1,5 @@
+import { normalizeTopicColor } from "../utils/topicAppearance.js";
+
 export const Channel = Object.freeze({
     EMAIL: "email",
     SMS: "sms",
@@ -40,6 +42,7 @@ function normalizeOrder(value) {
  * @property {string} title
  * @property {string} description
  * @property {string} icon
+ * @property {string} color
  * @property {number} order
  *
  * @typedef {Object} NodeTemplate
@@ -113,6 +116,7 @@ export function normalizeNode(node = {}) {
         title: normalizeText(node.title),
         description: normalizeText(node.description),
         icon: normalizeText(node.icon),
+        color: normalizeTopicColor(node.color),
         order: normalizeOrder(node.order)
     };
 }

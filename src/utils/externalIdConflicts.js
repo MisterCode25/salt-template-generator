@@ -245,3 +245,11 @@ export function applyExternalIdValuesToImportResult(importResult = {}) {
         tokenValues
     };
 }
+
+export function applyExternalIdConflictSelectionsToImportResult(importResult = {}, conflicts = [], selections = {}) {
+    const baseImportResult = applyExternalIdValuesToImportResult(importResult);
+    const sourceConflicts = conflicts.filter((conflict) => (
+        selections?.[conflict.field] !== "external"
+    ));
+    return applyExternalIdSourceCorrectionsToImportResult(baseImportResult, sourceConflicts);
+}

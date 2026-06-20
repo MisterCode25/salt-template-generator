@@ -13,7 +13,7 @@ import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import Modal from "../components/Modal.jsx";
 import { showToast } from "../services/clipboardService.js";
-import { loadTemplateTreeData, saveTemplateTreeData } from "../services/templateTreeService.js";
+import { TEMPLATE_TREE_UPDATED_EVENT, loadTemplateTreeData, saveTemplateTreeData } from "../services/templateTreeService.js";
 import { loadTemplateImageMap } from "../services/templateImageService.js";
 import { loadTokens, loadTokensWithClientData, saveTokens } from "../services/tokenService.js";
 import { Channel, CHANNEL_VALUES } from "../models/templateTreeModel.js";
@@ -41,6 +41,12 @@ import {
     stripImagesFromHtml,
     TEMPLATE_IMAGES_UPDATED_EVENT
 } from "../utils/templateImages.js";
+import {
+    TOPIC_COLOR_PRESETS,
+    getTopicColorStyle,
+    getTopicColorValue,
+    normalizeTopicColor
+} from "../utils/topicAppearance.js";
 
 const TREE_DRAG_MIME = "application/x-template-tree-item";
 const RichTextEditor = lazy(() => import("../components/RichTextEditor.jsx"));
@@ -354,11 +360,14 @@ function NodeFormModal({ mode, initial, parentTitle, onClose, onSave }) {
     const isEdit = mode === "edit";
     const [title, setTitle] = useState(initial?.title || "");
     const [icon, setIcon] = useState(initial?.icon || "");
+    const [color, setColor] = useState(initial?.color || "");
     const [iconMenuOpen, setIconMenuOpen] = useState(false);
     const [iconQuery, setIconQuery] = useState("");
     const [iconCategory, setIconCategory] = useState("All");
     const canSubmit = title.trim().length > 0;
     const selectedIconPreset = getNodeIconPreset(icon);
+    const currentTopicDraft = { title, icon, color };
+    const selectedColor = getTopicColorValue(currentTopicDraft);
     const filteredIconPresets = useMemo(() => {
         const query = iconQuery.trim().toLowerCase();
         return NODE_ICON_PRESETS.filter((preset) => {
@@ -379,7 +388,8 @@ function NodeFormModal({ mode, initial, parentTitle, onClose, onSave }) {
         if (!canSubmit) return;
         onSave({
             title: title.trim(),
-            icon: icon.trim()
+            icon: icon.trim(),
+            color: normalizeTopicColor(color)
         });
     };
 
@@ -396,20 +406,21 @@ function NodeFormModal({ mode, initial, parentTitle, onClose, onSave }) {
                         {parentTitle && !isEdit && <p className="node-modal-subtitle">Inside {parentTitle}</p>}
                     </div>
                 </div>
-                <div className="node-form">
+                <div className="node-form" style={getTopicColorStyle(currentTopicDraft)}>
                     {parentTitle && !isEdit && (
                         <div className="node-form-parent">
                             <span className="client-info-label">Parent</span>
                             <strong>{parentTitle}</strong>
                         </div>
                     )}
-                    <div className="node-form-preview">
+                    <div className="node-form-preview" style={getTopicColorStyle(currentTopicDraft)}>
                         <span className="node-object-icon"><NodeIconGlyph icon={icon} /></span>
                         <span>
                             <strong>{title || "Untitled topic"}</strong>
+                            <small>{selectedColor.toUpperCase()}</small>
                         </span>
                     </div>
-                    <div className="node-section-form-grid">
+                    <div className="node-section-form-grid node-section-form-grid--appearance">
                         <div className="form-field">
                             <label>Title</label>
                             <input
@@ -494,6 +505,47 @@ function NodeFormModal({ mode, initial, parentTitle, onClose, onSave }) {
                                         </div>
                                     </div>
                                 )}
+                            </div>
+                        </div>
+                        <div className="form-field node-color-field">
+                            <label>Color</label>
+                            <div className="node-color-grid" aria-label="Topic colors">
+                                <button
+                                    type="button"
+                                    className={!normalizeTopicColor(color) ? "node-color-auto is-selected" : "node-color-auto"}
+                                    onClick={() => setColor("")}
+                                    title="Automatic color"
+                                >
+                                    Auto
+                                </button>
+                                {TOPIC_COLOR_PRESETS.map((preset) => {
+                                    const selected = normalizeTopicColor(color) === preset.value;
+                                    return (
+                                        <button
+                                            key={preset.value}
+                                            type="button"
+                                            className={selected ? "node-color-swatch is-selected" : "node-color-swatch"}
+                                            style={getTopicColorStyle({ color: preset.value })}
+                                            onClick={() => setColor(preset.value)}
+                                            aria-label={preset.label}
+                                            title={preset.label}
+                                        />
+                                    );
+                                })}
+                            </div>
+                            <div className="node-color-custom">
+                                <input
+                                    type="color"
+                                    value={selectedColor}
+                                    onChange={(event) => setColor(event.target.value)}
+                                    aria-label="Custom topic color"
+                                />
+                                <input
+                                    value={color}
+                                    onChange={(event) => setColor(event.target.value)}
+                                    placeholder="#6366f1"
+                                    aria-label="Topic color hex value"
+                                />
                             </div>
                         </div>
                     </div>
@@ -1240,7 +1292,7 @@ const NodeTreeRow = memo(function NodeTreeRow({
     ].filter(Boolean).join(" ");
 
     return (
-        <div className="node-tree-item" style={{ "--node-depth": depth }}>
+        <div className="node-tree-item" style={{ "--node-depth": depth, ...getTopicColorStyle(node) }}>
             <div
                 className={rowClassName}
                 data-depth={depth}
@@ -1468,7 +1520,7 @@ const TopicDetailPanel = memo(function TopicDetailPanel({
 
     return (
         <>
-            <div className="node-canvas-hero node-canvas-hero--detail">
+            <div className="node-canvas-hero node-canvas-hero--detail" style={getTopicColorStyle(selectedNode)}>
                 <div className="node-hero-icon"><NodeIconGlyph icon={selectedNode.icon} /></div>
                 <div className="node-hero-copy">
                     <h2>{selectedNode.title || "Untitled topic"}</h2>
@@ -1648,7 +1700,7 @@ const TemplateDetailPanel = memo(function TemplateDetailPanel({
                     <h3>Linked topics</h3>
                     <div className="node-template-linked-pills">
                         {linkedNodes.map((node) => (
-                            <span key={node.id} className="node-template-node-pill">
+                            <span key={node.id} className="node-template-node-pill" style={getTopicColorStyle(node)}>
                                 <Link2 size={14} aria-hidden="true" />
                                 {node.title || "Untitled topic"}
                             </span>
@@ -1705,7 +1757,7 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
 
     useEffect(() => {
         let active = true;
-        loadTemplateTreeData().then((treeData) => {
+        const refreshTreeData = (resetSelection = false) => loadTemplateTreeData().then((treeData) => {
             if (!active) return;
             setNodes(treeData.nodes);
             setTemplates(treeData.templates);
@@ -1713,11 +1765,22 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
                 if (current && treeData.nodes.some((node) => node.id === current)) return current;
                 return treeData.nodes.find((node) => !node.parentId)?.id || treeData.nodes[0]?.id || null;
             });
-            setSelectedTemplateId(null);
-            setExpandedNodeIds(new Set(treeData.nodes.map((node) => node.id)));
+            setSelectedTemplateId((current) => {
+                if (resetSelection || !current) return null;
+                return treeData.templates.some((template) => template.id === current) ? current : null;
+            });
+            setExpandedNodeIds((current) => {
+                if (resetSelection) return new Set(treeData.nodes.map((node) => node.id));
+                const validIds = new Set(treeData.nodes.map((node) => node.id));
+                return new Set([...current].filter((nodeId) => validIds.has(nodeId)));
+            });
         });
+        refreshTreeData(true);
+        const handleTemplateTreeUpdated = () => refreshTreeData(false);
+        window.addEventListener(TEMPLATE_TREE_UPDATED_EVENT, handleTemplateTreeUpdated);
         return () => {
             active = false;
+            window.removeEventListener(TEMPLATE_TREE_UPDATED_EVENT, handleTemplateTreeUpdated);
         };
     }, []);
 

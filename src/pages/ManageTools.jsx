@@ -25,6 +25,7 @@ import {
     sanitizeToolType,
     saveTools
 } from "../services/toolsService.js";
+import { handleToolModuleTemplateRequest } from "../services/toolModuleTemplateService.js";
 import { loadTokens } from "../services/tokenService.js";
 import { loadActiveClientPayload } from "../services/activeClientService.js";
 import { loadTokenInputValues } from "../services/tokenInputValueService.js";
@@ -491,6 +492,15 @@ function ModulePreviewFrame({ draft, tokens, runtimePreviewContext }) {
                     const nextHeight = Math.min(Math.max(Math.ceil(Number(payload.height) || 0), 180), 620);
                     if (nextHeight > 0) setFrameHeight(nextHeight);
                     reply(requestId, { ok: true });
+                    return;
+                }
+
+                if (String(type || "").startsWith("tool:templates:")) {
+                    const result = await handleToolModuleTemplateRequest(type, payload);
+                    if (["tool:templates:apply-migration", "tool:templates:update-template", "tool:templates:move-template"].includes(type)) {
+                        showToast("Template tree updated from module preview.", "success");
+                    }
+                    reply(requestId, result);
                     return;
                 }
 

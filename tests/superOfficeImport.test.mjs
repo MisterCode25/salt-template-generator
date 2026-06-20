@@ -5,6 +5,7 @@ import {
   parseSuperOfficeInfoPayload
 } from "../src/utils/superOfficeImport.js";
 import {
+  applyExternalIdConflictSelectionsToImportResult,
   applyExternalIdValuesToImportResult,
   applyExternalIdSourceCorrections,
   applyExternalIdSourceCorrectionsToImportResult,
@@ -75,6 +76,17 @@ import { parseExternalId } from "../src/utils/externalGenerator.js";
   assert.equal(externalIdResult.tokenValues["{contractor_number}"], "99999999");
   assert.equal(externalIdResult.tokenValues["{client_contractor_number}"], "99999999");
   assert.equal(externalIdResult.tokenValues["{so_ticket_num}"], "SO-WRONG");
+
+  const mixedResult = applyExternalIdConflictSelectionsToImportResult(result, conflicts, {
+    customer: "source",
+    soTicket: "external"
+  });
+  const mixedExternalId = parseExternalId(mixedResult.externalTicketId);
+  assert.equal(mixedExternalId.ok, true);
+  assert.equal(mixedExternalId.fields.customer, "31447756");
+  assert.equal(mixedExternalId.fields.soTicket, "SO-WRONG");
+  assert.equal(mixedResult.tokenValues["{external_customer}"], "31447756");
+  assert.equal(mixedResult.tokenValues["{so_ticket_num}"], "SO-WRONG");
 }
 
 {

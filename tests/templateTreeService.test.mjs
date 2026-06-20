@@ -105,7 +105,10 @@ const {
   LEGACY_TEMPLATE_MIGRATION_KEY,
   NODE_TEMPLATE_KEY,
   TEMPLATE_NODE_KEY,
+  listTemplateTokensInTemplateTree,
   loadTemplateTreeData,
+  migrateTokenInTemplateTree,
+  previewTokenMigrationInTemplateTree,
   renameTokenInTemplateTree,
   saveTemplateTreeData
 } = await import("../src/services/templateTreeService.js");
@@ -124,6 +127,7 @@ assert.deepEqual(
     title: "No signal",
     description: "Signal troubleshooting",
     icon: "wifi-off",
+    color: "#6366f1",
     order: 2
   }),
   {
@@ -132,6 +136,7 @@ assert.deepEqual(
     title: "No signal",
     description: "Signal troubleshooting",
     icon: "wifi-off",
+    color: "#6366f1",
     order: 2
   }
 );
@@ -295,6 +300,7 @@ assert.deepEqual(indexedDB.data.get(TEMPLATE_NODE_KEY), [
     title: "No signal",
     description: "",
     icon: "wifi-off",
+    color: "",
     order: 1
   }
 ]);
@@ -309,10 +315,39 @@ assert.equal(savedTemplates[0].contentByChannel.other.title, "Customer unreachab
 const loaded = await loadTemplateTreeData();
 assert.equal(loaded.nodes[0].title, "No signal");
 assert.equal(loaded.templates[0].parentNodeId, "node-root");
+assert.deepEqual(await listTemplateTokensInTemplateTree(), ["{old_token}", "{so_ticket_num}"]);
 
 await renameTokenInTemplateTree("{old_token}", "{new_token}");
 const renamed = await loadTemplateTreeData();
 assert.equal(renamed.templates[0].contentByChannel.sms.text_fr, "Bonjour {new_token} {so_ticket_num}");
 assert.equal(renamed.templates[0].contentByChannel.sms.variants[0].text_fr, "Variante {new_token} {so_ticket_num}");
+assert.deepEqual(await listTemplateTokensInTemplateTree(), ["{new_token}", "{so_ticket_num}"]);
+
+const migrationPreview = await previewTokenMigrationInTemplateTree("{new_token}");
+assert.deepEqual(migrationPreview, {
+  fromToken: "{new_token}",
+  replacements: 2,
+  templateCount: 1
+});
+
+const migrationResult = await migrateTokenInTemplateTree("{new_token}", "{replacement_token}");
+assert.deepEqual(migrationResult, {
+  fromToken: "{new_token}",
+  toToken: "{replacement_token}",
+  replacements: 2,
+  templateCount: 1
+});
+
+const migratedTokens = await loadTemplateTreeData();
+assert.equal(migratedTokens.templates[0].contentByChannel.sms.text_fr, "Bonjour {replacement_token} {so_ticket_num}");
+assert.equal(migratedTokens.templates[0].contentByChannel.sms.variants[0].text_fr, "Variante {replacement_token} {so_ticket_num}");
+
+const emptyMigration = await migrateTokenInTemplateTree("{missing_token}", "{other_token}");
+assert.deepEqual(emptyMigration, {
+  fromToken: "{missing_token}",
+  toToken: "{other_token}",
+  replacements: 0,
+  templateCount: 0
+});
 
 console.log("templateTreeService tests passed");

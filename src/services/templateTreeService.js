@@ -2,12 +2,16 @@ import { loadIndexedJSON, saveIndexedJSON } from "./indexedDbService.js";
 import { loadJSON, readLegacyStorageValue, removeLegacyStorageValue, saveJSON } from "./storageService.js";
 import { CHANNEL_VALUES, normalizeNode, normalizeTemplate } from "../models/templateTreeModel.js";
 import { migrateLegacyModelsToTemplateTree } from "../utils/legacyTemplateMigration.js";
-import { canonicalizeTemplateTokensInText } from "../utils/tokenCanonicalization.js";
+import {
+    canonicalizeInputTokenValue,
+    canonicalizeTemplateTokensInText
+} from "../utils/tokenCanonicalization.js";
 
 export const TEMPLATE_NODE_KEY = "template_nodes";
 export const NODE_TEMPLATE_KEY = "node_templates";
 export const LEGACY_MODEL_KEY = "models";
 export const LEGACY_TEMPLATE_MIGRATION_KEY = "template_tree_legacy_migration";
+export const TEMPLATE_TREE_UPDATED_EVENT = "template-tree-updated";
 const TEMPLATE_TEXT_FIELDS = Object.freeze(["text_fr", "text_en", "text_de", "text_it"]);
 
 async function loadList(key, normalize) {
@@ -80,6 +84,19 @@ export async function saveTemplateTreeData({ nodes = [], templates = [] } = {}) 
         saveTemplateNodes(nodes),
         saveNodeTemplates(canonicalizedTemplates)
     ]);
+    dispatchTemplateTreeUpdated({
+        nodes: Array.isArray(nodes) ? nodes.length : 0,
+        templates: canonicalizedTemplates.length
+    });
+}
+
+function dispatchTemplateTreeUpdated(detail = {}) {
+    if (
+        typeof globalThis.window?.dispatchEvent !== "function"
+        || typeof globalThis.CustomEvent !== "function"
+    ) return;
+
+    globalThis.window.dispatchEvent(new globalThis.CustomEvent(TEMPLATE_TREE_UPDATED_EVENT, { detail }));
 }
 
 function transformTextFields(source = {}, transformText) {
@@ -217,6 +234,20 @@ async function migrateStoredLegacyTemplates({ nodes = [], templates = [] } = {})
     return migrated;
 }
 
+function countOccurrences(text = "", token = "") {
+    if (!text || !token) return 0;
+    return String(text).split(token).length - 1;
+}
+
+function collectTemplateTokensInText(text = "", tokenSet) {
+    if (typeof text !== "string" || !text) return;
+    const matches = text.match(/\{[^{}]+\}/g) || [];
+    for (const match of matches) {
+        const token = canonicalizeInputTokenValue(match);
+        if (token) tokenSet.add(token);
+    }
+}
+
 function replaceInText(text, fromToken, toToken) {
     if (!text || !fromToken || fromToken === toToken) return text;
     if (!text.includes(fromToken)) return text;
@@ -228,27 +259,134 @@ function replaceTokenInChannelContent(content, fromToken, toToken) {
 }
 
 export async function renameTokenInTemplateTree(fromToken, toToken) {
-    if (!fromToken || !toToken || fromToken === toToken) return;
+    await migrateTokenInTemplateTree(fromToken, toToken);
+}
+
+function countTokenInChannelContent(content, token) {
+    if (!content) return 0;
+
+    let count = 0;
+    for (const field of TEMPLATE_TEXT_FIELDS) {
+        count += countOccurrences(content[field], token);
+    }
+
+    if (Array.isArray(content.variants)) {
+        for (const variant of content.variants) {
+            for (const field of TEMPLATE_TEXT_FIELDS) {
+                count += countOccurrences(variant?.[field], token);
+            }
+        }
+    }
+
+    return count;
+}
+
+function collectTokensInChannelContent(content, tokenSet) {
+    if (!content) return;
+
+    for (const field of TEMPLATE_TEXT_FIELDS) {
+        collectTemplateTokensInText(content[field], tokenSet);
+    }
+
+    if (Array.isArray(content.variants)) {
+        for (const variant of content.variants) {
+            for (const field of TEMPLATE_TEXT_FIELDS) {
+                collectTemplateTokensInText(variant?.[field], tokenSet);
+            }
+        }
+    }
+}
+
+function countTokenInTemplate(template, token) {
+    const contentByChannel = template?.contentByChannel || {};
+    let count = 0;
+    for (const channel of CHANNEL_VALUES) {
+        count += countTokenInChannelContent(contentByChannel[channel], token);
+    }
+    return count;
+}
+
+export async function listTemplateTokensInTemplateTree() {
+    const { templates } = await loadTemplateTreeData();
+    const tokenSet = new Set();
+
+    for (const template of templates) {
+        const contentByChannel = template?.contentByChannel || {};
+        for (const channel of CHANNEL_VALUES) {
+            collectTokensInChannelContent(contentByChannel[channel], tokenSet);
+        }
+    }
+
+    return Array.from(tokenSet).sort((left, right) => left.localeCompare(right));
+}
+
+export async function previewTokenMigrationInTemplateTree(fromToken) {
+    const normalizedFromToken = canonicalizeInputTokenValue(fromToken);
+    if (!normalizedFromToken) {
+        return {
+            fromToken: "",
+            replacements: 0,
+            templateCount: 0
+        };
+    }
+
+    const { templates } = await loadTemplateTreeData();
+    let replacements = 0;
+    let templateCount = 0;
+
+    for (const template of templates) {
+        const templateMatches = countTokenInTemplate(template, normalizedFromToken);
+        if (templateMatches === 0) continue;
+        replacements += templateMatches;
+        templateCount += 1;
+    }
+
+    return {
+        fromToken: normalizedFromToken,
+        replacements,
+        templateCount
+    };
+}
+
+export async function migrateTokenInTemplateTree(fromToken, toToken) {
+    const normalizedFromToken = canonicalizeInputTokenValue(fromToken);
+    const normalizedToToken = canonicalizeInputTokenValue(toToken);
+    if (!normalizedFromToken || !normalizedToToken || normalizedFromToken === normalizedToToken) {
+        return {
+            fromToken: normalizedFromToken,
+            toToken: normalizedToToken,
+            replacements: 0,
+            templateCount: 0
+        };
+    }
 
     const { nodes, templates } = await loadTemplateTreeData();
     let dirty = false;
+    let replacements = 0;
+    let templateCount = 0;
     const nextTemplates = [];
     for (const template of templates) {
         const originalContentByChannel = template.contentByChannel || {};
         let contentByChannel = originalContentByChannel;
         let templateDirty = false;
+        let templateReplacements = 0;
 
         for (const channel of CHANNEL_VALUES) {
-            const result = replaceTokenInChannelContent(contentByChannel[channel], fromToken, toToken);
+            const content = contentByChannel[channel];
+            const channelReplacementCount = countTokenInChannelContent(content, normalizedFromToken);
+            const result = replaceTokenInChannelContent(content, normalizedFromToken, normalizedToToken);
             if (!result.dirty) continue;
             if (contentByChannel === originalContentByChannel) {
                 contentByChannel = { ...originalContentByChannel };
             }
             contentByChannel[channel] = result.content;
             templateDirty = true;
+            templateReplacements += channelReplacementCount;
         }
 
         dirty = dirty || templateDirty;
+        replacements += templateReplacements;
+        if (templateReplacements > 0) templateCount += 1;
         nextTemplates.push(templateDirty
             ? normalizeTemplate({
                 ...template,
@@ -260,4 +398,11 @@ export async function renameTokenInTemplateTree(fromToken, toToken) {
     if (dirty) {
         await saveTemplateTreeData({ nodes, templates: nextTemplates });
     }
+
+    return {
+        fromToken: normalizedFromToken,
+        toToken: normalizedToToken,
+        replacements,
+        templateCount
+    };
 }

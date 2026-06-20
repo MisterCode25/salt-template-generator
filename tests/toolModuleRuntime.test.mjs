@@ -18,6 +18,8 @@ import {
   assert.match(srcDoc, /getVar/);
   assert.match(srcDoc, /getProfile/);
   assert.match(srcDoc, /listVariables/);
+  assert.match(srcDoc, /templates/);
+  assert.match(srcDoc, /previewMigration/);
   assert.match(srcDoc, /template-tool-host-style/);
   assert.match(srcDoc, /<main>Tool body<\/main>/);
 }
@@ -30,6 +32,8 @@ import {
   assert.equal(TOOL_MODULE_API_REFERENCE.functions["TemplateTool.getContext()"], "Promise<TemplateContext>");
   assert.equal(TOOL_MODULE_API_REFERENCE.functions["TemplateTool.getProfile()"], "Promise<TemplateProfile>");
   assert.equal(TOOL_MODULE_API_REFERENCE.functions["TemplateTool.getVar(name, fallback = '')"], "Promise<string>");
+  assert.equal(TOOL_MODULE_API_REFERENCE.functions["TemplateTool.templates.getTree()"], "Promise<{ nodes, templates, counts }>");
+  assert.equal(TOOL_MODULE_API_REFERENCE.functions["TemplateTool.templates.applyMigration(operations)"], "Promise<{ ok, appliedCount, skippedCount, tree }>");
   assert.ok(TOOL_MODULE_API_REFERENCE.variables.examples.includes("TemplateVars.clientName"));
   const apiPromptReference = formatToolModuleApiReferenceForPrompt();
   assert.match(apiPromptReference, /Template Generator Module API/);
@@ -165,6 +169,10 @@ import {
   assert.match(prompt, /Return one complete HTML file, and nothing else/);
   assert.match(prompt, /downloadable \.html file/);
   assert.match(prompt, /Do not split the answer into multiple parts/);
+  assert.match(prompt, /Generation contract:/);
+  assert.match(prompt, /implement only that workflow/);
+  assert.match(prompt, /Do not add unrelated dashboards/);
+  assert.match(prompt, /Every visible control must map to a requested user action/);
   assert.match(prompt, /Module API reference:/);
   assert.match(prompt, /Globals:/);
   assert.match(prompt, /Variable access:/);
@@ -175,6 +183,11 @@ import {
   assert.match(prompt, /If the user explicitly asks for a main-page action/);
   assert.match(prompt, /tokens is an array of available variables/);
   assert.match(prompt, /Never invent variable names or sample values/);
+  assert.match(prompt, /Template tree and migration rules:/);
+  assert.match(prompt, /host-mediated full-access layer/);
+  assert.match(prompt, /instead of raw IndexedDB/);
+  assert.match(prompt, /Show the preview result before mutating storage/);
+  assert.match(prompt, /Apply migrations only from a clear user action/);
   assert.match(prompt, /Do not create a second card-centered popup/);
   assert.match(prompt, /TemplateTool\.findField/);
   assert.match(prompt, /TemplateVars/);
@@ -188,9 +201,16 @@ import {
   assert.match(prompt, /TemplateTool\.getVars/);
   assert.match(prompt, /TemplateTool\.getVar/);
   assert.match(prompt, /TemplateTool\.listVariables/);
+  assert.match(prompt, /TemplateTool\.templates\.getTree/);
+  assert.match(prompt, /TemplateTool\.templates\.previewMigration/);
+  assert.match(prompt, /TemplateTool\.templates\.applyMigration/);
   assert.match(prompt, /TemplateTool\.copyHtml\(html, message\)/);
   assert.match(prompt, /TemplateTool\.requestResize/);
   assert.match(prompt, /Use <main class="template-tool-module">/);
+  assert.match(prompt, /Make the interface shape specific to the requested job/);
+  assert.match(prompt, /Avoid repeating the same generic module layout/);
+  assert.match(prompt, /accent may change per module/);
+  assert.match(prompt, /Never write to localStorage or IndexedDB directly/);
   assert.match(prompt, /window\.TemplateTool\.getContext/);
   assert.match(prompt, /Refund helper/);
   assert.match(prompt, /Calculate a refund/);

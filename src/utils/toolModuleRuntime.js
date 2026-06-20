@@ -73,6 +73,12 @@ export const TOOL_MODULE_API_REFERENCE = Object.freeze({
         "TemplateTool.listVariables()": "Promise<string[]>",
         "TemplateTool.findField(candidates)": "Promise<Field|null>",
         "TemplateTool.getFieldValue(candidates, fallback = '')": "Promise<string>",
+        "TemplateTool.templates.list()": "Promise<{ nodes, templates, counts }>",
+        "TemplateTool.templates.getTree()": "Promise<{ nodes, templates, counts }>",
+        "TemplateTool.templates.previewMigration(rules)": "Promise<{ operations, skipped, operationCount, affectedTemplateCount }>",
+        "TemplateTool.templates.applyMigration(operations)": "Promise<{ ok, appliedCount, skippedCount, tree }>",
+        "TemplateTool.templates.updateTemplate(templateId, patch)": "Promise<{ ok, template }>",
+        "TemplateTool.templates.moveTemplate(templateId, targetNodeId, options = {})": "Promise<{ ok, template }>",
         "TemplateTool.copyText(text, message)": "Promise<{ ok: boolean }>",
         "TemplateTool.copyHtml(html, message)": "Promise<{ ok: boolean }>",
         "TemplateTool.toast(message, variant)": "Promise<{ ok: boolean }>",
@@ -411,6 +417,33 @@ const TOOL_MODULE_BRIDGE = `
         },
         close: function () {
             return post("tool:close", {}, false);
+        },
+        templates: {
+            list: function () {
+                return post("tool:templates:list", {}, true);
+            },
+            getTree: function () {
+                return post("tool:templates:get-tree", {}, true);
+            },
+            previewMigration: function (rules) {
+                return post("tool:templates:preview-migration", { rules: rules || [] }, true);
+            },
+            applyMigration: function (operations) {
+                return post("tool:templates:apply-migration", { operations: operations || [] }, true);
+            },
+            updateTemplate: function (templateId, patch) {
+                return post("tool:templates:update-template", {
+                    templateId: String(templateId || ""),
+                    patch: patch || {}
+                }, true);
+            },
+            moveTemplate: function (templateId, targetNodeId, options) {
+                return post("tool:templates:move-template", {
+                    templateId: String(templateId || ""),
+                    targetNodeId: String(targetNodeId || ""),
+                    options: options || {}
+                }, true);
+            }
         }
     };
 
@@ -947,6 +980,13 @@ Return one complete HTML file, and nothing else.
 - Do not include explanations before or after the file.
 - Do not use external dependencies, CDNs, remote fonts, build steps, imports or backend calls.
 
+Generation contract:
+- Read the user request literally and implement only that workflow.
+- Do not add unrelated dashboards, tabs, settings, history, import/export, theme switches, fake navigation, sample records, analytics, onboarding, help copy or extra panels unless the user explicitly requested them or they are required for the requested action.
+- Every visible control must map to a requested user action, a required validation step or a TemplateTool API operation.
+- If the request is vague, build the smallest useful module for the named task and show missing requirements inside the module instead of inventing behavior.
+- Use real app context and API responses only. Do not prefill fake topics, templates, clients, IDs or example data.
+
 Module API reference:
 ${formatToolModuleApiReferenceForPrompt()}
 
@@ -975,6 +1015,10 @@ Runtime:
 - Use await window.TemplateTool.getVar("clientName", "") for a single variable.
 - Use await window.TemplateTool.listVariables() when you need to discover the variable names available in the current context.
 - Use window.TemplateTool.describeApi() when you need the static API reference.
+- Use await window.TemplateTool.templates.getTree() or .list() when a trusted module needs the current topic/template tree.
+- Use await window.TemplateTool.templates.previewMigration(rules) before writing migrations. Rules may target topics by id, title, or path with fields like { fromTopic, toTopic, channel, titleIncludes }.
+- Use await window.TemplateTool.templates.applyMigration(preview.operations) to apply reviewed migration operations through the host storage service.
+- Use await window.TemplateTool.templates.updateTemplate(templateId, patch) or .moveTemplate(templateId, targetNodeId, options) for focused edits.
 - Use window.TemplateTool.copyText(text, message) to copy plain text.
 - Use window.TemplateTool.copyHtml(html, message) to copy formatted HTML.
 - Use window.TemplateTool.toast(message, "info" | "success" | "warning" | "error") for feedback.
@@ -990,6 +1034,15 @@ Available data rules:
 - If a required field is missing from context.tokens, context.clientInfo and context.client, show a clear missing-data state instead of guessing.
 - For date tools, accept common formats like YYYY-MM-DD and DD.MM.YYYY, but only calculate from an actual available value.
 
+Template tree and migration rules:
+- TemplateTool.templates is the host-mediated full-access layer for trusted modules. Use it instead of raw IndexedDB, localStorage hacks or parent DOM access.
+- list() and getTree() return the live topic/template tree from the app storage service.
+- previewMigration(rules) accepts an array of rule objects. Rule targets can use topic ids, topic titles or paths. Useful fields include fromTopic, toTopic, fromNodeId, toNodeId, channel, channels, title, templateTitle, titleIncludes, templateTitleIncludes, templateId, templateIds and reason.
+- Show the preview result before mutating storage: operation count, affected templates, skipped items and enough template/topic labels for the user to verify the move.
+- Apply migrations only from a clear user action such as an Apply button, unless the user explicitly requested an automatic action.
+- For risky operations, keep the UI focused on review and rollback clarity: no hidden writes, no silent bulk edits and no mutation without feedback.
+- After applyMigration, updateTemplate or moveTemplate succeeds, show a concise success state and call requestResize() if the visible result changes.
+
 Host behavior:
 - The host app always opens this module inside its own popup/modal. The user does not need to ask for a popup.
 - Build the HTML as the complete content of that popup, with a compact self-contained interface that fits inside the modal.
@@ -1003,17 +1056,20 @@ Visual style:
 - The host popup already provides the modal frame and title. Do not create a second card-centered popup inside it.
 - Use <main class="template-tool-module"> as the only top-level visual wrapper.
 - Let the module content fill the iframe width. Set html/body margin to 0, do not set body min-height: 100vh, do not use place-items: center, do not use large empty gray backgrounds and do not center a max-width card in the canvas.
-- Use a white or very light surface, #172033 text, #526078 muted text, #5b63f6 as the primary action color, #21a36a for success and #dc2626 only for destructive actions.
-- Use 8px radius or less, clear labels, dense spacing and visible focus states.
+- Make the interface shape specific to the requested job. Migration tools should feel like review tables or rule builders; calculators should feel like input/result panels; inspectors should feel like searchable lists; copy helpers should feel like compact composers.
+- Avoid repeating the same generic module layout. Do not always use a header block, stats grid, centered card, icon pills or decorative preview panel unless that structure fits the request.
+- Use a restrained app-like palette with white or very light surfaces, dark readable text, one purposeful accent color and state colors for success, warning and destructive actions. The accent may change per module when it helps distinguish the workflow.
+- Use 8px radius or less, clear labels, dense spacing, aligned controls and visible focus states.
 - Buttons should look like app tools: bordered, solid when primary, quiet when secondary.
-- Avoid decorative gradients, big hero sections, stock imagery and explanatory marketing copy.
+- Avoid decorative gradients, big hero sections, stock imagery, ornamental icons and explanatory marketing copy.
+- Keep copy operational and short. Do not explain what the app is or how modules work unless the user asked for help text.
 
 Robustness:
 - Do not assume a token exists. Read values defensively.
 - Keep the layout responsive from 360px to desktop.
 - Use type="button" on action buttons so forms do not submit unexpectedly.
 - Ensure empty, loading and error states remain inside the same compact layout.
-- Never write to localStorage unless it is essential for the tool.
+- Never write to localStorage or IndexedDB directly. Use TemplateTool APIs for app data writes.
 
 Tool name: ${safeTitle}
 

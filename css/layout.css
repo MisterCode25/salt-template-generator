@@ -278,15 +278,15 @@
 }
 
 .client-import-status-btn--vti {
-    border-color: rgba(248,113,113,0.44);
-    background: rgba(185,28,28,0.18);
-    color: #fecaca;
+    border-color: rgba(96,165,250,0.48);
+    background: rgba(37,99,235,0.24);
+    color: #dbeafe;
 }
 
 .client-import-status-btn--vti:hover:not(:disabled) {
-    background: rgba(185,28,28,0.28);
-    border-color: rgba(248,113,113,0.62);
-    color: #fee2e2;
+    background: rgba(37,99,235,0.34);
+    border-color: rgba(147,197,253,0.68);
+    color: #eff6ff;
 }
 
 .client-import-status-btn--so {
@@ -317,8 +317,8 @@
 }
 
 .client-import-status-btn--vti small {
-    background: rgba(248,113,113,0.16);
-    color: #fecaca;
+    background: rgba(96,165,250,0.2);
+    color: #bfdbfe;
 }
 
 .client-import-status-btn--so small {
@@ -465,9 +465,11 @@
 }
 
 .client-info-bar-field {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
+    display: inline-grid;
+    grid-template-rows: auto auto;
+    gap: 2px;
+    flex: 0 0 auto;
+    inline-size: max-content;
     padding: 0 14px;
     border-right: 1px solid var(--border-default);
 }
@@ -481,6 +483,8 @@
 }
 
 .client-info-bar-field-key {
+    display: block;
+    white-space: nowrap;
     font-size: 10px;
     font-weight: 700;
     text-transform: uppercase;
@@ -489,13 +493,11 @@
 }
 
 .client-info-bar-field-val {
+    display: block;
     font-size: var(--font-sm);
     font-weight: 700;
     color: var(--text-primary);
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 200px;
 }
 
 .client-info-bar-controls {
@@ -1142,14 +1144,20 @@
 }
 
 .light-theme .client-import-status-btn--vti {
-    border-color: rgba(190, 40, 40, 0.24);
-    background: rgba(220, 38, 38, 0.09);
-    color: #9f1d1d;
+    border-color: rgba(37, 99, 235, 0.28);
+    background: rgba(37, 99, 235, 0.1);
+    color: #1d4ed8;
+}
+
+.light-theme .client-import-status-btn--vti:hover:not(:disabled) {
+    border-color: rgba(37, 99, 235, 0.42);
+    background: rgba(37, 99, 235, 0.16);
+    color: #1e40af;
 }
 
 .light-theme .client-import-status-btn--vti small {
-    background: rgba(220, 38, 38, 0.1);
-    color: #9f1d1d;
+    background: rgba(37, 99, 235, 0.12);
+    color: #1e40af;
 }
 
 .light-theme .client-import-status-btn--so {
@@ -1169,8 +1177,8 @@
 }
 
 .light-theme .client-import-status-btn--vti small {
-    background: rgba(220, 38, 38, 0.1);
-    color: #9f1d1d;
+    background: rgba(37, 99, 235, 0.12);
+    color: #1e40af;
 }
 
 .light-theme .client-import-status-btn--so small {
@@ -1341,9 +1349,15 @@
 }
 
 .salt-theme .client-import-status-btn--vti {
-    border-color: rgba(248,113,113,0.42);
-    background: rgba(185,28,28,0.18);
-    color: #fecaca;
+    border-color: rgba(96,165,250,0.48);
+    background: rgba(37,99,235,0.24);
+    color: #dbeafe;
+}
+
+.salt-theme .client-import-status-btn--vti:hover:not(:disabled) {
+    background: rgba(37,99,235,0.34);
+    border-color: rgba(147,197,253,0.68);
+    color: #eff6ff;
 }
 
 .salt-theme .client-import-status-btn--so {
@@ -1358,8 +1372,8 @@
 }
 
 .salt-theme .client-import-status-btn--vti small {
-    background: rgba(248,113,113,0.16);
-    color: #fecaca;
+    background: rgba(96,165,250,0.2);
+    color: #bfdbfe;
 }
 
 .salt-theme .client-import-status-btn--so small {

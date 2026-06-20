@@ -13,7 +13,7 @@ import {
     Search,
     Settings,
     Smartphone,
-    Star,
+    TrendingUp,
     Truck,
     Upload,
     Users,
@@ -34,15 +34,14 @@ import {
     VariantModal
 } from "../components/TemplateRuntime.jsx";
 import { generateFinalText, getTemplateTextResult } from "../core/tokenEngine.js";
-import { loadTemplateTreeData, saveTemplateTreeData } from "../services/templateTreeService.js";
-import { Channel } from "../models/templateTreeModel.js";
+import { TEMPLATE_TREE_UPDATED_EVENT, loadTemplateTreeData } from "../services/templateTreeService.js";
+import { CHANNEL_VALUES, Channel } from "../models/templateTreeModel.js";
 import {
     buildNodeChildrenIndex,
     buildNodeLookup,
     buildTemplateNodeIndex,
     getIndexedChildNodes,
-    getIndexedTemplatesForNode,
-    updateTemplate
+    getIndexedTemplatesForNode
 } from "../utils/templateTreeOperations.js";
 import {
     buildTemplateTreeSearchIndex,
@@ -80,6 +79,13 @@ import {
     getCaseProfileInfoSections,
     getCaseProfileSummaryFields
 } from "../utils/caseProfile.js";
+import {
+    loadTemplateQuickSectionsState,
+    loadTemplateUsageStats,
+    recordTemplateUsage,
+    saveTemplateQuickSectionsState
+} from "../services/templateUsageService.js";
+import { getTopicColorStyle } from "../utils/topicAppearance.js";
 
 const ExternalGenerator = lazy(() => import("./ExternalGenerator.jsx"));
 const ManageNodes = lazy(() => import("./ManageNodes.jsx"));
@@ -104,6 +110,11 @@ const LANGUAGES = [
     { code: "de", label: "DE" },
     { code: "it", label: "IT" }
 ];
+
+const QUICK_TEMPLATE_LIMIT = 8;
+const DEFAULT_QUICK_SECTION_STATE = Object.freeze({
+    mostUsed: false
+});
 
 const ALO_TYPE_OPTIONS = [
     { value: "noSignal", label: "No signal" },
@@ -244,6 +255,45 @@ function buildTemplateDisplayChannelIndex(templates = []) {
     );
 }
 
+function buildMostUsedTemplateEntries(templates = [], usageStats = {}) {
+    const templateLookup = new Map(templates.map((template) => [template.id, template]));
+    return Object.entries(usageStats || {})
+        .map(([templateId, usage]) => ({
+            template: templateLookup.get(templateId),
+            usage: {
+                usageCount: Number(usage?.usageCount) || 0,
+                lastUsedAt: Number(usage?.lastUsedAt) || 0
+            }
+        }))
+        .filter(({ template, usage }) => template && (usage.usageCount > 0 || usage.lastUsedAt > 0))
+        .sort((left, right) => (right.usage.usageCount - left.usage.usageCount)
+            || (right.usage.lastUsedAt - left.usage.lastUsedAt)
+            || (left.template.title || "").localeCompare(right.template.title || ""))
+        .slice(0, QUICK_TEMPLATE_LIMIT);
+}
+
+function templateIdFromSectionKey(sectionKey = "") {
+    const raw = String(sectionKey || "");
+    if (!raw.startsWith("tree_")) return "";
+    const body = raw.slice(5);
+
+    for (const channel of CHANNEL_VALUES) {
+        const marker = `_${channel}`;
+        const markerIndex = body.lastIndexOf(marker);
+        if (markerIndex > 0) return body.slice(0, markerIndex);
+    }
+
+    return "";
+}
+
+function formatQuickTemplateMeta(sectionId, usage = {}) {
+    if (sectionId === "mostUsed") {
+        const count = Number(usage.usageCount) || 0;
+        return count > 0 ? `${count} use${count > 1 ? "s" : ""}` : "";
+    }
+    return "";
+}
+
 function toneForValue(value = "") {
     const source = String(value || "template");
     const total = [...source].reduce((sum, char) => sum + char.charCodeAt(0), 0);
@@ -319,9 +369,10 @@ const PlaybookNodeRow = memo(function PlaybookNodeRow({
         <button
             type="button"
             className={`templates-column-row templates-column-row--node${selected ? " is-active" : ""}`}
+            style={getTopicColorStyle(node)}
             onClick={() => onOpenNode(node.id)}
         >
-            <IconBadge Icon={Icon} tone={toneForValue(node.icon || node.title)} />
+            <IconBadge Icon={Icon} tone={toneForValue(node.icon || node.title)} className="templates-topic-badge" />
             <span className="templates-column-copy">
                 <strong>{node.title || "Untitled topic"}</strong>
             </span>
@@ -354,12 +405,16 @@ const PlaybookTemplateRow = memo(function PlaybookTemplateRow({
     );
 });
 
-const FavoriteTemplateButton = memo(function FavoriteTemplateButton({
-    template,
+const QuickTemplateButton = memo(function QuickTemplateButton({
+    entry,
+    sectionId,
+    channels,
     selected,
     onOpenTemplate
 }) {
+    const { template, usage } = entry;
     const Icon = templateIcon(template);
+    const meta = formatQuickTemplateMeta(sectionId, usage);
     const handleClick = useCallback(() => {
         onOpenTemplate(template.id);
     }, [onOpenTemplate, template.id]);
@@ -367,12 +422,61 @@ const FavoriteTemplateButton = memo(function FavoriteTemplateButton({
     return (
         <button
             type="button"
-            className={`templates-favorites-item${selected ? " is-active" : ""}`}
+            className={`templates-quick-template${selected ? " is-active" : ""}`}
             onClick={handleClick}
         >
-            <IconBadge Icon={Icon} tone={toneForValue(template.title)} className="templates-favorites-icon" />
-            <span>{template.title || "Untitled"}</span>
+            <IconBadge Icon={Icon} tone={toneForValue(template.title)} className="templates-quick-template-icon" />
+            <span className="templates-quick-template-copy">
+                <strong>{template.title || "Untitled"}</strong>
+                {meta && <small>{meta}</small>}
+                <ChannelPills channels={channels} />
+            </span>
         </button>
+    );
+});
+
+const QuickTemplateSection = memo(function QuickTemplateSection({
+    id,
+    title,
+    Icon,
+    entries,
+    collapsed,
+    activeTemplateId,
+    templateChannelsById,
+    onOpenTemplate,
+    onToggle
+}) {
+    if (entries.length === 0) return null;
+
+    return (
+        <section className={`templates-quick-section templates-quick-section--${id}${collapsed ? " is-collapsed" : ""}`}>
+            <button
+                type="button"
+                className="templates-quick-section-head"
+                aria-expanded={!collapsed}
+                onClick={() => onToggle(id)}
+            >
+                <ChevronRight className="templates-quick-section-chevron" size={16} aria-hidden="true" />
+                <Icon size={15} aria-hidden="true" />
+                <span>{title}</span>
+                <span className="templates-quick-section-count">{entries.length}</span>
+            </button>
+
+            {!collapsed && (
+                <div className="templates-quick-grid">
+                    {entries.map((entry) => (
+                        <QuickTemplateButton
+                            key={`${id}-${entry.template.id}`}
+                            entry={entry}
+                            sectionId={id}
+                            channels={templateChannelsById.get(entry.template.id) || entry.template.channels}
+                            selected={activeTemplateId === entry.template.id}
+                            onOpenTemplate={onOpenTemplate}
+                        />
+                    ))}
+                </div>
+            )}
+        </section>
     );
 });
 
@@ -605,11 +709,49 @@ const PlaybookColumn = memo(function PlaybookColumn({
     templateChannelsById,
     onOpenNode,
     onOpenTemplate,
-    emptyMessage
+    emptyMessage,
+    templatesFirst = false
 }) {
     const hasItems = columnNodes.length > 0 || columnTemplates.length > 0;
     const showNodeGroup = columnNodes.length > 0;
     const showTemplateGroup = columnTemplates.length > 0;
+    const nodeGroup = showNodeGroup ? (
+        <PlaybookColumnGroup
+            title={nodeGroupTitle}
+            count={columnNodes.length}
+        >
+            {columnNodes.map((node) => {
+                const summary = nodeSummaryById.get(node.id) || EMPTY_NODE_SUMMARY;
+                return (
+                    <PlaybookNodeRow
+                        key={node.id}
+                        node={node}
+                        summary={summary}
+                        selected={activeNodeId === node.id}
+                        onOpenNode={onOpenNode}
+                    />
+                );
+            })}
+        </PlaybookColumnGroup>
+    ) : null;
+    const templateGroup = showTemplateGroup ? (
+        <PlaybookColumnGroup
+            title="Templates"
+            count={columnTemplates.length}
+        >
+            {columnTemplates.map((template) => {
+                return (
+                    <PlaybookTemplateRow
+                        key={template.id}
+                        template={template}
+                        channels={templateChannelsById.get(template.id) || template.channels}
+                        selected={activeTemplateId === template.id}
+                        onOpenTemplate={onOpenTemplate}
+                    />
+                );
+            })}
+        </PlaybookColumnGroup>
+    ) : null;
 
     return (
         <section className="templates-column" aria-label={title || "Playbook column"}>
@@ -621,43 +763,8 @@ const PlaybookColumn = memo(function PlaybookColumn({
             <div className="templates-column-list">
                 {hasItems ? (
                     <>
-                        {showNodeGroup && (
-                            <PlaybookColumnGroup
-                                title={nodeGroupTitle}
-                                count={columnNodes.length}
-                            >
-                                {columnNodes.map((node) => {
-                                    const summary = nodeSummaryById.get(node.id) || EMPTY_NODE_SUMMARY;
-                                    return (
-                                        <PlaybookNodeRow
-                                            key={node.id}
-                                            node={node}
-                                            summary={summary}
-                                            selected={activeNodeId === node.id}
-                                            onOpenNode={onOpenNode}
-                                        />
-                                    );
-                                })}
-                            </PlaybookColumnGroup>
-                        )}
-                        {showTemplateGroup && (
-                            <PlaybookColumnGroup
-                                title="Templates"
-                                count={columnTemplates.length}
-                            >
-                                {columnTemplates.map((template) => {
-                                    return (
-                                        <PlaybookTemplateRow
-                                            key={template.id}
-                                            template={template}
-                                            channels={templateChannelsById.get(template.id) || template.channels}
-                                            selected={activeTemplateId === template.id}
-                                            onOpenTemplate={onOpenTemplate}
-                                        />
-                                    );
-                                })}
-                            </PlaybookColumnGroup>
-                        )}
+                        {templatesFirst ? templateGroup : nodeGroup}
+                        {templatesFirst ? nodeGroup : templateGroup}
                     </>
                 ) : (
                     <EmptyColumnState message={emptyMessage || "No item here."} />
@@ -767,8 +874,7 @@ const TemplateDetail = memo(function TemplateDetail({
     onRequestCopy,
     onRequestTemplateResult,
     onSetVariantPicker,
-    onManage,
-    onToggleFavorite
+    onManage
 }) {
     const previewTokenMap = useMemo(() => buildPreviewTokenMap(tokens), [tokens]);
     const uniqueVisibleChannels = useMemo(
@@ -838,15 +944,6 @@ const TemplateDetail = memo(function TemplateDetail({
                         </div>
                     </div>
                     <div className="templates-detail-head-actions">
-                        <button
-                            type="button"
-                            className={`templates-favorite-btn${template.favorite ? " is-favorite" : ""}`}
-                            onClick={() => onToggleFavorite(template.id)}
-                            aria-label={template.favorite ? "Remove from favorites" : "Add to favorites"}
-                            title={template.favorite ? "Remove from favorites" : "Add to favorites"}
-                        >
-                            <Star size={18} fill={template.favorite ? "currentColor" : "none"} />
-                        </button>
                         <button type="button" className="secondary-btn templates-manage-btn" onClick={onManage}>
                             <Settings size={17} aria-hidden="true" />
                             Manage playbook
@@ -932,6 +1029,8 @@ export default function Templates() {
     const [aloPreparation, setAloPreparation] = useState(null);
     const [templateImageMap, setTemplateImageMap] = useState(() => new Map());
     const [configName, setConfigName] = useState("No configuration");
+    const [templateUsageStats, setTemplateUsageStats] = useState({});
+    const [quickSectionsCollapsed, setQuickSectionsCollapsed] = useState(DEFAULT_QUICK_SECTION_STATE);
     const caseProfile = useMemo(() => buildCaseProfile({
         clientPayload: runtime.clientPayload,
         superOfficePayload: superOfficeTicket,
@@ -967,6 +1066,27 @@ export default function Templates() {
     useEffect(() => {
         refreshTreeData();
         loadConfigName().then(setConfigName);
+    }, []);
+
+    useEffect(() => {
+        const handler = () => refreshTreeData();
+        window.addEventListener(TEMPLATE_TREE_UPDATED_EVENT, handler);
+        return () => window.removeEventListener(TEMPLATE_TREE_UPDATED_EVENT, handler);
+    }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+        Promise.all([
+            loadTemplateUsageStats(),
+            loadTemplateQuickSectionsState()
+        ]).then(([usageStats, sectionState]) => {
+            if (cancelled) return;
+            setTemplateUsageStats(usageStats);
+            setQuickSectionsCollapsed(sectionState);
+        });
+        return () => {
+            cancelled = true;
+        };
     }, []);
 
     const refreshSuperOfficeState = useCallback(async (payload = undefined) => {
@@ -1057,18 +1177,29 @@ export default function Templates() {
         return summaries;
     }, [childrenByParent, nodes, templatesByNode]);
 
-    const favoriteTemplates = useMemo(
-        () => treeTemplates.filter((t) => t.favorite),
-        [treeTemplates]
+    const mostUsedTemplateEntries = useMemo(
+        () => buildMostUsedTemplateEntries(treeTemplates, templateUsageStats),
+        [templateUsageStats, treeTemplates]
     );
 
-    const toggleFavorite = useCallback(async (templateId) => {
-        const template = templateLookup.get(templateId);
-        if (!template) return;
-        const nextTemplates = updateTemplate(treeTemplates, templateId, { favorite: !template.favorite });
-        setTreeTemplates(nextTemplates);
-        await saveTemplateTreeData({ nodes, templates: nextTemplates });
-    }, [nodes, templateLookup, treeTemplates]);
+    const toggleQuickSection = useCallback((sectionId) => {
+        setQuickSectionsCollapsed((current) => {
+            const next = {
+                ...current,
+                [sectionId]: !current[sectionId]
+            };
+            saveTemplateQuickSectionsState(next).catch((error) => {
+                console.error("saveTemplateQuickSectionsState error", error);
+            });
+            return next;
+        });
+    }, []);
+
+    const markTemplateUsed = useCallback(async (templateId) => {
+        if (!templateId) return;
+        const nextStats = await recordTemplateUsage(templateId);
+        setTemplateUsageStats(nextStats);
+    }, []);
 
     const activeNode = useMemo(
         () => nodeLookup.get(activeNodeId) || null,
@@ -1202,7 +1333,7 @@ export default function Templates() {
         runtimeRef.current.setClientDetailsExpanded((expanded) => !expanded);
     }, []);
 
-    const requestFirstTemplateWorkflow = useCallback((template, preferredChannel) => {
+    const requestFirstTemplateWorkflow = useCallback(async (template, preferredChannel) => {
         if (!template) return false;
         const runtimeApi = runtimeRef.current;
         const channels = getIndexedTemplateChannels(template)
@@ -1221,13 +1352,14 @@ export default function Templates() {
             }
             if (model) {
                 setActiveChannel(channel);
-                runtimeApi.requestTemplateResult(model, `tree_${template.id}_${channel}`);
-                return true;
+                const copied = await runtimeApi.requestTemplateResult(model, `tree_${template.id}_${channel}`);
+                if (copied) await markTemplateUsed(template.id);
+                return copied;
             }
         }
 
         return false;
-    }, [getIndexedTemplateChannels]);
+    }, [getIndexedTemplateChannels, markTemplateUsed]);
 
     const openTemplate = useCallback((templateId) => {
         const template = templateLookup.get(templateId);
@@ -1236,7 +1368,9 @@ export default function Templates() {
         const channels = getIndexedTemplateChannels(template);
         const nextChannel = channels[0] || template?.channels?.[0] || Channel.EMAIL;
         setActiveChannel(nextChannel);
-        requestFirstTemplateWorkflow(template, nextChannel);
+        requestFirstTemplateWorkflow(template, nextChannel).catch((error) => {
+            console.error("requestFirstTemplateWorkflow error", error);
+        });
         resetSearchQuery();
     }, [getIndexedTemplateChannels, requestFirstTemplateWorkflow, resetSearchQuery, templateLookup]);
 
@@ -1253,13 +1387,17 @@ export default function Templates() {
         setActiveTemplateId(null);
     }, []);
 
-    const requestDetailCopy = useCallback((model, sectionKey) => {
-        return runtimeRef.current.requestCopy(model, sectionKey);
-    }, []);
+    const requestDetailCopy = useCallback(async (model, sectionKey) => {
+        const copied = await runtimeRef.current.requestCopy(model, sectionKey);
+        if (copied) await markTemplateUsed(templateIdFromSectionKey(sectionKey) || activeTemplateId);
+        return copied;
+    }, [activeTemplateId, markTemplateUsed]);
 
-    const requestDetailTemplateResult = useCallback((model, sectionKey, baseModel = null) => {
-        return runtimeRef.current.requestTemplateResult(model, sectionKey, baseModel);
-    }, []);
+    const requestDetailTemplateResult = useCallback(async (model, sectionKey, baseModel = null) => {
+        const copied = await runtimeRef.current.requestTemplateResult(model, sectionKey, baseModel);
+        if (copied) await markTemplateUsed(templateIdFromSectionKey(sectionKey) || activeTemplateId);
+        return copied;
+    }, [activeTemplateId, markTemplateUsed]);
 
     const setDetailVariantPicker = useCallback((picker) => {
         runtimeRef.current.setVariantPicker(picker);
@@ -1273,11 +1411,15 @@ export default function Templates() {
         const sectionKey = variant ? `${baseKey}_${variant.id}` : `${baseKey}_main`;
         runtimeApi.setVariantPicker(null);
         if (variant) {
-            runtimeApi.requestTemplateResult(variant, sectionKey, picker.model);
+            runtimeApi.requestTemplateResult(variant, sectionKey, picker.model).then((copied) => {
+                if (copied) markTemplateUsed(templateIdFromSectionKey(sectionKey) || activeTemplateId);
+            });
         } else {
-            runtimeApi.requestTemplateResult(picker.model, sectionKey);
+            runtimeApi.requestTemplateResult(picker.model, sectionKey).then((copied) => {
+                if (copied) markTemplateUsed(templateIdFromSectionKey(sectionKey) || activeTemplateId);
+            });
         }
-    }, []);
+    }, [activeTemplateId, markTemplateUsed]);
 
     const changeTokenPromptValue = useCallback((token, nextValue) => {
         const runtimeApi = runtimeRef.current;
@@ -1285,9 +1427,12 @@ export default function Templates() {
         runtimeApi.setPromptMissingTokens((prev) => prev.filter((name) => name !== token));
     }, []);
 
-    const confirmRuntimeTokenPrompt = useCallback(() => {
-        return runtimeRef.current.confirmTokenPrompt();
-    }, []);
+    const confirmRuntimeTokenPrompt = useCallback(async () => {
+        const prompt = runtimeRef.current.tokenPrompt;
+        const templateId = templateIdFromSectionKey(prompt?.sectionKey) || activeTemplateId;
+        const copied = await runtimeRef.current.confirmTokenPrompt();
+        if (copied && prompt?.mode !== "fill" && templateId) await markTemplateUsed(templateId);
+    }, [activeTemplateId, markTemplateUsed]);
 
     const closeRuntimeTokenPrompt = useCallback(() => {
         const runtimeApi = runtimeRef.current;
@@ -1296,9 +1441,10 @@ export default function Templates() {
         runtimeApi.clearOnDemandValues(defs);
     }, [closeTemplateWorkflow]);
 
-    const copyRuntimeTemplateResultAgain = useCallback(() => {
-        return runtimeRef.current.copyTemplateResultAgain();
-    }, []);
+    const copyRuntimeTemplateResultAgain = useCallback(async () => {
+        const copied = await runtimeRef.current.copyTemplateResultAgain();
+        if (copied && activeTemplateId) await markTemplateUsed(activeTemplateId);
+    }, [activeTemplateId, markTemplateUsed]);
 
     const resultChannelOptions = useMemo(() => {
         if (!activeTemplate) return [];
@@ -1324,8 +1470,11 @@ export default function Templates() {
             runtimeApi.setVariantPicker({ model, sectionKey });
             return true;
         }
-        return runtimeApi.requestTemplateResult(model, sectionKey);
-    }, [activeTemplate]);
+        return runtimeApi.requestTemplateResult(model, sectionKey).then((copied) => {
+            if (copied) markTemplateUsed(activeTemplate.id);
+            return copied;
+        });
+    }, [activeTemplate, markTemplateUsed]);
 
     const openNextResultChannel = useCallback(() => {
         if (resultChannelOptions.length === 0) return false;
@@ -1405,6 +1554,7 @@ export default function Templates() {
                 nodeGroupTitle: "Topics",
                 nodes: searchResults.nodes,
                 templates: searchResults.templates,
+                templatesFirst: true,
                 emptyMessage: "No result found."
             }];
         }
@@ -1557,24 +1707,19 @@ export default function Templates() {
                         />
                     </div>
 
-                    {favoriteTemplates.length > 0 && (
-                        <div className="templates-favorites">
-                            <div className="templates-favorites-head">
-                                <Star size={14} fill="currentColor" aria-hidden="true" />
-                                <span>Favorites</span>
-                            </div>
-                            <div className="templates-favorites-list">
-                                {favoriteTemplates.map((template) => (
-                                    <FavoriteTemplateButton
-                                        key={template.id}
-                                        template={template}
-                                        selected={activeTemplateId === template.id}
-                                        onOpenTemplate={openTemplate}
-                                    />
-                                ))}
-                            </div>
-                        </div>
-                    )}
+                    <div className="templates-quick-sections" aria-label="Quick templates">
+                        <QuickTemplateSection
+                            id="mostUsed"
+                            title="Most used"
+                            Icon={TrendingUp}
+                            entries={mostUsedTemplateEntries}
+                            collapsed={quickSectionsCollapsed.mostUsed}
+                            activeTemplateId={activeTemplateId}
+                            templateChannelsById={templateChannelsById}
+                            onOpenTemplate={openTemplate}
+                            onToggle={toggleQuickSection}
+                        />
+                    </div>
 
                     <div className="templates-columns" aria-label="Playbook columns">
                         {navigationColumns.map((column) => (
@@ -1591,6 +1736,7 @@ export default function Templates() {
                                 onOpenNode={openNode}
                                 onOpenTemplate={openTemplate}
                                 emptyMessage={column.emptyMessage}
+                                templatesFirst={column.templatesFirst}
                             />
                         ))}
                     </div>
@@ -1617,7 +1763,6 @@ export default function Templates() {
                         onRequestTemplateResult={requestDetailTemplateResult}
                         onSetVariantPicker={setDetailVariantPicker}
                         onManage={openNodesWorkspace}
-                        onToggleFavorite={toggleFavorite}
                     />
                 </Modal>
             )}
@@ -1701,8 +1846,7 @@ export default function Templates() {
             {runtime.externalIdConflictPrompt && (
                 <ExternalIdConflictModal
                     conflicts={runtime.externalIdConflictPrompt.conflicts}
-                    onKeepSourceValues={runtime.keepExternalIdSourceValues}
-                    onKeepExternalIdValues={runtime.keepExternalIdValues}
+                    onApplySelections={runtime.applyExternalIdConflictSelections}
                     onCancel={runtime.cancelExternalIdConflictCorrection}
                 />
             )}

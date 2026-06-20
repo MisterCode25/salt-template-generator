@@ -49,6 +49,7 @@ import {
 } from "../utils/externalGenerator.js";
 import {
     applyExternalIdValuesToImportResult,
+    applyExternalIdConflictSelectionsToImportResult,
     applyExternalIdSourceCorrectionsToImportResult,
     getExternalIdSourceConflicts
 } from "../utils/externalIdConflicts.js";
@@ -659,7 +660,11 @@ export const ClientInfoPanel = memo(function ClientInfoPanel({
                             <span className="client-info-bar-check" aria-label="Client loaded">✓</span>
                             <div className="client-info-bar-fields">
                                 {summaryFields.map((field) => (
-                                    <div key={field.label} className="client-info-bar-field">
+                                    <div
+                                        key={field.label}
+                                        className="client-info-bar-field"
+                                        title={`${field.label}: ${field.value}`}
+                                    >
                                         <span className="client-info-bar-field-key">{field.label}</span>
                                         <span className="client-info-bar-field-val">{field.value}</span>
                                     </div>
@@ -822,40 +827,66 @@ export function ClientPasteModal({ onClose, onImport, initialError = "" }) {
     );
 }
 
-export function ExternalIdConflictModal({ conflicts = [], onKeepSourceValues, onKeepExternalIdValues, onCancel }) {
+export function ExternalIdConflictModal({ conflicts = [], onApplySelections, onCancel }) {
+    const [selectionByField, setSelectionByField] = useState(() => (
+        Object.fromEntries(conflicts.map((conflict) => [conflict.field, "source"]))
+    ));
+
+    useEffect(() => {
+        setSelectionByField(Object.fromEntries(conflicts.map((conflict) => [conflict.field, "source"])));
+    }, [conflicts]);
+
+    const selectValue = (field, source) => {
+        setSelectionByField((current) => ({
+            ...current,
+            [field]: source
+        }));
+    };
+
     return (
         <Modal onClose={onCancel} dialogClassName="popup-box external-id-conflict-modal" ariaLabel="Import data conflict">
             <div className="popup-header">
                 <div>
                     <h2>Import data conflict</h2>
-                    <p className="hint">Some SuperOffice import values do not match the current VTI/client data. Choose which values to keep.</p>
+                    <p className="hint">Click the value to keep for each conflicting field.</p>
                 </div>
             </div>
             <div className="external-id-conflict-list">
-                {conflicts.map((conflict) => (
-                    <div key={conflict.field} className="external-id-conflict-item">
-                        <div className="external-id-conflict-head">
-                            <strong>{conflict.label}</strong>
-                            <span>{conflict.sourceLabel}</span>
-                        </div>
-                        <div className="external-id-conflict-values">
-                            <div>
-                                <span>SO import</span>
-                                <code>{conflict.externalValue || "Empty"}</code>
-                            </div>
-                            <div className="external-id-conflict-arrow" aria-hidden="true">→</div>
-                            <div>
+                {conflicts.map((conflict) => {
+                    const selectedSource = selectionByField[conflict.field] || "source";
+                    return (
+                        <div key={conflict.field} className="external-id-conflict-item">
+                            <div className="external-id-conflict-head">
+                                <strong>{conflict.label}</strong>
                                 <span>{conflict.sourceLabel}</span>
-                                <code>{conflict.expectedValue}</code>
+                            </div>
+                            <div className="external-id-conflict-values">
+                                <button
+                                    type="button"
+                                    className={`external-id-conflict-choice${selectedSource === "external" ? " is-selected" : ""}`}
+                                    onClick={() => selectValue(conflict.field, "external")}
+                                    aria-pressed={selectedSource === "external"}
+                                >
+                                    <span>SO import</span>
+                                    <code>{conflict.externalValue || "Empty"}</code>
+                                </button>
+                                <button
+                                    type="button"
+                                    className={`external-id-conflict-choice${selectedSource === "source" ? " is-selected" : ""}`}
+                                    onClick={() => selectValue(conflict.field, "source")}
+                                    aria-pressed={selectedSource === "source"}
+                                >
+                                    <span>{conflict.sourceLabel}</span>
+                                    <code>{conflict.expectedValue}</code>
+                                </button>
                             </div>
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
             <div className="popup-actions">
                 <button type="button" className="secondary-btn" onClick={onCancel}>Cancel import</button>
-                <button type="button" className="secondary-btn" onClick={onKeepExternalIdValues}>Keep SO import</button>
-                <button type="button" className="primary-btn" onClick={onKeepSourceValues}>Keep VTI/client data</button>
+                <button type="button" className="primary-btn" onClick={() => onApplySelections(selectionByField)}>Import selected data</button>
             </div>
         </Modal>
     );
@@ -1045,11 +1076,13 @@ export function useTemplateRuntime() {
 
         const message = options.corrected
             ? "VTI/client values kept and SuperOffice data imported."
-            : options.keptExternalId
-                ? "SuperOffice import values kept."
-                : nextResult.ignoredExternalId
-                    ? "SO ticket imported. External ID ignored because its format is invalid."
-                    : "SuperOffice data imported.";
+            : options.selectedConflictValues
+                ? "Selected conflict values kept and SuperOffice data imported."
+                : options.keptExternalId
+                    ? "SuperOffice import values kept."
+                    : nextResult.ignoredExternalId
+                        ? "SO ticket imported. External ID ignored because its format is invalid."
+                        : "SuperOffice data imported.";
         setClientImportStatus({ type: "success", message: "" });
         if (!contractorNumber || nextResult.ignoredExternalId || options.corrected || options.keptExternalId) {
             showToast(message, nextResult.ignoredExternalId ? "warning" : "success");
@@ -1087,6 +1120,29 @@ export function useTemplateRuntime() {
         );
         setExternalIdConflictPrompt(null);
     };
+
+    const applyExternalIdConflictSelections = async (selections = {}) => {
+        if (!externalIdConflictPrompt) return;
+        const selectedImportResult = applyExternalIdConflictSelectionsToImportResult(
+            externalIdConflictPrompt.importResult,
+            externalIdConflictPrompt.conflicts,
+            selections
+        );
+        const sourceCount = externalIdConflictPrompt.conflicts.filter((conflict) => (
+            selections?.[conflict.field] !== "external"
+        )).length;
+        await completeSuperOfficeImport(
+            selectedImportResult,
+            selectedImportResult?.tokenValues || {},
+            {
+                corrected: sourceCount === externalIdConflictPrompt.conflicts.length,
+                keptExternalId: sourceCount === 0,
+                selectedConflictValues: sourceCount > 0 && sourceCount < externalIdConflictPrompt.conflicts.length
+            }
+        );
+        setExternalIdConflictPrompt(null);
+    };
+
 
     const cancelExternalIdConflictCorrection = () => {
         setExternalIdConflictPrompt(null);
@@ -1413,9 +1469,10 @@ export function useTemplateRuntime() {
     };
 
     const copyTemplateResultAgain = async () => {
-        if (!copyPreview?.html) return;
+        if (!copyPreview?.html) return false;
         setCopyPreview((prev) => prev ? { ...prev, copied: false } : prev);
         await copyPreviewHtml(copyPreview.html, copyPreview.id);
+        return true;
     };
 
     const copyModel = async (model, section, baseModel = null, skipPopup = false) => {
@@ -1470,8 +1527,9 @@ export function useTemplateRuntime() {
         if (!model) return;
         if (model.variants && model.variants.length > 0) {
             setVariantPicker({ model, sectionKey });
+            return false;
         } else {
-            requestTemplateResult(model, sectionKey);
+            return requestTemplateResult(model, sectionKey);
         }
     };
 
@@ -1509,24 +1567,24 @@ export function useTemplateRuntime() {
     };
 
     const confirmTokenPrompt = async () => {
-        if (!tokenPrompt) return;
+        if (!tokenPrompt) return false;
         const requiredTokens = tokenPrompt.tokenDefs.map((tokenDef) => tokenDef.token);
         const { values: filled, missing } = collectInputValues(requiredTokens);
         if (missing.length > 0) {
             setPromptMissingTokens(missing);
             showToast("Missing data for: " + missing.join(", "), "error");
-            return;
+            return false;
         }
         const { effectiveModel, sectionKey, tokenDefs } = tokenPrompt;
         await persistTokenPromptValues(tokenDefs, filled);
         setTokenPrompt(null);
         setPromptMissingTokens([]);
-        if (tokenPrompt.mode === "fill") return;
+        if (tokenPrompt.mode === "fill") return true;
         if (tokenPrompt.mode === "result") {
-            await openTemplateResult(effectiveModel, sectionKey);
-            return;
+            return openTemplateResult(effectiveModel, sectionKey);
         }
         await copyModel(effectiveModel, sectionKey, null, true);
+        return true;
     };
 
     return {
@@ -1555,6 +1613,7 @@ export function useTemplateRuntime() {
         externalIdConflictPrompt,
         keepExternalIdSourceValues,
         keepExternalIdValues,
+        applyExternalIdConflictSelections,
         cancelExternalIdConflictCorrection,
         readClientClipboard,
         readSuperOfficeClipboard,

@@ -4,6 +4,7 @@ import { ClipboardPaste, ExternalLink, Image as ImageIcon, Puzzle, Settings2 } f
 import Modal from "./Modal.jsx";
 import { copyHtml, copyText, showToast } from "../services/clipboardService.js";
 import { isModuleTool, loadTools, resolveToolUrl, sanitizeToolColor } from "../services/toolsService.js";
+import { handleToolModuleTemplateRequest } from "../services/toolModuleTemplateService.js";
 import { buildToolModuleSrcDoc, buildToolRuntimeContext } from "../utils/toolModuleRuntime.js";
 
 const ToolButton = memo(function ToolButton({ tool, valuesRef, onOpenModule }) {
@@ -137,6 +138,15 @@ function ToolModuleModal({ tool, valuesRef, runtimeContextRef, onClose }) {
 
                 if (type === "tool:request-context") {
                     postContext(requestId);
+                    return;
+                }
+
+                if (String(type || "").startsWith("tool:templates:")) {
+                    const result = await handleToolModuleTemplateRequest(type, payload);
+                    if (["tool:templates:apply-migration", "tool:templates:update-template", "tool:templates:move-template"].includes(type)) {
+                        showToast("Template tree updated.", "success");
+                    }
+                    reply(requestId, result);
                     return;
                 }
 
@@ -277,66 +287,87 @@ function ToolsBar({
         navigate("/tools");
     }, [navigate, onManageTools]);
 
-    if (tools.length === 0 && !onOpenExternalGenerator && !onCopyAloAutofillData && !onOpenSuperOfficePhotos) return null;
+    const hasInternalTools = Boolean(
+        onOpenExternalGenerator
+        || onCopyAloAutofillData
+        || (onOpenSuperOfficePhotos && superOfficePhotoCount > 0)
+    );
+    const hasExternalTools = tools.length > 0;
+
+    if (!hasInternalTools && !hasExternalTools && !onManageTools) return null;
 
     return (
         <div className="tools-bar">
             <div className="tools-bar-inner">
-                {onOpenExternalGenerator && (
-                    <button
-                        type="button"
-                        className={`tools-bar-btn tools-bar-btn--system tools-bar-btn--external${hasExternalId ? " is-disabled" : ""}`}
-                        onClick={onOpenExternalGenerator}
-                        disabled={hasExternalId}
-                        aria-disabled={hasExternalId}
-                        title={hasExternalId ? "External ID already present" : "Generate external ID"}
-                    >
-                        Generate external ID
-                    </button>
+                {hasInternalTools && (
+                    <div className="tools-bar-section tools-bar-section--internal" aria-label="Internal actions">
+                        <div className="tools-bar-section-items">
+                            {onOpenExternalGenerator && (
+                                <button
+                                    type="button"
+                                    className={`tools-bar-btn tools-bar-btn--system tools-bar-btn--external${hasExternalId ? " is-disabled" : ""}`}
+                                    onClick={onOpenExternalGenerator}
+                                    disabled={hasExternalId}
+                                    aria-disabled={hasExternalId}
+                                    title={hasExternalId ? "External ID already present" : "Generate external ID"}
+                                >
+                                    Generate external ID
+                                </button>
+                            )}
+                            {onCopyAloAutofillData && (
+                                <button
+                                    type="button"
+                                    className={`tools-bar-btn tools-bar-btn--system tools-bar-btn--alo${hasAloAutofillData ? "" : " is-disabled"}`}
+                                    onClick={onCopyAloAutofillData}
+                                    disabled={!hasAloAutofillData}
+                                    aria-disabled={!hasAloAutofillData}
+                                    title={hasAloAutofillData ? "Copy ALO fill data for the bookmarklet" : "Import VTI data before preparing ALO fill data"}
+                                >
+                                    <ClipboardPaste size={14} strokeWidth={2} aria-hidden="true" />
+                                    ALO fill
+                                </button>
+                            )}
+                            {onOpenSuperOfficePhotos && superOfficePhotoCount > 0 && (
+                                <button
+                                    type="button"
+                                    className="tools-bar-btn tools-bar-btn--system tools-bar-btn--photos"
+                                    onClick={onOpenSuperOfficePhotos}
+                                    title="Afficher les photos du dernier ticket SuperOffice importé"
+                                >
+                                    <ImageIcon size={14} strokeWidth={2} aria-hidden="true" />
+                                    Photos SO
+                                    <span className="tools-bar-count">{superOfficePhotoCount}</span>
+                                </button>
+                            )}
+                        </div>
+                    </div>
                 )}
-                {onCopyAloAutofillData && (
-                    <button
-                        type="button"
-                        className={`tools-bar-btn tools-bar-btn--system tools-bar-btn--alo${hasAloAutofillData ? "" : " is-disabled"}`}
-                        onClick={onCopyAloAutofillData}
-                        disabled={!hasAloAutofillData}
-                        aria-disabled={!hasAloAutofillData}
-                        title={hasAloAutofillData ? "Copy ALO fill data for the bookmarklet" : "Import VTI data before preparing ALO fill data"}
-                    >
-                        <ClipboardPaste size={14} strokeWidth={2} aria-hidden="true" />
-                        ALO fill
-                    </button>
-                )}
-                {onOpenSuperOfficePhotos && superOfficePhotoCount > 0 && (
-                    <button
-                        type="button"
-                        className="tools-bar-btn tools-bar-btn--system tools-bar-btn--photos"
-                        onClick={onOpenSuperOfficePhotos}
-                        title="Afficher les photos du dernier ticket SuperOffice importé"
-                    >
-                        <ImageIcon size={14} strokeWidth={2} aria-hidden="true" />
-                        Photos SO
-                        <span className="tools-bar-count">{superOfficePhotoCount}</span>
-                    </button>
-                )}
-                {tools.map((tool) => (
-                    <ToolButton
-                        key={tool.id}
-                        tool={tool}
-                        valuesRef={valuesRef}
-                        onOpenModule={openModuleTool}
-                    />
-                ))}
+                <div className="tools-bar-section tools-bar-section--external" aria-label="External tools and modules">
+                    <div className="tools-bar-section-items">
+                        {hasExternalTools ? (
+                            tools.map((tool) => (
+                                <ToolButton
+                                    key={tool.id}
+                                    tool={tool}
+                                    valuesRef={valuesRef}
+                                    onOpenModule={openModuleTool}
+                                />
+                            ))
+                        ) : (
+                            <span className="tools-bar-empty-tip">No tools yet. Open Options &gt; Tools to create one.</span>
+                        )}
+                        <button
+                            type="button"
+                            className="tools-bar-manage-btn"
+                            onClick={handleManageTools}
+                            title="Manage tools"
+                            aria-label="Manage tools"
+                        >
+                            <Settings2 size={15} strokeWidth={1.9} />
+                        </button>
+                    </div>
+                </div>
             </div>
-            <button
-                type="button"
-                className="tools-bar-manage-btn"
-                onClick={handleManageTools}
-                title="Manage tools"
-                aria-label="Manage tools"
-            >
-                <Settings2 size={15} strokeWidth={1.9} />
-            </button>
             {activeModuleTool && (
                 <ToolModuleModal
                     tool={activeModuleTool}
