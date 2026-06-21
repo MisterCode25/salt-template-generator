@@ -1,7 +1,8 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ClipboardPaste, ExternalLink, Image as ImageIcon, Puzzle, Settings2 } from "lucide-react";
+import { ClipboardPaste, ExternalLink, Image as ImageIcon, Puzzle, Settings2, Users } from "lucide-react";
 import Modal from "./Modal.jsx";
+import PartnersModal from "./PartnersModal.jsx";
 import { copyHtml, copyText, showToast } from "../services/clipboardService.js";
 import { isModuleTool, loadTools, resolveToolUrl, sanitizeToolColor } from "../services/toolsService.js";
 import { handleToolModuleTemplateRequest } from "../services/toolModuleTemplateService.js";
@@ -256,6 +257,7 @@ function ToolsBar({
     const navigate = useNavigate();
     const [tools, setTools] = useState([]);
     const [activeModuleTool, setActiveModuleTool] = useState(null);
+    const [partnersOpen, setPartnersOpen] = useState(false);
     const internalValuesRef = useRef(values);
     internalValuesRef.current = values;
     const valuesRef = externalValuesRef || internalValuesRef;
@@ -279,6 +281,14 @@ function ToolsBar({
         setActiveModuleTool(null);
     }, []);
 
+    const openPartners = useCallback(() => {
+        setPartnersOpen(true);
+    }, []);
+
+    const closePartners = useCallback(() => {
+        setPartnersOpen(false);
+    }, []);
+
     const handleManageTools = useCallback(() => {
         if (onManageTools) {
             onManageTools();
@@ -287,11 +297,7 @@ function ToolsBar({
         navigate("/tools");
     }, [navigate, onManageTools]);
 
-    const hasInternalTools = Boolean(
-        onOpenExternalGenerator
-        || onCopyAloAutofillData
-        || (onOpenSuperOfficePhotos && superOfficePhotoCount > 0)
-    );
+    const hasInternalTools = true;
     const hasExternalTools = tools.length > 0;
 
     if (!hasInternalTools && !hasExternalTools && !onManageTools) return null;
@@ -302,6 +308,15 @@ function ToolsBar({
                 {hasInternalTools && (
                     <div className="tools-bar-section tools-bar-section--internal" aria-label="Internal actions">
                         <div className="tools-bar-section-items">
+                            <button
+                                type="button"
+                                className="tools-bar-btn tools-bar-btn--system tools-bar-btn--partner"
+                                onClick={openPartners}
+                                title="Open partner contact list"
+                            >
+                                <Users size={14} strokeWidth={2} aria-hidden="true" />
+                                Partner
+                            </button>
                             {onOpenExternalGenerator && (
                                 <button
                                     type="button"
@@ -376,6 +391,7 @@ function ToolsBar({
                     onClose={closeModuleTool}
                 />
             )}
+            {partnersOpen && <PartnersModal onClose={closePartners} />}
         </div>
     );
 }
