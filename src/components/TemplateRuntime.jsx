@@ -1,5 +1,5 @@
-import { lazy, memo, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, Check, Copy, Edit3, RotateCcw } from "lucide-react";
+import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowRight, Check, Copy, Edit3, ExternalLink, RotateCcw, Sparkles } from "lucide-react";
 import { generateFinalText, getTemplateTextByLang } from "../core/tokenEngine.js";
 import {
     ACTIVE_CLIENT_PAYLOAD_UPDATED_EVENT,
@@ -62,6 +62,14 @@ import {
     loadSuperOfficeTicketPayload,
     saveSuperOfficeTicketPayload
 } from "../services/superOfficeTicketService.js";
+import {
+    buildChatGptTemplatePrompt,
+    extractChatGptTemplateHtml
+} from "../utils/chatGptPrompt.js";
+import {
+    CHATGPT_PROMPT_SETTINGS_UPDATED_EVENT,
+    loadChatGptPromptSettings
+} from "../services/chatGptPromptSettingsService.js";
 import Modal from "./Modal.jsx";
 
 const CLIENT_CLIPBOARD_READ_TIMEOUT_MS = 3500;
@@ -330,6 +338,319 @@ const TemplateResultEditorFallback = memo(function TemplateResultEditorFallback(
     );
 });
 
+async function copyRawTextToClipboard(text, { message = "Prompt copied.", variant = "success" } = {}) {
+    const value = String(text || "");
+    if (!value) return false;
+
+    try {
+        await navigator.clipboard.writeText(value);
+    } catch {
+        const textarea = document.createElement("textarea");
+        textarea.value = value;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+    }
+
+    showToast(message, variant);
+    return true;
+}
+
+function openCenteredChatGptWindow() {
+    const availableLeft = window.screen?.availLeft ?? 0;
+    const availableTop = window.screen?.availTop ?? 0;
+    const availableWidth = window.screen?.availWidth || window.outerWidth || 1440;
+    const availableHeight = window.screen?.availHeight || window.outerHeight || 900;
+    const width = Math.min(1120, Math.max(960, Math.round(availableWidth * 0.74)));
+    const height = Math.min(840, Math.max(720, Math.round(availableHeight * 0.82)));
+    const left = Math.max(availableLeft, Math.round(availableLeft + (availableWidth - width) / 2));
+    const top = Math.max(availableTop, Math.round(availableTop + (availableHeight - height) / 2));
+    const features = [
+        "popup=yes",
+        `width=${width}`,
+        `height=${height}`,
+        `left=${left}`,
+        `top=${top}`,
+        "toolbar=no",
+        "menubar=no",
+        "location=no",
+        "status=no",
+        "resizable=yes",
+        "scrollbars=yes"
+    ].join(",");
+    const chatGptWindow = window.open("https://chatgpt.com/", `templateGeneratorChatGPT-${Date.now()}`, features);
+    if (chatGptWindow) {
+        try {
+            chatGptWindow.opener = null;
+        } catch {
+            // Some browsers block opener changes for external windows.
+        }
+        chatGptWindow.focus();
+    }
+    return chatGptWindow;
+}
+
+function ChatGptPromptModal({
+    title,
+    html,
+    allowImages,
+    onApplyResult,
+    onClose
+}) {
+    const [step, setStep] = useState("instructions");
+    const [instruction, setInstruction] = useState("");
+    const [templateInstruction, setTemplateInstruction] = useState("");
+    const [pasteError, setPasteError] = useState("");
+    const [clipboardStatus, setClipboardStatus] = useState("idle");
+    const requestId = useMemo(() => {
+        if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+            return crypto.randomUUID();
+        }
+        return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    }, []);
+    const prompt = useMemo(() => buildChatGptTemplatePrompt({
+        title,
+        html,
+        instruction: instruction.trim(),
+        templateInstruction,
+        requestId
+    }), [html, instruction, requestId, templateInstruction, title]);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const syncSettings = async (event = null) => {
+            const settings = event?.detail?.settings || await loadChatGptPromptSettings();
+            if (!cancelled) setTemplateInstruction(settings.templateInstruction || "");
+        };
+
+        syncSettings();
+        window.addEventListener(CHATGPT_PROMPT_SETTINGS_UPDATED_EVENT, syncSettings);
+
+        return () => {
+            cancelled = true;
+            window.removeEventListener(CHATGPT_PROMPT_SETTINGS_UPDATED_EVENT, syncSettings);
+        };
+    }, []);
+
+    const goToCopyStep = () => {
+        if (!instruction.trim()) {
+            setPasteError("Write the instruction first.");
+            return;
+        }
+        setPasteError("");
+        setStep("copy");
+    };
+
+    const copyPromptAndOpen = async () => {
+        if (!instruction.trim()) {
+            setStep("instructions");
+            setPasteError("Write the instruction first.");
+            return;
+        }
+        const copied = await copyRawTextToClipboard(prompt, {
+            message: "ChatGPT prompt copied.",
+            variant: "success"
+        });
+        if (!copied) return;
+        const chatGptWindow = openCenteredChatGptWindow();
+        if (!chatGptWindow) {
+            showToast("ChatGPT window was blocked by the browser.", "error");
+            return;
+        }
+        setPasteError("");
+        setClipboardStatus("waiting");
+        setStep("waiting");
+    };
+
+    const applyResultText = useCallback((value, { requireRequestId = true } = {}) => {
+        const extractedHtml = extractChatGptTemplateHtml(value, {
+            requestId,
+            requireRequestId
+        });
+        if (!extractedHtml) {
+            setClipboardStatus("invalid");
+            setPasteError("Clipboard does not contain the expected ChatGPT result yet.");
+            return false;
+        }
+        onApplyResult(allowImages ? extractedHtml : stripImagesFromHtml(extractedHtml));
+        showToast("ChatGPT result added as draft.", "success");
+        onClose();
+        return true;
+    }, [allowImages, onApplyResult, onClose, requestId]);
+
+    const readChatGptClipboard = useCallback(async ({ automatic = false } = {}) => {
+        if (!navigator.clipboard?.readText) {
+            setClipboardStatus("blocked");
+            setPasteError("Clipboard reading is not available in this browser.");
+            return false;
+        }
+
+        setClipboardStatus("checking");
+
+        try {
+            const clipboardText = await withClipboardTimeout(() => navigator.clipboard.readText());
+            if (!clipboardText || clipboardText === prompt) {
+                setClipboardStatus("waiting");
+                if (!automatic) setPasteError("Copy ChatGPT's answer first, then try again.");
+                return false;
+            }
+
+            const applied = applyResultText(clipboardText, { requireRequestId: true });
+            if (!applied && automatic) {
+                setPasteError("");
+                setClipboardStatus("waiting");
+            }
+            return applied;
+        } catch {
+            setClipboardStatus("blocked");
+            setPasteError(automatic
+                ? "Automatic clipboard reading was blocked. Use the button below when you are back from ChatGPT."
+                : "Clipboard access was blocked. Click the button again after allowing clipboard access."
+            );
+            return false;
+        }
+    }, [applyResultText, prompt]);
+
+    useEffect(() => {
+        if (step !== "waiting") return undefined;
+
+        const handleReturn = () => {
+            if (document.visibilityState === "hidden") return;
+            readChatGptClipboard({ automatic: true });
+        };
+
+        const timeoutId = window.setTimeout(handleReturn, 600);
+        window.addEventListener("focus", handleReturn);
+        window.addEventListener("pageshow", handleReturn);
+        document.addEventListener("visibilitychange", handleReturn);
+
+        return () => {
+            window.clearTimeout(timeoutId);
+            window.removeEventListener("focus", handleReturn);
+            window.removeEventListener("pageshow", handleReturn);
+            document.removeEventListener("visibilitychange", handleReturn);
+        };
+    }, [readChatGptClipboard, step]);
+
+    return (
+        <Modal onClose={onClose} dialogClassName="popup-box template-chatgpt-modal" ariaLabel="ChatGPT prompt">
+            <div className="popup-header">
+                <div>
+                    <p className="template-result-kicker">ChatGPT</p>
+                    <h2>Edit with ChatGPT</h2>
+                </div>
+            </div>
+            <div className="template-chatgpt-progress" aria-label="ChatGPT edit progress">
+                <span className={step === "instructions" ? "is-active" : ""}>1 Instructions</span>
+                <span className={step === "copy" ? "is-active" : ""}>2 Copy</span>
+                <span className={step === "waiting" ? "is-active" : ""}>3 Waiting</span>
+            </div>
+            {step === "instructions" && (
+                <div className="template-chatgpt-step">
+                    <div className="template-chatgpt-step-header">
+                        <span className="template-chatgpt-step-number">1</span>
+                        <div>
+                            <h3>Instructions</h3>
+                            <p>Write exactly what ChatGPT should change in this temporary draft.</p>
+                        </div>
+                    </div>
+                    <label className="template-chatgpt-field">
+                        <span>Instruction</span>
+                        <textarea
+                            value={instruction}
+                            onChange={(event) => {
+                                setInstruction(event.target.value);
+                                setPasteError("");
+                            }}
+                            placeholder="Write the exact instruction for ChatGPT."
+                            rows={5}
+                        />
+                    </label>
+                    <div className="template-chatgpt-note">
+                        Nothing is sent automatically from the app. The next step only copies the prepared prompt.
+                    </div>
+                    {pasteError && <div className="template-chatgpt-error">{pasteError}</div>}
+                    <div className="popup-actions template-chatgpt-actions">
+                        <button type="button" className="template-result-action-btn template-result-ai-btn" onClick={goToCopyStep}>
+                            Next
+                            <ArrowRight size={14} aria-hidden="true" />
+                        </button>
+                    </div>
+                </div>
+            )}
+            {step === "copy" && (
+                <div className="template-chatgpt-step">
+                    <div className="template-chatgpt-step-header">
+                        <span className="template-chatgpt-step-number">2</span>
+                        <div>
+                            <h3>Copy prompt</h3>
+                            <p>One click copies the hidden prompt and opens ChatGPT in a centered window.</p>
+                        </div>
+                    </div>
+                    <div className="template-chatgpt-note">
+                        If ChatGPT opens empty, paste with Cmd+V. Then copy ChatGPT's answer and come back here.
+                    </div>
+                    <div className="popup-actions template-chatgpt-actions">
+                        <button type="button" className="secondary-btn" onClick={() => setStep("instructions")}>
+                            Back
+                        </button>
+                        <button type="button" className="template-result-action-btn template-result-ai-btn" onClick={copyPromptAndOpen}>
+                            <ExternalLink size={14} aria-hidden="true" />
+                            Copy prompt and open ChatGPT
+                        </button>
+                    </div>
+                </div>
+            )}
+            {step === "waiting" && (
+                <div className="template-chatgpt-step">
+                    <div className="template-chatgpt-step-header">
+                        <span className="template-chatgpt-step-number">3</span>
+                        <div>
+                            <h3>Waiting for result</h3>
+                            <p>Copy ChatGPT's answer, then return here. The app will try to apply it automatically.</p>
+                        </div>
+                    </div>
+                    <div className={`template-chatgpt-waiting is-${clipboardStatus}`}>
+                        <span className="template-chatgpt-spinner" aria-hidden="true" />
+                        <div>
+                            <strong>
+                                {clipboardStatus === "checking"
+                                    ? "Checking clipboard..."
+                                    : clipboardStatus === "blocked"
+                                        ? "Waiting for permission"
+                                        : clipboardStatus === "invalid"
+                                            ? "Result not detected"
+                                            : "Waiting for ChatGPT"}
+                            </strong>
+                            <p>
+                                {clipboardStatus === "blocked"
+                                    ? "Browser security can block automatic clipboard reading. Use the button below after copying the answer."
+                                    : clipboardStatus === "invalid"
+                                        ? "The copied text is not the expected ChatGPT answer for this request."
+                                        : "Leave this popup open, copy the full ChatGPT answer, and come back to this app."}
+                            </p>
+                        </div>
+                    </div>
+                    {pasteError && <div className="template-chatgpt-error">{pasteError}</div>}
+                    <div className="popup-actions template-chatgpt-actions">
+                        <button type="button" className="secondary-btn" onClick={() => setStep("copy")}>
+                            Back
+                        </button>
+                        <button type="button" className="template-result-action-btn template-result-edit-btn" onClick={() => readChatGptClipboard()}>
+                            <Check size={14} aria-hidden="true" />
+                            Read clipboard
+                        </button>
+                    </div>
+                </div>
+            )}
+        </Modal>
+    );
+}
+
 export const TokenPromptModal = memo(function TokenPromptModal({ title, tokenDefs, values, missingTokens, mode = "copy", onChange, onConfirm, onClose }) {
     const isMultiCol = tokenDefs.length > 2;
     const isFillMode = mode === "fill";
@@ -410,10 +731,12 @@ export const TemplateResultModal = memo(function TemplateResultModal({
 }) {
     const [isEditing, setIsEditing] = useState(false);
     const [draftHtml, setDraftHtml] = useState(result?.html || "");
+    const [chatGptPromptOpen, setChatGptPromptOpen] = useState(false);
 
     useEffect(() => {
         setDraftHtml(result?.html || "");
         setIsEditing(false);
+        setChatGptPromptOpen(false);
     }, [result?.id]);
 
     if (!result) return null;
@@ -436,99 +759,128 @@ export const TemplateResultModal = memo(function TemplateResultModal({
     };
 
     return (
-        <Modal
-            onClose={onClose}
-            dialogClassName={`popup-box template-result-modal${isEditing ? " is-editing" : ""}`}
-            ariaLabel="Generated template"
-        >
-            <div className="popup-header template-result-header">
-                <div>
-                    <p className="template-result-kicker">{isEditing ? "Edit final text" : "Final text"}</p>
-                    <h2>{result.title || "Template"}</h2>
-                </div>
-                <span className={`template-result-copy-state${result.copied && !isDirty && !isEditing ? " is-copied" : ""}`} aria-live="polite">
-                    {copyStateText}
-                </span>
-            </div>
-            {showChannelControls && (
-                <div className="template-result-toolbar">
-                    <div className="template-result-channel-segments" role="tablist" aria-label="Channel">
-                        {channelOptions.map((option) => (
-                            <button
-                                key={option.value}
-                                type="button"
-                                className={`template-result-channel-segment${currentChannel === option.value ? " is-active" : ""}`}
-                                onClick={() => onSelectChannel(option.value)}
-                                role="tab"
-                                aria-selected={currentChannel === option.value}
-                            >
-                                {option.label}
-                            </button>
-                        ))}
+        <>
+            <Modal
+                onClose={onClose}
+                dialogClassName={`popup-box template-result-modal${isEditing ? " is-editing" : ""}`}
+                ariaLabel="Generated template"
+            >
+                <div className="popup-header template-result-header">
+                    <div>
+                        <p className="template-result-kicker">{isEditing ? "Edit final text" : "Final text"}</p>
+                        <h2>{result.title || "Template"}</h2>
                     </div>
+                    <span className={`template-result-copy-state${result.copied && !isDirty && !isEditing ? " is-copied" : ""}`} aria-live="polite">
+                        {copyStateText}
+                    </span>
                 </div>
-            )}
-            {isEditing ? (
-                <Suspense fallback={<TemplateResultEditorFallback />}>
-                    <RichTextEditor
-                        className="template-result-editor"
-                        value={draftHtml}
-                        onChange={setDraftHtml}
-                        placeholder="Final text"
-                        tokens={tokens}
-                        allowImages={allowImages}
-                    />
-                </Suspense>
-            ) : (
-                <div
-                    className="rich-preview template-result-preview"
-                    data-placeholder="No content."
-                    dangerouslySetInnerHTML={{ __html: formatTokenPreviewHTML(formatClipboardHtmlBody(previewHtml)) }}
-                />
-            )}
-            <div className="popup-actions template-result-actions">
+                {showChannelControls && (
+                    <div className="template-result-toolbar">
+                        <div className="template-result-channel-segments" role="tablist" aria-label="Channel">
+                            {channelOptions.map((option) => (
+                                <button
+                                    key={option.value}
+                                    type="button"
+                                    className={`template-result-channel-segment${currentChannel === option.value ? " is-active" : ""}`}
+                                    onClick={() => onSelectChannel(option.value)}
+                                    role="tab"
+                                    aria-selected={currentChannel === option.value}
+                                >
+                                    {option.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
                 {isEditing ? (
-                    <>
-                        <button
-                            type="button"
-                            className="template-result-action-btn template-result-reset-btn"
-                            onClick={resetDraft}
-                            disabled={!isDirty}
-                        >
-                            <RotateCcw size={14} aria-hidden="true" />
-                            Reset
-                        </button>
+                    <Suspense fallback={<TemplateResultEditorFallback />}>
+                        <RichTextEditor
+                            className="template-result-editor"
+                            value={draftHtml}
+                            onChange={setDraftHtml}
+                            placeholder="Final text"
+                            tokens={tokens}
+                            allowImages={allowImages}
+                        />
+                    </Suspense>
+                ) : (
+                    <div
+                        className="rich-preview template-result-preview"
+                        data-placeholder="No content."
+                        dangerouslySetInnerHTML={{ __html: formatTokenPreviewHTML(formatClipboardHtmlBody(previewHtml)) }}
+                    />
+                )}
+                <div className="popup-actions template-result-actions">
+                    {isEditing ? (
+                        <>
+                            <button
+                                type="button"
+                                className="template-result-action-btn template-result-ai-btn"
+                                onClick={() => setChatGptPromptOpen(true)}
+                            >
+                                <Sparkles size={14} aria-hidden="true" />
+                                ChatGPT
+                            </button>
+                            {isDirty && (
+                                <button
+                                    type="button"
+                                    className="template-result-action-btn template-result-reset-btn"
+                                    onClick={resetDraft}
+                                >
+                                    <RotateCcw size={14} aria-hidden="true" />
+                                    Reset
+                                </button>
+                            )}
+                            <button
+                                type="button"
+                                className="template-result-action-btn template-result-edit-btn"
+                                onClick={() => setIsEditing(false)}
+                            >
+                                <Check size={14} aria-hidden="true" />
+                                Done
+                            </button>
+                        </>
+                    ) : (
                         <button
                             type="button"
                             className="template-result-action-btn template-result-edit-btn"
-                            onClick={() => setIsEditing(false)}
+                            onClick={() => setIsEditing(true)}
                         >
-                            <Check size={14} aria-hidden="true" />
-                            Done
+                            <Edit3 size={14} aria-hidden="true" />
+                            Modify
                         </button>
-                    </>
-                ) : (
-                    <button
-                        type="button"
-                        className="template-result-action-btn template-result-edit-btn"
-                        onClick={() => setIsEditing(true)}
-                    >
-                        <Edit3 size={14} aria-hidden="true" />
-                        Modify
-                    </button>
-                )}
-                <button type="button" className="template-result-action-btn template-result-copy-btn" onClick={copyDraft}>
-                    <Copy size={14} aria-hidden="true" />
-                    {isDirty ? "Copy draft" : "Copy again"}
-                </button>
-                {showChannelControls && (
-                    <button type="button" className="template-result-action-btn template-result-next-btn" onClick={onNextChannel}>
-                        Next
-                        <ArrowRight size={14} aria-hidden="true" />
-                    </button>
-                )}
-            </div>
-        </Modal>
+                    )}
+                    {(!isEditing || isDirty) && (
+                        <button type="button" className="template-result-action-btn template-result-copy-btn" onClick={copyDraft}>
+                            <Copy size={14} aria-hidden="true" />
+                            {isDirty ? "Copy draft" : "Copy again"}
+                        </button>
+                    )}
+                    {!isEditing && showChannelControls && (
+                        <button
+                            type="button"
+                            className="template-result-action-btn template-result-next-btn"
+                            onClick={onNextChannel}
+                        >
+                            Next
+                            <ArrowRight size={14} aria-hidden="true" />
+                        </button>
+                    )}
+                </div>
+            </Modal>
+            {chatGptPromptOpen && (
+                <ChatGptPromptModal
+                    title={result.title || "Template"}
+                    html={draftHtml}
+                    allowImages={allowImages}
+                    onApplyResult={(nextHtml) => {
+                        setDraftHtml(nextHtml);
+                        setIsEditing(true);
+                    }}
+                    onClose={() => setChatGptPromptOpen(false)}
+                />
+            )}
+        </>
     );
 });
 

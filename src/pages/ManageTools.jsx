@@ -33,7 +33,12 @@ import { loadSuperOfficeTicketPayload } from "../services/superOfficeTicketServi
 import { getClientInfoSections, getClientInternalTokenData, getClientSummaryFields } from "../utils/clientClipboard.js";
 import { DATA_SHORTCUTS, copyTextFallback } from "../services/shortcutsService.js";
 import { KEYBOARD_SHORTCUTS, formatKeyboardShortcut } from "../utils/keyboardShortcuts.js";
-import { buildToolModulePrompt, buildToolModuleSrcDoc, buildToolRuntimeContext } from "../utils/toolModuleRuntime.js";
+import {
+    buildToolModulePrompt,
+    buildToolModuleSrcDoc,
+    buildToolRuntimeContext,
+    extractToolModuleHtmlFromAiResult
+} from "../utils/toolModuleRuntime.js";
 import { buildCaseProfile } from "../utils/caseProfile.js";
 import Modal from "../components/Modal.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
@@ -611,23 +616,39 @@ function ModuleToolStep({ step, draft, onPatch, tokens, runtimePreviewContext })
         fileInputRef.current?.click();
     }, []);
 
+    const applyGeneratedModuleValue = useCallback((value) => {
+        const extractedHtml = extractToolModuleHtmlFromAiResult(value);
+        if (extractedHtml) {
+            onPatch({ html: extractedHtml });
+            showToast("Generated JSON parsed.", "success");
+            return;
+        }
+        onPatch({ html: value });
+    }, [onPatch]);
+
     const loadHtmlFile = useCallback(async (event) => {
         const file = event.target.files?.[0] || null;
         event.target.value = "";
         if (!file) return;
 
         const isHtmlFile = /\.html?$/i.test(file.name) || file.type === "text/html";
-        if (!isHtmlFile) {
-            showToast("Choose an .html file.", "error");
+        const isJsonFile = /\.json$/i.test(file.name) || file.type === "application/json";
+        if (!isHtmlFile && !isJsonFile) {
+            showToast("Choose an .html or .json file.", "error");
             return;
         }
 
         try {
-            const html = await file.text();
-            onPatch({ html });
+            const fileText = await file.text();
+            const extractedHtml = isJsonFile ? extractToolModuleHtmlFromAiResult(fileText) : "";
+            if (isJsonFile && !extractedHtml) {
+                showToast("JSON file does not contain an html field.", "error");
+                return;
+            }
+            onPatch({ html: extractedHtml || fileText });
             showToast(`${file.name} loaded.`, "success");
         } catch {
-            showToast("Unable to read this HTML file.", "error");
+            showToast("Unable to read this file.", "error");
         }
     }, [onPatch]);
 
@@ -676,14 +697,14 @@ function ModuleToolStep({ step, draft, onPatch, tokens, runtimePreviewContext })
             <div className="tool-module-step-panel">
                 <section className="tools-panel-block">
                     <div className="tools-panel-title">
-                        <h3>Generated HTML</h3>
-                        <p>Paste the complete single-file HTML returned by ChatGPT, or load the downloaded HTML file.</p>
+                        <h3>Generated module</h3>
+                        <p>Paste the JSON returned by ChatGPT. The app extracts the html field automatically.</p>
                     </div>
                     <div className="tools-action-row">
                         <input
                             ref={fileInputRef}
                             type="file"
-                            accept=".html,.htm,text/html"
+                            accept=".html,.htm,.json,text/html,application/json"
                             className="sr-only"
                             onChange={loadHtmlFile}
                         />
@@ -697,8 +718,8 @@ function ModuleToolStep({ step, draft, onPatch, tokens, runtimePreviewContext })
                         <textarea
                             className="tools-code-textarea"
                             value={draft.html || ""}
-                            onChange={(event) => onPatch({ html: event.target.value })}
-                            placeholder="<!doctype html>..."
+                            onChange={(event) => applyGeneratedModuleValue(event.target.value)}
+                            placeholder='{"html":"<!doctype html>..."}'
                             rows={16}
                         />
                     </label>

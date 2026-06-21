@@ -10,6 +10,7 @@ import {
     Moon,
     Palette,
     ShieldCheck,
+    Sparkles,
     Sun,
     Tags,
     TestTube2,
@@ -22,6 +23,10 @@ import { clearAppIndexedDB } from "../services/indexedDbService.js";
 import { loadTemplateImages, saveTemplateImages } from "../services/templateImageService.js";
 import { buildConfigPayload, mergeConfigData, validateImportedConfig } from "../services/configService.js";
 import { loadConfigName, saveConfigName } from "../services/appConfigService.js";
+import {
+    loadChatGptPromptSettings,
+    saveChatGptPromptSettings
+} from "../services/chatGptPromptSettingsService.js";
 import { copyText, showToast } from "../services/clipboardService.js";
 import { getStorageInfo, requestPersistentStorage } from "../services/storageInfoService.js";
 import { AGENT_PROFILE_FIELDS, loadAgentProfile, saveAgentProfile } from "../services/agentProfileService.js";
@@ -77,6 +82,12 @@ const SETTINGS_SECTIONS = [
         label: "Custom tokens",
         summary: "User tokens",
         icon: Tags
+    },
+    {
+        id: "aiPrompt",
+        label: "AI prompt",
+        summary: "Template guidance",
+        icon: Sparkles
     },
     {
         id: "theme",
@@ -145,6 +156,7 @@ export default function Settings({ embedded = false, onClose = null }) {
     const [exportNameValue, setExportNameValue] = useState("");
     const [storageInfo, setStorageInfo] = useState(null);
     const [agentProfile, setAgentProfile] = useState({});
+    const [chatGptPromptSettings, setChatGptPromptSettings] = useState({ templateInstruction: "" });
     const [activeSection, setActiveSection] = useState("agent");
     const [themePreference, setThemePreference] = useState(() => getInitialTheme());
     const [resolvedTheme, setResolvedTheme] = useState(() => getResolvedTheme(getInitialTheme()));
@@ -153,6 +165,7 @@ export default function Settings({ embedded = false, onClose = null }) {
         loadTemplateTreeData().then(setTreeData);
         loadConfigName().then(setConfigName);
         loadAgentProfile().then(setAgentProfile);
+        loadChatGptPromptSettings().then(setChatGptPromptSettings);
         getStorageInfo().then(setStorageInfo).catch(() => setStorageInfo(null));
     }, []);
 
@@ -199,7 +212,8 @@ export default function Settings({ embedded = false, onClose = null }) {
             nextName,
             tokens.filter((tokenDef) => !tokenDef.system),
             treeData,
-            await loadTemplateImages()
+            await loadTemplateImages(),
+            chatGptPromptSettings
         );
         const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
         const url = URL.createObjectURL(blob);
@@ -208,7 +222,7 @@ export default function Settings({ embedded = false, onClose = null }) {
         a.download = `${nextName || "config"}.templageConfig`;
         a.click();
         URL.revokeObjectURL(url);
-    }, [configName, exportNameValue, tokens, treeData]);
+    }, [chatGptPromptSettings, configName, exportNameValue, tokens, treeData]);
 
     const importConfig = useCallback(() => {
         if (fileInputRef.current) {
@@ -228,6 +242,7 @@ export default function Settings({ embedded = false, onClose = null }) {
                 nodes: importedNodes,
                 templates: importedTemplates,
                 templateImages: importedTemplateImages,
+                chatGptPromptSettings: importedChatGptPromptSettings,
                 configName: importedName
             } = validateImportedConfig(json);
             setPendingImportConfig({
@@ -236,6 +251,7 @@ export default function Settings({ embedded = false, onClose = null }) {
                 nodes: importedNodes,
                 templates: importedTemplates,
                 templateImages: importedTemplateImages,
+                chatGptPromptSettings: importedChatGptPromptSettings,
                 configName: importedName || "Imported configuration"
             });
         } catch (err) {
@@ -257,13 +273,15 @@ export default function Settings({ embedded = false, onClose = null }) {
                 tokens: tokens.filter((tokenDef) => !tokenDef.system && !tokenDef.internal),
                 nodes: treeData.nodes,
                 templates: treeData.templates,
-                templateImages: currentTemplateImages
+                templateImages: currentTemplateImages,
+                chatGptPromptSettings
             };
             const importedConfig = {
                 tokens: pendingImportConfig.tokens,
                 nodes: pendingImportConfig.nodes,
                 templates: pendingImportConfig.templates,
-                templateImages: pendingImportConfig.templateImages
+                templateImages: pendingImportConfig.templateImages,
+                chatGptPromptSettings: pendingImportConfig.chatGptPromptSettings
             };
             const nextConfig = mode === "merge"
                 ? mergeConfigData(currentConfig, importedConfig)
@@ -272,6 +290,7 @@ export default function Settings({ embedded = false, onClose = null }) {
             await saveTokens(nextConfig.tokens);
             await saveTemplateTreeData({ nodes: nextConfig.nodes, templates: nextConfig.templates });
             await saveTemplateImages(nextConfig.templateImages);
+            const savedChatGptPromptSettings = await saveChatGptPromptSettings(nextConfig.chatGptPromptSettings);
 
             const [normalizedTokens, normalizedTreeData] = await Promise.all([
                 loadTokens(),
@@ -279,6 +298,7 @@ export default function Settings({ embedded = false, onClose = null }) {
             ]);
             setTokens(normalizedTokens);
             setTreeData(normalizedTreeData);
+            setChatGptPromptSettings(savedChatGptPromptSettings);
             refreshStorageInfo();
 
             const importedName = pendingImportConfig.configName || "Imported configuration";
@@ -293,7 +313,7 @@ export default function Settings({ embedded = false, onClose = null }) {
             console.error(err);
             showToast("Import failed", "error");
         }
-    }, [configName, navigate, pendingImportConfig, refreshStorageInfo, tokens, treeData]);
+    }, [chatGptPromptSettings, configName, navigate, pendingImportConfig, refreshStorageInfo, tokens, treeData]);
 
     const triggerReset = useCallback(() => {
         setConfirmReset(true);
@@ -305,6 +325,13 @@ export default function Settings({ embedded = false, onClose = null }) {
 
     const handleTokensChange = useCallback((nextTokens) => {
         setTokens(nextTokens);
+    }, []);
+
+    const updateChatGptTemplateInstruction = useCallback((event) => {
+        setChatGptPromptSettings((prev) => ({
+            ...prev,
+            templateInstruction: event.target.value
+        }));
     }, []);
 
     const changeThemePreference = useCallback((nextTheme) => {
@@ -325,6 +352,12 @@ export default function Settings({ embedded = false, onClose = null }) {
         showToast("Agent profile saved", "success");
     }, [agentProfile]);
 
+    const saveAiPromptSettings = useCallback(async () => {
+        const savedSettings = await saveChatGptPromptSettings(chatGptPromptSettings);
+        setChatGptPromptSettings(savedSettings);
+        showToast("AI prompt settings saved", "success");
+    }, [chatGptPromptSettings]);
+
     const copyTestData = useCallback((kind) => {
         const isVti = kind === "vti";
         const payload = isVti ? TEST_VTI_IMPORT_PAYLOAD : TEST_SO_IMPORT_PAYLOAD;
@@ -337,7 +370,7 @@ export default function Settings({ embedded = false, onClose = null }) {
     const resetStorage = useCallback(async () => {
         setConfirmReset(false);
         const keysToDelete = [];
-        const appScopedLegacyKeys = new Set(["tokens", "models", "theme_pref", "active_client_payload", "agent_profile"]);
+        const appScopedLegacyKeys = new Set(["tokens", "models", "theme_pref", "active_client_payload", "agent_profile", "chatgpt_prompt_settings"]);
         try {
             const storage = globalThis.localStorage || null;
             if (storage) {
@@ -433,6 +466,30 @@ export default function Settings({ embedded = false, onClose = null }) {
                                     ? `System (${resolvedTheme === "light" ? "Light" : "Dark"})`
                                     : THEME_OPTIONS.find((option) => option.id === themePreference)?.label || "Dark"}
                             </strong>
+                        </div>
+                    </div>
+                );
+            case "aiPrompt":
+                return (
+                    <div className="settings-detail-stack">
+                        <label className="settings-ai-prompt-field">
+                            <span>Template guidance</span>
+                            <textarea
+                                value={chatGptPromptSettings.templateInstruction || ""}
+                                onChange={updateChatGptTemplateInstruction}
+                                placeholder="Example: start with Hello {customer_name}, and end with Meilleures salutations {agent_firstName} de votre equipe Salt."
+                                rows={8}
+                            />
+                        </label>
+                        <div className="settings-info-card">
+                            <span>Internal rules</span>
+                            <strong>Response markers, request IDs, HTML format, and placeholder safety stay locked.</strong>
+                        </div>
+                        <div className="settings-detail-actions">
+                            <button type="button" className="settings-action-btn settings-action-btn--save" onClick={saveAiPromptSettings}>
+                                <ShieldCheck size={16} aria-hidden="true" />
+                                <span>Save AI prompt</span>
+                            </button>
                         </div>
                     </div>
                 );
@@ -565,8 +622,10 @@ export default function Settings({ embedded = false, onClose = null }) {
                                     ? storageInfo?.usageLabel || section.summary
                                     : section.id === "tokens"
                                         ? `${customTokenCount} custom`
-                                        : section.id === "theme"
-                                            ? themePreference === "system" ? `System (${resolvedTheme})` : themePreference
+                                    : section.id === "theme"
+                                        ? themePreference === "system" ? `System (${resolvedTheme})` : themePreference
+                                        : section.id === "aiPrompt"
+                                            ? chatGptPromptSettings.templateInstruction?.trim() ? "Configured" : "Empty"
                                             : section.summary;
 
                             return (

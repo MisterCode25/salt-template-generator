@@ -5,6 +5,7 @@ import {
   buildToolModulePrompt,
   buildToolModuleSrcDoc,
   buildToolRuntimeContext,
+  extractToolModuleHtmlFromAiResult,
   formatToolModuleApiReferenceForPrompt,
   normalizeToolModuleHtml
 } from "../src/utils/toolModuleRuntime.js";
@@ -166,8 +167,14 @@ import {
     title: "Refund helper",
     prompt: "Calculate a refund and copy a customer message."
   });
-  assert.match(prompt, /Return one complete HTML file, and nothing else/);
-  assert.match(prompt, /downloadable \.html file/);
+  assert.match(prompt, /Return exactly one valid JSON object, and nothing else/);
+  assert.match(prompt, /"html": "<!doctype html>\.\.\."/);
+  assert.match(prompt, /Act as a senior frontend engineer/);
+  assert.match(prompt, /The JSON must parse with JSON\.parse/);
+  assert.match(prompt, /Do not add extra JSON fields/);
+  assert.match(prompt, /Do not return raw HTML/);
+  assert.match(prompt, /Escape the HTML as a valid JSON string/);
+  assert.match(prompt, /Priority order:/);
   assert.match(prompt, /Do not split the answer into multiple parts/);
   assert.match(prompt, /Generation contract:/);
   assert.match(prompt, /implement only that workflow/);
@@ -210,10 +217,26 @@ import {
   assert.match(prompt, /Make the interface shape specific to the requested job/);
   assert.match(prompt, /Avoid repeating the same generic module layout/);
   assert.match(prompt, /accent may change per module/);
+  assert.match(prompt, /Validate input before copying/);
+  assert.match(prompt, /Avoid eval, Function constructors/);
+  assert.match(prompt, /Before returning, verify silently:/);
+  assert.match(prompt, /exactly one JSON object with only an html string field/);
   assert.match(prompt, /Never write to localStorage or IndexedDB directly/);
   assert.match(prompt, /window\.TemplateTool\.getContext/);
   assert.match(prompt, /Refund helper/);
   assert.match(prompt, /Calculate a refund/);
+}
+
+{
+  assert.equal(
+    extractToolModuleHtmlFromAiResult('{"html":"<!doctype html><html><body>OK</body></html>"}'),
+    "<!doctype html><html><body>OK</body></html>"
+  );
+  assert.equal(
+    extractToolModuleHtmlFromAiResult('```json\n{"html":"<!doctype html><html></html>"}\n```'),
+    "<!doctype html><html></html>"
+  );
+  assert.equal(extractToolModuleHtmlFromAiResult("<!doctype html><html></html>"), "");
 }
 
 console.log("toolModuleRuntime tests passed");

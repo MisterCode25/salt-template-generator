@@ -1,11 +1,16 @@
 import { lazy, memo, Suspense, useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import {
+    ArrowRight,
+    Check,
     ChevronDown,
     Copy,
     Edit3,
+    ExternalLink,
+    Languages,
     Link2,
     MoreVertical,
     Plus,
+    Sparkles,
     Trash2
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -16,6 +21,7 @@ import { showToast } from "../services/clipboardService.js";
 import { TEMPLATE_TREE_UPDATED_EVENT, loadTemplateTreeData, saveTemplateTreeData } from "../services/templateTreeService.js";
 import { loadTemplateImageMap } from "../services/templateImageService.js";
 import { loadTokens, loadTokensWithClientData, saveTokens } from "../services/tokenService.js";
+import { loadChatGptPromptSettings } from "../services/chatGptPromptSettingsService.js";
 import { Channel, CHANNEL_VALUES } from "../models/templateTreeModel.js";
 import {
     buildNodeChildrenIndex,
@@ -42,6 +48,11 @@ import {
     TEMPLATE_IMAGES_UPDATED_EVENT
 } from "../utils/templateImages.js";
 import {
+    buildChatGptEditorPrompt,
+    parseChatGptEditorJsonResult,
+    sanitizeEditorPromptHtml
+} from "../utils/chatGptEditorPrompt.js";
+import {
     TOPIC_COLOR_PRESETS,
     getTopicColorStyle,
     getTopicColorValue,
@@ -49,6 +60,7 @@ import {
 } from "../utils/topicAppearance.js";
 
 const TREE_DRAG_MIME = "application/x-template-tree-item";
+const CHATGPT_CLIPBOARD_READ_TIMEOUT_MS = 3500;
 const RichTextEditor = lazy(() => import("../components/RichTextEditor.jsx"));
 
 const CHANNEL_LABELS = {
@@ -336,6 +348,215 @@ function hasRichTextContent(value = "") {
         .trim();
 
     return textOnly.length > 0;
+}
+
+function uniqueLanguages(preferredCode = "fr") {
+    const seen = new Set();
+    return [preferredCode, "fr", "en", "de", "it"]
+        .map((code) => LANGUAGES.find((language) => language.code === code))
+        .filter((language) => {
+            if (!language || seen.has(language.code)) return false;
+            seen.add(language.code);
+            return true;
+        });
+}
+
+function getBestSourceLanguage(record = {}, preferredCode = "fr") {
+    return uniqueLanguages(preferredCode).find((language) => hasRichTextContent(record?.[language.field])) || null;
+}
+
+function sanitizeGeneratedHtmlForChannel(channel, html = "") {
+    const value = String(html || "").trim();
+    return channel === Channel.SMS ? stripImagesFromHtml(value) : value;
+}
+
+function getAiPayloadHtml(payload = {}) {
+    const value = payload.html || payload.text || payload.content || payload.message || "";
+    return typeof value === "string" ? value.trim() : "";
+}
+
+function getAiPayloadName(payload = {}, fallback = "Variant") {
+    const value = payload.name || payload.title || payload.label || "";
+    return typeof value === "string" && value.trim() ? value.trim() : fallback;
+}
+
+function collectMissingTranslationTargets(content = {}, variants = [], preferredCode = "fr") {
+    const mainSource = getBestSourceLanguage(content, preferredCode);
+    const mainTargets = mainSource
+        ? LANGUAGES.filter((language) => language.field !== mainSource.field && !hasRichTextContent(content?.[language.field]))
+        : [];
+    const variantTargets = variants
+        .map((variant) => {
+            const source = getBestSourceLanguage(variant, preferredCode);
+            if (!source) return null;
+            const targets = LANGUAGES.filter((language) => (
+                language.field !== source.field
+                && !hasRichTextContent(variant?.[language.field])
+            ));
+            return targets.length > 0
+                ? { variant, source, targets }
+                : null;
+        })
+        .filter(Boolean);
+
+    return {
+        main: mainTargets.length > 0 ? { source: mainSource, targets: mainTargets } : null,
+        variants: variantTargets,
+        count: mainTargets.length + variantTargets.reduce((sum, item) => sum + item.targets.length, 0)
+    };
+}
+
+function buildTranslationContext(content = {}, variants = [], translationTargets = {}) {
+    const context = {};
+    if (translationTargets.main) {
+        context.main = {
+            sourceLanguage: translationTargets.main.source.label,
+            sourceField: translationTargets.main.source.field,
+            sourceHtml: sanitizeEditorPromptHtml(content[translationTargets.main.source.field] || ""),
+            targets: translationTargets.main.targets.map((language) => ({
+                language: language.label,
+                field: language.field
+            }))
+        };
+    }
+    if (translationTargets.variants?.length > 0) {
+        context.variants = translationTargets.variants.map(({ variant, source, targets }) => ({
+            id: variant.id,
+            name: variant.name || "Variant",
+            sourceLanguage: source.label,
+            sourceField: source.field,
+            sourceHtml: sanitizeEditorPromptHtml(variant[source.field] || ""),
+            targets: targets.map((language) => ({
+                language: language.label,
+                field: language.field
+            }))
+        }));
+    }
+    return context;
+}
+
+function collectMissingTranslationChannelItems(channelList = [], contentByChannel = {}, preferredCode = "fr", title = "") {
+    return channelList
+        .map((channel) => {
+            const content = {
+                ...createChannelContentDraft(channel, title),
+                ...(contentByChannel[channel] || {})
+            };
+            const variants = Array.isArray(content.variants) ? content.variants : [];
+            const targets = collectMissingTranslationTargets(content, variants, preferredCode);
+            return { channel, content, variants, targets };
+        })
+        .filter((item) => item.targets.count > 0);
+}
+
+function getTranslationChannelItemCount(items = []) {
+    return items.reduce((sum, item) => sum + item.targets.count, 0);
+}
+
+function buildChannelTranslationContext(items = []) {
+    return {
+        channels: items.map(({ channel, content, variants, targets }) => ({
+            channel,
+            channelLabel: CHANNEL_LABELS[channel] || channel,
+            ...buildTranslationContext(content, variants, targets)
+        }))
+    };
+}
+
+function buildChannelTranslationOutputSchema(items = []) {
+    return JSON.stringify({
+        channels: items.map(({ channel, targets }) => ({
+            channel,
+            main: Object.fromEntries(
+                (targets.main?.targets || []).map((language) => [language.field, `<p>${language.label} translation HTML</p>`])
+            ),
+            variants: (targets.variants || []).map(({ variant, targets: variantTargets }) => ({
+                id: variant.id,
+                ...Object.fromEntries(
+                    variantTargets.map((language) => [language.field, `<p>${language.label} translation HTML</p>`])
+                )
+            }))
+        }))
+    }, null, 2);
+}
+
+function formatTokenContext(tokens = []) {
+    const visibleTokens = tokens
+        .filter((tokenDef) => tokenDef?.token)
+        .slice(0, 80)
+        .map((tokenDef) => `${tokenDef.token}${tokenDef.label ? ` - ${tokenDef.label}` : ""}`);
+    return visibleTokens.length > 0 ? visibleTokens.join("\n") : "No configured tokens.";
+}
+
+async function copyRawTextToClipboard(text, { message = "Prompt copied.", variant = "success" } = {}) {
+    const value = String(text || "");
+    if (!value) return false;
+
+    try {
+        await navigator.clipboard.writeText(value);
+    } catch {
+        const textarea = document.createElement("textarea");
+        textarea.value = value;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+    }
+
+    showToast(message, variant);
+    return true;
+}
+
+async function readClipboardWithTimeout(readOperation) {
+    let timeoutId;
+    try {
+        return await Promise.race([
+            readOperation(),
+            new Promise((_, reject) => {
+                timeoutId = window.setTimeout(() => {
+                    reject(new Error("Clipboard reading timed out."));
+                }, CHATGPT_CLIPBOARD_READ_TIMEOUT_MS);
+            })
+        ]);
+    } finally {
+        window.clearTimeout(timeoutId);
+    }
+}
+
+function openCenteredChatGptWindow() {
+    const availableLeft = window.screen?.availLeft ?? 0;
+    const availableTop = window.screen?.availTop ?? 0;
+    const availableWidth = window.screen?.availWidth || window.outerWidth || 1440;
+    const availableHeight = window.screen?.availHeight || window.outerHeight || 900;
+    const width = Math.min(1120, Math.max(960, Math.round(availableWidth * 0.74)));
+    const height = Math.min(840, Math.max(720, Math.round(availableHeight * 0.82)));
+    const left = Math.max(availableLeft, Math.round(availableLeft + (availableWidth - width) / 2));
+    const top = Math.max(availableTop, Math.round(availableTop + (availableHeight - height) / 2));
+    const features = [
+        "popup=yes",
+        `width=${width}`,
+        `height=${height}`,
+        `left=${left}`,
+        `top=${top}`,
+        "toolbar=no",
+        "menubar=no",
+        "location=no",
+        "status=no",
+        "resizable=yes",
+        "scrollbars=yes"
+    ].join(",");
+    const chatGptWindow = window.open("https://chatgpt.com/", `templateEditorChatGPT-${Date.now()}`, features);
+    if (chatGptWindow) {
+        try {
+            chatGptWindow.opener = null;
+        } catch {
+            // Some browsers block opener changes for external windows.
+        }
+        chatGptWindow.focus();
+    }
+    return chatGptWindow;
 }
 
 function buildNodeOptions(childrenByParent, parentId = null, depth = 0) {
@@ -658,6 +879,256 @@ const ExistingTemplatePickerModal = memo(function ExistingTemplatePickerModal({ 
     );
 });
 
+function TemplateEditorAiModal({ request, onClose }) {
+    const [step, setStep] = useState("instructions");
+    const [instruction, setInstruction] = useState(request.defaultInstruction || "");
+    const [templateInstruction, setTemplateInstruction] = useState("");
+    const [error, setError] = useState("");
+    const [clipboardStatus, setClipboardStatus] = useState("idle");
+    const requestId = useMemo(() => {
+        if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+            return crypto.randomUUID();
+        }
+        return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    }, []);
+    const prompt = useMemo(() => request.buildPrompt({
+        requestId,
+        templateInstruction,
+        userInstruction: instruction.trim()
+    }), [instruction, request, requestId, templateInstruction]);
+
+    useEffect(() => {
+        let active = true;
+        loadChatGptPromptSettings().then((settings) => {
+            if (active) setTemplateInstruction(settings.templateInstruction || "");
+        });
+        return () => {
+            active = false;
+        };
+    }, []);
+
+    const goToCopyStep = () => {
+        if (request.requiresInstruction && !instruction.trim()) {
+            setError("Write the instruction first.");
+            return;
+        }
+        setError("");
+        setStep("copy");
+    };
+
+    const copyPromptAndOpen = async () => {
+        if (request.requiresInstruction && !instruction.trim()) {
+            setStep("instructions");
+            setError("Write the instruction first.");
+            return;
+        }
+
+        const copied = await copyRawTextToClipboard(prompt, {
+            message: "ChatGPT prompt copied.",
+            variant: "success"
+        });
+        if (!copied) return;
+
+        const chatGptWindow = openCenteredChatGptWindow();
+        if (!chatGptWindow) {
+            showToast("ChatGPT window was blocked by the browser.", "error");
+            return;
+        }
+
+        setError("");
+        setClipboardStatus("waiting");
+        setStep("waiting");
+    };
+
+    const applyClipboardText = useCallback((value) => {
+        const parsed = parseChatGptEditorJsonResult(value, { requestId });
+        if (!parsed) {
+            setClipboardStatus("invalid");
+            setError("Clipboard does not contain the expected ChatGPT result yet.");
+            return false;
+        }
+
+        const applied = request.applyResult(parsed);
+        if (!applied) {
+            setClipboardStatus("invalid");
+            setError("ChatGPT result has the wrong format for this action.");
+            return false;
+        }
+
+        showToast(request.successMessage || "ChatGPT result applied.", "success");
+        onClose();
+        return true;
+    }, [onClose, request, requestId]);
+
+    const readChatGptClipboard = useCallback(async ({ automatic = false } = {}) => {
+        if (!navigator.clipboard?.readText) {
+            setClipboardStatus("blocked");
+            setError("Clipboard reading is not available in this browser.");
+            return false;
+        }
+
+        setClipboardStatus("checking");
+
+        try {
+            const clipboardText = await readClipboardWithTimeout(() => navigator.clipboard.readText());
+            if (!clipboardText || clipboardText === prompt) {
+                setClipboardStatus("waiting");
+                if (!automatic) setError("Copy ChatGPT's answer first, then try again.");
+                return false;
+            }
+
+            const applied = applyClipboardText(clipboardText);
+            if (!applied && automatic) {
+                setError("");
+                setClipboardStatus("waiting");
+            }
+            return applied;
+        } catch {
+            setClipboardStatus("blocked");
+            setError(automatic
+                ? "Automatic clipboard reading was blocked. Use the button below when you are back from ChatGPT."
+                : "Clipboard access was blocked. Click the button again after allowing clipboard access."
+            );
+            return false;
+        }
+    }, [applyClipboardText, prompt]);
+
+    useEffect(() => {
+        if (step !== "waiting") return undefined;
+
+        const handleReturn = () => {
+            if (document.visibilityState === "hidden") return;
+            readChatGptClipboard({ automatic: true });
+        };
+
+        const timeoutId = window.setTimeout(handleReturn, 600);
+        window.addEventListener("focus", handleReturn);
+        window.addEventListener("pageshow", handleReturn);
+        document.addEventListener("visibilitychange", handleReturn);
+
+        return () => {
+            window.clearTimeout(timeoutId);
+            window.removeEventListener("focus", handleReturn);
+            window.removeEventListener("pageshow", handleReturn);
+            document.removeEventListener("visibilitychange", handleReturn);
+        };
+    }, [readChatGptClipboard, step]);
+
+    return (
+        <Modal onClose={onClose} dialogClassName="popup-box template-chatgpt-modal" ariaLabel={request.title}>
+            <div className="popup-header">
+                <div>
+                    <p className="template-result-kicker">ChatGPT</p>
+                    <h2>{request.title}</h2>
+                </div>
+            </div>
+            <div className="template-chatgpt-progress" aria-label="ChatGPT editor progress">
+                <span className={step === "instructions" ? "is-active" : ""}>1 Instructions</span>
+                <span className={step === "copy" ? "is-active" : ""}>2 Copy</span>
+                <span className={step === "waiting" ? "is-active" : ""}>3 Waiting</span>
+            </div>
+            {step === "instructions" && (
+                <div className="template-chatgpt-step">
+                    <div className="template-chatgpt-step-header">
+                        <span className="template-chatgpt-step-number">1</span>
+                        <div>
+                            <h3>{request.instructionTitle || "Instructions"}</h3>
+                            <p>{request.description}</p>
+                        </div>
+                    </div>
+                    <label className="template-chatgpt-field">
+                        <span>{request.instructionLabel || "Instruction"}</span>
+                        <textarea
+                            value={instruction}
+                            onChange={(event) => {
+                                setInstruction(event.target.value);
+                                setError("");
+                            }}
+                            placeholder={request.instructionPlaceholder || "Write the exact instruction for ChatGPT."}
+                            rows={5}
+                        />
+                    </label>
+                    <div className="template-chatgpt-note">
+                        The technical format, response marker, and placeholder safety rules stay locked.
+                    </div>
+                    {error && <div className="template-chatgpt-error">{error}</div>}
+                    <div className="popup-actions template-chatgpt-actions">
+                        <button type="button" className="template-result-action-btn template-result-ai-btn" onClick={goToCopyStep}>
+                            Next
+                            <ArrowRight size={14} aria-hidden="true" />
+                        </button>
+                    </div>
+                </div>
+            )}
+            {step === "copy" && (
+                <div className="template-chatgpt-step">
+                    <div className="template-chatgpt-step-header">
+                        <span className="template-chatgpt-step-number">2</span>
+                        <div>
+                            <h3>Copy prompt</h3>
+                            <p>One click copies the hidden prompt and opens ChatGPT in a centered window.</p>
+                        </div>
+                    </div>
+                    <div className="template-chatgpt-note">
+                        If ChatGPT opens empty, paste with Cmd+V. Then copy ChatGPT's full answer and come back here.
+                    </div>
+                    <div className="popup-actions template-chatgpt-actions">
+                        <button type="button" className="secondary-btn" onClick={() => setStep("instructions")}>
+                            Back
+                        </button>
+                        <button type="button" className="template-result-action-btn template-result-ai-btn" onClick={copyPromptAndOpen}>
+                            <ExternalLink size={14} aria-hidden="true" />
+                            Copy prompt and open ChatGPT
+                        </button>
+                    </div>
+                </div>
+            )}
+            {step === "waiting" && (
+                <div className="template-chatgpt-step">
+                    <div className="template-chatgpt-step-header">
+                        <span className="template-chatgpt-step-number">3</span>
+                        <div>
+                            <h3>Waiting for result</h3>
+                            <p>Copy ChatGPT's answer, then return here. The editor will try to apply it automatically.</p>
+                        </div>
+                    </div>
+                    <div className={`template-chatgpt-waiting is-${clipboardStatus}`}>
+                        <span className="template-chatgpt-spinner" aria-hidden="true" />
+                        <div>
+                            <strong>
+                                {clipboardStatus === "checking"
+                                    ? "Checking clipboard..."
+                                    : clipboardStatus === "blocked"
+                                        ? "Waiting for permission"
+                                        : clipboardStatus === "invalid"
+                                            ? "Result not detected"
+                                            : "Waiting for ChatGPT"}
+                            </strong>
+                            <p>
+                                {clipboardStatus === "blocked"
+                                    ? "Browser security can block automatic clipboard reading. Use the button below after copying the answer."
+                                    : clipboardStatus === "invalid"
+                                        ? "The copied text is not the expected ChatGPT answer for this request."
+                                        : "Leave this popup open, copy the full ChatGPT answer, and come back to this editor."}
+                            </p>
+                        </div>
+                    </div>
+                    {error && <div className="template-chatgpt-error">{error}</div>}
+                    <div className="popup-actions template-chatgpt-actions">
+                        <button type="button" className="secondary-btn" onClick={() => setStep("copy")}>
+                            Back
+                        </button>
+                        <button type="button" className="template-result-action-btn template-result-edit-btn" onClick={() => readChatGptClipboard()}>
+                            <Check size={14} aria-hidden="true" />
+                            Read clipboard
+                        </button>
+                    </div>
+                </div>
+            )}
+        </Modal>
+    );
+}
+
 function TemplateFormModal({ initial, parentTitle, onClose, onSave, inline = false }) {
     const isEdit = Boolean(initial);
     const [title, setTitle] = useState(initial?.title || "");
@@ -667,6 +1138,7 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave, inline = fal
     const [activeLanguage, setActiveLanguage] = useState("fr");
     const [activeVariantByChannel, setActiveVariantByChannel] = useState({});
     const [previewRequest, setPreviewRequest] = useState(null);
+    const [aiRequest, setAiRequest] = useState(null);
     const [tokens, setTokens] = useState([]);
     const [templateImageMap, setTemplateImageMap] = useState(() => new Map());
     const canSubmit = title.trim().length > 0 && channels.length > 0;
@@ -910,6 +1382,354 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave, inline = fal
                 : stripImagesFromHtml(activeVariantTextValue)
         });
     }, [activeChannelAllowsImages, activeLanguageDef.label, activeVariant, activeVariantTextValue, selectedContentChannel, templateImageMap]);
+    const openGenerateMainWithAi = useCallback(() => {
+        if (!selectedContentChannel) return;
+        const channelLabel = CHANNEL_LABELS[selectedContentChannel] || selectedContentChannel;
+        const languageLabel = activeLanguageDef.label;
+        const currentTitle = title.trim() || "Untitled template";
+        setAiRequest({
+            title: "Generate template",
+            description: `Generate ${languageLabel} content for the ${channelLabel} template.`,
+            instructionTitle: "Template request",
+            instructionLabel: "What should this template say?",
+            instructionPlaceholder: "Example: explain to the customer that the outage is being handled and that we will update them shortly.",
+            requiresInstruction: true,
+            successMessage: "Template content generated.",
+            buildPrompt: ({ requestId, templateInstruction, userInstruction }) => buildChatGptEditorPrompt({
+                requestId,
+                templateInstruction,
+                userInstruction,
+                taskTitle: "Generate main template content",
+                outputSchema: JSON.stringify({ html: `<p>${languageLabel} template HTML</p>` }, null, 2),
+                taskRules: [
+                    `Write only in ${languageLabel}.`,
+                    `Optimize for the ${channelLabel} channel.`,
+                    selectedContentChannel === Channel.SMS
+                        ? "For SMS, keep it short, plain, direct and suitable for mobile reading."
+                        : "For email or other rich channels, use short paragraphs and only necessary formatting.",
+                    "If existing content is present, improve or replace it according to the user instruction without losing important intent.",
+                    "Use available placeholders only when they are useful for the requested template."
+                ],
+                contextBlocks: [
+                    {
+                        title: "Target",
+                        body: [
+                            `Template title: ${currentTitle}`,
+                            `Channel: ${channelLabel}`,
+                            `Language: ${languageLabel}`
+                        ].join("\n")
+                    },
+                    {
+                        title: "Existing content for this language",
+                        body: sanitizeEditorPromptHtml(activeTextValue) || "Empty"
+                    },
+                    {
+                        title: "Available placeholders",
+                        body: formatTokenContext(tokens)
+                    }
+                ],
+                allowImages: activeChannelAllowsImages
+            }),
+            applyResult: (payload) => {
+                const html = getAiPayloadHtml(payload);
+                if (!html) return false;
+                updateChannelContent(
+                    selectedContentChannel,
+                    activeLanguageDef.field,
+                    sanitizeGeneratedHtmlForChannel(selectedContentChannel, html)
+                );
+                return true;
+            }
+        });
+    }, [
+        activeChannelAllowsImages,
+        activeLanguageDef.field,
+        activeLanguageDef.label,
+        activeTextValue,
+        selectedContentChannel,
+        title,
+        tokens,
+        updateChannelContent
+    ]);
+    const openGenerateVariantWithAi = useCallback(() => {
+        if (!selectedContentChannel) return;
+        const channelLabel = CHANNEL_LABELS[selectedContentChannel] || selectedContentChannel;
+        const languageLabel = activeLanguageDef.label;
+        const currentTitle = title.trim() || "Untitled template";
+        const variantIndex = selectedVariants.length + 1;
+        setAiRequest({
+            title: "Generate variants",
+            description: `Generate one or more ${languageLabel} variants for the ${channelLabel} template.`,
+            instructionTitle: "Variant request",
+            instructionLabel: "What variants do you need?",
+            instructionPlaceholder: "Example: create two variants, one short and one more detailed for customers who already know the case context.",
+            requiresInstruction: true,
+            successMessage: "Variants generated.",
+            buildPrompt: ({ requestId, templateInstruction, userInstruction }) => buildChatGptEditorPrompt({
+                requestId,
+                templateInstruction,
+                userInstruction,
+                taskTitle: "Generate template variants",
+                outputSchema: JSON.stringify({
+                    variants: [
+                        {
+                            name: `Variant ${variantIndex}`,
+                            html: `<p>${languageLabel} variant HTML</p>`
+                        }
+                    ]
+                }, null, 2),
+                taskRules: [
+                    `Write every variant in ${languageLabel}.`,
+                    `Optimize variants for the ${channelLabel} channel.`,
+                    "Each variant must be meaningfully different from the main content and from other generated variants.",
+                    "Variant names must be short, descriptive labels, not full sentences.",
+                    "Do not duplicate an existing variant name unless the user explicitly requested it.",
+                    selectedContentChannel === Channel.SMS
+                        ? "For SMS variants, keep wording short, plain and mobile-friendly."
+                        : "For rich text variants, keep formatting simple and support-agent friendly."
+                ],
+                contextBlocks: [
+                    {
+                        title: "Target",
+                        body: [
+                            `Template title: ${currentTitle}`,
+                            `Channel: ${channelLabel}`,
+                            `Language: ${languageLabel}`
+                        ].join("\n")
+                    },
+                    {
+                        title: "Main content for this language",
+                        body: sanitizeEditorPromptHtml(activeTextValue) || "Empty"
+                    },
+                    {
+                        title: "Existing variants",
+                        body: selectedVariants.length > 0
+                            ? selectedVariants.map((variant) => `- ${variant.name || "Variant"}`).join("\n")
+                            : "No existing variants."
+                    },
+                    {
+                        title: "Available placeholders",
+                        body: formatTokenContext(tokens)
+                    }
+                ],
+                allowImages: activeChannelAllowsImages
+            }),
+            applyResult: (payload) => {
+                const rawVariants = Array.isArray(payload.variants) && payload.variants.length > 0
+                    ? payload.variants
+                    : [payload];
+                const generatedVariants = rawVariants
+                    .map((item, index) => {
+                        const html = getAiPayloadHtml(item);
+                        if (!html) return null;
+                        return {
+                            ...createVariantDraft(variantIndex + index),
+                            name: getAiPayloadName(item, `Variant ${variantIndex + index}`),
+                            [activeLanguageDef.field]: sanitizeGeneratedHtmlForChannel(selectedContentChannel, html)
+                        };
+                    })
+                    .filter(Boolean);
+
+                if (generatedVariants.length === 0) return false;
+
+                setContentByChannel((current) => {
+                    const content = {
+                        ...createChannelContentDraft(selectedContentChannel, title.trim()),
+                        ...(current[selectedContentChannel] || {})
+                    };
+                    const variants = Array.isArray(content.variants) ? content.variants : [];
+                    return {
+                        ...current,
+                        [selectedContentChannel]: {
+                            ...content,
+                            variants: [...variants, ...generatedVariants]
+                        }
+                    };
+                });
+                setActiveVariantByChannel((current) => ({
+                    ...current,
+                    [selectedContentChannel]: generatedVariants[0].id
+                }));
+                return true;
+            }
+        });
+    }, [
+        activeChannelAllowsImages,
+        activeLanguageDef.field,
+        activeLanguageDef.label,
+        activeTextValue,
+        selectedContentChannel,
+        selectedVariants,
+        title,
+        tokens
+    ]);
+    const openTranslateMissingWithAi = useCallback(() => {
+        const translationItems = collectMissingTranslationChannelItems(channels, contentByChannel, activeLanguage, title.trim());
+        const translationCount = getTranslationChannelItemCount(translationItems);
+        if (translationCount === 0) {
+            showToast("No missing translations with source text.", "info");
+            return;
+        }
+        const translationContext = buildChannelTranslationContext(translationItems);
+        const outputSchema = buildChannelTranslationOutputSchema(translationItems);
+        const currentTitle = title.trim() || "Untitled template";
+        const payloadForChannel = (payload, channel, allowSingleChannelFallback = false) => {
+            if (Array.isArray(payload?.channels)) {
+                return payload.channels.find((item) => item?.channel === channel) || null;
+            }
+            return allowSingleChannelFallback ? payload : null;
+        };
+        const hasApplicableTranslation = (payload) => translationItems.some((item) => {
+            const channelPayload = payloadForChannel(payload, item.channel, translationItems.length === 1);
+            if (!channelPayload || typeof channelPayload !== "object") return false;
+
+            const mainHasValue = item.targets.main?.targets.some((language) => (
+                typeof channelPayload.main?.[language.field] === "string"
+                && channelPayload.main[language.field].trim()
+                && !hasRichTextContent(item.content[language.field])
+            ));
+            if (mainHasValue) return true;
+
+            const payloadVariants = Array.isArray(channelPayload.variants) ? channelPayload.variants : [];
+            const payloadByVariantId = new Map(
+                payloadVariants
+                    .filter((variant) => typeof variant?.id === "string")
+                    .map((variant) => [variant.id, variant])
+            );
+            return item.targets.variants.some(({ variant, targets }) => {
+                const payloadVariant = payloadByVariantId.get(variant.id);
+                if (!payloadVariant) return false;
+                return targets.some((language) => (
+                    typeof payloadVariant[language.field] === "string"
+                    && payloadVariant[language.field].trim()
+                    && !hasRichTextContent(variant[language.field])
+                ));
+            });
+        });
+        setAiRequest({
+            title: "Translate missing",
+            description: `Generate ${translationCount} missing translation${translationCount === 1 ? "" : "s"} across this template.`,
+            instructionTitle: "Translation instruction",
+            instructionLabel: "Additional instruction",
+            instructionPlaceholder: "Optional: tone, terminology, or regional preference.",
+            requiresInstruction: false,
+            successMessage: "Missing translations generated.",
+            buildPrompt: ({ requestId, templateInstruction, userInstruction }) => buildChatGptEditorPrompt({
+                requestId,
+                templateInstruction,
+                userInstruction,
+                taskTitle: "Translate missing template languages",
+                outputSchema,
+                taskRules: [
+                    "Translate natural-language text only.",
+                    "Preserve all HTML tag structure unless the target language requires minor punctuation spacing.",
+                    "Preserve placeholders, IDs, product names, ticket references, brand names and technical values exactly.",
+                    "Do not return translations for fields that are not listed as targets.",
+                    "Do not rewrite existing non-empty fields.",
+                    "Keep the tone, intent and level of detail of the source text."
+                ],
+                contextBlocks: [
+                    {
+                        title: "Target",
+                        body: [
+                            `Template title: ${currentTitle}`,
+                            `Channels: ${translationItems.map((item) => CHANNEL_LABELS[item.channel] || item.channel).join(", ")}`,
+                            "Translate only the requested empty fields.",
+                            "Do not return fields that are not listed as targets."
+                        ].join("\n")
+                    },
+                    {
+                        title: "Translation targets",
+                        body: JSON.stringify(translationContext, null, 2)
+                    },
+                    {
+                        title: "Available placeholders",
+                        body: formatTokenContext(tokens)
+                    }
+                ],
+                allowImages: translationItems.some((item) => item.channel !== Channel.SMS)
+            }),
+            applyResult: (payload) => {
+                if (!hasApplicableTranslation(payload)) return false;
+
+                setContentByChannel((current) => {
+                    let nextState = current;
+
+                    translationItems.forEach((item) => {
+                        const channelPayload = payloadForChannel(payload, item.channel, translationItems.length === 1);
+                        if (!channelPayload || typeof channelPayload !== "object") return;
+
+                        const content = {
+                            ...createChannelContentDraft(item.channel, title.trim()),
+                            ...(nextState[item.channel] || {})
+                        };
+                        const nextContent = { ...content };
+                        let changed = false;
+
+                        if (channelPayload.main && typeof channelPayload.main === "object") {
+                            item.targets.main?.targets.forEach((language) => {
+                                const nextValue = channelPayload.main?.[language.field];
+                                if (
+                                    typeof nextValue === "string"
+                                    && nextValue.trim()
+                                    && !hasRichTextContent(nextContent[language.field])
+                                ) {
+                                    nextContent[language.field] = sanitizeGeneratedHtmlForChannel(item.channel, nextValue);
+                                    changed = true;
+                                }
+                            });
+                        }
+
+                        const payloadVariants = Array.isArray(channelPayload.variants) ? channelPayload.variants : [];
+                        const payloadByVariantId = new Map(
+                            payloadVariants
+                                .filter((variant) => typeof variant?.id === "string")
+                                .map((variant) => [variant.id, variant])
+                        );
+                        const targetsByVariantId = new Map(
+                            item.targets.variants.map((target) => [target.variant.id, target])
+                        );
+                        nextContent.variants = Array.isArray(content.variants)
+                            ? content.variants.map((variant) => {
+                                const target = targetsByVariantId.get(variant.id);
+                                const payloadVariant = payloadByVariantId.get(variant.id);
+                                if (!target || !payloadVariant) return variant;
+                                const nextVariant = { ...variant };
+                                target.targets.forEach((language) => {
+                                    const nextValue = payloadVariant[language.field];
+                                    if (
+                                        typeof nextValue === "string"
+                                        && nextValue.trim()
+                                        && !hasRichTextContent(nextVariant[language.field])
+                                    ) {
+                                        nextVariant[language.field] = sanitizeGeneratedHtmlForChannel(item.channel, nextValue);
+                                        changed = true;
+                                    }
+                                });
+                                return nextVariant;
+                            })
+                            : [];
+
+                        if (changed) {
+                            nextState = {
+                                ...nextState,
+                                [item.channel]: nextContent
+                            };
+                        }
+                    });
+
+                    return nextState;
+                });
+                return true;
+            }
+        });
+    }, [
+        activeLanguage,
+        channels,
+        contentByChannel,
+        title,
+        tokens
+    ]);
     const editorContent = (
         <>
             <form onSubmit={submit} className={`node-template-modal${inline ? " node-template-modal--inline" : ""}`}>
@@ -1001,13 +1821,33 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave, inline = fal
                                                     </button>
                                                 ))}
                                             </div>
-                                            <button
-                                                type="button"
-                                                className="secondary-btn node-preview-btn"
-                                                onClick={openMainPreview}
-                                            >
-                                                Preview
-                                            </button>
+                                            <div className="node-ai-action-group">
+                                                <button
+                                                    type="button"
+                                                    className="secondary-btn node-ai-action-btn node-ai-action-btn--primary"
+                                                    onClick={openGenerateMainWithAi}
+                                                    title="Generate or replace the current language content with ChatGPT"
+                                                >
+                                                    <Sparkles size={14} aria-hidden="true" />
+                                                    Generate
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="secondary-btn node-ai-action-btn"
+                                                    onClick={openTranslateMissingWithAi}
+                                                    title="Generate all missing translations for this template"
+                                                >
+                                                    <Languages size={14} aria-hidden="true" />
+                                                    Translate missing
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="secondary-btn node-preview-btn"
+                                                    onClick={openMainPreview}
+                                                >
+                                                    Preview
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                     <div className="node-content-main">
@@ -1038,13 +1878,25 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave, inline = fal
                                             <div>
                                                 <label>Variants</label>
                                             </div>
-                                            <button
-                                                type="button"
-                                                className="secondary-btn"
-                                                onClick={() => addVariant(selectedContentChannel)}
-                                            >
-                                                + Variant
-                                            </button>
+                                            <div className="variant-editor-head-actions">
+                                                <button
+                                                    type="button"
+                                                    className="secondary-btn node-ai-action-btn"
+                                                    onClick={openGenerateVariantWithAi}
+                                                    title="Generate one or more variants with ChatGPT"
+                                                >
+                                                    <Sparkles size={14} aria-hidden="true" />
+                                                    AI variants
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="secondary-btn node-ai-action-btn"
+                                                    onClick={() => addVariant(selectedContentChannel)}
+                                                >
+                                                    <Plus size={14} aria-hidden="true" />
+                                                    Variant
+                                                </button>
+                                            </div>
                                         </div>
                                         {selectedVariants.length > 0 ? (
                                             <div className="variant-split">
@@ -1151,6 +2003,12 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave, inline = fal
                         )}
                     </div>
                 </Modal>
+            )}
+            {aiRequest && (
+                <TemplateEditorAiModal
+                    request={aiRequest}
+                    onClose={() => setAiRequest(null)}
+                />
             )}
         </>
     );

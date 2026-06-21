@@ -966,19 +966,59 @@ export function buildToolRuntimeContext({
     };
 }
 
+function stripJsonMarkdownFence(value = "") {
+    const text = String(value || "").trim();
+    const match = text.match(/^```(?:json|text)?\s*([\s\S]*?)\s*```$/i);
+    return match ? match[1].trim() : text;
+}
+
+export function extractToolModuleHtmlFromAiResult(value = "") {
+    const text = stripJsonMarkdownFence(value);
+    if (!text) return "";
+
+    try {
+        const parsed = JSON.parse(text);
+        return parsed
+            && typeof parsed === "object"
+            && !Array.isArray(parsed)
+            && typeof parsed.html === "string"
+            && parsed.html.trim()
+            ? parsed.html.trim()
+            : "";
+    } catch {
+        return "";
+    }
+}
+
 export function buildToolModulePrompt({ title = "", prompt = "" } = {}) {
     const safeTitle = String(title || "").trim() || "Custom tool";
     const userPrompt = String(prompt || "").trim() || "Create a useful workflow tool for my Template Generator app.";
 
     return `You are building a custom Beta module for a local app called Template Generator.
+Act as a senior frontend engineer building a compact operational support tool.
 
-Return one complete HTML file, and nothing else.
-- Put all HTML, CSS and JavaScript in that single file.
-- Prefer attaching the result as a downloadable .html file when the chat interface supports files.
-- If you cannot attach a file, return exactly one fenced code block containing the full HTML document from <!doctype html> to </html>.
+Return exactly one valid JSON object, and nothing else.
+
+JSON shape:
+{
+  "html": "<!doctype html>..."
+}
+
+- Put one complete HTML file in the html string.
+- Put all HTML, CSS and JavaScript in that single HTML document.
+- Escape the HTML as a valid JSON string.
+- The JSON must parse with JSON.parse.
+- Do not add extra JSON fields.
+- Do not return raw HTML, markdown fences, downloadable files, explanations, notes or comments outside JSON.
 - Do not split the answer into multiple parts or multiple messages. If the file would be too long, reduce scope and keep a complete working single-file version.
-- Do not include explanations before or after the file.
 - Do not use external dependencies, CDNs, remote fonts, build steps, imports or backend calls.
+
+Priority order:
+1. JSON validity and single-file module constraints.
+2. Security and host runtime rules.
+3. TemplateTool API and real-data rules.
+4. User request.
+5. Visual style guidance.
 
 Generation contract:
 - Read the user request literally and implement only that workflow.
@@ -986,6 +1026,7 @@ Generation contract:
 - Every visible control must map to a requested user action, a required validation step or a TemplateTool API operation.
 - If the request is vague, build the smallest useful module for the named task and show missing requirements inside the module instead of inventing behavior.
 - Use real app context and API responses only. Do not prefill fake topics, templates, clients, IDs or example data.
+- Keep all user-facing copy short and operational.
 
 Module API reference:
 ${formatToolModuleApiReferenceForPrompt()}
@@ -1070,6 +1111,15 @@ Robustness:
 - Use type="button" on action buttons so forms do not submit unexpectedly.
 - Ensure empty, loading and error states remain inside the same compact layout.
 - Never write to localStorage or IndexedDB directly. Use TemplateTool APIs for app data writes.
+- Validate input before copying, opening URLs or writing through TemplateTool APIs.
+- Avoid eval, Function constructors, inline remote scripts and hidden network calls.
+
+Before returning, verify silently:
+- The whole answer is exactly one JSON object with only an html string field.
+- The html string contains a complete document from <!doctype html> to </html>.
+- The module uses TemplateTool APIs for app data and copy actions.
+- The module does not invent customer data or unsupported variables.
+- The interface is compact, responsive and specific to the requested job.
 
 Tool name: ${safeTitle}
 

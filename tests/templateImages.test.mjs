@@ -23,6 +23,10 @@ const image = {
   dataUrl: "data:image/jpeg;base64,abc123"
 };
 
+function computeTestChecksum(serialized) {
+  return Array.from(serialized).reduce((sum, ch) => (sum + ch.charCodeAt(0)) % 1000000007, 0);
+}
+
 {
   const normalized = normalizeTemplateImages([
     image,
@@ -51,12 +55,39 @@ const image = {
 }
 
 {
-  const payload = buildConfigPayload("Image config", [], { nodes: [], templates: [] }, [image]);
+  const payload = buildConfigPayload(
+    "Image config",
+    [],
+    { nodes: [], templates: [] },
+    [image],
+    { templateInstruction: "Start with Hello {customer_name}." }
+  );
   const imported = validateImportedConfig(payload);
 
   assert.equal(payload.meta.schemaVersion, 3);
   assert.equal(imported.templateImages.length, 1);
   assert.equal(imported.templateImages[0].dataUrl, image.dataUrl);
+  assert.equal(imported.chatGptPromptSettings.templateInstruction, "Start with Hello {customer_name}.");
+
+  const previousPayload = {
+    meta: { ...payload.meta, checksum: 0 },
+    tokens: payload.tokens,
+    nodes: payload.nodes,
+    templates: payload.templates,
+    templateImages: payload.templateImages,
+    configName: payload.configName
+  };
+  previousPayload.meta.checksum = computeTestChecksum(JSON.stringify({
+    meta: previousPayload.meta,
+    tokens: previousPayload.tokens,
+    nodes: previousPayload.nodes,
+    templates: previousPayload.templates,
+    templateImages: previousPayload.templateImages
+  }));
+
+  const previousImported = validateImportedConfig(previousPayload);
+  assert.equal(previousImported.templateImages.length, 1);
+  assert.equal(previousImported.chatGptPromptSettings.templateInstruction, "");
 }
 
 {

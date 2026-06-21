@@ -1,4 +1,5 @@
 import { normalizeNode, normalizeTemplate } from "../models/templateTreeModel.js";
+import { normalizeChatGptPromptSettings } from "./chatGptPromptSettingsService.js";
 import { migrateLegacyModelsToTemplateTree } from "../utils/legacyTemplateMigration.js";
 import { normalizeTemplateImages } from "../utils/templateImages.js";
 
@@ -15,16 +16,24 @@ function normalizeTreeData(treeData = {}) {
     };
 }
 
-export function buildConfigPayload(configName, tokens, treeData, templateImages = []) {
+export function buildConfigPayload(configName, tokens, treeData, templateImages = [], chatGptPromptSettings = {}) {
     const { nodes, templates } = normalizeTreeData(treeData);
     const images = normalizeTemplateImages(templateImages);
+    const normalizedChatGptPromptSettings = normalizeChatGptPromptSettings(chatGptPromptSettings);
     const meta = {
         configName,
         schemaVersion: CONFIG_SCHEMA_VERSION,
         exportedAt: Date.now(),
         checksum: 0
     };
-    const base = { meta, tokens, nodes, templates, templateImages: images };
+    const base = {
+        meta,
+        tokens,
+        nodes,
+        templates,
+        templateImages: images,
+        chatGptPromptSettings: normalizedChatGptPromptSettings
+    };
     const serialized = JSON.stringify({ ...base, meta: { ...meta, checksum: 0 } });
     meta.checksum = computeConfigChecksum(serialized);
     return {
@@ -33,6 +42,7 @@ export function buildConfigPayload(configName, tokens, treeData, templateImages 
         nodes,
         templates,
         templateImages: images,
+        chatGptPromptSettings: normalizedChatGptPromptSettings,
         configName
     };
 }
@@ -49,6 +59,7 @@ export function validateImportedConfig(raw = {}) {
         ? migrateLegacyModelsToTemplateTree(raw.models)
         : normalizeTreeData(raw);
     const templateImages = normalizeTemplateImages(raw.templateImages);
+    const chatGptPromptSettings = normalizeChatGptPromptSettings(raw.chatGptPromptSettings);
     const meta = raw.meta || {};
     const configName = meta.configName || raw.configName || "Imported configuration";
 
@@ -57,6 +68,14 @@ export function validateImportedConfig(raw = {}) {
     }
 
     const serialized = JSON.stringify({
+        meta: { ...meta, checksum: 0 },
+        tokens,
+        nodes,
+        templates,
+        templateImages,
+        chatGptPromptSettings
+    });
+    const previousSerialized = JSON.stringify({
         meta: { ...meta, checksum: 0 },
         tokens,
         nodes,
@@ -71,13 +90,14 @@ export function validateImportedConfig(raw = {}) {
     });
     if (!hasLegacyModels && meta.checksum !== undefined) {
         const computed = computeConfigChecksum(serialized);
+        const previousComputed = computeConfigChecksum(previousSerialized);
         const legacyComputed = computeConfigChecksum(legacySerialized);
-        if (computed !== meta.checksum && legacyComputed !== meta.checksum) {
+        if (computed !== meta.checksum && previousComputed !== meta.checksum && legacyComputed !== meta.checksum) {
             throw new Error("Checksum mismatch");
         }
     }
 
-    return { tokens, nodes, templates, templateImages, configName };
+    return { tokens, nodes, templates, templateImages, chatGptPromptSettings, configName };
 }
 
 function mergeUniqueByKey(current = [], imported = [], getKey) {
@@ -105,6 +125,11 @@ export function mergeConfigData(current = {}, imported = {}) {
         tokens: mergeUniqueByKey(current.tokens, imported.tokens, (tokenDef) => tokenDef?.token || tokenDef?.id),
         nodes: mergeUniqueByKey(current.nodes, imported.nodes, (node) => node?.id),
         templates: mergeUniqueByKey(current.templates, imported.templates, (template) => template?.id),
-        templateImages: mergeUniqueByKey(current.templateImages, imported.templateImages, (image) => image?.id)
+        templateImages: mergeUniqueByKey(current.templateImages, imported.templateImages, (image) => image?.id),
+        chatGptPromptSettings: normalizeChatGptPromptSettings(
+            imported.chatGptPromptSettings?.templateInstruction
+                ? imported.chatGptPromptSettings
+                : current.chatGptPromptSettings
+        )
     };
 }
