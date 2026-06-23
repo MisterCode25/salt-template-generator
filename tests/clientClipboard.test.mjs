@@ -115,6 +115,7 @@ ${JSON.stringify(sampleClientJSON, null, 2)}`);
 
   assert.ok(client.fields.some((field) => field.label === "Full name" && field.value === "Peter manuel BILLIG"));
   assert.ok(client.fields.some((field) => field.label === "Activation date" && field.value === "2026-06-20"));
+  assert.ok(contact.fields.some((field) => field.label === "Contact eligibility" && field.value === "ALO (SIG)"));
   assert.ok(contact.fields.some((field) => field.label === "Eligibility ordering" && field.value === "35"));
   assert.ok(contact.fields.some((field) => field.label === "Public ID" && field.value === "28453061"));
   assert.ok(contact.fields.some((field) => field.label === "Fixed number" && field.value === "41788451664"));

@@ -2,6 +2,86 @@ import { IMPORTED_EXTERNAL_ID_KEY, MANUAL_CLIENT_INPUTS_KEY } from "../services/
 import { canonicalizeInputTokenValue, normalizeTokenName } from "./tokenCanonicalization.js";
 import { parseExternalId } from "./externalGenerator.js";
 
+const ELIGIBILITY_ORDERING_PARTNERS = new Map([
+    [0, "ALO"],
+    [1, "EWM"],
+    [3, "IWB"],
+    [6, "SAK"],
+    [8, "ftth fr"],
+    [19, "Sgsw"],
+    [22, "Ewl"],
+    [35, "SIG"],
+    [38, "EWZ"],
+    [39, "Ewb"],
+    [43, "SWW"],
+    [44, "AMB"],
+    [45, "SEY"],
+    [46, "Danet"],
+    [47, "Leu"],
+    [48, "SEIC"],
+    [50, "GAW"],
+    [54, "LFO"],
+    [55, "DWW"],
+    [56, "PGL"],
+    [57, "TBW"],
+    [59, "EWA"],
+    [60, "EWH"],
+    [61, "LID"],
+    [62, "GES"],
+    [63, "SWL"],
+    [64, "ANI"],
+    [65, "PGE"],
+    [66, "EWS"],
+    [67, "EWG"],
+    [68, "GBM"],
+    [69, "TBWAE"],
+    [70, "LKWG"],
+    [71, "EBS"],
+    [72, "EWLA"],
+    [73, "GWB"],
+    [74, "EVB"],
+    [75, "WWB"],
+    [76, "TBS"],
+    [77, "EVK"],
+    [78, "SME"],
+    [80, "EWME"],
+    [81, "GEF"],
+    [84, "EWMAI"],
+    [85, "ESI"],
+    [86, "EWR"],
+    [87, "EVAL"],
+    [88, "EVM"],
+    [89, "WEW"],
+    [90, "TBA"],
+    [93, "TBF"],
+    [94, "Swiss4"],
+    [95, "TVT"],
+    [96, "DEK"],
+    [97, "PGS"],
+    [98, "GEL"],
+    [99, "KCL"],
+    [1001, "LOCN"],
+    [1002, "GABU"],
+    [1004, "ESAG"],
+    [1005, "GAG"],
+    [1006, "TBG"],
+    [1008, "COM"],
+    [1009, "RWT"],
+    [1011, "TWAG"],
+    [1012, "ENIWA"],
+    [1013, "FLMS"],
+    [1014, "REGAS"],
+    [1016, "AGF"],
+    [1019, "EWBU"],
+    [1022, "TRN"],
+    [1023, "WBB"],
+    [1025, "WWZ"],
+    [1026, "SWG"],
+    [1028, "StWZ"],
+    [1029, "RENET"],
+    [1030, "ENERC"]
+]);
+
 const CLIENT_FIELD_GROUPS = [
     {
         id: "client",
@@ -105,7 +185,8 @@ const CLIENT_FIELD_GROUPS = [
             {
                 label: "Contact eligibility",
                 path: "contact.eligibilitySource",
-                aliases: ["contactEligibilitySource", "contactEligibility"]
+                aliases: ["contactEligibilitySource", "contactEligibility"],
+                displayCompute: (payload) => formatContactEligibilityWithPartner(payload)
             },
             {
                 label: "Eligibility ordering",
@@ -440,6 +521,23 @@ function valueForField(payload, field) {
     return displayValue(readPath(payload, field.path));
 }
 
+function displayValueForField(payload, field) {
+    if (field.displayCompute) return displayValue(field.displayCompute(payload));
+    return valueForField(payload, field);
+}
+
+function formatContactEligibilityWithPartner(payload) {
+    const eligibilitySource = displayValue(readPath(payload, "contact.eligibilitySource"));
+    if (!eligibilitySource) return "";
+
+    const orderingValue = displayValue(readPath(payload, "contact.eligibilityOrdering"));
+    const ordering = orderingValue === "" ? Number.NaN : Number(orderingValue);
+    const partnerName = Number.isInteger(ordering) ? ELIGIBILITY_ORDERING_PARTNERS.get(ordering) : "";
+
+    if (!partnerName || eligibilitySource.includes(`(${partnerName})`)) return eligibilitySource;
+    return `${eligibilitySource} (${partnerName})`;
+}
+
 function knownClientFieldPaths() {
     if (knownClientFieldPathCache) return knownClientFieldPathCache;
 
@@ -591,7 +689,7 @@ export function getClientInfoSections(payload) {
     for (const group of CLIENT_FIELD_GROUPS) {
         const fields = [];
         for (const field of group.fields) {
-            const value = valueForField(payload, field);
+            const value = displayValueForField(payload, field);
             if (value === "") continue;
             fields.push({
                 label: field.label,
