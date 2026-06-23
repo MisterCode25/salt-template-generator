@@ -43,6 +43,7 @@ import {
   assert.match(apiPromptReference, /Context shape:/);
   assert.match(apiPromptReference, /Functions:/);
   assert.match(apiPromptReference, /TemplateTool\.copyHtml/);
+  assert.match(apiPromptReference, /availableTokens/);
 }
 
 {
@@ -66,7 +67,8 @@ import {
     values: { "{client_name}": "Samir", "{client_birth_date}": "1989-04-12" },
     tokens: [
       { token: "{client_name}", label: "Client name", key: "client.name", input_type: "text", searchAliases: ["fullName"], internal: true },
-      { token: "{client_birth_date}", label: "Birth date", key: "client.birthDate", input_type: "date", searchAliases: ["dob", "date of birth"] }
+      { token: "{client_birth_date}", label: "Birth date", key: "client.birthDate", input_type: "date", searchAliases: ["dob", "date of birth"] },
+      { token: "{empty_manual_note}", label: "Manual note", key: "manual.note", input_type: "textarea", searchAliases: ["note libre"] }
     ],
     client: { client: { name: "Samir", birthDate: "1989-04-12" } },
     clientInfo: [{ id: "client", title: "Client", fields: [{ label: "Birth date", value: "1989-04-12" }] }],
@@ -139,8 +141,20 @@ import {
       value: "1989-04-12",
       aliases: ["dob", "date of birth"],
       internal: false
+    },
+    {
+      token: "{empty_manual_note}",
+      label: "Manual note",
+      key: "manual.note",
+      inputType: "textarea",
+      value: "",
+      aliases: ["note libre"],
+      internal: false
     }
   ]);
+  assert.equal(context.variables.byToken["{empty_manual_note}"], "");
+  assert.ok(context.variables.availableTokens.some((entry) => entry.token === "{empty_manual_note}" && entry.names.includes("manualNote")));
+  assert.ok(context.variables.available.some((entry) => entry.token === "{client_birth_date}" && entry.names.includes("birthDate")));
   assert.ok(context.fields.some((field) => field.label === "Birth date" && field.value === "1989-04-12"));
   assert.ok(context.fields.some((field) => field.label === "Contractor" && field.value === "31447756" && field.source === "profile"));
   assert.equal(context.fieldIndex.birthdate.value, "1989-04-12");
@@ -208,6 +222,9 @@ import {
   assert.match(prompt, /TemplateTool\.getVars/);
   assert.match(prompt, /TemplateTool\.getVar/);
   assert.match(prompt, /TemplateTool\.listVariables/);
+  assert.match(prompt, /All known token definitions are exposed/);
+  assert.match(prompt, /variable picker\/search/);
+  assert.match(prompt, /TemplateVars\.availableTokens/);
   assert.match(prompt, /TemplateTool\.templates\.getTree/);
   assert.match(prompt, /TemplateTool\.templates\.previewMigration/);
   assert.match(prompt, /TemplateTool\.templates\.applyMigration/);
