@@ -44,16 +44,17 @@ export const TOOL_MODULE_API_REFERENCE = Object.freeze({
             "TemplateVars.soTicketNum",
             "TemplateVars.byToken['{client_first_name}']",
             "TemplateVars.byKey['client.firstName']",
-            "TemplateVars.byLabel['Full name']"
+            "TemplateVars.byLabel['Full name']",
+            "TemplateVars.available.map((entry) => entry.name)"
         ],
-        reservedContainers: ["env", "raw", "byToken", "byKey", "byLabel"]
+        reservedContainers: ["env", "raw", "byToken", "byKey", "byLabel", "available", "availableTokens", "availableFields"]
     },
     contextShape: {
         apiVersion: "string",
         tool: "{ id: string, title: string, description: string }",
         environment: "{ apiVersion, toolId, toolTitle, toolDescription, generatedAt }",
         profile: "normalized customer profile with fields, vars, tokenValues, photos and attachments",
-        variables: "TemplateVars object",
+        variables: "TemplateVars object with scalar aliases plus available, availableTokens, availableFields, byToken, byKey and byLabel discovery containers",
         values: "token values plus compatibility aliases",
         tokenValues: "original token-keyed values",
         tokens: "Array<{ token, label, key, inputType, value, internal, aliases }>",
@@ -383,19 +384,55 @@ const TOOL_MODULE_BRIDGE = `
                 var key = String(name || "");
                 if (!key) return fallback || "";
                 if (Object.prototype.hasOwnProperty.call(vars, key)) return vars[key];
+                if (vars.byToken && Object.prototype.hasOwnProperty.call(vars.byToken, key)) return vars.byToken[key];
+                if (vars.byKey && Object.prototype.hasOwnProperty.call(vars.byKey, key)) return vars.byKey[key];
+                if (vars.byLabel && Object.prototype.hasOwnProperty.call(vars.byLabel, key)) return vars.byLabel[key];
+                var normalized = key.replace(/[{}]/g, "").replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase().replace(/[^a-z0-9]+/g, "");
+                var available = Array.isArray(vars.available) ? vars.available : [];
+                for (var index = 0; index < available.length; index += 1) {
+                    var entry = available[index] || {};
+                    var names = Array.isArray(entry.names) ? entry.names : [];
+                    var candidates = [entry.name, entry.token, entry.key, entry.label].concat(names);
+                    var found = candidates.some(function (candidate) {
+                        return String(candidate || "").replace(/[{}]/g, "").replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase().replace(/[^a-z0-9]+/g, "") === normalized;
+                    });
+                    if (found) return entry.value !== undefined ? entry.value : (fallback || "");
+                }
                 return fallback || "";
             });
         },
         hasVariable: function (name) {
             return this.getVars().then(function (vars) {
-                return Object.prototype.hasOwnProperty.call(vars, String(name || ""));
+                var key = String(name || "");
+                if (!key) return false;
+                if (Object.prototype.hasOwnProperty.call(vars, key)) return true;
+                if (vars.byToken && Object.prototype.hasOwnProperty.call(vars.byToken, key)) return true;
+                if (vars.byKey && Object.prototype.hasOwnProperty.call(vars.byKey, key)) return true;
+                if (vars.byLabel && Object.prototype.hasOwnProperty.call(vars.byLabel, key)) return true;
+                var normalized = key.replace(/[{}]/g, "").replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase().replace(/[^a-z0-9]+/g, "");
+                return (Array.isArray(vars.available) ? vars.available : []).some(function (entry) {
+                    var names = Array.isArray(entry.names) ? entry.names : [];
+                    return [entry.name, entry.token, entry.key, entry.label].concat(names).some(function (candidate) {
+                        return String(candidate || "").replace(/[{}]/g, "").replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase().replace(/[^a-z0-9]+/g, "") === normalized;
+                    });
+                });
             });
         },
         listVariables: function () {
             return this.getVars().then(function (vars) {
-                return Object.keys(vars).filter(function (key) {
+                var scalarKeys = Object.keys(vars).filter(function (key) {
                     var value = vars[key];
                     return value === null || typeof value !== "object";
+                });
+                var availableKeys = [];
+                (Array.isArray(vars.available) ? vars.available : []).forEach(function (entry) {
+                    if (entry.name) availableKeys.push(entry.name);
+                    (Array.isArray(entry.names) ? entry.names : []).forEach(function (name) {
+                        if (name) availableKeys.push(name);
+                    });
+                });
+                return scalarKeys.concat(availableKeys).filter(function (key, index, all) {
+                    return key && all.indexOf(key) === index;
                 }).sort();
             });
         },
@@ -803,6 +840,79 @@ function assignCanonicalFieldVariables(target, fields = []) {
     });
 }
 
+function buildAvailableVariableEntries({ tokens = [], fields = [], variables = {} } = {}) {
+    const entries = [];
+    const seen = new Set();
+    const addEntry = (entry) => {
+        const names = Array.isArray(entry.names) ? entry.names.filter(Boolean) : [];
+        const signature = [
+            entry.token || "",
+            entry.key || "",
+            entry.label || "",
+            entry.source || "",
+            names.join("|")
+        ].join(":");
+        if (seen.has(signature)) return;
+        seen.add(signature);
+        entries.push({
+            name: names[0] || entry.token || entry.key || entry.label || "",
+            names,
+            token: entry.token || "",
+            key: entry.key || "",
+            label: entry.label || "",
+            value: displayValue(entry.value),
+            source: entry.source || "context",
+            inputType: entry.inputType || "",
+            internal: Boolean(entry.internal)
+        });
+    };
+
+    tokens.forEach((token) => {
+        const aliases = aliasesFromField({
+            label: token.label,
+            token: token.token,
+            key: token.key,
+            aliases: token.aliases
+        });
+        const names = aliases.map(toVariableName).filter(Boolean);
+        addEntry({
+            names: [...new Set(names)],
+            token: token.token,
+            key: token.key,
+            label: token.label,
+            value: token.value,
+            source: "token",
+            inputType: token.inputType,
+            internal: token.internal
+        });
+    });
+
+    fields.forEach((field) => {
+        const aliases = [field.label, field.token, field.key, ...(field.aliases || [])];
+        const names = aliases.map(toVariableName).filter(Boolean);
+        addEntry({
+            names: [...new Set(names)],
+            token: field.token,
+            key: field.key,
+            label: field.label,
+            value: field.value,
+            source: field.source
+        });
+    });
+
+    Object.entries(variables).forEach(([name, value]) => {
+        if (!name || value === null || typeof value === "object") return;
+        addEntry({
+            names: [name],
+            label: name,
+            value,
+            source: "variable"
+        });
+    });
+
+    return entries.sort((a, b) => a.name.localeCompare(b.name));
+}
+
 function buildFieldIndex(fields = []) {
     const index = {};
     fields.forEach((field) => {
@@ -864,19 +974,27 @@ function assignProfileVariables(variables, profile = null) {
     });
 }
 
-function buildRuntimeVariables({ fields = [], tokenValues = {}, environment = {}, profile = null } = {}) {
+function buildRuntimeVariables({ fields = [], tokens = [], tokenValues = {}, environment = {}, profile = null } = {}) {
     const variables = {
         env: environment,
         raw: tokenValues,
         byToken: {},
         byKey: {},
-        byLabel: {}
+        byLabel: {},
+        available: [],
+        availableTokens: [],
+        availableFields: []
     };
+
+    tokens.forEach((token) => {
+        if (!token.token) return;
+        variables.byToken[token.token] = displayValue(token.value);
+    });
 
     Object.entries(tokenValues || {}).forEach(([token, value]) => {
         const display = displayValue(value);
-        if (display === "") return;
         variables.byToken[token] = display;
+        if (display === "") return;
         assignVariableAlias(variables, token, display);
         assignVariableAlias(variables, token.replace(/[{}]/g, ""), display);
     });
@@ -900,6 +1018,17 @@ function buildRuntimeVariables({ fields = [], tokenValues = {}, environment = {}
     });
 
     assignCanonicalFieldVariables(variables, fields);
+    variables.available = buildAvailableVariableEntries({ tokens, fields, variables });
+    variables.availableTokens = variables.available.filter((entry) => entry.token);
+    variables.availableFields = fields.map((field) => ({
+        name: toVariableName(field.key || field.token || field.label),
+        token: field.token || "",
+        key: field.key || "",
+        label: field.label || "",
+        value: field.value,
+        source: field.source || "context",
+        aliases: field.aliases || []
+    }));
     return variables;
 }
 
@@ -954,6 +1083,7 @@ export function buildToolRuntimeContext({
         fieldIndex: buildFieldIndex(fields),
         variables: buildRuntimeVariables({
             fields,
+            tokens: normalizedTokens,
             tokenValues: mergedValues,
             environment,
             profile: safeProfile
@@ -1039,7 +1169,10 @@ Runtime:
 - profile is the simplest normalized customer object. Read it with await window.TemplateTool.getProfile() or context.profile. Common fields: profile.clientName, profile.contractorNumber, profile.mobile, profile.activationDate, profile.otoId, profile.routerSerialNumber, profile.soTicketNum, profile.externalId, profile.photos, profile.attachments, profile.vars and profile.tokenValues.
 - tokenValues is the original object keyed by token strings, for example tokenValues["{client_first_name}"].
 - values keeps those token keys and also includes host-generated aliases such as values.client.firstName, values.firstName and values.clientFirstName when they come from real data.
-- variables is the easiest API for module JavaScript. It is also exposed globally as window.TemplateVars and contains safe JS property names from the profile such as TemplateVars.clientName, TemplateVars.contractorNumber, TemplateVars.mobile, TemplateVars.activationDate, TemplateVars.otoId, TemplateVars.soTicketNum, plus TemplateVars.byToken, TemplateVars.byKey, TemplateVars.byLabel and TemplateVars.raw.
+- variables is the easiest API for module JavaScript. It is also exposed globally as window.TemplateVars and contains safe JS property names from the profile such as TemplateVars.clientName, TemplateVars.contractorNumber, TemplateVars.mobile, TemplateVars.activationDate, TemplateVars.otoId, TemplateVars.soTicketNum, plus TemplateVars.byToken, TemplateVars.byKey, TemplateVars.byLabel, TemplateVars.raw and discovery lists.
+- All known token definitions are exposed, including empty/missing values: context.tokens lists every token definition, TemplateVars.byToken has every token key, and TemplateVars.available / TemplateVars.availableTokens list discoverable names with { name, names, token, key, label, value, source, inputType, internal }.
+- Do not hard-code an assumed token list. At startup, call const context = await TemplateTool.getContext(); const vars = await TemplateTool.getVars(); then derive selectable variables from context.tokens, context.fields, vars.available, vars.availableTokens, vars.availableFields and await TemplateTool.listVariables().
+- If the module lets the user calculate or operate on variables, include a compact variable picker/search built from the live context instead of expecting the AI to know variable names in advance.
 - environment is also exposed globally as window.TemplateEnv and contains { apiVersion, toolId, toolTitle, toolDescription, generatedAt }.
 - The normalized profile is exposed globally as window.TemplateProfile, the full context as window.TemplateContext, and normalized fields as window.TemplateFields.
 - The API reference is exposed globally as window.TemplateAPI and through window.TemplateTool.describeApi().
@@ -1053,8 +1186,9 @@ Runtime:
 - Use await window.TemplateTool.getFieldValue(["mobile", "phone"], "") when only the string value is needed.
 - Use await window.TemplateTool.getProfile() when you want the normalized customer profile object.
 - Use await window.TemplateTool.getVars() or window.TemplateVars after getContext() when you want variable-style access.
-- Use await window.TemplateTool.getVar("clientName", "") for a single variable.
-- Use await window.TemplateTool.listVariables() when you need to discover the variable names available in the current context.
+- Use await window.TemplateTool.getVar("clientName", "") for a single variable. getVar also accepts token strings like "{client_first_name}", keys and labels when present.
+- Use await window.TemplateTool.hasVariable(name) to check availability without treating an empty value as missing.
+- Use await window.TemplateTool.listVariables() when you need to discover the variable names available in the current context; it includes safe aliases from TemplateVars.available, not only populated scalar values.
 - Use window.TemplateTool.describeApi() when you need the static API reference.
 - Use await window.TemplateTool.templates.getTree() or .list() when a trusted module needs the current topic/template tree.
 - Use await window.TemplateTool.templates.previewMigration(rules) before writing migrations. Rules may target topics by id, title, or path with fields like { fromTopic, toTopic, channel, titleIncludes }.
@@ -1070,9 +1204,9 @@ Runtime:
 Available data rules:
 - Never invent variable names or sample values. Read the actual context returned by getContext().
 - Prefer context.profile, TemplateProfile, TemplateTool.getProfile(), TemplateVars, TemplateTool.getVars(), TemplateTool.findField, context.fields, context.fieldIndex and context.clientInfo for user-facing data because they describe the available variables.
-- Do not rely only on semantic object paths like context.values.client.birthDate. Use the field helpers first, then tokenValues when an exact token is known, then context.client last for raw nested data.
+- Do not rely only on semantic object paths like context.values.client.birthDate. Use the variable/token discovery lists first, field helpers second, tokenValues/byToken when an exact token is known, then context.client last for raw nested data.
 - Use context.client only when structured raw data is needed.
-- If a required field is missing from context.tokens, context.clientInfo and context.client, show a clear missing-data state instead of guessing.
+- If a required field is missing from context.tokens, TemplateVars.available, context.fields, context.clientInfo and context.client, show a clear missing-data state instead of guessing.
 - For date tools, accept common formats like YYYY-MM-DD and DD.MM.YYYY, but only calculate from an actual available value.
 
 Template tree and migration rules:
