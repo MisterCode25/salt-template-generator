@@ -599,9 +599,23 @@ function ModuleWizardStepper({ activeStep }) {
 
 function ModuleToolStep({ step, draft, onPatch, tokens, runtimePreviewContext }) {
     const fileInputRef = useRef(null);
+    const modulePromptRuntimeContext = useMemo(() => buildToolRuntimeContext({
+        tool: draft,
+        values: runtimePreviewContext.values || {},
+        tokens,
+        client: runtimePreviewContext.client || null,
+        clientInfo: runtimePreviewContext.clientInfo || [],
+        clientSummary: runtimePreviewContext.clientSummary || [],
+        profile: runtimePreviewContext.profile || null
+    }), [draft, runtimePreviewContext, tokens]);
+
     const buildPrompt = useMemo(
-        () => buildToolModulePrompt({ title: draft.title, prompt: draft.prompt }),
-        [draft.prompt, draft.title]
+        () => buildToolModulePrompt({
+            title: draft.title,
+            prompt: draft.prompt,
+            runtimeContext: modulePromptRuntimeContext
+        }),
+        [draft.prompt, draft.title, modulePromptRuntimeContext]
     );
 
     const copyBuildPrompt = useCallback(() => {

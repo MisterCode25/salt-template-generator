@@ -1120,7 +1120,95 @@ export function extractToolModuleHtmlFromAiResult(value = "") {
     }
 }
 
-export function buildToolModulePrompt({ title = "", prompt = "" } = {}) {
+function formatInventoryValue(value = "") {
+    const text = displayValue(value);
+    if (!text) return "empty now";
+    return `value: ${text.slice(0, 80)}${text.length > 80 ? "…" : ""}`;
+}
+
+function formatInventoryNames(entry = {}) {
+    const names = Array.isArray(entry.names) ? entry.names.filter(Boolean) : [];
+    return [...new Set([entry.name, ...names].filter(Boolean))].slice(0, 8).join(", ");
+}
+
+export function formatToolModuleVariableInventoryForPrompt(context = null) {
+    if (!context || typeof context !== "object") {
+        return "No live app context was loaded while copying this prompt. The module must discover variables at runtime with TemplateTool.getContext(), TemplateTool.getVars(), TemplateTool.listVariables(), context.tokens and context.fields.";
+    }
+
+    const lines = [
+        "Live variable inventory from the current app context:",
+        "Use these exact names/tokens/keys when they fit the request, and still keep runtime fallbacks because availability changes per customer."
+    ];
+
+    const profile = context.profile && typeof context.profile === "object" ? context.profile : null;
+    const profileVars = profile?.vars && typeof profile.vars === "object" ? profile.vars : {};
+    const profileEntries = Object.entries(profileVars)
+        .filter(([, value]) => displayValue(value) !== "")
+        .sort(([a], [b]) => a.localeCompare(b));
+    if (profileEntries.length > 0) {
+        lines.push("", "Profile variables (TemplateProfile / TemplateVars aliases):");
+        profileEntries.forEach(([name, value]) => {
+            lines.push(`- ${name} (${formatInventoryValue(value)})`);
+        });
+    }
+
+    const available = Array.isArray(context.variables?.available) ? context.variables.available : [];
+    if (available.length > 0) {
+        lines.push("", "Discoverable TemplateVars.available entries:");
+        available.forEach((entry) => {
+            const bits = [
+                entry.token ? `token ${entry.token}` : "",
+                entry.key ? `key ${entry.key}` : "",
+                entry.label ? `label ${entry.label}` : "",
+                `names: ${formatInventoryNames(entry) || "none"}`,
+                `source ${entry.source || "context"}`,
+                formatInventoryValue(entry.value)
+            ].filter(Boolean);
+            lines.push(`- ${bits.join("; ")}`);
+        });
+    }
+
+    const fields = Array.isArray(context.fields) ? context.fields : [];
+    if (fields.length > 0) {
+        lines.push("", "Resolved context.fields (preferred for visible customer data):");
+        fields.forEach((field) => {
+            const bits = [
+                field.label ? `label ${field.label}` : "",
+                field.token ? `token ${field.token}` : "",
+                field.key ? `key ${field.key}` : "",
+                field.section ? `section ${field.section}` : "",
+                `source ${field.source || "context"}`,
+                formatInventoryValue(field.value)
+            ].filter(Boolean);
+            lines.push(`- ${bits.join("; ")}`);
+        });
+    }
+
+    const tokens = Array.isArray(context.tokens) ? context.tokens : [];
+    if (tokens.length > 0) {
+        lines.push("", "All configured context.tokens, including empty values:");
+        tokens.forEach((token) => {
+            const bits = [
+                token.token ? `token ${token.token}` : "",
+                token.key ? `key ${token.key}` : "",
+                token.label ? `label ${token.label}` : "",
+                token.inputType ? `type ${token.inputType}` : "",
+                token.internal ? "internal" : "manual/configured",
+                formatInventoryValue(token.value)
+            ].filter(Boolean);
+            lines.push(`- ${bits.join("; ")}`);
+        });
+    }
+
+    if (profileEntries.length === 0 && available.length === 0 && fields.length === 0 && tokens.length === 0) {
+        lines.push("- No variables are currently configured or populated in this context. Build a missing-data state and rely on runtime discovery.");
+    }
+
+    return lines.join("\n");
+}
+
+export function buildToolModulePrompt({ title = "", prompt = "", runtimeContext = null } = {}) {
     const safeTitle = String(title || "").trim() || "Custom tool";
     const userPrompt = String(prompt || "").trim() || "Create a useful workflow tool for my Template Generator app.";
 
@@ -1160,6 +1248,9 @@ Generation contract:
 
 Module API reference:
 ${formatToolModuleApiReferenceForPrompt()}
+
+Current variable inventory:
+${formatToolModuleVariableInventoryForPrompt(runtimeContext)}
 
 Runtime:
 - The file runs inside an iframe.
