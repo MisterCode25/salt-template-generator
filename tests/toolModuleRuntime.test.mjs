@@ -3,6 +3,7 @@ import {
   TOOL_MODULE_API_REFERENCE,
   TOOL_MODULE_API_VERSION,
   buildToolModulePrompt,
+  formatToolModuleVariableInventoryForPrompt,
   buildToolModuleSrcDoc,
   buildToolRuntimeContext,
   extractToolModuleHtmlFromAiResult,
@@ -174,6 +175,39 @@ import {
   });
   assert.equal(context.variables.clientName, "Peter manuel BILLIG");
   assert.equal(context.values.clientName, "Peter manuel BILLIG");
+}
+
+{
+  const context = buildToolRuntimeContext({
+    values: { "{client_first_name}": "Mila", "{empty_note}": "" },
+    tokens: [
+      { token: "{client_first_name}", label: "First name", key: "client.firstName" },
+      { token: "{empty_note}", label: "Empty note", key: "manual.note" }
+    ],
+    clientInfo: [{ id: "client", title: "Client", fields: [{ label: "Mobile", value: "079 000 00 00" }] }],
+    profile: { vars: { clientName: "Mila TEST" } }
+  });
+  const inventory = formatToolModuleVariableInventoryForPrompt(context);
+  assert.match(inventory, /Live variable inventory from the current app context/);
+  assert.match(inventory, /Profile variables/);
+  assert.match(inventory, /clientName/);
+  assert.match(inventory, /Discoverable TemplateVars\.available entries/);
+  assert.match(inventory, /token \{client_first_name\}/);
+  assert.match(inventory, /key client\.firstName/);
+  assert.match(inventory, /Resolved context\.fields/);
+  assert.match(inventory, /label Mobile/);
+  assert.match(inventory, /All configured context\.tokens, including empty values/);
+  assert.match(inventory, /token \{empty_note\}/);
+  assert.match(inventory, /empty now/);
+
+  const prompt = buildToolModulePrompt({
+    title: "Variable inspector",
+    prompt: "Show available variables.",
+    runtimeContext: context
+  });
+  assert.match(prompt, /Current variable inventory:/);
+  assert.match(prompt, /token \{client_first_name\}/);
+  assert.match(prompt, /label Mobile/);
 }
 
 {
