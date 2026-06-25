@@ -11,6 +11,7 @@ import {
     MoreVertical,
     Plus,
     Sparkles,
+    Star,
     Trash2
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -1132,6 +1133,7 @@ function TemplateEditorAiModal({ request, onClose }) {
 function TemplateFormModal({ initial, parentTitle, onClose, onSave, inline = false }) {
     const isEdit = Boolean(initial);
     const [title, setTitle] = useState(initial?.title || "");
+    const [favorite, setFavorite] = useState(Boolean(initial?.favorite));
     const [channels, setChannels] = useState(initial?.channels || []);
     const [contentByChannel, setContentByChannel] = useState(initial?.contentByChannel || {});
     const [activeContentChannel, setActiveContentChannel] = useState(initial?.channels?.[0] || Channel.EMAIL);
@@ -1142,6 +1144,10 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave, inline = fal
     const [tokens, setTokens] = useState([]);
     const [templateImageMap, setTemplateImageMap] = useState(() => new Map());
     const canSubmit = title.trim().length > 0 && channels.length > 0;
+
+    useEffect(() => {
+        setFavorite(Boolean(initial?.favorite));
+    }, [initial?.favorite]);
 
     useEffect(() => {
         let active = true;
@@ -1291,6 +1297,7 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave, inline = fal
 
         onSave({
             title: normalizedTitle,
+            favorite,
             channels,
             contentByChannel: CHANNEL_VALUES.reduce((acc, channel) => {
                 if (!channels.includes(channel)) return acc;
@@ -1745,12 +1752,24 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave, inline = fal
                     <div className="node-template-setup">
                         <div className="form-field node-template-title-field">
                             <label>Title</label>
-                            <input
-                                autoFocus={!inline}
-                                value={title}
-                                onChange={(event) => setTitle(event.target.value)}
-                                placeholder="Request OTO photo"
-                            />
+                            <div className="node-template-title-row">
+                                <input
+                                    autoFocus={!inline}
+                                    value={title}
+                                    onChange={(event) => setTitle(event.target.value)}
+                                    placeholder="Request OTO photo"
+                                />
+                                <button
+                                    type="button"
+                                    className={`secondary-btn node-favorite-btn${favorite ? " is-active" : ""}`}
+                                    onClick={() => setFavorite((current) => !current)}
+                                    aria-pressed={favorite}
+                                    title={favorite ? "Remove from favorites" : "Add to favorites"}
+                                >
+                                    <Star size={16} aria-hidden="true" fill={favorite ? "currentColor" : "none"} />
+                                    <span>Favorite</span>
+                                </button>
+                            </div>
                         </div>
                         <div className="node-template-channel-control">
                             <span className="node-template-field-label">Channels</span>
@@ -2505,6 +2524,10 @@ const TemplateDetailPanel = memo(function TemplateDetailPanel({
         onDelete(template.id);
     }, [onDelete, template.id]);
 
+    const handleFavorite = useCallback(() => {
+        onSave({ favorite: !template.favorite });
+    }, [onSave, template.favorite]);
+
     const handleLinkTargetChange = useCallback((event) => {
         onLinkTargetChange(template.id, event.target.value);
     }, [onLinkTargetChange, template.id]);
@@ -2522,6 +2545,16 @@ const TemplateDetailPanel = memo(function TemplateDetailPanel({
                     <p>{channelSummary} · {linkedSummary}</p>
                 </div>
                 <div className="node-detail-top-actions">
+                    <button
+                        type="button"
+                        className={`secondary-btn node-action-btn node-favorite-btn${template.favorite ? " is-active" : ""}`}
+                        onClick={handleFavorite}
+                        aria-pressed={Boolean(template.favorite)}
+                        title={template.favorite ? "Remove from favorites" : "Add to favorites"}
+                    >
+                        <Star size={16} aria-hidden="true" fill={template.favorite ? "currentColor" : "none"} />
+                        Favorite
+                    </button>
                     <button type="button" className="secondary-btn node-action-btn" onClick={handleDuplicate}>
                         <Copy size={16} aria-hidden="true" />
                         Duplicate

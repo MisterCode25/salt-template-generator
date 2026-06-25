@@ -91,7 +91,13 @@ assert.deepEqual(normalizeTemplateQuickSectionsState({
   recent: 1,
   mostUsed: ""
 }), {
-  mostUsed: false
+  favorites: true
+});
+
+assert.deepEqual(normalizeTemplateQuickSectionsState({
+  mostUsed: true
+}), {
+  favorites: true
 });
 
 assert.deepEqual(await loadTemplateUsageStats(), {});
@@ -115,7 +121,7 @@ assert.deepEqual(global.indexedDB.data.get(TEMPLATE_USAGE_STATS_KEY), {
 });
 
 assert.deepEqual(await loadTemplateQuickSectionsState(), {
-  mostUsed: false
+  favorites: false
 });
 
 await saveTemplateQuickSectionsState({
@@ -124,7 +130,7 @@ await saveTemplateQuickSectionsState({
   mostUsed: true
 });
 assert.deepEqual(global.indexedDB.data.get(TEMPLATE_QUICK_SECTIONS_KEY), {
-  mostUsed: true
+  favorites: true
 });
 
 console.log("templateUsageService tests passed");

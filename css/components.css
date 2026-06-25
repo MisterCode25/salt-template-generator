@@ -7133,6 +7133,18 @@ textarea:focus {
     min-width: 0;
 }
 
+.node-template-title-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+}
+
+.node-template-title-row .node-favorite-btn {
+    min-height: 40px;
+    padding: 8px 11px;
+}
+
 .node-template-field-label {
     display: block;
     margin-bottom: 6px;
@@ -8191,6 +8203,18 @@ textarea:focus {
     background: var(--button-primary-bg-hover);
     color: #fff;
     border-color: transparent;
+}
+
+.templates-favorite-btn,
+.node-favorite-btn {
+    color: var(--text-secondary);
+}
+
+.templates-favorite-btn.is-active,
+.node-favorite-btn.is-active {
+    border-color: rgba(245, 158, 11, 0.38) !important;
+    background: rgba(245, 158, 11, 0.12) !important;
+    color: #fbbf24 !important;
 }
 
 .templates-page .client-info-panel {

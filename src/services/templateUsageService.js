@@ -4,7 +4,7 @@ export const TEMPLATE_USAGE_STATS_KEY = "template_usage_stats";
 export const TEMPLATE_QUICK_SECTIONS_KEY = "template_quick_sections";
 
 const DEFAULT_QUICK_SECTIONS_STATE = Object.freeze({
-    mostUsed: false
+    favorites: false
 });
 
 function normalizeTimestamp(value) {
@@ -35,8 +35,12 @@ export function normalizeTemplateUsageStats(value = {}) {
 
 export function normalizeTemplateQuickSectionsState(value = {}) {
     const source = value && typeof value === "object" ? value : {};
+    const favoritesSource = Object.prototype.hasOwnProperty.call(source, "favorites")
+        ? source.favorites
+        : source.mostUsed;
+
     return {
-        mostUsed: Boolean(source.mostUsed)
+        favorites: Boolean(favoritesSource)
     };
 }
 

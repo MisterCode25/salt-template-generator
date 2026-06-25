@@ -13,7 +13,7 @@ import {
     Search,
     Settings,
     Smartphone,
-    TrendingUp,
+    Star,
     Truck,
     Upload,
     Users,
@@ -35,14 +35,15 @@ import {
     VariantModal
 } from "../components/TemplateRuntime.jsx";
 import { generateFinalText, getTemplateTextResult } from "../core/tokenEngine.js";
-import { TEMPLATE_TREE_UPDATED_EVENT, loadTemplateTreeData } from "../services/templateTreeService.js";
+import { TEMPLATE_TREE_UPDATED_EVENT, loadTemplateTreeData, saveTemplateTreeData } from "../services/templateTreeService.js";
 import { CHANNEL_VALUES, Channel } from "../models/templateTreeModel.js";
 import {
     buildNodeChildrenIndex,
     buildNodeLookup,
     buildTemplateNodeIndex,
     getIndexedChildNodes,
-    getIndexedTemplatesForNode
+    getIndexedTemplatesForNode,
+    updateTemplate
 } from "../utils/templateTreeOperations.js";
 import {
     buildTemplateTreeSearchIndex,
@@ -60,7 +61,7 @@ import { loadTemplateImageMap } from "../services/templateImageService.js";
 import { loadConfigName } from "../services/appConfigService.js";
 import ToolsBar from "../components/ToolsBar.jsx";
 import SuperOfficePhotoGallery from "../components/SuperOfficePhotoGallery.jsx";
-import { copyText } from "../services/clipboardService.js";
+import { copyText, showToast } from "../services/clipboardService.js";
 import { loadAgentProfile } from "../services/agentProfileService.js";
 import {
     SUPER_OFFICE_TICKET_UPDATED_EVENT,
@@ -82,7 +83,6 @@ import {
 } from "../utils/caseProfile.js";
 import {
     loadTemplateQuickSectionsState,
-    loadTemplateUsageStats,
     recordTemplateUsage,
     saveTemplateQuickSectionsState
 } from "../services/templateUsageService.js";
@@ -114,7 +114,7 @@ const LANGUAGES = [
 
 const QUICK_TEMPLATE_LIMIT = 8;
 const DEFAULT_QUICK_SECTION_STATE = Object.freeze({
-    mostUsed: false
+    favorites: false
 });
 
 const ALO_TYPE_OPTIONS = [
@@ -278,20 +278,10 @@ function buildTemplateDisplayChannelIndex(templates = []) {
     );
 }
 
-function buildMostUsedTemplateEntries(templates = [], usageStats = {}) {
-    const templateLookup = new Map(templates.map((template) => [template.id, template]));
-    return Object.entries(usageStats || {})
-        .map(([templateId, usage]) => ({
-            template: templateLookup.get(templateId),
-            usage: {
-                usageCount: Number(usage?.usageCount) || 0,
-                lastUsedAt: Number(usage?.lastUsedAt) || 0
-            }
-        }))
-        .filter(({ template, usage }) => template && (usage.usageCount > 0 || usage.lastUsedAt > 0))
-        .sort((left, right) => (right.usage.usageCount - left.usage.usageCount)
-            || (right.usage.lastUsedAt - left.usage.lastUsedAt)
-            || (left.template.title || "").localeCompare(right.template.title || ""))
+function buildFavoriteTemplateEntries(templates = []) {
+    return templates
+        .filter((template) => template?.favorite)
+        .map((template) => ({ template }))
         .slice(0, QUICK_TEMPLATE_LIMIT);
 }
 
@@ -306,14 +296,6 @@ function templateIdFromSectionKey(sectionKey = "") {
         if (markerIndex > 0) return body.slice(0, markerIndex);
     }
 
-    return "";
-}
-
-function formatQuickTemplateMeta(sectionId, usage = {}) {
-    if (sectionId === "mostUsed") {
-        const count = Number(usage.usageCount) || 0;
-        return count > 0 ? `${count} use${count > 1 ? "s" : ""}` : "";
-    }
     return "";
 }
 
@@ -430,14 +412,12 @@ const PlaybookTemplateRow = memo(function PlaybookTemplateRow({
 
 const QuickTemplateButton = memo(function QuickTemplateButton({
     entry,
-    sectionId,
     channels,
     selected,
     onOpenTemplate
 }) {
-    const { template, usage } = entry;
+    const { template } = entry;
     const Icon = templateIcon(template);
-    const meta = formatQuickTemplateMeta(sectionId, usage);
     const handleClick = useCallback(() => {
         onOpenTemplate(template.id);
     }, [onOpenTemplate, template.id]);
@@ -451,7 +431,6 @@ const QuickTemplateButton = memo(function QuickTemplateButton({
             <IconBadge Icon={Icon} tone={toneForValue(template.title)} className="templates-quick-template-icon" />
             <span className="templates-quick-template-copy">
                 <strong>{template.title || "Untitled"}</strong>
-                {meta && <small>{meta}</small>}
                 <ChannelPills channels={channels} />
             </span>
         </button>
@@ -491,7 +470,6 @@ const QuickTemplateSection = memo(function QuickTemplateSection({
                         <QuickTemplateButton
                             key={`${id}-${entry.template.id}`}
                             entry={entry}
-                            sectionId={id}
                             channels={templateChannelsById.get(entry.template.id) || entry.template.channels}
                             selected={activeTemplateId === entry.template.id}
                             onOpenTemplate={onOpenTemplate}
@@ -900,6 +878,7 @@ const TemplateDetail = memo(function TemplateDetail({
     onRequestCopy,
     onRequestTemplateResult,
     onSetVariantPicker,
+    onToggleFavorite,
     onManage
 }) {
     const previewTokenMap = useMemo(() => buildPreviewTokenMap(tokens), [tokens]);
@@ -958,6 +937,10 @@ const TemplateDetail = memo(function TemplateDetail({
         }
     }, [onRequestTemplateResult, onSetVariantPicker, setActiveChannel, template]);
 
+    const toggleFavorite = useCallback(() => {
+        onToggleFavorite(template.id);
+    }, [onToggleFavorite, template.id]);
+
     return (
         <>
             <aside className="templates-detail-panel" aria-label="Template detail">
@@ -970,6 +953,20 @@ const TemplateDetail = memo(function TemplateDetail({
                         </div>
                     </div>
                     <div className="templates-detail-head-actions">
+                        <button
+                            type="button"
+                            className={`secondary-btn templates-favorite-btn${template.favorite ? " is-active" : ""}`}
+                            onClick={toggleFavorite}
+                            aria-pressed={Boolean(template.favorite)}
+                            title={template.favorite ? "Remove from favorites" : "Add to favorites"}
+                        >
+                            <Star
+                                size={17}
+                                aria-hidden="true"
+                                fill={template.favorite ? "currentColor" : "none"}
+                            />
+                            {template.favorite ? "Favorite" : "Add favorite"}
+                        </button>
                         <button type="button" className="secondary-btn templates-manage-btn" onClick={onManage}>
                             <Settings size={17} aria-hidden="true" />
                             Manage playbook
@@ -1055,7 +1052,6 @@ export default function Templates() {
     const [aloPreparation, setAloPreparation] = useState(null);
     const [templateImageMap, setTemplateImageMap] = useState(() => new Map());
     const [configName, setConfigName] = useState("No configuration");
-    const [templateUsageStats, setTemplateUsageStats] = useState({});
     const [quickSectionsCollapsed, setQuickSectionsCollapsed] = useState(DEFAULT_QUICK_SECTION_STATE);
     const caseProfile = useMemo(() => buildCaseProfile({
         clientPayload: runtime.clientPayload,
@@ -1102,12 +1098,8 @@ export default function Templates() {
 
     useEffect(() => {
         let cancelled = false;
-        Promise.all([
-            loadTemplateUsageStats(),
-            loadTemplateQuickSectionsState()
-        ]).then(([usageStats, sectionState]) => {
+        loadTemplateQuickSectionsState().then((sectionState) => {
             if (cancelled) return;
-            setTemplateUsageStats(usageStats);
             setQuickSectionsCollapsed(sectionState);
         });
         return () => {
@@ -1203,9 +1195,9 @@ export default function Templates() {
         return summaries;
     }, [childrenByParent, nodes, templatesByNode]);
 
-    const mostUsedTemplateEntries = useMemo(
-        () => buildMostUsedTemplateEntries(treeTemplates, templateUsageStats),
-        [templateUsageStats, treeTemplates]
+    const favoriteTemplateEntries = useMemo(
+        () => buildFavoriteTemplateEntries(treeTemplates),
+        [treeTemplates]
     );
 
     const toggleQuickSection = useCallback((sectionId) => {
@@ -1223,9 +1215,27 @@ export default function Templates() {
 
     const markTemplateUsed = useCallback(async (templateId) => {
         if (!templateId) return;
-        const nextStats = await recordTemplateUsage(templateId);
-        setTemplateUsageStats(nextStats);
+        await recordTemplateUsage(templateId);
     }, []);
+
+    const toggleTemplateFavorite = useCallback(async (templateId) => {
+        const template = treeTemplates.find((item) => item.id === templateId);
+        if (!template) return;
+
+        const nextFavorite = !template.favorite;
+        const previousTemplates = treeTemplates;
+        const nextTemplates = updateTemplate(treeTemplates, templateId, { favorite: nextFavorite });
+        setTreeTemplates(nextTemplates);
+
+        try {
+            await saveTemplateTreeData({ nodes, templates: nextTemplates });
+            showToast(nextFavorite ? "Template added to favorites" : "Template removed from favorites", "info");
+        } catch (error) {
+            console.error("toggleTemplateFavorite error", error);
+            setTreeTemplates(previousTemplates);
+            showToast("Favorite was not saved", "error");
+        }
+    }, [nodes, treeTemplates]);
 
     const activeNode = useMemo(
         () => nodeLookup.get(activeNodeId) || null,
@@ -1736,11 +1746,11 @@ export default function Templates() {
 
                     <div className="templates-quick-sections" aria-label="Quick templates">
                         <QuickTemplateSection
-                            id="mostUsed"
-                            title="Most used"
-                            Icon={TrendingUp}
-                            entries={mostUsedTemplateEntries}
-                            collapsed={quickSectionsCollapsed.mostUsed}
+                            id="favorites"
+                            title="Favorites"
+                            Icon={Star}
+                            entries={favoriteTemplateEntries}
+                            collapsed={quickSectionsCollapsed.favorites}
                             activeTemplateId={activeTemplateId}
                             templateChannelsById={templateChannelsById}
                             onOpenTemplate={openTemplate}
@@ -1789,6 +1799,7 @@ export default function Templates() {
                         onRequestCopy={requestDetailCopy}
                         onRequestTemplateResult={requestDetailTemplateResult}
                         onSetVariantPicker={setDetailVariantPicker}
+                        onToggleFavorite={toggleTemplateFavorite}
                         onManage={openNodesWorkspace}
                     />
                 </Modal>
