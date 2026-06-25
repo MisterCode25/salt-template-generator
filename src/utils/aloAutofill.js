@@ -104,19 +104,13 @@ export function buildAloPreparationDefaults(clientPayload = {}, superOfficePaylo
         superOfficePayload?.messageDate,
         superOfficePayload?.importedAt
     ]));
-    const extRef = firstValue([
-        superOfficePayload?.sourceTicketId,
-        superOfficePayload?.ticketId,
-        superOfficePayload?.tokenValues?.[SO_TICKET_NUM_TOKEN],
-        externalFields.soTicket
-    ]);
 
     return {
         externalId,
         externalFields,
         aloType: "",
         signalState,
-        extRef,
+        extRef: "",
         disconnectionDate: signalState === "lost" ? ticketCreatedDate : "",
         activationDate,
         description: ""
@@ -152,7 +146,6 @@ export function buildAloAutofillFields(clientPayload = {}, agentProfile = {}, su
     const contact = clientPayload?.contact || {};
     const healthcheck = clientPayload?.healthcheck || {};
     const agent = normalizeAgentProfile(agentProfile);
-    const superOffice = normalizeSuperOfficePayload(superOfficePayload);
     const fixedPhone = firstValue([
         contact.fixedNumber,
         contact.voipNumber,
@@ -184,7 +177,7 @@ export function buildAloAutofillFields(clientPayload = {}, agentProfile = {}, su
         : formatDisplayDate(options.disconnectionDate);
 
     return {
-        externalReference: firstValue([options.extRef, superOffice.ticketId]),
+        externalReference: textValue(options.extRef),
         socketId: firstValue([healthcheck.otoId, healthcheck.oto_id, healthcheck.oto]),
         plugNr: firstValue([healthcheck.otoPortId, healthcheck.otoPort, healthcheck.oto_port]),
         breakoutCable: firstValue([healthcheck.breakoutCableId, healthcheck.breakoutCable, healthcheck.cable]),
@@ -354,15 +347,13 @@ function aloAutofillBookmarkletRunner(expectedSource) {
         var client = payload.client || {};
         var technical = payload.technical || payload.healthcheck || {};
         var agent = payload.agent || {};
-        var superOffice = payload.superOffice || {};
-        var tokenValues = superOffice.tokenValues || payload.tokenValues || {};
         var count = 0;
 
         function apply(id, value, allowEmpty) {
             if (setVal(id, value, allowEmpty)) count += 1;
         }
 
-        apply("ticket.extRef", field(payload, "externalReference", [superOffice.sourceTicketId, superOffice.ticketId, payload.ticketId, tokenValues["{so_ticket_num}"]]));
+        apply("ticket.extRef", field(payload, "externalReference", []));
         apply("ticket.socketId", field(payload, "socketId", [technical.socketId, technical.otoId, technical.oto_id, technical.oto]));
         apply("ticket.plugNr", field(payload, "plugNr", [technical.plugNr, technical.otoPortId, technical.otoPort, technical.oto_port]));
         apply("ticket.breakoutCable", field(payload, "breakoutCable", [technical.breakoutCable, technical.breakoutCableId, technical.cable]));

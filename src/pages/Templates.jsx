@@ -534,7 +534,14 @@ function AloPreparationModal({ defaults, templateOptions = [], onCancel, onSubmi
     const steps = useMemo(() => {
         const next = [];
         next.push({ key: "aloType", kind: "choice", title: "Type", options: ALO_TYPE_OPTIONS });
-        next.push({ key: "extRef", kind: "input", title: "Ext ref field", inputType: "text", placeholder: "SO ticket / external reference" });
+        next.push({
+            key: "extRef",
+            kind: "input",
+            title: "External ref",
+            inputType: "text",
+            placeholder: "Optional external reference",
+            optional: true
+        });
         if (!inferredSignalState) next.push({ key: "signalState", kind: "choice", title: "Signal state", options: ALO_SIGNAL_OPTIONS });
         next.push({
             key: form.signalState === "never" ? "activationDate" : "disconnectionDate",
@@ -590,7 +597,7 @@ function AloPreparationModal({ defaults, templateOptions = [], onCancel, onSubmi
 
     const continueInput = () => {
         const value = String(form[step.key] || "").trim();
-        if (!value) return;
+        if (!value && !step.optional) return;
         if (stepIndex === steps.length - 1) {
             finish();
             return;

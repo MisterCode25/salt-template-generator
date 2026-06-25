@@ -155,7 +155,7 @@ ${JSON.stringify(sampleClientJSON, null, 2)}`);
 
 {
   const summary = getClientSummaryFields(sampleClientJSON);
-  assert.equal(summary.find((field) => field.label === "Name").value, "Mr. BILLIG Peter manuel");
+  assert.equal(summary.find((field) => field.label === "Name").value, "MR. BILLIG PETER MANUEL");
   assert.equal(summary.find((field) => field.label === "Sex"), undefined);
   assert.equal(summary.find((field) => field.label === "Language"), undefined);
   assert.equal(summary.find((field) => field.label === "Mobile").value, "078 912 56 85");

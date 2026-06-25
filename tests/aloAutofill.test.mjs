@@ -24,7 +24,7 @@ const agentProfile = {
 
   assert.equal(payload.source, ALO_AUTOFILL_CLIPBOARD_SOURCE);
   assert.equal(payload.version, 1);
-  assert.equal(payload.fields.externalReference, "31436062");
+  assert.equal(payload.fields.externalReference, "");
   assert.equal(payload.fields.socketId, "B.111.783.391.7");
   assert.equal(payload.fields.plugNr, "3");
   assert.equal(payload.fields.breakoutCable, "KP100314-C0036");
@@ -66,7 +66,7 @@ const agentProfile = {
   const defaults = buildAloPreparationDefaults(TEST_VTI_IMPORT_PAYLOAD, TEST_SO_IMPORT_PAYLOAD);
   assert.equal(defaults.aloType, "");
   assert.equal(defaults.signalState, "lost");
-  assert.equal(defaults.extRef, "31436062");
+  assert.equal(defaults.extRef, "");
   assert.equal(defaults.activationDate, "2026-06-20");
   assert.equal(defaults.description, "");
 }
@@ -132,6 +132,8 @@ const agentProfile = {
   assert.match(bookmarklet, /ticket\.problemDateTime/);
   assert.match(bookmarklet, /ticket\.problemCode3/);
   assert.match(bookmarklet, /tagName === "SELECT"/);
+  assert.doesNotMatch(bookmarklet, /sourceTicketId/);
+  assert.doesNotMatch(bookmarklet, /so_ticket_num/);
 }
 
 console.log("aloAutofill tests passed");

@@ -383,6 +383,11 @@ function displayValue(value) {
     return "";
 }
 
+function uppercaseDisplayValue(value) {
+    const text = displayValue(value);
+    return text ? text.toUpperCase() : "";
+}
+
 function formatDateForDisplay(value) {
     const text = displayValue(value);
     if (!text) return "";
@@ -745,7 +750,7 @@ export function getClientSummaryFields(payload) {
     return [
         {
             label: "Name",
-            value: fullName || firstValue([client.lastName, client.firstName])
+            value: uppercaseDisplayValue(fullName || firstValue([client.lastName, client.firstName]))
         },
         {
             label: "Mobile",
