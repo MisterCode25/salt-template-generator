@@ -1861,9 +1861,11 @@ export default function Templates() {
                     tokens={runtime.tokens}
                     channelOptions={resultChannelOptions}
                     currentChannel={activeChannel}
+                    isFavorite={Boolean(activeTemplate?.favorite)}
                     onSelectChannel={openResultChannel}
                     onNextChannel={openNextResultChannel}
                     onCopy={copyRuntimeTemplateResultAgain}
+                    onToggleFavorite={activeTemplate ? () => toggleTemplateFavorite(activeTemplate.id) : null}
                     onClose={closeTemplateWorkflow}
                 />
             )}

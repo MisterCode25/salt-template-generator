@@ -1,5 +1,5 @@
 import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, Check, Copy, Edit3, ExternalLink, RotateCcw, Sparkles } from "lucide-react";
+import { ArrowRight, Check, Copy, Edit3, ExternalLink, RotateCcw, Sparkles, Star } from "lucide-react";
 import { generateFinalText, getTemplateTextByLang } from "../core/tokenEngine.js";
 import {
     ACTIVE_CLIENT_PAYLOAD_UPDATED_EVENT,
@@ -724,9 +724,11 @@ export const TemplateResultModal = memo(function TemplateResultModal({
     tokens = [],
     channelOptions = [],
     currentChannel = "",
+    isFavorite = false,
     onSelectChannel,
     onNextChannel,
     onCopy,
+    onToggleFavorite,
     onClose
 }) {
     const [isEditing, setIsEditing] = useState(false);
@@ -748,6 +750,7 @@ export const TemplateResultModal = memo(function TemplateResultModal({
     const copyStateText = isEditing
         ? isDirty ? "Local draft" : "Editing"
         : result.copied ? "✓ Already copied" : "Copying...";
+    const canToggleFavorite = typeof onToggleFavorite === "function";
 
     const resetDraft = () => {
         setDraftHtml(sourceHtml);
@@ -770,9 +773,23 @@ export const TemplateResultModal = memo(function TemplateResultModal({
                         <p className="template-result-kicker">{isEditing ? "Edit final text" : "Final text"}</p>
                         <h2>{result.title || "Template"}</h2>
                     </div>
-                    <span className={`template-result-copy-state${result.copied && !isDirty && !isEditing ? " is-copied" : ""}`} aria-live="polite">
-                        {copyStateText}
-                    </span>
+                    <div className="template-result-header-actions">
+                        {canToggleFavorite && (
+                            <button
+                                type="button"
+                                className={`template-result-favorite-btn${isFavorite ? " is-active" : ""}`}
+                                onClick={onToggleFavorite}
+                                aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
+                                aria-pressed={Boolean(isFavorite)}
+                                title={isFavorite ? "Remove from favorites" : "Add to favorites"}
+                            >
+                                <Star size={16} aria-hidden="true" fill={isFavorite ? "currentColor" : "none"} />
+                            </button>
+                        )}
+                        <span className={`template-result-copy-state${result.copied && !isDirty && !isEditing ? " is-copied" : ""}`} aria-live="polite">
+                            {copyStateText}
+                        </span>
+                    </div>
                 </div>
                 {showChannelControls && (
                     <div className="template-result-toolbar">
