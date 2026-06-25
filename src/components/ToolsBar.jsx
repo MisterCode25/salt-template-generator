@@ -12,7 +12,11 @@ import {
     sanitizeToolColor
 } from "../services/toolsService.js";
 import { handleToolModuleTemplateRequest } from "../services/toolModuleTemplateService.js";
-import { buildToolModuleSrcDoc, buildToolRuntimeContext } from "../utils/toolModuleRuntime.js";
+import {
+    buildToolModuleSrcDoc,
+    buildToolRuntimeContext,
+    fetchToolModuleNetworkResource
+} from "../utils/toolModuleRuntime.js";
 
 const ToolButton = memo(function ToolButton({ tool, valuesRef, onOpenModule }) {
     const linkRef = useRef(null);
@@ -199,6 +203,15 @@ function ToolModuleModal({ tool, valuesRef, runtimeContextRef, onClose }) {
                     }
                     window.open(payload.url, "_blank", "noopener,noreferrer");
                     reply(requestId, { ok: true });
+                    return;
+                }
+
+                if (type === "tool:fetch-json" || type === "tool:fetch-text") {
+                    const result = await fetchToolModuleNetworkResource({
+                        url: payload.url,
+                        responseType: type === "tool:fetch-json" ? "json" : "text"
+                    });
+                    reply(requestId, result);
                     return;
                 }
 

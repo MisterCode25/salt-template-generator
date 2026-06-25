@@ -7,7 +7,9 @@ import {
   buildToolModuleSrcDoc,
   buildToolRuntimeContext,
   extractToolModuleHtmlFromAiResult,
+  fetchToolModuleNetworkResource,
   formatToolModuleApiReferenceForPrompt,
+  isSafeToolModuleNetworkUrl,
   normalizeToolModuleHtml
 } from "../src/utils/toolModuleRuntime.js";
 
@@ -20,6 +22,8 @@ import {
   assert.match(srcDoc, /getVar/);
   assert.match(srcDoc, /getProfile/);
   assert.match(srcDoc, /listVariables/);
+  assert.match(srcDoc, /fetchJson/);
+  assert.match(srcDoc, /fetchText/);
   assert.match(srcDoc, /templates/);
   assert.match(srcDoc, /previewMigration/);
   assert.match(srcDoc, /template-tool-host-style/);
@@ -36,15 +40,76 @@ import {
   assert.equal(TOOL_MODULE_API_REFERENCE.functions["TemplateTool.getVar(name, fallback = '')"], "Promise<string>");
   assert.equal(TOOL_MODULE_API_REFERENCE.functions["TemplateTool.templates.getTree()"], "Promise<{ nodes, templates, counts }>");
   assert.equal(TOOL_MODULE_API_REFERENCE.functions["TemplateTool.templates.applyMigration(operations)"], "Promise<{ ok, appliedCount, skippedCount, tree }>");
+  assert.equal(TOOL_MODULE_API_REFERENCE.functions["TemplateTool.fetchJson(url)"], "Promise<{ ok, status, url, contentType, data?, text?, error?, truncated? }>");
+  assert.equal(TOOL_MODULE_API_REFERENCE.functions["TemplateTool.fetchText(url)"], "Promise<{ ok, status, url, contentType, text?, error?, truncated? }>");
   assert.ok(TOOL_MODULE_API_REFERENCE.variables.examples.includes("TemplateVars.clientName"));
+  assert.ok(TOOL_MODULE_API_REFERENCE.variables.containers["context.tokens"]);
+  assert.match(TOOL_MODULE_API_REFERENCE.dataAccess.internet, /public HTTP\(S\)/);
   const apiPromptReference = formatToolModuleApiReferenceForPrompt();
   assert.match(apiPromptReference, /Template Generator Module API/);
   assert.match(apiPromptReference, /Globals:/);
   assert.match(apiPromptReference, /Variable access:/);
+  assert.match(apiPromptReference, /Variable containers:/);
+  assert.match(apiPromptReference, /Variable examples:/);
+  assert.match(apiPromptReference, /context\.tokens/);
+  assert.match(apiPromptReference, /Data access:/);
+  assert.match(apiPromptReference, /Public Internet/);
   assert.match(apiPromptReference, /Context shape:/);
   assert.match(apiPromptReference, /Functions:/);
   assert.match(apiPromptReference, /TemplateTool\.copyHtml/);
+  assert.match(apiPromptReference, /TemplateTool\.fetchJson/);
   assert.match(apiPromptReference, /availableTokens/);
+}
+
+{
+  assert.equal(isSafeToolModuleNetworkUrl("https://api.example.com/data.json"), true);
+  assert.equal(isSafeToolModuleNetworkUrl("http://data.example.com/search?q=client"), true);
+  assert.equal(isSafeToolModuleNetworkUrl("ftp://example.com/file.txt"), false);
+  assert.equal(isSafeToolModuleNetworkUrl("http://localhost:5173/api"), false);
+  assert.equal(isSafeToolModuleNetworkUrl("http://127.0.0.1/api"), false);
+  assert.equal(isSafeToolModuleNetworkUrl("http://192.168.1.1/api"), false);
+  assert.equal(isSafeToolModuleNetworkUrl("http://10.0.0.4/api"), false);
+  assert.equal(isSafeToolModuleNetworkUrl("http://service.local/api"), false);
+}
+
+{
+  const originalFetch = globalThis.fetch;
+  let capturedUrl = "";
+  let capturedOptions = null;
+  try {
+    globalThis.fetch = async (url, options) => {
+      capturedUrl = String(url);
+      capturedOptions = options;
+      return new Response(JSON.stringify({ answer: 42 }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    };
+
+    const result = await fetchToolModuleNetworkResource({
+      url: "https://api.example.com/data.json",
+      responseType: "json"
+    });
+
+    assert.equal(capturedUrl, "https://api.example.com/data.json");
+    assert.equal(capturedOptions.method, "GET");
+    assert.equal(capturedOptions.credentials, "omit");
+    assert.equal(result.ok, true);
+    assert.equal(result.status, 200);
+    assert.deepEqual(result.data, { answer: 42 });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+}
+
+{
+  const result = await fetchToolModuleNetworkResource({
+    url: "http://127.0.0.1/private",
+    responseType: "text"
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 0);
+  assert.match(result.error, /Only public http\/https URLs/);
 }
 
 {
@@ -222,6 +287,7 @@ import {
   assert.match(prompt, /Do not add extra JSON fields/);
   assert.match(prompt, /Do not return raw HTML/);
   assert.match(prompt, /Escape the HTML as a valid JSON string/);
+  assert.match(prompt, /Public Internet\/API\/database reads are allowed/);
   assert.match(prompt, /Priority order:/);
   assert.match(prompt, /Do not split the answer into multiple parts/);
   assert.match(prompt, /Generation contract:/);
@@ -231,6 +297,8 @@ import {
   assert.match(prompt, /Module API reference:/);
   assert.match(prompt, /Globals:/);
   assert.match(prompt, /Variable access:/);
+  assert.match(prompt, /Variable containers:/);
+  assert.match(prompt, /Data access:/);
   assert.match(prompt, /Context shape:/);
   assert.match(prompt, /Functions:/);
   assert.match(prompt, /always opens this module inside its own popup\/modal/);
@@ -262,8 +330,14 @@ import {
   assert.match(prompt, /TemplateTool\.templates\.getTree/);
   assert.match(prompt, /TemplateTool\.templates\.previewMigration/);
   assert.match(prompt, /TemplateTool\.templates\.applyMigration/);
+  assert.match(prompt, /TemplateTool\.fetchJson/);
+  assert.match(prompt, /TemplateTool\.fetchText/);
   assert.match(prompt, /TemplateTool\.copyHtml\(html, message\)/);
   assert.match(prompt, /TemplateTool\.requestResize/);
+  assert.match(prompt, /Internet and database access:/);
+  assert.match(prompt, /App database access is authorized through TemplateTool APIs only/);
+  assert.match(prompt, /Public Internet database\/API access is authorized/);
+  assert.match(prompt, /block localhost\/private-network URLs/);
   assert.match(prompt, /Use <main class="template-tool-module">/);
   assert.match(prompt, /Make the interface shape specific to the requested job/);
   assert.match(prompt, /Avoid repeating the same generic module layout/);

@@ -1,4 +1,4 @@
-export const TOOL_MODULE_API_VERSION = "template-tool-module-beta-1";
+export const TOOL_MODULE_API_VERSION = "template-tool-module-beta-2";
 
 export const TOOL_MODULE_API_REFERENCE = Object.freeze({
     name: "Template Generator Module API",
@@ -35,6 +35,22 @@ export const TOOL_MODULE_API_REFERENCE = Object.freeze({
     },
     variables: {
         access: "await TemplateTool.getContext(); then read window.TemplateVars",
+        containers: {
+            "context.profile / TemplateProfile": "Normalized customer and case profile with common scalar fields, tokenValues, vars, photos and attachments.",
+            "context.variables / TemplateVars": "Variable-friendly aliases generated from profile fields, tokens and visible client fields. This is the preferred object for JavaScript property access.",
+            "TemplateVars.byToken": "Exact token lookup keyed by brace tokens such as {client_first_name}. Includes known tokens even when the current value is empty.",
+            "TemplateVars.byKey": "Lookup keyed by structured token keys such as client.firstName or contractorNumber.",
+            "TemplateVars.byLabel": "Lookup keyed by user-facing field labels from the app.",
+            "TemplateVars.available": "Discovery list for every exposed variable with names, token, key, label, value, source, inputType and internal.",
+            "TemplateVars.availableTokens": "Subset of TemplateVars.available that comes from token definitions.",
+            "TemplateVars.availableFields": "Visible normalized field list with aliases for customer-facing selectors.",
+            "context.tokens": "All configured token definitions, including manual/internal tokens and empty values.",
+            "context.fields / TemplateFields": "Best normalized list for user-facing customer, case and profile fields.",
+            "context.fieldIndex": "Normalized lookup map for labels, tokens, keys and aliases with punctuation/accent/braces removed.",
+            "context.client": "Raw imported VTI/customer payload. Use only when the module needs structured nested source data.",
+            "context.clientInfo": "Visible client detail sections used by the app UI.",
+            "context.clientSummary": "Compact client bar fields currently selected in the app."
+        },
         examples: [
             "TemplateVars.clientName",
             "TemplateVars.mobile",
@@ -48,6 +64,11 @@ export const TOOL_MODULE_API_REFERENCE = Object.freeze({
             "TemplateVars.available.map((entry) => entry.name)"
         ],
         reservedContainers: ["env", "raw", "byToken", "byKey", "byLabel", "available", "availableTokens", "availableFields"]
+    },
+    dataAccess: {
+        appDatabase: "Authorized only through TemplateTool APIs. TemplateTool.templates reads and writes the app's IndexedDB-backed topic/template data through host services.",
+        internet: "Public Internet API/database access is authorized for explicit user-requested public HTTP(S) read requests. Prefer TemplateTool.fetchJson(url) or TemplateTool.fetchText(url) for CORS-enabled Internet APIs/databases.",
+        restrictions: "Do not use secrets, cookies, credentials, private/local network URLs, remote scripts, CDNs, remote fonts, eval, parent DOM access, localStorage or raw IndexedDB."
     },
     contextShape: {
         apiVersion: "string",
@@ -80,6 +101,8 @@ export const TOOL_MODULE_API_REFERENCE = Object.freeze({
         "TemplateTool.templates.applyMigration(operations)": "Promise<{ ok, appliedCount, skippedCount, tree }>",
         "TemplateTool.templates.updateTemplate(templateId, patch)": "Promise<{ ok, template }>",
         "TemplateTool.templates.moveTemplate(templateId, targetNodeId, options = {})": "Promise<{ ok, template }>",
+        "TemplateTool.fetchJson(url)": "Promise<{ ok, status, url, contentType, data?, text?, error?, truncated? }>",
+        "TemplateTool.fetchText(url)": "Promise<{ ok, status, url, contentType, text?, error?, truncated? }>",
         "TemplateTool.copyText(text, message)": "Promise<{ ok: boolean }>",
         "TemplateTool.copyHtml(html, message)": "Promise<{ ok: boolean }>",
         "TemplateTool.toast(message, variant)": "Promise<{ ok: boolean }>",
@@ -103,10 +126,24 @@ export function formatToolModuleApiReferenceForPrompt(api = TOOL_MODULE_API_REFE
     });
 
     lines.push("", "Variable access:", `- ${api.variables.access}`);
+    if (api.variables.containers && typeof api.variables.containers === "object") {
+        lines.push("", "Variable containers:");
+        Object.entries(api.variables.containers).forEach(([name, detail]) => {
+            lines.push(`- ${name}: ${detail}`);
+        });
+    }
+    lines.push("", "Variable examples:");
     (api.variables.examples || []).forEach((example) => {
         lines.push(`- ${example}`);
     });
     lines.push(`- Reserved TemplateVars containers: ${(api.variables.reservedContainers || []).join(", ")}`);
+
+    if (api.dataAccess && typeof api.dataAccess === "object") {
+        lines.push("", "Data access:");
+        Object.entries(api.dataAccess).forEach(([name, detail]) => {
+            lines.push(`- ${name}: ${detail}`);
+        });
+    }
 
     lines.push("", "Context shape:");
     Object.entries(api.contextShape || {}).forEach(([name, detail]) => {
@@ -452,6 +489,12 @@ const TOOL_MODULE_BRIDGE = `
         openUrl: function (url) {
             return post("tool:open-url", { url: String(url || "") }, true);
         },
+        fetchJson: function (url) {
+            return post("tool:fetch-json", { url: String(url || "") }, true);
+        },
+        fetchText: function (url) {
+            return post("tool:fetch-text", { url: String(url || "") }, true);
+        },
         close: function () {
             return post("tool:close", {}, false);
         },
@@ -591,6 +634,108 @@ export function buildToolModuleSrcDoc(html = "") {
     const documentHtml = ensureDocument(html);
     const withBridge = injectIntoHeadStart(documentHtml, TOOL_MODULE_BRIDGE, "template-tool-bridge");
     return injectIntoHeadEnd(withBridge, TOOL_MODULE_HOST_STYLE, "template-tool-host-style");
+}
+
+const TOOL_MODULE_NETWORK_TEXT_LIMIT = 300000;
+
+function isBlockedIpv4Host(hostname = "") {
+    const parts = hostname.split(".").map((part) => Number(part));
+    if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
+        return false;
+    }
+
+    const [first, second] = parts;
+    return first === 0
+        || first === 10
+        || first === 127
+        || first === 169 && second === 254
+        || first === 172 && second >= 16 && second <= 31
+        || first === 192 && second === 168;
+}
+
+export function isSafeToolModuleNetworkUrl(url = "") {
+    try {
+        const parsed = new URL(String(url || "").trim());
+        if (!["http:", "https:"].includes(parsed.protocol)) return false;
+
+        const hostname = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+        if (!hostname) return false;
+        if (hostname === "localhost" || hostname.endsWith(".localhost") || hostname.endsWith(".local")) return false;
+        if (hostname === "::1" || hostname === "0:0:0:0:0:0:0:1") return false;
+        if (isBlockedIpv4Host(hostname)) return false;
+
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+export async function fetchToolModuleNetworkResource({ url = "", responseType = "json" } = {}) {
+    const safeUrl = String(url || "").trim();
+    const wantsJson = responseType === "json";
+    if (!isSafeToolModuleNetworkUrl(safeUrl)) {
+        return {
+            ok: false,
+            status: 0,
+            url: safeUrl,
+            contentType: "",
+            error: "Only public http/https URLs can be fetched by a module."
+        };
+    }
+
+    try {
+        const response = await fetch(safeUrl, {
+            method: "GET",
+            credentials: "omit",
+            cache: "no-store",
+            redirect: "follow",
+            headers: {
+                Accept: wantsJson
+                    ? "application/json, text/plain;q=0.8, */*;q=0.5"
+                    : "text/plain, application/json;q=0.8, */*;q=0.5"
+            }
+        });
+        const contentType = response.headers.get("content-type") || "";
+        const rawText = await response.text();
+        const truncated = rawText.length > TOOL_MODULE_NETWORK_TEXT_LIMIT;
+        const text = truncated ? rawText.slice(0, TOOL_MODULE_NETWORK_TEXT_LIMIT) : rawText;
+        const base = {
+            ok: response.ok,
+            status: response.status,
+            url: response.url || safeUrl,
+            contentType,
+            truncated
+        };
+
+        if (!wantsJson) {
+            return {
+                ...base,
+                text
+            };
+        }
+
+        try {
+            return {
+                ...base,
+                data: text ? JSON.parse(text) : null
+            };
+        } catch {
+            return {
+                ...base,
+                ok: false,
+                text,
+                error: "The Internet response was not valid JSON."
+            };
+        }
+    } catch (error) {
+        return {
+            ok: false,
+            status: 0,
+            url: safeUrl,
+            contentType: "",
+            error: error?.message || "Internet request failed."
+        };
+    }
 }
 
 function normalizeToolTokens(tokens = [], values = {}) {
@@ -1229,12 +1374,13 @@ JSON shape:
 - Do not add extra JSON fields.
 - Do not return raw HTML, markdown fences, downloadable files, explanations, notes or comments outside JSON.
 - Do not split the answer into multiple parts or multiple messages. If the file would be too long, reduce scope and keep a complete working single-file version.
-- Do not use external dependencies, CDNs, remote fonts, build steps, imports or backend calls.
+- Do not use external JavaScript/CSS dependencies, CDNs, remote fonts, build steps, module imports or remote scripts.
+- Public Internet/API/database reads are allowed when the user request needs them. Use TemplateTool.fetchJson(url), TemplateTool.fetchText(url), or browser fetch for public CORS-enabled HTTP(S) endpoints.
 
 Priority order:
 1. JSON validity and single-file module constraints.
 2. Security and host runtime rules.
-3. TemplateTool API and real-data rules.
+3. TemplateTool API, variable discovery and data-access rules.
 4. User request.
 5. Visual style guidance.
 
@@ -1243,7 +1389,7 @@ Generation contract:
 - Do not add unrelated dashboards, tabs, settings, history, import/export, theme switches, fake navigation, sample records, analytics, onboarding, help copy or extra panels unless the user explicitly requested them or they are required for the requested action.
 - Every visible control must map to a requested user action, a required validation step or a TemplateTool API operation.
 - If the request is vague, build the smallest useful module for the named task and show missing requirements inside the module instead of inventing behavior.
-- Use real app context and API responses only. Do not prefill fake topics, templates, clients, IDs or example data.
+- Use real app context, TemplateTool APIs and user-requested public Internet API responses only. Do not prefill fake topics, templates, clients, IDs or example data.
 - Keep all user-facing copy short and operational.
 
 Module API reference:
@@ -1264,6 +1410,7 @@ Runtime:
 - All known token definitions are exposed, including empty/missing values: context.tokens lists every token definition, TemplateVars.byToken has every token key, and TemplateVars.available / TemplateVars.availableTokens list discoverable names with { name, names, token, key, label, value, source, inputType, internal }.
 - Do not hard-code an assumed token list. At startup, call const context = await TemplateTool.getContext(); const vars = await TemplateTool.getVars(); then derive selectable variables from context.tokens, context.fields, vars.available, vars.availableTokens, vars.availableFields and await TemplateTool.listVariables().
 - If the module lets the user calculate or operate on variables, include a compact variable picker/search built from the live context instead of expecting the AI to know variable names in advance.
+- Do not say variables are unavailable just because the prompt did not list the exact requested name. Search context.tokens, context.fields, TemplateVars.available, TemplateVars.availableTokens, TemplateVars.availableFields, TemplateVars.byToken, TemplateVars.byKey, TemplateVars.byLabel and context.clientInfo first.
 - environment is also exposed globally as window.TemplateEnv and contains { apiVersion, toolId, toolTitle, toolDescription, generatedAt }.
 - The normalized profile is exposed globally as window.TemplateProfile, the full context as window.TemplateContext, and normalized fields as window.TemplateFields.
 - The API reference is exposed globally as window.TemplateAPI and through window.TemplateTool.describeApi().
@@ -1285,6 +1432,8 @@ Runtime:
 - Use await window.TemplateTool.templates.previewMigration(rules) before writing migrations. Rules may target topics by id, title, or path with fields like { fromTopic, toTopic, channel, titleIncludes }.
 - Use await window.TemplateTool.templates.applyMigration(preview.operations) to apply reviewed migration operations through the host storage service.
 - Use await window.TemplateTool.templates.updateTemplate(templateId, patch) or .moveTemplate(templateId, targetNodeId, options) for focused edits.
+- Use await window.TemplateTool.fetchJson("https://example.com/data.json") for public Internet JSON/database lookups requested by the user.
+- Use await window.TemplateTool.fetchText("https://example.com/file.txt") for public text/HTML/CSV lookups requested by the user.
 - Use window.TemplateTool.copyText(text, message) to copy plain text.
 - Use window.TemplateTool.copyHtml(html, message) to copy formatted HTML.
 - Use window.TemplateTool.toast(message, "info" | "success" | "warning" | "error") for feedback.
@@ -1299,6 +1448,13 @@ Available data rules:
 - Use context.client only when structured raw data is needed.
 - If a required field is missing from context.tokens, TemplateVars.available, context.fields, context.clientInfo and context.client, show a clear missing-data state instead of guessing.
 - For date tools, accept common formats like YYYY-MM-DD and DD.MM.YYYY, but only calculate from an actual available value.
+
+Internet and database access:
+- App database access is authorized through TemplateTool APIs only. Use TemplateTool.templates.* for topic/template reads, previews and writes.
+- Public Internet database/API access is authorized when the user request needs external data. Prefer TemplateTool.fetchJson(url) or TemplateTool.fetchText(url); these are GET-only public HTTP(S) reads, omit credentials and block localhost/private-network URLs.
+- Plain browser fetch is also allowed for public CORS-enabled HTTP(S) endpoints when TemplateTool.fetchJson/fetchText is not enough.
+- Do not invent API keys, passwords, headers or private endpoints. If an external service requires authentication or a proxy, include a compact input/state explaining what is needed.
+- Keep network reads visible in the UI: show loading, source URL/domain, failure state and empty state. Avoid background polling unless explicitly requested.
 
 Template tree and migration rules:
 - TemplateTool.templates is the host-mediated full-access layer for trusted modules. Use it instead of raw IndexedDB, localStorage hacks or parent DOM access.
@@ -1337,7 +1493,7 @@ Robustness:
 - Ensure empty, loading and error states remain inside the same compact layout.
 - Never write to localStorage or IndexedDB directly. Use TemplateTool APIs for app data writes.
 - Validate input before copying, opening URLs or writing through TemplateTool APIs.
-- Avoid eval, Function constructors, inline remote scripts and hidden network calls.
+- Avoid eval, Function constructors, inline remote scripts and hidden or credentialed network calls.
 
 Before returning, verify silently:
 - The whole answer is exactly one JSON object with only an html string field.

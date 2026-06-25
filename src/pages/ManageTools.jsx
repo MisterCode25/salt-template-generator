@@ -37,7 +37,8 @@ import {
     buildToolModulePrompt,
     buildToolModuleSrcDoc,
     buildToolRuntimeContext,
-    extractToolModuleHtmlFromAiResult
+    extractToolModuleHtmlFromAiResult,
+    fetchToolModuleNetworkResource
 } from "../utils/toolModuleRuntime.js";
 import { buildCaseProfile } from "../utils/caseProfile.js";
 import Modal from "../components/Modal.jsx";
@@ -550,6 +551,15 @@ function ModulePreviewFrame({ draft, tokens, runtimePreviewContext }) {
                     return;
                 }
 
+                if (type === "tool:fetch-json" || type === "tool:fetch-text") {
+                    const result = await fetchToolModuleNetworkResource({
+                        url: payload.url,
+                        responseType: type === "tool:fetch-json" ? "json" : "text"
+                    });
+                    reply(requestId, result);
+                    return;
+                }
+
                 if (type === "tool:close") {
                     showToast("Preview close action received.", "info");
                     reply(requestId, { ok: true });
@@ -686,7 +696,7 @@ function ModuleToolStep({ step, draft, onPatch, tokens, runtimePreviewContext })
                 <section className="tools-panel-block">
                     <div className="tools-panel-title">
                         <h3>Build prompt</h3>
-                        <p>The copied prompt includes the module API and runtime rules automatically.</p>
+                        <p>The copied prompt includes the module API, live variables, Internet rules and design guidelines.</p>
                     </div>
                     <label className="tools-field-line">
                         <span>User request</span>
