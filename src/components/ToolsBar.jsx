@@ -4,7 +4,13 @@ import { ClipboardPaste, ExternalLink, Image as ImageIcon, Puzzle, Settings2, Us
 import Modal from "./Modal.jsx";
 import PartnersModal from "./PartnersModal.jsx";
 import { copyHtml, copyText, showToast } from "../services/clipboardService.js";
-import { isModuleTool, loadTools, resolveToolUrl, sanitizeToolColor } from "../services/toolsService.js";
+import {
+    hasRequiredToolUrlValues,
+    isModuleTool,
+    loadTools,
+    resolveToolUrl,
+    sanitizeToolColor
+} from "../services/toolsService.js";
 import { handleToolModuleTemplateRequest } from "../services/toolModuleTemplateService.js";
 import { buildToolModuleSrcDoc, buildToolRuntimeContext } from "../utils/toolModuleRuntime.js";
 
@@ -297,8 +303,10 @@ function ToolsBar({
         navigate("/tools");
     }, [navigate, onManageTools]);
 
+    const visibleTools = tools.filter((tool) => isModuleTool(tool) || hasRequiredToolUrlValues(tool.url, valuesRef.current || {}));
     const hasInternalTools = true;
-    const hasExternalTools = tools.length > 0;
+    const hasConfiguredTools = tools.length > 0;
+    const hasExternalTools = visibleTools.length > 0;
 
     if (!hasInternalTools && !hasExternalTools && !onManageTools) return null;
 
@@ -360,7 +368,7 @@ function ToolsBar({
                 <div className="tools-bar-section tools-bar-section--external" aria-label="External tools and modules">
                     <div className="tools-bar-section-items">
                         {hasExternalTools ? (
-                            tools.map((tool) => (
+                            visibleTools.map((tool) => (
                                 <ToolButton
                                     key={tool.id}
                                     tool={tool}
@@ -369,7 +377,11 @@ function ToolsBar({
                                 />
                             ))
                         ) : (
-                            <span className="tools-bar-empty-tip">No tools yet. Open Options &gt; Tools to create one.</span>
+                            <span className="tools-bar-empty-tip">
+                                {hasConfiguredTools
+                                    ? "No tools available for current data."
+                                    : "No tools yet. Open Options > Tools to create one."}
+                            </span>
                         )}
                         <button
                             type="button"
@@ -397,10 +409,8 @@ function ToolsBar({
 }
 
 export default memo(ToolsBar, (prevProps, nextProps) => {
-    const refBackedValues = prevProps.valuesRef || nextProps.valuesRef;
-    const valuesEqual = refBackedValues
-        ? prevProps.valuesRef === nextProps.valuesRef
-        : prevProps.values === nextProps.values;
+    const valuesEqual = prevProps.values === nextProps.values
+        && prevProps.valuesRef === nextProps.valuesRef;
 
     return valuesEqual
         && prevProps.runtimeContextRef === nextProps.runtimeContextRef

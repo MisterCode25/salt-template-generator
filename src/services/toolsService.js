@@ -64,11 +64,23 @@ export async function saveTools(tools) {
     return saveIndexedJSON(TOOLS_KEY, normalizedTools);
 }
 
+function getToolUrlTokens(urlTemplate = "") {
+    return Array.from(new Set(String(urlTemplate || "").match(/\{[^}]+\}/g) || []));
+}
+
+function normalizeToolUrlValue(value) {
+    if (value == null || value === "") return "";
+    return String(value).replace(/<[^>]+>/g, "").trim();
+}
+
+export function hasRequiredToolUrlValues(urlTemplate, values = {}) {
+    return getToolUrlTokens(urlTemplate).every((token) => normalizeToolUrlValue(values[token]) !== "");
+}
+
 export function resolveToolUrl(urlTemplate, values = {}) {
     return (urlTemplate || "").replace(/\{[^}]+\}/g, (match) => {
-        const raw = values[match];
-        if (raw == null || raw === "") return match;
-        const plain = String(raw).replace(/<[^>]+>/g, "").trim();
+        const plain = normalizeToolUrlValue(values[match]);
+        if (!plain) return match;
         return encodeURIComponent(plain);
     });
 }

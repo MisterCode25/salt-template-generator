@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   DEFAULT_TOOL_COLOR,
   TOOL_TYPES,
+  hasRequiredToolUrlValues,
   isModuleTool,
   normalizeTool,
   resolveToolUrl,
@@ -47,6 +48,26 @@ import {
     "{client_name}": "Jane & Bob <strong>Fiber</strong>"
   });
   assert.equal(url, "https://example.com/search?q=Jane%20%26%20Bob%20Fiber");
+}
+
+{
+  assert.equal(hasRequiredToolUrlValues("https://example.com/static", {}), true);
+  assert.equal(hasRequiredToolUrlValues("https://example.com/search?q={client_name}", {
+    "{client_name}": "Jane"
+  }), true);
+  assert.equal(hasRequiredToolUrlValues("https://example.com/search?q={client_name}", {
+    "{client_name}": ""
+  }), false);
+  assert.equal(hasRequiredToolUrlValues("https://example.com/search?q={client_name}", {
+    "{client_name}": " <strong></strong> "
+  }), false);
+  assert.equal(hasRequiredToolUrlValues("https://example.com/{contractor}/{ticket}", {
+    "{contractor}": "31447756",
+    "{ticket}": "SO-1"
+  }), true);
+  assert.equal(hasRequiredToolUrlValues("https://example.com/{contractor}/{ticket}", {
+    "{contractor}": "31447756"
+  }), false);
 }
 
 console.log("toolsService tests passed");

@@ -1712,6 +1712,7 @@ export default function Templates() {
             />
 
             <ToolsBar
+                values={runtime.values}
                 valuesRef={toolValuesRef}
                 runtimeContextRef={toolRuntimeContextRef}
                 onOpenExternalGenerator={openExternalGenerator}
