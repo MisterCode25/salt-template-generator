@@ -33,6 +33,7 @@ const sampleClientJSON = {
     eligibilityOrdering: "35",
     publicId: "28453061",
     fixedNumber: "41788451664",
+    providerOrderRef: "10031420260327025732000000",
     contactRecordId: "50895045",
     error: ""
   },
@@ -119,6 +120,7 @@ ${JSON.stringify(sampleClientJSON, null, 2)}`);
   assert.ok(contact.fields.some((field) => field.label === "Eligibility ordering" && field.value === "35"));
   assert.ok(contact.fields.some((field) => field.label === "Public ID" && field.value === "28453061"));
   assert.ok(contact.fields.some((field) => field.label === "Fixed number" && field.value === "41788451664"));
+  assert.ok(contact.fields.some((field) => field.label === "Provider order ref" && field.value === "10031420260327025732000000"));
   assert.ok(technical.fields.some((field) => field.label === "OTO ID" && field.value === "B.111.783.391.7"));
   assert.ok(crossConnection.fields.some((field) => field.label === "Port" && field.value === "23"));
 }
@@ -170,6 +172,7 @@ ${JSON.stringify(sampleClientJSON, null, 2)}`);
 
   assert.equal(values["{client_first_name}"], "Peter manuel");
   assert.equal(values["{healthcheck_oto_id}"], "B.111.783.391.7");
+  assert.equal(values["{contact_provider_order_ref}"], "10031420260327025732000000");
   assert.equal(values["{healthcheck_cross_connexion_port}"], "23");
   assert.equal(values["{contact_error}"], "");
   assert.equal(tokenMap.get("{client_first_name}").label, "First name");
@@ -191,6 +194,7 @@ ${JSON.stringify(sampleClientJSON, null, 2)}`);
     { token: "{lastName}", label: "Last name" },
     { token: "{contractor}", label: "Contractor" },
     { token: "{activation_date}", label: "Activation" },
+    { token: "{provider_order_ref}", label: "Provider order ref" },
     { token: "{oto_id}", label: "OTO" },
     { token: "{cross_connection_port}", label: "Cross port" },
     { token: "{unknown}", label: "Unknown" }
@@ -201,6 +205,7 @@ ${JSON.stringify(sampleClientJSON, null, 2)}`);
   assert.equal(values["{lastName}"], "BILLIG");
   assert.equal(values["{contractor}"], "31447756");
   assert.equal(values["{activation_date}"], "2026-06-20");
+  assert.equal(values["{provider_order_ref}"], "10031420260327025732000000");
   assert.equal(values["{oto_id}"], "B.111.783.391.7");
   assert.equal(values["{cross_connection_port}"], "23");
   assert.equal(matchClientDataToTokens(sampleClientJSON, [
@@ -208,7 +213,7 @@ ${JSON.stringify(sampleClientJSON, null, 2)}`);
     { token: "{healthcheck_router_serial_number}", label: "Internal router" }
   ]).values["{healthcheck_router_serial_number}"], "GFAB11004892");
   assert.equal(values["{unknown}"], undefined);
-  assert.equal(matchedTokens.length, 7);
+  assert.equal(matchedTokens.length, 8);
 }
 
 {

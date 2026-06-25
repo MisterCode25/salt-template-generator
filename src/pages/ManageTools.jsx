@@ -58,6 +58,12 @@ const KEYBOARD_SHORTCUT_DESCRIPTIONS = Object.freeze({
     clearData: "Clear the currently imported customer and ticket data."
 });
 
+const DATA_SHORTCUT_MINI_DESCRIPTIONS = Object.freeze({
+    vti: "Copies clean customer JSON from VTI for the main import.",
+    so: "Copies SO ticket data, External ID and photos when available.",
+    alo: "Fills the ALO ticket form from the app's prepared data."
+});
+
 const MODULE_WIZARD_STEPS = Object.freeze([
     {
         label: "Setup",
@@ -936,21 +942,29 @@ function DataShortcutsPanel() {
                 <div>
                     <p className="eyebrow">Shortcuts</p>
                     <h2>Data capture shortcuts</h2>
-                    <p>Bookmarklets used to capture VTI, SuperOffice and ALO data.</p>
+                    <p>Bookmarklets used for VTI, SuperOffice and ALO handoffs.</p>
                 </div>
+            </section>
+
+            <section className="tools-shortcut-guide" aria-label="Shortcut install instructions">
+                <strong>Install once</strong>
+                <p>Drag a colored shortcut button to Chrome's bookmarks bar. If dragging is blocked, copy the shortcut and paste it as the bookmark URL.</p>
             </section>
 
             <div className="tools-shortcut-grid">
                 {DATA_SHORTCUTS.map((shortcut) => (
-                    <article key={shortcut.id} className="tools-shortcut-card">
-                        <div className="tools-shortcut-card__head">
+                    <article key={shortcut.id} className={`tools-shortcut-card tools-shortcut-card--${shortcut.id}`}>
+                        <div className="tools-shortcut-card__body">
                             <div>
                                 <p className="eyebrow">{shortcut.eyebrow}</p>
                                 <h3>{shortcut.title}</h3>
-                                <p>{shortcut.description}</p>
+                                <p>{DATA_SHORTCUT_MINI_DESCRIPTIONS[shortcut.id] || shortcut.description}</p>
                             </div>
+                        </div>
+
+                        <div className="tools-shortcut-card__actions">
                             <a
-                                className={`vti-bookmarklet-button vti-bookmarklet-button--${shortcut.id}`}
+                                className="tools-shortcut-install"
                                 href={shortcut.bookmarklet}
                                 title={shortcut.buttonLabel}
                                 aria-label={shortcut.buttonLabel}
@@ -961,16 +975,11 @@ function DataShortcutsPanel() {
                             >
                                 {shortcut.buttonLabel}
                             </a>
+                            <button type="button" className="tools-shortcut-copy" onClick={() => copyBookmarklet(shortcut)}>
+                                <ClipboardCopy size={15} strokeWidth={2} aria-hidden="true" />
+                                Copy
+                            </button>
                         </div>
-                        <ol className="tools-shortcut-steps">
-                            {shortcut.steps.map((step) => (
-                                <li key={step}>{step}</li>
-                            ))}
-                        </ol>
-                        <button type="button" className="settings-action-btn" onClick={() => copyBookmarklet(shortcut)}>
-                            <ClipboardCopy size={15} strokeWidth={2} aria-hidden="true" />
-                            Copy shortcut
-                        </button>
                     </article>
                 ))}
             </div>

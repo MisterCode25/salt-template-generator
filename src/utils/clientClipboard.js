@@ -204,6 +204,11 @@ const CLIENT_FIELD_GROUPS = [
                 aliases: ["fixedNumber", "fixedPhone", "voipNumber", "voip"]
             },
             {
+                label: "Provider order ref",
+                path: "contact.providerOrderRef",
+                aliases: ["providerOrderRef", "provider_order_ref", "providerOrder", "orderRef", "providerOrderReference"]
+            },
+            {
                 label: "Contact record",
                 path: "contact.contactRecordId",
                 aliases: ["contactContactRecordId"]

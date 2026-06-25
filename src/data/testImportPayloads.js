@@ -24,6 +24,7 @@ export const TEST_VTI_IMPORT_PAYLOAD = Object.freeze({
         eligibilityOrdering: "35",
         publicId: "28453061",
         fixedNumber: "41788451664",
+        providerOrderRef: "10031420260327025732000000",
         contactRecordId: "50895045",
         error: ""
     },

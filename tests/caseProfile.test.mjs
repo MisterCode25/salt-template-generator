@@ -19,6 +19,9 @@ const importedExternalId = "FLAG//26.02.2026//777001//SO-777//Lost//Off//Check O
         mobile: "+41790000000",
         activationDate: "2026-06-20"
       },
+      contact: {
+        providerOrderRef: "10031420260327025732000000"
+      },
       healthcheck: {
         otoId: "B.111.783.391.7",
         routerSerialNumber: "GFAB11004892",
@@ -40,11 +43,14 @@ const importedExternalId = "FLAG//26.02.2026//777001//SO-777//Lost//Off//Check O
   assert.equal(profile.version, CASE_PROFILE_VERSION);
   assert.equal(profile.clientName, "Ana Muster");
   assert.equal(profile.contractorNumber, "31447756");
+  assert.equal(profile.providerOrderRef, "10031420260327025732000000");
   assert.equal(profile.externalCustomer, "777001");
   assert.equal(profile.soTicketNum, "SO-314");
   assert.equal(profile.lexId, "LEX-VTI");
   assert.equal(profile.externalLexId, "LEX-SO");
   assert.equal(profile.vars.contractorNumber, "31447756");
+  assert.equal(profile.vars.providerOrderRef, "10031420260327025732000000");
+  assert.equal(profile.tokenValues["{provider_order_ref}"], "10031420260327025732000000");
   assert.equal(profile.vars.healthcheckNewFutureProperty, "future-value");
   assert.equal(profile.tokenValues["{contractor_number}"], "31447756");
   assert.equal(profile.tokenValues["{external_customer}"], "777001");

@@ -1,6 +1,15 @@
 import { useCallback, useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 
+function safeFocus(element) {
+    if (!element || typeof element.focus !== "function") return;
+    try {
+        element.focus({ preventScroll: true });
+    } catch (error) {
+        console.warn("Unable to restore modal focus", error);
+    }
+}
+
 function getFocusableElements(container) {
     if (!container) return [];
     return Array.from(
@@ -36,9 +45,9 @@ export default function Modal({
         const focusables = getFocusableElements(dialogRef.current);
         dialogRef.current?.scrollTo?.({ top: 0, left: 0 });
         if (focusables.length > 0) {
-            focusables[0].focus({ preventScroll: true });
+            safeFocus(focusables[0]);
         } else {
-            dialogRef.current?.focus({ preventScroll: true });
+            safeFocus(dialogRef.current);
         }
         dialogRef.current?.scrollTo?.({ top: 0, left: 0 });
 
@@ -53,7 +62,7 @@ export default function Modal({
             const items = getFocusableElements(dialogRef.current);
             if (items.length === 0) {
                 event.preventDefault();
-                dialogRef.current?.focus({ preventScroll: true });
+                safeFocus(dialogRef.current);
                 return;
             }
 
@@ -63,10 +72,10 @@ export default function Modal({
 
             if (event.shiftKey && active === first) {
                 event.preventDefault();
-                last.focus({ preventScroll: true });
+                safeFocus(last);
             } else if (!event.shiftKey && active === last) {
                 event.preventDefault();
-                first.focus({ preventScroll: true });
+                safeFocus(first);
             }
         };
 
@@ -74,9 +83,7 @@ export default function Modal({
         return () => {
             document.removeEventListener("keydown", onKeyDown);
             document.body.style.overflow = previousOverflow;
-            if (previousActive && typeof previousActive.focus === "function") {
-                previousActive.focus({ preventScroll: true });
-            }
+            safeFocus(previousActive);
         };
     }, [disableEscapeClose, requestClose]);
 

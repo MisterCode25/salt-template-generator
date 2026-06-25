@@ -21,6 +21,7 @@ import {
     Wrench
 } from "lucide-react";
 import EmptyState from "../components/EmptyState.jsx";
+import ErrorBoundary from "../components/ErrorBoundary.jsx";
 import Modal from "../components/Modal.jsx";
 import {
     ClientBarCustomizeModal,
@@ -120,6 +121,28 @@ const ALO_TYPE_OPTIONS = [
     { value: "noSignal", label: "No signal" },
     { value: "lowBadRxTx", label: "Low / bad RX TX" }
 ];
+
+function WorkspaceErrorFallback({ workspace, error, onClose, onRetry }) {
+    const workspaceLabel = {
+        nodes: "Manage playbook",
+        tools: "Tools + shortcuts",
+        settings: "Settings",
+        vti: "Tools + shortcuts"
+    }[workspace] || "Workspace";
+    const message = error?.message || "This workspace could not be opened.";
+
+    return (
+        <div className="workspace-error-panel">
+            <p className="eyebrow">Interface error</p>
+            <h2>{workspaceLabel} did not open</h2>
+            <p>{message}</p>
+            <div className="workspace-error-actions">
+                <button type="button" className="secondary-btn" onClick={onClose}>Close</button>
+                <button type="button" className="primary-btn" onClick={onRetry}>Try again</button>
+            </div>
+        </div>
+    );
+}
 
 const ALO_SIGNAL_OPTIONS = [
     { value: "lost", label: "Lost" },
@@ -1773,9 +1796,21 @@ export default function Templates() {
                     dialogClassName={`popup-box workspace-modal workspace-modal--${activeWorkspace}`}
                     ariaLabel="Workspace"
                 >
-                    <Suspense fallback={<div className="node-content-empty">Loading...</div>}>
-                        {renderWorkspace()}
-                    </Suspense>
+                    <ErrorBoundary
+                        resetKey={activeWorkspace}
+                        fallback={({ error, reset }) => (
+                            <WorkspaceErrorFallback
+                                workspace={activeWorkspace}
+                                error={error}
+                                onClose={closeWorkspace}
+                                onRetry={reset}
+                            />
+                        )}
+                    >
+                        <Suspense fallback={<div className="node-content-empty">Loading...</div>}>
+                            {renderWorkspace()}
+                        </Suspense>
+                    </ErrorBoundary>
                 </Modal>
             )}
 

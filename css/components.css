@@ -520,6 +520,50 @@ textarea:focus {
     box-sizing: border-box;
 }
 
+.app-recovery-page {
+    min-height: 100dvh;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background: var(--bg-body);
+    color: var(--text-primary);
+}
+
+.app-recovery-card,
+.workspace-error-panel {
+    width: min(520px, 100%);
+    border: 1px solid var(--border-default);
+    border-radius: 8px;
+    background: var(--bg-surface-elevated);
+    color: var(--text-primary);
+    padding: 18px;
+    box-shadow: var(--shadow-md);
+}
+
+.app-recovery-card h1,
+.workspace-error-panel h2 {
+    margin: 4px 0 8px;
+    font-size: 20px;
+    line-height: 1.2;
+}
+
+.app-recovery-card p,
+.workspace-error-panel p {
+    margin: 0;
+    color: var(--text-secondary);
+    overflow-wrap: anywhere;
+}
+
+.app-recovery-actions,
+.workspace-error-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+}
+
 .modal-close-btn {
     position: absolute;
     top: 10px;
@@ -12072,27 +12116,68 @@ a.tools-bar-btn {
     gap: 14px;
 }
 
+.tools-shortcut-guide {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    border: 1px solid color-mix(in srgb, #14a7c7 24%, var(--border-default));
+    border-radius: 8px;
+    background: color-mix(in srgb, #14a7c7 8%, var(--bg-surface));
+}
+
+.tools-shortcut-guide strong {
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 900;
+    white-space: nowrap;
+}
+
+.tools-shortcut-guide p {
+    min-width: 0;
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: 650;
+    line-height: 1.4;
+}
+
 .tools-shortcut-card {
+    --shortcut-accent: #4d7cff;
     min-width: 0;
     display: grid;
     gap: 14px;
     padding: 16px;
-    border: 1px solid rgba(129, 153, 214, 0.18);
+    border: 1px solid color-mix(in srgb, var(--shortcut-accent) 36%, var(--border-default));
     border-radius: 8px;
-    background: rgba(129, 153, 214, 0.055);
+    background: color-mix(in srgb, var(--shortcut-accent) 10%, var(--bg-surface));
+    box-shadow: inset 4px 0 0 var(--shortcut-accent);
 }
 
-.tools-shortcut-card__head {
+.tools-shortcut-card--vti {
+    --shortcut-accent: #4d7cff;
+}
+
+.tools-shortcut-card--so {
+    --shortcut-accent: #d18b19;
+}
+
+.tools-shortcut-card--alo {
+    --shortcut-accent: #21a36a;
+}
+
+.tools-shortcut-card__body {
     min-width: 0;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 14px;
-    align-items: start;
+    gap: 10px;
 }
 
 .tools-shortcut-card h3 {
     margin: 2px 0 0;
     font-size: 18px;
+    line-height: 1.18;
 }
 
 .tools-shortcut-card p {
@@ -12103,16 +12188,64 @@ a.tools-bar-btn {
     line-height: 1.45;
 }
 
-.tools-shortcut-steps {
-    margin: 0;
-    padding-left: 18px;
-    color: var(--text-secondary);
-    font-size: 13px;
-    line-height: 1.5;
+.tools-shortcut-card__actions {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
 }
 
-.tools-shortcut-steps li + li {
-    margin-top: 6px;
+.tools-shortcut-install,
+.tools-shortcut-copy {
+    min-width: 0;
+    min-height: 38px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 0 12px;
+    border: 1px solid color-mix(in srgb, var(--shortcut-accent) 42%, var(--button-secondary-border));
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 850;
+    line-height: 1;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background 0.14s, border-color 0.14s, color 0.14s;
+}
+
+.tools-shortcut-install {
+    flex: 1 1 154px;
+    background: color-mix(in srgb, var(--shortcut-accent) 88%, #ffffff 12%);
+    border-color: color-mix(in srgb, var(--shortcut-accent) 76%, var(--button-primary-border));
+    color: #ffffff;
+    box-shadow: 0 8px 18px color-mix(in srgb, var(--shortcut-accent) 22%, transparent);
+}
+
+.tools-shortcut-copy {
+    flex: 0 0 auto;
+    background: color-mix(in srgb, var(--shortcut-accent) 12%, var(--button-secondary-bg));
+    color: color-mix(in srgb, var(--shortcut-accent) 22%, var(--text-primary));
+}
+
+.tools-shortcut-install:hover,
+.tools-shortcut-copy:hover {
+    border-color: color-mix(in srgb, var(--shortcut-accent) 68%, var(--control-border-hover));
+    background: color-mix(in srgb, var(--shortcut-accent) 22%, var(--button-secondary-bg-hover));
+    color: var(--text-primary);
+}
+
+.tools-shortcut-install:hover {
+    background: color-mix(in srgb, var(--shortcut-accent) 78%, #ffffff 22%);
+    color: #ffffff;
+}
+
+.tools-shortcut-install:focus-visible,
+.tools-shortcut-copy:focus-visible {
+    outline: 2px solid var(--control-focus);
+    outline-offset: 2px;
 }
 
 .tools-keyboard-list {
@@ -12194,7 +12327,7 @@ a.tools-bar-btn {
 .light-theme .tools-panel-title p,
 .light-theme .tools-field-line span,
 .light-theme .tools-shortcut-card p,
-.light-theme .tools-shortcut-steps,
+.light-theme .tools-shortcut-guide p,
 .light-theme .tools-keyboard-row p {
     color: #526078;
 }
@@ -12211,10 +12344,29 @@ a.tools-bar-btn {
 }
 
 .light-theme .tools-panel-block,
-.light-theme .tools-list-row,
-.light-theme .tools-shortcut-card {
+.light-theme .tools-list-row {
     background: #f8fafc;
     border-color: #dbe3f1;
+}
+
+.light-theme .tools-shortcut-guide {
+    background: #f8fafc;
+    border-color: color-mix(in srgb, #14a7c7 24%, #dbe3f1);
+}
+
+.light-theme .tools-shortcut-card {
+    background: color-mix(in srgb, var(--shortcut-accent) 8%, #ffffff);
+    border-color: color-mix(in srgb, var(--shortcut-accent) 32%, #dbe3f1);
+}
+
+.light-theme .tools-shortcut-copy {
+    background: color-mix(in srgb, var(--shortcut-accent) 10%, #ffffff);
+    color: color-mix(in srgb, var(--shortcut-accent) 30%, #172033);
+}
+
+.light-theme .tools-shortcut-copy:hover {
+    background: color-mix(in srgb, var(--shortcut-accent) 16%, #ffffff);
+    color: #172033;
 }
 
 .light-theme .tools-list-row__icon {
@@ -12355,7 +12507,7 @@ a.tools-bar-btn {
 
     .tools-form-grid,
     .tools-shortcut-grid,
-    .tools-shortcut-card__head {
+    .tools-shortcut-guide {
         grid-template-columns: minmax(0, 1fr);
     }
 

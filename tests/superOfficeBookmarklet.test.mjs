@@ -148,6 +148,11 @@ async function flushBookmarkletAsyncWork() {
 {
   let copiedText = "";
   const events = [];
+  const flipImage = {
+    click() {
+      events.push("flip-click");
+    }
+  };
   const toggle = {
     id: "message-toggle-1",
     className: "HtmlMessages2_toggle toggle-closed",
@@ -199,6 +204,7 @@ async function flushBookmarkletAsyncWork() {
         };
       },
       querySelectorAll(selector) {
+        if (selector === "img.HtmlMessages2_flipImage") return [flipImage];
         if (selector.includes("HtmlMessages2") && !selector.includes("img")) return [messageRoot];
         return [];
       }
@@ -229,6 +235,7 @@ async function flushBookmarkletAsyncWork() {
     await flushBookmarkletAsyncWork();
 
     assert.ok(events.includes("dblclick"));
+    assert.ok(events.includes("flip-click"));
     assert.equal(JSON.parse(copiedText).ticketId, "31436062");
   } finally {
     restoreGlobals.reverse().forEach((restore) => restore());
