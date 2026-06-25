@@ -187,6 +187,8 @@ export function buildAloAutofillFields(clientPayload = {}, agentProfile = {}, su
         contactPhone1: firstValue([fixedPhone, mobilePhone]),
         contactPhone2: fixedPhone && mobilePhone && fixedPhone !== mobilePhone ? mobilePhone : "",
         contactEmail: firstValue([client.email, client.mail, contact.email, contact.mail]),
+        notificationType: "Email",
+        preferredContactType: "Mobile",
         ispFirstName: agent.firstName,
         ispLastName: agent.lastName,
         ispPhone: agent.phoneNumber,
@@ -365,6 +367,8 @@ function aloAutofillBookmarkletRunner(expectedSource) {
         apply("ticket.contactPersonPhone1", field(payload, "contactPhone1", [client.contactPhone1, client.fixedNumber, client.mobileRaw, client.mobile, client.phone]));
         apply("ticket.contactPersonPhone2", field(payload, "contactPhone2", [client.contactPhone2]));
         apply("ticket.contactPersonMail", field(payload, "contactEmail", [client.email, client.mail]));
+        apply("ticket.contactPersonNotificationsType", field(payload, "notificationType", ["Email"]));
+        apply("ticket.contactPersonPreferredContactType", field(payload, "preferredContactType", ["Mobile"]));
         apply("ticket.contactPersonIspFirstName", field(payload, "ispFirstName", [agent.firstName]));
         apply("ticket.contactPersonIspLastName", field(payload, "ispLastName", [agent.lastName]));
         apply("ticket.contactPersonIspPhone", field(payload, "ispPhone", [agent.phoneNumber, agent.phone]));

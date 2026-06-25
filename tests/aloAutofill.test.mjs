@@ -34,6 +34,8 @@ const agentProfile = {
   assert.equal(payload.fields.contactPhone1, "41788451664");
   assert.equal(payload.fields.contactPhone2, "0789125685");
   assert.equal(payload.fields.contactEmail, "pierremb@gmail.com");
+  assert.equal(payload.fields.notificationType, "Email");
+  assert.equal(payload.fields.preferredContactType, "Mobile");
   assert.equal(payload.fields.ispFirstName, "Samir");
   assert.equal(payload.fields.ispLastName, "Mestari");
   assert.equal(payload.fields.ispPhone, "+41 79 000 00 00");
@@ -129,6 +131,8 @@ const agentProfile = {
   assert.match(bookmarklet, /ticket\.socketId/);
   assert.match(bookmarklet, /ticket\.contactPersonIspFirstName/);
   assert.match(bookmarklet, /ticket\.contactPersonIspMail/);
+  assert.match(bookmarklet, /ticket\.contactPersonNotificationsType/);
+  assert.match(bookmarklet, /ticket\.contactPersonPreferredContactType/);
   assert.match(bookmarklet, /ticket\.problemDateTime/);
   assert.match(bookmarklet, /ticket\.problemCode3/);
   assert.match(bookmarklet, /tagName === "SELECT"/);
