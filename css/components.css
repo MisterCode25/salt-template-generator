@@ -6825,7 +6825,17 @@ textarea:focus {
 }
 
 .node-section-dialog {
-    width: min(640px, 100%);
+    --popup-padding: clamp(18px, 2vw, 24px);
+    width: min(960px, calc(100vw - 48px));
+}
+
+.node-node-modal {
+    display: grid;
+    gap: 16px;
+}
+
+.node-node-modal .popup-header {
+    margin: 0;
 }
 
 .node-template-dialog {
@@ -6872,8 +6882,9 @@ textarea:focus {
 }
 
 .node-section-form-grid--appearance {
-    grid-template-columns: minmax(220px, 1fr) minmax(240px, 0.72fr) minmax(220px, 0.62fr);
+    grid-template-columns: minmax(280px, 1.2fr) minmax(320px, 1fr) minmax(180px, 0.45fr);
     align-items: start;
+    row-gap: 14px;
 }
 
 .node-color-field {
@@ -6882,15 +6893,20 @@ textarea:focus {
 
 .node-color-grid {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(4, 34px);
     gap: 7px;
+    justify-content: start;
     margin-top: 8px;
 }
 
 .node-color-auto,
 .node-color-swatch {
-    min-width: 0;
+    width: 34px;
+    min-width: 34px;
     height: 34px;
+    display: grid;
+    place-items: center;
+    padding: 0;
     border: 1px solid rgba(129, 153, 214, 0.22);
     border-radius: 8px;
     background: rgba(255, 255, 255, 0.055);
@@ -6899,7 +6915,7 @@ textarea:focus {
 
 .node-color-auto {
     color: #cbd8f8;
-    font-size: 12px;
+    font-size: 10px;
     font-weight: 850;
 }
 
@@ -6918,7 +6934,7 @@ textarea:focus {
 
 .node-color-custom {
     display: grid;
-    grid-template-columns: 42px minmax(0, 1fr);
+    grid-template-columns: 42px minmax(104px, 1fr);
     gap: 8px;
     margin-top: 8px;
 }
@@ -6929,6 +6945,47 @@ textarea:focus {
     height: 40px;
     padding: 3px !important;
     cursor: pointer;
+}
+
+@media (max-width: 920px) {
+    .node-section-dialog {
+        width: min(100%, calc(100vw - 24px));
+    }
+
+    .node-section-form-grid--appearance {
+        grid-template-columns: minmax(0, 1fr) minmax(260px, 0.85fr);
+    }
+
+    .node-color-field {
+        grid-column: 1 / -1;
+    }
+
+    .node-color-custom {
+        max-width: 300px;
+    }
+}
+
+@media (max-width: 560px) {
+    .node-node-modal {
+        gap: 14px;
+    }
+
+    .node-section-form-grid--appearance {
+        grid-template-columns: 1fr;
+    }
+
+    .node-icon-current {
+        grid-template-columns: 36px minmax(0, 1fr);
+    }
+
+    .node-icon-current-action {
+        grid-column: 2;
+        justify-self: start;
+    }
+
+    .node-color-custom {
+        max-width: none;
+    }
 }
 
 .node-form-parent,
