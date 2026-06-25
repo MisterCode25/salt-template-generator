@@ -148,9 +148,51 @@ async function flushBookmarkletAsyncWork() {
 {
   let copiedText = "";
   const events = [];
-  const flipImage = {
+  const openFlipImage = {
     click() {
-      events.push("flip-click");
+      events.push("open-flip-click");
+    },
+    getAttribute(name) {
+      if (name === "src") return "/graphics/nine/leftarrow.svg";
+      return null;
+    },
+    closest() {
+      return null;
+    }
+  };
+  const closedFlipImage = {
+    click() {
+      events.push("closed-flip-click");
+    },
+    getAttribute(name) {
+      if (name === "src") return "/graphics/nine/leftarrow.svg";
+      return null;
+    },
+    closest() {
+      return null;
+    }
+  };
+  const domOpenBody = {
+    offsetHeight: 120,
+    contains() {
+      return false;
+    }
+  };
+  const domOpenRoot = {
+    querySelectorAll() {
+      return [domOpenBody];
+    }
+  };
+  const domOpenFlipImage = {
+    click() {
+      events.push("dom-open-flip-click");
+    },
+    getAttribute(name) {
+      if (name === "src") return "/graphics/nine/leftarrow.svg";
+      return null;
+    },
+    closest() {
+      return domOpenRoot;
     }
   };
   const toggle = {
@@ -191,7 +233,17 @@ async function flushBookmarkletAsyncWork() {
     }
   };
   const restoreGlobals = [
-    withGlobal("window", { HtmlMessages2_data: {} }),
+    withGlobal("window", {
+      HtmlMessages2_data: {
+        ticketMessages: {
+          messages: [
+            { id: "open-message", bodyNotLoaded: false, body: "Already open" },
+            { id: "closed-message", bodyNotLoaded: true, body: "" },
+            { id: "dom-open-message", bodyNotLoaded: true, body: "" }
+          ]
+        }
+      }
+    }),
     withGlobal("document", {
       body: {
         innerText: "REQUEST 31436062\nExternal ticket ID:\n",
@@ -204,11 +256,15 @@ async function flushBookmarkletAsyncWork() {
         };
       },
       querySelectorAll(selector) {
-        if (selector === "img.HtmlMessages2_flipImage") return [flipImage];
+        if (selector === "img.HtmlMessages2_flipImage") return [openFlipImage, closedFlipImage, domOpenFlipImage];
         if (selector.includes("HtmlMessages2") && !selector.includes("img")) return [messageRoot];
         return [];
       }
     }),
+    withGlobal("getComputedStyle", () => ({
+      display: "block",
+      visibility: "visible"
+    })),
     withGlobal("location", { origin: "https://superoffice.example.test" }),
     withGlobal("navigator", {
       clipboard: {
@@ -235,7 +291,9 @@ async function flushBookmarkletAsyncWork() {
     await flushBookmarkletAsyncWork();
 
     assert.ok(events.includes("dblclick"));
-    assert.ok(events.includes("flip-click"));
+    assert.equal(events.includes("open-flip-click"), false);
+    assert.ok(events.includes("closed-flip-click"));
+    assert.equal(events.includes("dom-open-flip-click"), false);
     assert.equal(JSON.parse(copiedText).ticketId, "31436062");
   } finally {
     restoreGlobals.reverse().forEach((restore) => restore());
