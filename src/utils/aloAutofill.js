@@ -66,17 +66,6 @@ function getOfferActivationDate(clientPayload = {}) {
     ]);
 }
 
-function resolveAloType(externalFields = {}) {
-    const haystack = [
-        externalFields.SignalStatus,
-        externalFields.LedStatus,
-        externalFields.treatmentStep,
-        externalFields.comment
-    ].join(" ").toLowerCase();
-    if (/(low|bad|rx|tx|performance)/i.test(haystack)) return "lowBadRxTx";
-    return "noSignal";
-}
-
 function resolveAloSignalState(externalFields = {}) {
     const signal = textValue(externalFields.SignalStatus).toLowerCase();
     if (signal === "lost") return "lost";
@@ -106,7 +95,6 @@ export function buildAloPreparationDefaults(clientPayload = {}, superOfficePaylo
     ]);
     const parsedExternalId = parseExternalId(externalId);
     const externalFields = parsedExternalId.ok ? parsedExternalId.fields : {};
-    const aloType = resolveAloType(externalFields);
     const signalState = resolveAloSignalState(externalFields);
     const activationDate = formatIsoDate(getOfferActivationDate(clientPayload));
     const ticketCreatedDate = formatIsoDate(firstValue([
@@ -126,12 +114,12 @@ export function buildAloPreparationDefaults(clientPayload = {}, superOfficePaylo
     return {
         externalId,
         externalFields,
-        aloType,
+        aloType: "",
         signalState,
         extRef,
         disconnectionDate: signalState === "lost" ? ticketCreatedDate : "",
         activationDate,
-        description: buildAloProblemDescription({ aloType, signalState, disconnectionDate: ticketCreatedDate, activationDate })
+        description: ""
     };
 }
 

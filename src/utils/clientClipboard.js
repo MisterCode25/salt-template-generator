@@ -737,7 +737,7 @@ export function getClientSummaryFields(payload) {
     const client = payload.client || {};
     const contact = payload.contact || {};
     const healthcheck = payload.healthcheck || {};
-    const fullName = [client.title, client.firstName, client.lastName]
+    const fullName = [client.title, client.lastName, client.firstName]
         .map(displayValue)
         .filter(Boolean)
         .join(" ");
@@ -745,7 +745,7 @@ export function getClientSummaryFields(payload) {
     return [
         {
             label: "Name",
-            value: fullName || firstValue([client.firstName, client.lastName])
+            value: fullName || firstValue([client.lastName, client.firstName])
         },
         {
             label: "Mobile",

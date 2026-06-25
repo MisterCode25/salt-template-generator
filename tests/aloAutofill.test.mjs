@@ -10,6 +10,7 @@ import {
   TEST_SO_IMPORT_PAYLOAD,
   TEST_VTI_IMPORT_PAYLOAD
 } from "../src/data/testImportPayloads.js";
+import { buildExternalCode } from "../src/utils/externalGenerator.js";
 
 const agentProfile = {
   firstName: "Samir",
@@ -63,10 +64,30 @@ const agentProfile = {
 
 {
   const defaults = buildAloPreparationDefaults(TEST_VTI_IMPORT_PAYLOAD, TEST_SO_IMPORT_PAYLOAD);
-  assert.equal(defaults.aloType, "noSignal");
+  assert.equal(defaults.aloType, "");
   assert.equal(defaults.signalState, "lost");
   assert.equal(defaults.extRef, "31436062");
   assert.equal(defaults.activationDate, "2026-06-20");
+  assert.equal(defaults.description, "");
+}
+
+{
+  const defaults = buildAloPreparationDefaults(TEST_VTI_IMPORT_PAYLOAD, {
+    ...TEST_SO_IMPORT_PAYLOAD,
+    externalTicketId: buildExternalCode({
+      data: "2026-06-20",
+      customer: "31447756",
+      soTicket: "31436062",
+      SignalStatus: "Low RX|TX",
+      LedStatus: "Other",
+      treatmentStep: "Other",
+      partner: "ALO"
+    })
+  });
+
+  assert.equal(defaults.aloType, "");
+  assert.equal(defaults.signalState, "");
+  assert.equal(defaults.description, "");
 }
 
 {

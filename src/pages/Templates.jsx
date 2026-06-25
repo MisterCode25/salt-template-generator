@@ -541,7 +541,7 @@ const PlaybookSearchBox = memo(function PlaybookSearchBox({
 
 function AloPreparationModal({ defaults, templateOptions = [], onCancel, onSubmit }) {
     const [form, setForm] = useState(() => ({
-        aloType: defaults.aloType || "noSignal",
+        aloType: defaults.aloType || "",
         extRef: defaults.extRef || "",
         signalState: defaults.signalState || "",
         disconnectionDate: defaults.disconnectionDate || "",
@@ -551,12 +551,11 @@ function AloPreparationModal({ defaults, templateOptions = [], onCancel, onSubmi
         notes: defaults.description || ""
     }));
     const [stepIndex, setStepIndex] = useState(0);
-    const inferredType = Boolean(defaults.externalFields?.SignalStatus || defaults.externalFields?.LedStatus || defaults.externalFields?.treatmentStep);
     const inferredSignalState = Boolean(defaults.signalState);
 
     const steps = useMemo(() => {
         const next = [];
-        if (!inferredType) next.push({ key: "aloType", kind: "choice", title: "Type", options: ALO_TYPE_OPTIONS });
+        next.push({ key: "aloType", kind: "choice", title: "Type", options: ALO_TYPE_OPTIONS });
         next.push({ key: "extRef", kind: "input", title: "Ext ref field", inputType: "text", placeholder: "SO ticket / external reference" });
         if (!inferredSignalState) next.push({ key: "signalState", kind: "choice", title: "Signal state", options: ALO_SIGNAL_OPTIONS });
         next.push({
@@ -578,17 +577,21 @@ function AloPreparationModal({ defaults, templateOptions = [], onCancel, onSubmi
             ? { key: "selectedTemplateId", kind: "template", title: "Import template" }
             : { key: "notes", kind: "textarea", title: "Free text" });
         return next;
-    }, [form.notesMode, form.signalState, inferredSignalState, inferredType, templateOptions.length]);
+    }, [form.notesMode, form.signalState, inferredSignalState, templateOptions.length]);
 
     const step = steps[Math.min(stepIndex, steps.length - 1)];
     const showBack = stepIndex > 0;
-    const problemDescription = form.aloType === "lowBadRxTx" ? "Bad signal" : "No signal";
+    const problemDescription = form.aloType === "lowBadRxTx"
+        ? "Bad signal"
+        : form.aloType === "noSignal"
+            ? "No signal"
+            : "Choose type";
 
     const updateForm = (patch) => {
         setForm((current) => {
             const next = { ...current, ...patch };
             if (Object.prototype.hasOwnProperty.call(patch, "signalState") || Object.prototype.hasOwnProperty.call(patch, "aloType")) {
-                next.notes = buildAloProblemDescription(next);
+                next.notes = next.aloType ? buildAloProblemDescription(next) : "";
             }
             return next;
         });
@@ -603,7 +606,7 @@ function AloPreparationModal({ defaults, templateOptions = [], onCancel, onSubmi
         signalState: form.signalState,
         disconnectionDate: form.disconnectionDate,
         activationDate: form.activationDate,
-        description: problemDescription,
+        description: form.aloType === "lowBadRxTx" ? "Bad signal" : "No signal",
         notes: form.notes.trim()
     });
 
