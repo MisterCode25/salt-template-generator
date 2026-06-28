@@ -159,15 +159,17 @@ function getCaptureDataVisualState(state, hasConflict = false) {
         return {
             mode: "scanning",
             Icon: Loader2,
+            waitingTarget: "VTI",
             title: "Waiting for VTI data",
-            detail: "Open the customer in VTI, click the VTI Capture bookmark, then copy the result."
+            detail: "Open VTI, capture, copy."
         };
     }
     return {
         mode: "scanning",
         Icon: Loader2,
+        waitingTarget: "SO",
         title: "Waiting for SuperOffice data",
-        detail: "Open the BO/SuperOffice ticket, click the BO Capture bookmark, then copy the result."
+        detail: "Open SO, capture, copy."
     };
 }
 
@@ -1379,16 +1381,12 @@ export function CaptureDataModal({
         {
             id: "so",
             label: "SO",
-            status: state.soStatus,
-            note: state.contractorStatus === "done"
-                ? "Contractor copied"
-                : state.soStatus === "done" ? "Ticket imported" : "Do this first"
+            status: state.soStatus
         },
         {
             id: "vti",
             label: "VTI",
-            status: state.vtiStatus,
-            note: state.vtiStatus === "done" ? "Customer imported" : state.soStatus === "done" ? "Do this next" : "Next"
+            status: state.vtiStatus
         }
     ];
     const isBusy = visual.mode === "scanning" || state.isReading;
@@ -1397,6 +1395,11 @@ export function CaptureDataModal({
         : state.soStatus === "done"
             ? "is-half"
             : "is-start";
+    const statusText = state.error || (state.isReading
+        ? "Reading clipboard..."
+        : visual.waitingTarget
+            ? visual.detail
+            : state.detail);
 
     return (
         <Modal onClose={onClose} dialogClassName="popup-box capture-data-modal" ariaLabel="Capture data">
@@ -1405,19 +1408,24 @@ export function CaptureDataModal({
                     <Database size={22} />
                 </div>
                 <div>
-                    <p className="eyebrow">Clipboard capture</p>
                     <h2>Capture data</h2>
-                    <p>{state.message}</p>
                 </div>
             </div>
 
             <div className={`capture-data-focus is-${visual.mode}${isBusy ? " is-busy" : ""}`} aria-live="polite">
-                <strong>{visual.title}</strong>
+                {!visual.waitingTarget && <strong>{visual.title}</strong>}
                 <div className="capture-data-focus-ring" aria-hidden="true" />
                 <div className="capture-data-focus-icon">
-                    <VisualIcon size={34} aria-hidden="true" />
+                    {visual.waitingTarget ? (
+                        <div className="capture-data-focus-label" aria-hidden="true">
+                            <small>Waiting for</small>
+                            <b>{visual.waitingTarget}</b>
+                        </div>
+                    ) : (
+                        <VisualIcon size={38} aria-hidden="true" />
+                    )}
                 </div>
-                <span>{visual.detail}</span>
+                {!visual.waitingTarget && <span>{visual.detail}</span>}
             </div>
 
             <div className={`capture-data-timeline ${timelineProgressClass}`} aria-label="Capture progress">
@@ -1428,14 +1436,13 @@ export function CaptureDataModal({
                     <div key={step.id} className={`capture-data-timeline-step is-${step.status}`}>
                         <span className="capture-data-timeline-dot" aria-hidden="true" />
                         <strong>{step.label}</strong>
-                        <small>{step.note}</small>
                     </div>
                 ))}
             </div>
 
             <div className={`capture-data-status${state.error ? " is-error" : ""}${state.isPaused ? " is-paused" : ""}`}>
                 {state.isReading && <Loader2 size={16} aria-hidden="true" className="capture-data-spinner" />}
-                <span>{state.error || state.detail}</span>
+                <span>{statusText}</span>
             </div>
 
             {conflictPrompt && (
