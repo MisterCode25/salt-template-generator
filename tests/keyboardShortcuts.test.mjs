@@ -22,14 +22,14 @@ function eventFor(key, overrides = {}) {
 }
 
 {
-  assert.equal(getKeyboardShortcutForEvent(eventFor("q", { altKey: true })).id, "importVti");
-  assert.equal(getKeyboardShortcutForEvent(eventFor("W", { altKey: true })).id, "importSo");
+  assert.equal(getKeyboardShortcutForEvent(eventFor("q", { altKey: true })).id, "captureData");
+  assert.equal(getKeyboardShortcutForEvent(eventFor("W", { altKey: true })), null);
   assert.equal(getKeyboardShortcutForEvent(eventFor("e", { altKey: true })).id, "clearData");
 }
 
 {
-  assert.equal(getKeyboardShortcutForEvent(eventFor("Dead", { altKey: true, code: "KeyQ" })).id, "importVti");
-  assert.equal(getKeyboardShortcutForEvent(eventFor("∑", { altKey: true, code: "KeyW" })).id, "importSo");
+  assert.equal(getKeyboardShortcutForEvent(eventFor("Dead", { altKey: true, code: "KeyQ" })).id, "captureData");
+  assert.equal(getKeyboardShortcutForEvent(eventFor("∑", { altKey: true, code: "KeyW" })), null);
   assert.equal(getKeyboardShortcutForEvent(eventFor("Dead", { altKey: true, code: "KeyE" })).id, "clearData");
   assert.equal(getKeyboardShortcutForEvent(eventFor("Dead", { altKey: true, code: "KeyE", isComposing: true })).id, "clearData");
   assert.equal(getKeyboardShortcutForEvent(eventFor("Dead", { altKey: true, code: "KeyR" })), null);
@@ -53,8 +53,9 @@ function eventFor(key, overrides = {}) {
 }
 
 {
-  const shortcut = getKeyboardShortcutForEvent(eventFor("w", { altKey: true }));
-  assert.equal(formatKeyboardShortcut(shortcut), "Alt+w");
+  const shortcut = getKeyboardShortcutForEvent(eventFor("q", { altKey: true }));
+  assert.equal(formatKeyboardShortcut(shortcut), "Alt+q");
+  assert.equal(formatKeyboardShortcut(getKeyboardShortcutForEvent(eventFor("w", { altKey: true }))), "");
 }
 
 console.log("keyboardShortcuts tests passed");

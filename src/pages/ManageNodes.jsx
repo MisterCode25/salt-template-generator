@@ -1,4 +1,4 @@
-import { lazy, memo, Suspense, useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
+import { lazy, memo, Suspense, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
     ArrowRight,
     Check,
@@ -8,6 +8,7 @@ import {
     ExternalLink,
     Languages,
     Link2,
+    Lock,
     MoreVertical,
     Plus,
     Sparkles,
@@ -19,6 +20,7 @@ import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import Modal from "../components/Modal.jsx";
 import { showToast } from "../services/clipboardService.js";
+import { CONFIG_LOCK_UPDATED_EVENT, loadConfigLocked } from "../services/appConfigService.js";
 import { TEMPLATE_TREE_UPDATED_EVENT, loadTemplateTreeData, saveTemplateTreeData } from "../services/templateTreeService.js";
 import { loadTemplateImageMap } from "../services/templateImageService.js";
 import { loadTokens, loadTokensWithClientData, saveTokens } from "../services/tokenService.js";
@@ -62,6 +64,8 @@ import {
 
 const TREE_DRAG_MIME = "application/x-template-tree-item";
 const CHATGPT_CLIPBOARD_READ_TIMEOUT_MS = 3500;
+const TEMPLATE_DROP_BEFORE_THRESHOLD = 0.42;
+const TEMPLATE_DROP_AFTER_THRESHOLD = 0.58;
 const RichTextEditor = lazy(() => import("../components/RichTextEditor.jsx"));
 
 const CHANNEL_LABELS = {
@@ -2093,10 +2097,37 @@ function getNodeDropPosition(event) {
     return "inside";
 }
 
-function getTemplateDropPosition(event) {
+function getTemplateDropPosition(event, currentDropTarget = null, templateId = null, nodeId = null) {
     const rect = event.currentTarget.getBoundingClientRect();
     const ratio = rect.height > 0 ? (event.clientY - rect.top) / rect.height : 0.5;
+    if (ratio < TEMPLATE_DROP_BEFORE_THRESHOLD) return "before";
+    if (ratio > TEMPLATE_DROP_AFTER_THRESHOLD) return "after";
+
+    if (
+        currentDropTarget?.targetType === "template"
+        && currentDropTarget.templateId === templateId
+        && currentDropTarget.nodeId === nodeId
+    ) {
+        return currentDropTarget.position || (ratio < 0.5 ? "before" : "after");
+    }
+
     return ratio < 0.5 ? "before" : "after";
+}
+
+function normalizeTreeDropCandidate(candidate, item) {
+    if (!candidate) return null;
+    if (item?.type === "template" && candidate.targetType === "topic") {
+        return { ...candidate, position: "inside" };
+    }
+    return candidate;
+}
+
+function hasSameOrder(left = [], right = []) {
+    if (left.length !== right.length) return false;
+    for (let index = 0; index < left.length; index++) {
+        if (left[index] !== right[index]) return false;
+    }
+    return true;
 }
 
 function isSameDropTarget(left, right) {
@@ -2123,6 +2154,7 @@ const NodeTreeRow = memo(function NodeTreeRow({
     depth,
     hasChildren,
     expanded,
+    locked = false,
     dragItem,
     dropTarget,
     onToggle,
@@ -2133,28 +2165,43 @@ const NodeTreeRow = memo(function NodeTreeRow({
     onDrop
 }) {
     const handleSelect = useCallback(() => {
+        if (hasChildren) {
+            if (!expanded) {
+                onToggle(node.id);
+            } else if (selected) {
+                onToggle(node.id);
+                return;
+            }
+        }
         onSelect(node.id);
-    }, [node.id, onSelect]);
+    }, [expanded, hasChildren, node.id, onSelect, onToggle, selected]);
 
-    const handleToggle = useCallback(() => {
+    const handleToggle = useCallback((event) => {
+        event.stopPropagation();
         onToggle(node.id);
     }, [node.id, onToggle]);
 
     const handleDragStart = useCallback((event) => {
+        if (locked) {
+            event.preventDefault();
+            return;
+        }
         onDragStart({ type: "topic", id: node.id }, event);
-    }, [node.id, onDragStart]);
+    }, [locked, node.id, onDragStart]);
 
     const handleDragOver = useCallback((event) => {
+        if (locked) return;
         onDragOver(node.id, getNodeDropPosition(event), event);
-    }, [node.id, onDragOver]);
+    }, [locked, node.id, onDragOver]);
 
     const handleDrop = useCallback((event) => {
+        if (locked) return;
         onDrop({
             targetType: "topic",
             nodeId: node.id,
             position: getNodeDropPosition(event)
         }, event);
-    }, [node.id, onDrop]);
+    }, [locked, node.id, onDrop]);
 
     const dragging = dragItem?.type === "topic" && dragItem.id === node.id;
     const dropPosition = dropTarget?.targetType === "topic" && dropTarget.nodeId === node.id
@@ -2173,7 +2220,7 @@ const NodeTreeRow = memo(function NodeTreeRow({
             <div
                 className={rowClassName}
                 data-depth={depth}
-                draggable
+                draggable={!locked}
                 aria-grabbed={dragging ? "true" : undefined}
                 onDragStart={handleDragStart}
                 onDragEnd={onDragEnd}
@@ -2218,6 +2265,7 @@ const NodeTreeTemplateRow = memo(function NodeTreeTemplateRow({
     selected,
     depth,
     nodeId,
+    locked = false,
     dragItem,
     dropTarget,
     onSelect,
@@ -2231,21 +2279,27 @@ const NodeTreeTemplateRow = memo(function NodeTreeTemplateRow({
     }, [nodeId, onSelect, template.id]);
 
     const handleDragStart = useCallback((event) => {
+        if (locked) {
+            event.preventDefault();
+            return;
+        }
         onDragStart({ type: "template", id: template.id, nodeId }, event);
-    }, [nodeId, onDragStart, template.id]);
+    }, [locked, nodeId, onDragStart, template.id]);
 
     const handleDragOver = useCallback((event) => {
-        onDragOver(template.id, nodeId, getTemplateDropPosition(event), event);
-    }, [nodeId, onDragOver, template.id]);
+        if (locked) return;
+        onDragOver(template.id, nodeId, getTemplateDropPosition(event, dropTarget, template.id, nodeId), event);
+    }, [dropTarget, locked, nodeId, onDragOver, template.id]);
 
     const handleDrop = useCallback((event) => {
+        if (locked) return;
         onDrop({
             targetType: "template",
             templateId: template.id,
             nodeId,
-            position: getTemplateDropPosition(event)
+            position: getTemplateDropPosition(event, dropTarget, template.id, nodeId)
         }, event);
-    }, [nodeId, onDrop, template.id]);
+    }, [dropTarget, locked, nodeId, onDrop, template.id]);
 
     const dragging = dragItem?.type === "template" && dragItem.id === template.id && dragItem.nodeId === nodeId;
     const dropPosition = dropTarget?.targetType === "template"
@@ -2266,7 +2320,7 @@ const NodeTreeTemplateRow = memo(function NodeTreeTemplateRow({
             <div
                 className={rowClassName}
                 data-depth={depth}
-                draggable
+                draggable={!locked}
                 aria-grabbed={dragging ? "true" : undefined}
                 onDragStart={handleDragStart}
                 onDragEnd={onDragEnd}
@@ -2302,6 +2356,7 @@ const NodeTreeRows = memo(function NodeTreeRows({
     selectedTemplateId,
     selectedItemType,
     expandedNodeIds,
+    locked = false,
     dragItem,
     dropTarget,
     onToggleNode,
@@ -2329,6 +2384,7 @@ const NodeTreeRows = memo(function NodeTreeRows({
                     depth={depth}
                     hasChildren={hasChildren}
                     expanded={expanded}
+                    locked={locked}
                     dragItem={dragItem}
                     dropTarget={dropTarget}
                     onToggle={onToggleNode}
@@ -2348,6 +2404,7 @@ const NodeTreeRows = memo(function NodeTreeRows({
                         selectedTemplateId={selectedTemplateId}
                         selectedItemType={selectedItemType}
                         expandedNodeIds={expandedNodeIds}
+                        locked={locked}
                         dragItem={dragItem}
                         dropTarget={dropTarget}
                         onToggleNode={onToggleNode}
@@ -2368,6 +2425,7 @@ const NodeTreeRows = memo(function NodeTreeRows({
                         selected={selectedItemType === "template" && selectedNodeId === node.id && selectedTemplateId === template.id}
                         depth={depth + 1}
                         nodeId={node.id}
+                        locked={locked}
                         dragItem={dragItem}
                         dropTarget={dropTarget}
                         onSelect={onSelectTemplate}
@@ -2382,11 +2440,28 @@ const NodeTreeRows = memo(function NodeTreeRows({
     });
 });
 
+const LockedConfigPanel = memo(function LockedConfigPanel({ title, message, detail = "" }) {
+    return (
+        <section className="config-locked-panel">
+            <span className="config-locked-panel__icon" aria-hidden="true">
+                <Lock size={54} strokeWidth={1.8} />
+            </span>
+            <div>
+                <p className="eyebrow">Configuration locked</p>
+                <h2>{title}</h2>
+                <p>{message}</p>
+                {detail && <strong>{detail}</strong>}
+            </div>
+        </section>
+    );
+});
+
 const TopicDetailPanel = memo(function TopicDetailPanel({
     selectedNode,
     selectedSummary,
     selectedChildNodes,
     selectedTemplates,
+    locked = false,
     onRename,
     onDelete,
     onNewSubtopic,
@@ -2403,25 +2478,27 @@ const TopicDetailPanel = memo(function TopicDetailPanel({
                     <h2>{selectedNode.title || "Untitled topic"}</h2>
                     <p>{selectedSummary}</p>
                 </div>
-                <div className="node-detail-top-actions">
-                    <button type="button" className="secondary-btn node-action-btn" onClick={onRename}>
-                        <Edit3 size={17} aria-hidden="true" />
-                        Rename
-                    </button>
-                    <details className="node-overflow-menu">
-                        <summary className="secondary-btn node-icon-btn" aria-label="More topic actions" title="More actions">
-                            <MoreVertical size={20} aria-hidden="true" />
-                        </summary>
-                        <button
-                            type="button"
-                            className="node-overflow-danger"
-                            onClick={onDelete}
-                        >
-                            <Trash2 size={16} aria-hidden="true" />
-                            Delete topic
+                {!locked && (
+                    <div className="node-detail-top-actions">
+                        <button type="button" className="secondary-btn node-action-btn" onClick={onRename}>
+                            <Edit3 size={17} aria-hidden="true" />
+                            Rename
                         </button>
-                    </details>
-                </div>
+                        <details className="node-overflow-menu">
+                            <summary className="secondary-btn node-icon-btn" aria-label="More topic actions" title="More actions">
+                                <MoreVertical size={20} aria-hidden="true" />
+                            </summary>
+                            <button
+                                type="button"
+                                className="node-overflow-danger"
+                                onClick={onDelete}
+                            >
+                                <Trash2 size={16} aria-hidden="true" />
+                                Delete topic
+                            </button>
+                        </details>
+                    </div>
+                )}
             </div>
 
             <div className="node-detail-topic-grid">
@@ -2446,38 +2523,45 @@ const TopicDetailPanel = memo(function TopicDetailPanel({
                     </div>
                 )}
 
-                <section className="node-detail-card node-topic-action-card">
-                    <div>
-                        <h3>Topic actions</h3>
-                        <p>Add content here, then navigate it from the tree on the left.</p>
-                    </div>
-                    <div className="node-detail-card-actions">
-                        <button
-                            type="button"
-                            className="secondary-btn node-action-btn"
-                            onClick={onNewSubtopic}
-                        >
-                            <Plus size={16} aria-hidden="true" />
-                            New subtopic
-                        </button>
-                        <button
-                            type="button"
-                            className="secondary-btn node-action-btn"
-                            onClick={onLinkExisting}
-                        >
-                            <Link2 size={16} aria-hidden="true" />
-                            Link existing
-                        </button>
-                        <button
-                            type="button"
-                            className="primary-btn node-action-btn"
-                            onClick={onNewTemplate}
-                        >
-                            <Plus size={16} aria-hidden="true" />
-                            New template
-                        </button>
-                    </div>
-                </section>
+                {locked ? (
+                    <LockedConfigPanel
+                        title="Playbook editing is locked"
+                        message="This imported configuration allows template usage, but topic and template changes are disabled."
+                    />
+                ) : (
+                    <section className="node-detail-card node-topic-action-card">
+                        <div>
+                            <h3>Topic actions</h3>
+                            <p>Add content here, then navigate it from the tree on the left.</p>
+                        </div>
+                        <div className="node-detail-card-actions">
+                            <button
+                                type="button"
+                                className="secondary-btn node-action-btn"
+                                onClick={onNewSubtopic}
+                            >
+                                <Plus size={16} aria-hidden="true" />
+                                New subtopic
+                            </button>
+                            <button
+                                type="button"
+                                className="secondary-btn node-action-btn"
+                                onClick={onLinkExisting}
+                            >
+                                <Link2 size={16} aria-hidden="true" />
+                                Link existing
+                            </button>
+                            <button
+                                type="button"
+                                className="primary-btn node-action-btn"
+                                onClick={onNewTemplate}
+                            >
+                                <Plus size={16} aria-hidden="true" />
+                                New template
+                            </button>
+                        </div>
+                    </section>
+                )}
             </div>
         </>
     );
@@ -2645,6 +2729,8 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
     const [templateLinkTargets, setTemplateLinkTargets] = useState({});
     const [dragItem, setDragItem] = useState(null);
     const [dropTarget, setDropTarget] = useState(null);
+    const dropTargetRef = useRef(null);
+    const [configLocked, setConfigLocked] = useState(false);
 
     useEffect(() => {
         let active = true;
@@ -2672,6 +2758,25 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
         return () => {
             active = false;
             window.removeEventListener(TEMPLATE_TREE_UPDATED_EVENT, handleTemplateTreeUpdated);
+        };
+    }, []);
+
+    useEffect(() => {
+        let active = true;
+        const syncConfigLock = (event = null) => {
+            if (event?.detail && typeof event.detail.locked === "boolean") {
+                setConfigLocked(event.detail.locked);
+                return;
+            }
+            loadConfigLocked().then((locked) => {
+                if (active) setConfigLocked(locked);
+            });
+        };
+        syncConfigLock();
+        window.addEventListener(CONFIG_LOCK_UPDATED_EVENT, syncConfigLock);
+        return () => {
+            active = false;
+            window.removeEventListener(CONFIG_LOCK_UPDATED_EVENT, syncConfigLock);
         };
     }, []);
 
@@ -2790,49 +2895,102 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
         });
     }, []);
 
+    const ensureUnlocked = useCallback(() => {
+        if (!configLocked) return true;
+        showToast("Configuration locked: templates and topics cannot be edited.", "warning");
+        return false;
+    }, [configLocked]);
+
     const persist = useCallback(async (nextNodes = nodes, nextTemplates = templates) => {
+        if (!ensureUnlocked()) return false;
         setNodes(nextNodes);
         setTemplates(nextTemplates);
         await saveTemplateTreeData({ nodes: nextNodes, templates: nextTemplates });
-    }, [nodes, templates]);
+        return true;
+    }, [ensureUnlocked, nodes, templates]);
+
+    const getTemplateDropPlan = useCallback((candidate, item = dragItem) => {
+        const normalizedCandidate = normalizeTreeDropCandidate(candidate, item);
+        if (!normalizedCandidate || item?.type !== "template") return null;
+
+        const templateExists = templates.some((template) => template.id === item.id);
+        if (!templateExists) return null;
+
+        const targetNodeId = normalizedCandidate.nodeId;
+        if (!nodeLookup.has(targetNodeId)) return null;
+
+        const targetTemplatesForNode = getIndexedTemplatesForNode(templatesByNode, targetNodeId);
+        const targetTemplates = targetTemplatesForNode.filter((template) => template.id !== item.id);
+        let insertIndex = targetTemplates.length;
+
+        if (normalizedCandidate.targetType === "template") {
+            if (normalizedCandidate.templateId === item.id) return null;
+            const targetIndex = targetTemplates.findIndex((template) => template.id === normalizedCandidate.templateId);
+            if (targetIndex < 0) return null;
+            insertIndex = targetIndex + (normalizedCandidate.position === "after" ? 1 : 0);
+        } else if (normalizedCandidate.targetType !== "topic") {
+            return null;
+        }
+
+        if (item.nodeId === targetNodeId) {
+            const currentOrder = targetTemplatesForNode.map((template) => template.id);
+            const nextOrder = targetTemplates.map((template) => template.id);
+            nextOrder.splice(insertIndex, 0, item.id);
+            if (hasSameOrder(currentOrder, nextOrder)) return null;
+        }
+
+        return { targetNodeId, insertIndex };
+    }, [dragItem, nodeLookup, templates, templatesByNode]);
 
     const isValidTreeDrop = useCallback((candidate, item = dragItem) => {
-        if (!candidate || !item) return false;
+        if (configLocked) return false;
+        const normalizedCandidate = normalizeTreeDropCandidate(candidate, item);
+        if (!normalizedCandidate || !item) return false;
 
         if (item.type === "topic") {
-            if (candidate.targetType !== "topic") return false;
-            const targetNode = nodeLookup.get(candidate.nodeId);
+            if (normalizedCandidate.targetType !== "topic") return false;
+            const targetNode = nodeLookup.get(normalizedCandidate.nodeId);
             if (!targetNode || targetNode.id === item.id) return false;
 
-            const nextParentId = candidate.position === "inside"
+            const nextParentId = normalizedCandidate.position === "inside"
                 ? targetNode.id
                 : targetNode.parentId || null;
             return canMoveNode(nodes, item.id, nextParentId);
         }
 
         if (item.type === "template") {
-            const templateExists = templates.some((template) => template.id === item.id);
-            if (!templateExists) return false;
-            if (candidate.targetType === "topic") {
-                return nodeLookup.has(candidate.nodeId);
-            }
-            if (candidate.targetType === "template") {
-                return candidate.templateId !== item.id && nodeLookup.has(candidate.nodeId);
-            }
+            return Boolean(getTemplateDropPlan(normalizedCandidate, item));
         }
 
         return false;
-    }, [dragItem, nodeLookup, nodes, templates]);
+    }, [configLocked, dragItem, getTemplateDropPlan, nodeLookup, nodes]);
 
     const updateDropTarget = useCallback((candidate) => {
+        dropTargetRef.current = candidate;
         setDropTarget((current) => (
             isSameDropTarget(current, candidate) ? current : candidate
         ));
     }, []);
 
-    const handleTreeDragStart = useCallback((item, event) => {
-        setDragItem(item);
+    const clearDropTarget = useCallback(() => {
+        dropTargetRef.current = null;
         setDropTarget(null);
+    }, []);
+
+    const allowCurrentDropTarget = useCallback((event, item = dragItem) => {
+        if (!isValidTreeDrop(dropTargetRef.current, item)) return false;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+        return true;
+    }, [dragItem, isValidTreeDrop]);
+
+    const handleTreeDragStart = useCallback((item, event) => {
+        if (!ensureUnlocked()) {
+            event.preventDefault();
+            return;
+        }
+        setDragItem(item);
+        clearDropTarget();
         try {
             event.dataTransfer.effectAllowed = "move";
             event.dataTransfer.setData(TREE_DRAG_MIME, JSON.stringify(item));
@@ -2840,54 +2998,68 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
         } catch {
             // Drag metadata is only a browser hint; React state remains the source for this interaction.
         }
-    }, []);
+    }, [clearDropTarget, ensureUnlocked]);
 
     const handleTreeDragEnd = useCallback(() => {
         setDragItem(null);
-        setDropTarget(null);
-    }, []);
+        clearDropTarget();
+    }, [clearDropTarget]);
 
     const handleNodeDragOver = useCallback((nodeId, position, event) => {
-        const candidate = { targetType: "topic", nodeId, position };
-        if (!isValidTreeDrop(candidate)) return;
+        const candidate = normalizeTreeDropCandidate({ targetType: "topic", nodeId, position }, dragItem);
+        if (!isValidTreeDrop(candidate)) {
+            if (!allowCurrentDropTarget(event)) clearDropTarget();
+            return;
+        }
         event.preventDefault();
         event.dataTransfer.dropEffect = "move";
         updateDropTarget(candidate);
-    }, [isValidTreeDrop, updateDropTarget]);
+    }, [allowCurrentDropTarget, clearDropTarget, dragItem, isValidTreeDrop, updateDropTarget]);
 
     const handleTemplateDragOver = useCallback((templateId, nodeId, position, event) => {
         const candidate = { targetType: "template", templateId, nodeId, position };
-        if (!isValidTreeDrop(candidate)) return;
+        if (!isValidTreeDrop(candidate)) {
+            if (!allowCurrentDropTarget(event)) clearDropTarget();
+            return;
+        }
         event.preventDefault();
         event.dataTransfer.dropEffect = "move";
         updateDropTarget(candidate);
-    }, [isValidTreeDrop, updateDropTarget]);
+    }, [allowCurrentDropTarget, clearDropTarget, isValidTreeDrop, updateDropTarget]);
 
     const handleTreeDrop = useCallback(async (candidate, event) => {
         event.preventDefault();
         event.stopPropagation();
+        if (!ensureUnlocked()) {
+            setDragItem(null);
+            clearDropTarget();
+            return;
+        }
 
         const activeDragItem = dragItem || readDragItemFromEvent(event);
-        if (!isValidTreeDrop(candidate, activeDragItem)) {
+        const committedCandidate = isValidTreeDrop(dropTargetRef.current, activeDragItem)
+            ? dropTargetRef.current
+            : normalizeTreeDropCandidate(candidate, activeDragItem);
+        if (!isValidTreeDrop(committedCandidate, activeDragItem)) {
             setDragItem(null);
-            setDropTarget(null);
+            clearDropTarget();
             return;
         }
 
         try {
-            if (activeDragItem.type === "topic" && candidate.targetType === "topic") {
-                const targetNode = nodeLookup.get(candidate.nodeId);
+            if (activeDragItem.type === "topic" && committedCandidate.targetType === "topic") {
+                const targetNode = nodeLookup.get(committedCandidate.nodeId);
                 if (!targetNode) return;
 
-                const nextParentId = candidate.position === "inside"
+                const nextParentId = committedCandidate.position === "inside"
                     ? targetNode.id
                     : targetNode.parentId || null;
                 const siblingNodes = getIndexedChildNodes(childrenByParent, nextParentId)
                     .filter((node) => node.id !== activeDragItem.id);
-                const targetIndex = candidate.position === "inside"
+                const targetIndex = committedCandidate.position === "inside"
                     ? siblingNodes.length
                     : siblingNodes.findIndex((node) => node.id === targetNode.id);
-                const insertIndex = candidate.position === "after"
+                const insertIndex = committedCandidate.position === "after"
                     ? targetIndex + 1
                     : targetIndex;
 
@@ -2898,7 +3070,7 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
                     insertIndex < 0 ? siblingNodes.length : insertIndex
                 );
                 const nextLookup = buildNodeLookup(nextNodes);
-                await persist(nextNodes, templates);
+                if (!await persist(nextNodes, templates)) return;
                 setSelectedNodeId(activeDragItem.id);
                 setSelectedTemplateId(null);
                 setExpandedNodeIds((current) => {
@@ -2913,33 +3085,24 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
             }
 
             if (activeDragItem.type === "template") {
-                const targetNodeId = candidate.nodeId;
-                const targetTemplates = getIndexedTemplatesForNode(templatesByNode, targetNodeId)
-                    .filter((template) => template.id !== activeDragItem.id);
-                let insertIndex = targetTemplates.length;
-
-                if (candidate.targetType === "template") {
-                    const targetIndex = targetTemplates.findIndex((template) => template.id === candidate.templateId);
-                    insertIndex = targetIndex < 0
-                        ? targetTemplates.length
-                        : targetIndex + (candidate.position === "after" ? 1 : 0);
-                }
+                const dropPlan = getTemplateDropPlan(committedCandidate, activeDragItem);
+                if (!dropPlan) return;
 
                 const nextTemplates = moveTemplateToNodeAtIndex(
                     templates,
                     activeDragItem.id,
                     activeDragItem.nodeId,
-                    targetNodeId,
-                    insertIndex,
+                    dropPlan.targetNodeId,
+                    dropPlan.insertIndex,
                     nodes
                 );
-                await persist(nodes, nextTemplates);
-                setSelectedNodeId(targetNodeId);
+                if (!await persist(nodes, nextTemplates)) return;
+                setSelectedNodeId(dropPlan.targetNodeId);
                 setSelectedTemplateId(activeDragItem.id);
                 setExpandedNodeIds((current) => {
                     const next = new Set(current);
-                    next.add(targetNodeId);
-                    buildNodeAncestorIds(nodeLookup, targetNodeId).forEach((ancestorId) => next.add(ancestorId));
+                    next.add(dropPlan.targetNodeId);
+                    buildNodeAncestorIds(nodeLookup, dropPlan.targetNodeId).forEach((ancestorId) => next.add(ancestorId));
                     return next;
                 });
                 showToast("Template moved", "info");
@@ -2949,42 +3112,48 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
             showToast(activeDragItem.type === "topic" ? "Topic cannot be moved there" : "Template cannot be moved there", "error");
         } finally {
             setDragItem(null);
-            setDropTarget(null);
+            clearDropTarget();
         }
     }, [
+        clearDropTarget,
         childrenByParent,
         dragItem,
+        ensureUnlocked,
+        getTemplateDropPlan,
         isValidTreeDrop,
         nodeLookup,
         nodes,
         persist,
-        templates,
-        templatesByNode
+        templates
     ]);
 
     const openRootNodeModal = () => {
+        if (!ensureUnlocked()) return;
         setNodeModal({ mode: "create", parentId: null });
     };
 
     const openChildNodeModal = (parentId = selectedNodeId) => {
+        if (!ensureUnlocked()) return;
         if (!parentId) return;
         setNodeModal({ mode: "create", parentId });
     };
 
     const openEditNodeModal = (node) => {
+        if (!ensureUnlocked()) return;
         setNodeModal({ mode: "edit", node });
     };
 
     const saveNode = async (fields) => {
+        if (!ensureUnlocked()) return;
         if (!nodeModal) return;
         if (nodeModal.mode === "edit") {
             const nextNodes = updateNode(nodes, nodeModal.node.id, fields);
-            await persist(nextNodes, templates);
+            if (!await persist(nextNodes, templates)) return;
             showToast("Topic updated", "info");
         } else {
             try {
                 const nextNode = createNodeForParent(nodes, nodeModal.parentId, fields, templates);
-                await persist([...nodes, nextNode], templates);
+                if (!await persist([...nodes, nextNode], templates)) return;
                 setSelectedNodeId(nextNode.id);
                 setSelectedTemplateId(null);
                 setExpandedNodeIds((current) => {
@@ -3003,23 +3172,25 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
     };
 
     const deleteSelectedNode = async () => {
+        if (!ensureUnlocked()) return;
         if (!confirmNodeDelete) return;
         const next = removeNodeCascade(nodes, templates, confirmNodeDelete);
-        await persist(next.nodes, next.templates);
+        if (!await persist(next.nodes, next.templates)) return;
         setConfirmNodeDelete(null);
         showToast("Topic deleted", "warning");
     };
 
     const saveTemplate = async (fields) => {
+        if (!ensureUnlocked()) return;
         if (!templateModal) return;
         if (templateModal.mode === "edit") {
             const nextTemplates = updateTemplate(templates, templateModal.template.id, fields);
-            await persist(nodes, nextTemplates);
+            if (!await persist(nodes, nextTemplates)) return;
             showToast("Template updated", "info");
         } else {
             try {
                 const nextTemplate = createTemplateForNode(templateModal.parentNodeId, fields, nodes, templates);
-                await persist(nodes, [...templates, nextTemplate]);
+                if (!await persist(nodes, [...templates, nextTemplate])) return;
                 setSelectedNodeId(templateModal.parentNodeId);
                 setSelectedTemplateId(nextTemplate.id);
                 showToast("Template created", "info");
@@ -3032,23 +3203,26 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
     };
 
     const saveSelectedTemplateInline = useCallback(async (fields) => {
+        if (!ensureUnlocked()) return;
         if (!selectedTemplate) return;
         const nextTemplates = updateTemplate(templates, selectedTemplate.id, fields);
-        await persist(nodes, nextTemplates);
+        if (!await persist(nodes, nextTemplates)) return;
         showToast("Template updated", "info");
-    }, [nodes, persist, selectedTemplate, templates]);
+    }, [ensureUnlocked, nodes, persist, selectedTemplate, templates]);
 
     const deleteTemplate = async () => {
+        if (!ensureUnlocked()) return;
         if (!confirmTemplateDelete) return;
         const nextTemplates = removeTemplate(templates, confirmTemplateDelete);
-        await persist(nodes, nextTemplates);
+        if (!await persist(nodes, nextTemplates)) return;
         setConfirmTemplateDelete(null);
         showToast("Template deleted", "warning");
     };
 
     const requestTemplateDelete = useCallback((templateId) => {
+        if (!ensureUnlocked()) return;
         setConfirmTemplateDelete(templateId);
-    }, []);
+    }, [ensureUnlocked]);
 
     const changeTemplateLinkTarget = useCallback((templateId, targetNodeId) => {
         setTemplateLinkTargets((current) => ({
@@ -3058,39 +3232,44 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
     }, []);
 
     const duplicateSelectedTemplate = useCallback(async (templateId) => {
+        if (!ensureUnlocked()) return;
         const nextTemplates = duplicateTemplate(templates, templateId);
-        await persist(nodes, nextTemplates);
+        if (!await persist(nodes, nextTemplates)) return;
         showToast("Template duplicated", "info");
-    }, [nodes, persist, templates]);
+    }, [ensureUnlocked, nodes, persist, templates]);
 
     const openTemplateCreationPicker = (nodeId = selectedNodeId) => {
+        if (!ensureUnlocked()) return;
         if (!nodeId) return;
         setTemplateModal({ mode: "create", parentNodeId: nodeId });
     };
 
     const openExistingTemplatePicker = (nodeId = selectedNodeId) => {
+        if (!ensureUnlocked()) return;
         if (!nodeId) return;
         setExistingPickerModal({ nodeId });
     };
 
     const linkTemplateToCurrentNode = useCallback(async (templateId) => {
+        if (!ensureUnlocked()) return;
         if (!existingPickerModal?.nodeId) return;
         try {
             const nextTemplates = linkTemplateToNode(templates, templateId, existingPickerModal.nodeId, nodes);
-            await persist(nodes, nextTemplates);
+            if (!await persist(nodes, nextTemplates)) return;
             setExistingPickerModal(null);
             showToast("Template linked", "info");
         } catch (error) {
             console.error(error);
             showToast("Template cannot be linked there", "error");
         }
-    }, [existingPickerModal?.nodeId, nodes, persist, templates]);
+    }, [ensureUnlocked, existingPickerModal?.nodeId, nodes, persist, templates]);
 
     const linkTemplate = useCallback(async (templateId, targetNodeId) => {
+        if (!ensureUnlocked()) return;
         if (!targetNodeId) return;
         try {
             const nextTemplates = linkTemplateToNode(templates, templateId, targetNodeId, nodes);
-            await persist(nodes, nextTemplates);
+            if (!await persist(nodes, nextTemplates)) return;
             setTemplateLinkTargets((current) => {
                 const next = { ...current };
                 delete next[templateId];
@@ -3101,15 +3280,16 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
             console.error(error);
             showToast("Template cannot be linked there", "error");
         }
-    }, [nodes, persist, templates]);
+    }, [ensureUnlocked, nodes, persist, templates]);
 
     const unlinkFromNode = useCallback(async (templateId, nodeId) => {
+        if (!ensureUnlocked()) return;
         const template = templates.find((t) => t.id === templateId);
         if (!template || (template.nodeIds || []).length <= 1) return;
         const nextTemplates = unlinkTemplateFromNode(templates, templateId, nodeId);
-        await persist(nodes, nextTemplates);
+        if (!await persist(nodes, nextTemplates)) return;
         showToast("Template unlinked from topic", "info");
-    }, [nodes, persist, templates]);
+    }, [ensureUnlocked, nodes, persist, templates]);
 
     const selectedBreadcrumb = selectedNodePath.length > 1
         ? selectedNodePath.slice(0, -1).map((node) => node.title || "Untitled topic").join(" · ")
@@ -3135,6 +3315,7 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
                         <div className="node-editor-title-line">
                             <h1>Playbook</h1>
                             {selectedNode && <span className="node-editor-breadcrumb">{selectedBreadcrumb}</span>}
+                            {configLocked && <span className="config-lock-badge"><Lock size={14} aria-hidden="true" /> Locked</span>}
                         </div>
                     </div>
                 </header>
@@ -3145,16 +3326,18 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
                             <div>
                                 <h2>Topics</h2>
                             </div>
-                            <button type="button" className="secondary-btn node-action-btn node-sidebar-add-btn" onClick={openRootNodeModal}>
-                                <Plus size={16} aria-hidden="true" />
-                                Topic
-                            </button>
+                            {!configLocked && (
+                                <button type="button" className="secondary-btn node-action-btn node-sidebar-add-btn" onClick={openRootNodeModal}>
+                                    <Plus size={16} aria-hidden="true" />
+                                    Topic
+                                </button>
+                            )}
                         </div>
                         <div className="node-tree-list node-tree-list--primary">
                             {nodes.length === 0 ? (
                                 <EmptyState
                                     message="No topics yet."
-                                    action={<button type="button" className="secondary-btn" onClick={openRootNodeModal}>Create topic</button>}
+                                    action={configLocked ? null : <button type="button" className="secondary-btn" onClick={openRootNodeModal}>Create topic</button>}
                                 />
                             ) : (
                                 <NodeTreeRows
@@ -3166,6 +3349,7 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
                                     selectedTemplateId={selectedTemplateId}
                                     selectedItemType={selectedItemType}
                                     expandedNodeIds={expandedNodeIds}
+                                    locked={configLocked}
                                     dragItem={dragItem}
                                     dropTarget={dropTarget}
                                     onToggleNode={toggleNodeExpansion}
@@ -3185,10 +3369,16 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
                         {!selectedNode ? (
                             <div className="node-topic-empty-panel">
                                 <EmptyState
-                                    message="Select a topic to edit."
-                                    action={<button type="button" className="primary-btn" onClick={openRootNodeModal}>Create topic</button>}
+                                    message={configLocked ? "Select a topic to view locked content." : "Select a topic to edit."}
+                                    action={configLocked ? null : <button type="button" className="primary-btn" onClick={openRootNodeModal}>Create topic</button>}
                                 />
                             </div>
+                        ) : configLocked && selectedTemplate ? (
+                            <LockedConfigPanel
+                                title="Template editing is locked"
+                                message="You can use this template from the main workspace, but this imported configuration blocks saved edits."
+                                detail={selectedTemplate.title || "Untitled template"}
+                            />
                         ) : selectedTemplate ? (
                             <TemplateDetailPanel
                                 template={selectedTemplate}
@@ -3209,6 +3399,7 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
                                 selectedSummary={selectedSummary}
                                 selectedChildNodes={selectedChildNodes}
                                 selectedTemplates={selectedTemplates}
+                                locked={configLocked}
                                 onRename={() => openEditNodeModal(selectedNode)}
                                 onDelete={() => setConfirmNodeDelete(selectedNode.id)}
                                 onNewSubtopic={() => openChildNodeModal(selectedNode.id)}
@@ -3219,7 +3410,7 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
                     </section>
                 </div>
 
-                {nodeModal && (
+                {nodeModal && !configLocked && (
                     <NodeFormModal
                         mode={nodeModal.mode}
                         initial={nodeModal.node}
@@ -3229,7 +3420,7 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
                     />
                 )}
 
-                {templateModal && (
+                {templateModal && !configLocked && (
                     <TemplateFormModal
                         initial={templateModal.template}
                         parentTitle={nodeLookup.get(templateModal.parentNodeId)?.title || "Selected topic"}
@@ -3238,7 +3429,7 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
                     />
                 )}
 
-                {existingPickerModal && (
+                {existingPickerModal && !configLocked && (
                     <ExistingTemplatePickerModal
                         currentNodeId={existingPickerModal.nodeId}
                         allTemplates={templates}
@@ -3248,7 +3439,7 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
                     />
                 )}
 
-                {confirmNodeDelete && (
+                {confirmNodeDelete && !configLocked && (
                     <ConfirmDialog
                         title="Delete topic"
                         message="Delete this topic, its subtopics, and all templates inside them?"
@@ -3259,7 +3450,7 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
                     />
                 )}
 
-                {confirmTemplateDelete && (
+                {confirmTemplateDelete && !configLocked && (
                     <ConfirmDialog
                         title="Delete template"
                         message="Delete this template from the playbook?"

@@ -28,6 +28,7 @@ import {
     ClientInfoPanel,
     ClientImportErrorModal,
     ClientPasteModal,
+    CaptureDataModal,
     ExternalIdConflictModal,
     TemplateResultModal,
     TokenPromptModal,
@@ -58,7 +59,7 @@ import {
     TEMPLATE_IMAGES_UPDATED_EVENT
 } from "../utils/templateImages.js";
 import { loadTemplateImageMap } from "../services/templateImageService.js";
-import { loadConfigName } from "../services/appConfigService.js";
+import { CONFIG_LOCK_UPDATED_EVENT, loadConfigLocked, loadConfigName } from "../services/appConfigService.js";
 import ToolsBar from "../components/ToolsBar.jsx";
 import SuperOfficePhotoGallery from "../components/SuperOfficePhotoGallery.jsx";
 import { copyText, showToast } from "../services/clipboardService.js";
@@ -944,9 +945,11 @@ const TemplateDetail = memo(function TemplateDetail({
         }
     }, [onRequestTemplateResult, onSetVariantPicker, setActiveChannel, template]);
 
+    const canToggleFavorite = typeof onToggleFavorite === "function";
     const toggleFavorite = useCallback(() => {
+        if (!canToggleFavorite) return;
         onToggleFavorite(template.id);
-    }, [onToggleFavorite, template.id]);
+    }, [canToggleFavorite, onToggleFavorite, template.id]);
 
     return (
         <>
@@ -964,8 +967,9 @@ const TemplateDetail = memo(function TemplateDetail({
                             type="button"
                             className={`secondary-btn templates-favorite-btn${template.favorite ? " is-active" : ""}`}
                             onClick={toggleFavorite}
+                            disabled={!canToggleFavorite}
                             aria-pressed={Boolean(template.favorite)}
-                            title={template.favorite ? "Remove from favorites" : "Add to favorites"}
+                            title={!canToggleFavorite ? "Configuration locked" : template.favorite ? "Remove from favorites" : "Add to favorites"}
                         >
                             <Star
                                 size={17}
@@ -1059,6 +1063,7 @@ export default function Templates() {
     const [aloPreparation, setAloPreparation] = useState(null);
     const [templateImageMap, setTemplateImageMap] = useState(() => new Map());
     const [configName, setConfigName] = useState("No configuration");
+    const [configLocked, setConfigLocked] = useState(false);
     const [quickSectionsCollapsed, setQuickSectionsCollapsed] = useState(DEFAULT_QUICK_SECTION_STATE);
     const caseProfile = useMemo(() => buildCaseProfile({
         clientPayload: runtime.clientPayload,
@@ -1095,6 +1100,25 @@ export default function Templates() {
     useEffect(() => {
         refreshTreeData();
         loadConfigName().then(setConfigName);
+        loadConfigLocked().then(setConfigLocked);
+    }, []);
+
+    useEffect(() => {
+        let active = true;
+        const syncConfigLock = (event = null) => {
+            if (event?.detail && typeof event.detail.locked === "boolean") {
+                setConfigLocked(event.detail.locked);
+                return;
+            }
+            loadConfigLocked().then((locked) => {
+                if (active) setConfigLocked(locked);
+            });
+        };
+        window.addEventListener(CONFIG_LOCK_UPDATED_EVENT, syncConfigLock);
+        return () => {
+            active = false;
+            window.removeEventListener(CONFIG_LOCK_UPDATED_EVENT, syncConfigLock);
+        };
     }, []);
 
     useEffect(() => {
@@ -1226,6 +1250,10 @@ export default function Templates() {
     }, []);
 
     const toggleTemplateFavorite = useCallback(async (templateId) => {
+        if (configLocked) {
+            showToast("Configuration locked: template favorites cannot be changed.", "warning");
+            return;
+        }
         const template = treeTemplates.find((item) => item.id === templateId);
         if (!template) return;
 
@@ -1242,7 +1270,7 @@ export default function Templates() {
             setTreeTemplates(previousTemplates);
             showToast("Favorite was not saved", "error");
         }
-    }, [nodes, treeTemplates]);
+    }, [configLocked, nodes, treeTemplates]);
 
     const activeNode = useMemo(
         () => nodeLookup.get(activeNodeId) || null,
@@ -1308,17 +1336,18 @@ export default function Templates() {
         resetCaseNavigation();
     }, [refreshSuperOfficeState, resetCaseNavigation]);
 
-    const importClientFromClipboardAndResetCase = useCallback(async (event) => {
-        const imported = await runtimeRef.current.readClientClipboard(event);
-        if (imported) resetCaseNavigation();
-    }, [resetCaseNavigation]);
-
-    const importSuperOfficeFromClipboardAndResetCase = useCallback(async (event) => {
-        const imported = await runtimeRef.current.readSuperOfficeClipboard(event);
-        if (imported) {
-            await refreshSuperOfficeState();
-            resetCaseNavigation();
-        }
+    const openCaptureDataFlow = useCallback(async () => {
+        const hasSoData = await hasSuperOfficeTicketPayload();
+        runtimeRef.current.openCaptureDataFlow({
+            hasVtiData: Boolean(runtimeRef.current.clientPayload),
+            hasSuperOfficeData: hasSoData,
+            onImported: async (type) => {
+                if (type === "superOffice") {
+                    await refreshSuperOfficeState();
+                }
+                resetCaseNavigation();
+            }
+        });
     }, [refreshSuperOfficeState, resetCaseNavigation]);
 
     const openSuperOfficeGallery = useCallback(async () => {
@@ -1633,6 +1662,7 @@ export default function Templates() {
         || workflowModalOpen
         || runtime.clientPasteOpen
         || runtime.clientImportErrorModal
+        || runtime.captureDataOpen
         || runtime.clientBarCustomizeOpen
         || runtime.externalIdConflictPrompt
         || externalGeneratorOpen
@@ -1647,17 +1677,10 @@ export default function Templates() {
             const hasVtiData = Boolean(runtimeRef.current.clientPayload);
             const hasSoData = await hasSuperOfficeTicketPayload();
 
-            if (shortcut.id === "importVti") {
-                if (hasVtiData) return;
+            if (shortcut.id === "captureData") {
+                if (hasVtiData && hasSoData) return;
                 event.preventDefault();
-                await importClientFromClipboardAndResetCase(event);
-                return;
-            }
-
-            if (shortcut.id === "importSo") {
-                if (hasSoData) return;
-                event.preventDefault();
-                await importSuperOfficeFromClipboardAndResetCase(event);
+                await openCaptureDataFlow();
                 return;
             }
 
@@ -1672,8 +1695,7 @@ export default function Templates() {
         return () => document.removeEventListener("keydown", handleKeyboardShortcut);
     }, [
         clearClientAndResetCase,
-        importClientFromClipboardAndResetCase,
-        importSuperOfficeFromClipboardAndResetCase,
+        openCaptureDataFlow,
         shortcutModalOpen
     ]);
 
@@ -1719,8 +1741,7 @@ export default function Templates() {
                 hasVtiData={Boolean(runtime.clientPayload)}
                 hasSuperOfficeData={superOfficeDataPresent}
                 onChangeLang={changeLanguage}
-                onReadClipboard={importClientFromClipboardAndResetCase}
-                onReadSuperOffice={importSuperOfficeFromClipboardAndResetCase}
+                onOpenCaptureData={openCaptureDataFlow}
                 onOpenPaste={openClientPasteModal}
                 onClearClient={clearClientAndResetCase}
                 onCustomizeBar={canCustomizeClientBar ? () => runtimeRef.current.setClientBarCustomizeOpen(true) : null}
@@ -1806,7 +1827,7 @@ export default function Templates() {
                         onRequestCopy={requestDetailCopy}
                         onRequestTemplateResult={requestDetailTemplateResult}
                         onSetVariantPicker={setDetailVariantPicker}
-                        onToggleFavorite={toggleTemplateFavorite}
+                        onToggleFavorite={configLocked ? null : toggleTemplateFavorite}
                         onManage={openNodesWorkspace}
                     />
                 </Modal>
@@ -1872,7 +1893,7 @@ export default function Templates() {
                     onSelectChannel={openResultChannel}
                     onNextChannel={openNextResultChannel}
                     onCopy={copyRuntimeTemplateResultAgain}
-                    onToggleFavorite={activeTemplate ? () => toggleTemplateFavorite(activeTemplate.id) : null}
+                    onToggleFavorite={!configLocked && activeTemplate ? () => toggleTemplateFavorite(activeTemplate.id) : null}
                     onClose={closeTemplateWorkflow}
                 />
             )}
@@ -1882,6 +1903,21 @@ export default function Templates() {
                     initialError={runtime.clientPasteInitialError}
                     onClose={closeClientPasteModal}
                     onImport={importClientFromPasteAndResetCase}
+                />
+            )}
+
+            {runtime.captureDataOpen && (
+                <CaptureDataModal
+                    state={runtime.captureDataState}
+                    conflictPrompt={runtime.externalIdConflictPrompt}
+                    onApplyConflictSelections={runtime.applyExternalIdConflictSelections}
+                    onCancelConflict={runtime.cancelExternalIdConflictCorrection}
+                    onClose={runtime.closeCaptureDataFlow}
+                    onReadNow={() => runtime.readCaptureDataClipboard("manual")}
+                    onOpenPaste={() => {
+                        runtime.closeCaptureDataFlow();
+                        openClientPasteModal();
+                    }}
                 />
             )}
 
@@ -1903,7 +1939,7 @@ export default function Templates() {
                 />
             )}
 
-            {runtime.externalIdConflictPrompt && (
+            {runtime.externalIdConflictPrompt && !runtime.captureDataOpen && (
                 <ExternalIdConflictModal
                     conflicts={runtime.externalIdConflictPrompt.conflicts}
                     onApplySelections={runtime.applyExternalIdConflictSelections}

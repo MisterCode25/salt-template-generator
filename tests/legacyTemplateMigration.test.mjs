@@ -93,6 +93,11 @@ assert.equal(imported.configName, "Legacy config");
 assert.equal(imported.tokens[0].token, "{customer}");
 assert.equal(imported.nodes.length, migrated.nodes.length);
 assert.equal(imported.templates.length, migrated.templates.length);
+assert.equal(imported.hasTokens, true);
+assert.equal(imported.hasTreeData, true);
+assert.equal(imported.hasTools, false);
+assert.equal(imported.hasLock, false);
+assert.equal(imported.locked, false);
 
 const merged = mergeConfigData(
   {
@@ -103,6 +108,10 @@ const merged = mergeConfigData(
     nodes: [{ id: "local-node", title: "Local" }],
     templates: [{ id: "shared-template", title: "Local template" }],
     templateImages: [{ id: "local-image", name: "Local image" }],
+    tools: [
+      { id: "local-tool", title: "Local tool", url: "https://local.example" },
+      { id: "shared-tool", title: "Local shared tool", url: "https://local.example/shared" }
+    ],
     chatGptPromptSettings: { templateInstruction: "Local instruction" }
   },
   {
@@ -113,6 +122,10 @@ const merged = mergeConfigData(
     nodes: [{ id: "imported-node", title: "Imported" }],
     templates: [{ id: "shared-template", title: "Imported template" }],
     templateImages: [{ id: "imported-image", name: "Imported image" }],
+    tools: [
+      { id: "shared-tool", title: "Imported shared tool", url: "https://imported.example/shared" },
+      { id: "module-tool", type: "module", title: "Imported module", html: "<main>Imported</main>" }
+    ],
     chatGptPromptSettings: { templateInstruction: "Imported instruction" }
   }
 );
@@ -121,6 +134,38 @@ assert.equal(merged.tokens.find((tokenDef) => tokenDef.token === "{shared}").lab
 assert.deepEqual(merged.nodes.map((node) => node.id), ["local-node", "imported-node"]);
 assert.equal(merged.templates.find((template) => template.id === "shared-template").title, "Imported template");
 assert.deepEqual(merged.templateImages.map((image) => image.id), ["local-image", "imported-image"]);
+assert.deepEqual(merged.tools.map((tool) => tool.id), ["local-tool", "shared-tool", "module-tool"]);
+assert.equal(merged.tools.find((tool) => tool.id === "shared-tool").title, "Imported shared tool");
 assert.equal(merged.chatGptPromptSettings.templateInstruction, "Imported instruction");
+
+const mergedPartial = mergeConfigData(
+  {
+    tokens: [{ token: "{existing}", label: "Existing" }],
+    nodes: [{ id: "local-node", title: "Local" }],
+    templates: [{ id: "local-template", title: "Local template" }],
+    templateImages: [{ id: "local-image", name: "Local image" }],
+    tools: [{ id: "local-tool", title: "Local tool", url: "https://local.example" }],
+    chatGptPromptSettings: { templateInstruction: "Keep this instruction" }
+  },
+  {
+    tokens: [],
+    hasTokens: false,
+    nodes: [],
+    templates: [],
+    hasTreeData: false,
+    templateImages: [],
+    hasTemplateImages: false,
+    tools: [{ id: "new-tool", title: "New tool", url: "https://new.example" }],
+    hasTools: true,
+    chatGptPromptSettings: { templateInstruction: "" },
+    hasChatGptPromptSettings: false
+  }
+);
+assert.deepEqual(mergedPartial.tokens.map((tokenDef) => tokenDef.token), ["{existing}"]);
+assert.deepEqual(mergedPartial.nodes.map((node) => node.id), ["local-node"]);
+assert.deepEqual(mergedPartial.templates.map((template) => template.id), ["local-template"]);
+assert.deepEqual(mergedPartial.templateImages.map((image) => image.id), ["local-image"]);
+assert.deepEqual(mergedPartial.tools.map((tool) => tool.id), ["local-tool", "new-tool"]);
+assert.equal(mergedPartial.chatGptPromptSettings.templateInstruction, "Keep this instruction");
 
 console.log("legacyTemplateMigration tests passed");

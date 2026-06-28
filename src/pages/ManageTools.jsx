@@ -8,6 +8,7 @@ import {
     ExternalLink,
     Keyboard,
     Link2,
+    Lock,
     Pencil,
     Plus,
     Puzzle,
@@ -45,6 +46,7 @@ import Modal from "../components/Modal.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import { copyHtml, copyText, showToast } from "../services/clipboardService.js";
+import { CONFIG_LOCK_UPDATED_EVENT, loadConfigLocked } from "../services/appConfigService.js";
 
 const SELECTIONS = Object.freeze({
     LINK_TOOLS: "link-tools",
@@ -54,8 +56,7 @@ const SELECTIONS = Object.freeze({
 });
 
 const KEYBOARD_SHORTCUT_DESCRIPTIONS = Object.freeze({
-    importVti: "Import VTI customer data from the clipboard.",
-    importSo: "Import SuperOffice ticket data from the clipboard.",
+    captureData: "Open the automatic SO/BO and VTI capture flow.",
     clearData: "Clear the currently imported customer and ticket data."
 });
 
@@ -198,7 +199,12 @@ async function writeTextToClipboard(value, message) {
     showToast(message, "success");
 }
 
-function describeTool(tool) {
+function describeTool(tool, locked = false) {
+    if (locked) {
+        return tool.type === TOOL_TYPES.MODULE
+            ? "Module locked by configuration."
+            : "Link target locked by configuration.";
+    }
     if (tool.type === TOOL_TYPES.MODULE) return tool.description || "HTML module · Beta";
     return tool.url || "Link tool";
 }
@@ -876,12 +882,12 @@ function ToolEditorModal({ draft, tokens, runtimePreviewContext, onPatch, onSave
     );
 }
 
-function ToolListPanel({ type, tools, onCreate, onEdit, onDelete }) {
+function ToolListPanel({ type, tools, locked = false, onCreate, onEdit, onDelete }) {
     const isModule = type === TOOL_TYPES.MODULE;
     const title = isModule ? "Modules" : "Link tools";
     const subtitle = isModule
-        ? "HTML modules launched locally from the tools bar."
-        : "External links launched from the tools bar.";
+        ? locked ? "HTML modules are usable but their source is locked." : "HTML modules launched locally from the tools bar."
+        : locked ? "External links are usable but their targets are locked." : "External links launched from the tools bar.";
     const emptyMessage = isModule ? "No modules yet." : "No link tools yet.";
 
     return (
@@ -895,13 +901,19 @@ function ToolListPanel({ type, tools, onCreate, onEdit, onDelete }) {
                     <h2>{title}</h2>
                     <p>{subtitle}</p>
                 </div>
-                <div className="tools-detail-actions">
-                    <button type="button" className="settings-action-btn settings-action-btn--import" onClick={() => onCreate(type)}>
-                        <Plus size={15} strokeWidth={2} aria-hidden="true" />
-                        {isModule ? "New module" : "New link tool"}
-                        {isModule && <span className="tool-beta-pill">Beta</span>}
-                    </button>
-                </div>
+                {locked ? (
+                    <div className="tools-detail-actions">
+                        <span className="config-lock-badge"><Lock size={14} aria-hidden="true" /> Locked</span>
+                    </div>
+                ) : (
+                    <div className="tools-detail-actions">
+                        <button type="button" className="settings-action-btn settings-action-btn--import" onClick={() => onCreate(type)}>
+                            <Plus size={15} strokeWidth={2} aria-hidden="true" />
+                            {isModule ? "New module" : "New link tool"}
+                            {isModule && <span className="tool-beta-pill">Beta</span>}
+                        </button>
+                    </div>
+                )}
             </section>
 
             {tools.length === 0 ? (
@@ -918,18 +930,24 @@ function ToolListPanel({ type, tools, onCreate, onEdit, onDelete }) {
                             </div>
                             <div className="tools-list-row__copy">
                                 <h3>{tool.title || "Untitled tool"}</h3>
-                                <p>{describeTool(tool)}</p>
+                                <p>{describeTool(tool, locked)}</p>
                             </div>
-                            <div className="tools-list-row__actions">
-                                <button type="button" className="settings-action-btn" onClick={() => onEdit(tool)}>
-                                    <Pencil size={15} strokeWidth={2} aria-hidden="true" />
-                                    Edit
-                                </button>
-                                <button type="button" className="settings-action-btn settings-action-btn--danger" onClick={() => onDelete(tool.id)}>
-                                    <Trash2 size={15} strokeWidth={2} aria-hidden="true" />
-                                    Delete
-                                </button>
-                            </div>
+                            {locked ? (
+                                <div className="tools-list-row__actions">
+                                    <span className="tools-locked-pill"><Lock size={13} aria-hidden="true" /> Locked</span>
+                                </div>
+                            ) : (
+                                <div className="tools-list-row__actions">
+                                    <button type="button" className="settings-action-btn" onClick={() => onEdit(tool)}>
+                                        <Pencil size={15} strokeWidth={2} aria-hidden="true" />
+                                        Edit
+                                    </button>
+                                    <button type="button" className="settings-action-btn settings-action-btn--danger" onClick={() => onDelete(tool.id)}>
+                                        <Trash2 size={15} strokeWidth={2} aria-hidden="true" />
+                                        Delete
+                                    </button>
+                                </div>
+                            )}
                         </article>
                     ))}
                 </section>
@@ -1042,6 +1060,7 @@ export default function ManageTools({ embedded = false, onClose = null, initialS
     );
     const [editorDraft, setEditorDraft] = useState(null);
     const [confirmDelete, setConfirmDelete] = useState(null);
+    const [configLocked, setConfigLocked] = useState(false);
 
     useEffect(() => {
         let active = true;
@@ -1059,12 +1078,48 @@ export default function ManageTools({ embedded = false, onClose = null, initialS
         };
     }, [initialSection]);
 
+    useEffect(() => {
+        let active = true;
+        const syncConfigLock = (event = null) => {
+            if (event?.detail && typeof event.detail.locked === "boolean") {
+                setConfigLocked(event.detail.locked);
+                if (event.detail.locked) {
+                    setEditorDraft(null);
+                    setConfirmDelete(null);
+                }
+                return;
+            }
+            loadConfigLocked().then((locked) => {
+                if (!active) return;
+                setConfigLocked(locked);
+                if (locked) {
+                    setEditorDraft(null);
+                    setConfirmDelete(null);
+                }
+            });
+        };
+        syncConfigLock();
+        window.addEventListener(CONFIG_LOCK_UPDATED_EVENT, syncConfigLock);
+        return () => {
+            active = false;
+            window.removeEventListener(CONFIG_LOCK_UPDATED_EVENT, syncConfigLock);
+        };
+    }, []);
+
+    const ensureUnlocked = useCallback(() => {
+        if (!configLocked) return true;
+        showToast("Configuration locked: tools cannot be edited.", "warning");
+        return false;
+    }, [configLocked]);
+
     const persist = useCallback(async (next) => {
+        if (!ensureUnlocked()) return false;
         const sortedNext = [...next].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
         setTools(sortedNext);
         await saveTools(sortedNext);
         window.dispatchEvent(new CustomEvent("tools-updated"));
-    }, []);
+        return true;
+    }, [ensureUnlocked]);
 
     const selectDataShortcuts = useCallback(() => {
         setSelection(SELECTIONS.DATA_SHORTCUTS);
@@ -1083,13 +1138,15 @@ export default function ManageTools({ embedded = false, onClose = null, initialS
     }, []);
 
     const createTool = useCallback((type) => {
+        if (!ensureUnlocked()) return;
         const nextDraft = createDraftTool(type, tools.length + 1);
         setEditorDraft(nextDraft);
-    }, [tools.length]);
+    }, [ensureUnlocked, tools.length]);
 
     const editTool = useCallback((tool) => {
+        if (!ensureUnlocked()) return;
         setEditorDraft(tool);
-    }, []);
+    }, [ensureUnlocked]);
 
     const closeEditor = useCallback(() => {
         setEditorDraft(null);
@@ -1100,6 +1157,7 @@ export default function ManageTools({ embedded = false, onClose = null, initialS
     }, []);
 
     const saveDraft = useCallback(async () => {
+        if (!ensureUnlocked()) return;
         if (!editorDraft) return;
         const normalized = normalizeTool(editorDraft);
         const title = normalized.title.trim();
@@ -1130,25 +1188,27 @@ export default function ManageTools({ embedded = false, onClose = null, initialS
         const next = exists
             ? tools.map((tool) => (tool.id === savedTool.id ? savedTool : tool))
             : [...tools, savedTool];
-        await persist(next);
+        if (!await persist(next)) return;
         setSelection(savedTool.type === TOOL_TYPES.MODULE ? SELECTIONS.MODULE_TOOLS : SELECTIONS.LINK_TOOLS);
         setEditorDraft(null);
         showToast("Tool saved.", "success");
-    }, [editorDraft, persist, tools]);
+    }, [editorDraft, ensureUnlocked, persist, tools]);
 
     const requestDelete = useCallback((toolId) => {
+        if (!ensureUnlocked()) return;
         if (!toolId) return;
         setConfirmDelete(toolId);
-    }, []);
+    }, [ensureUnlocked]);
 
     const deleteTool = useCallback(async () => {
+        if (!ensureUnlocked()) return;
         if (!confirmDelete) return;
         const next = tools.filter((tool) => tool.id !== confirmDelete);
-        await persist(next);
+        if (!await persist(next)) return;
         setConfirmDelete(null);
         setEditorDraft((current) => current?.id === confirmDelete ? null : current);
         showToast("Tool deleted.", "success");
-    }, [confirmDelete, persist, tools]);
+    }, [confirmDelete, ensureUnlocked, persist, tools]);
 
     const cancelDelete = useCallback(() => {
         setConfirmDelete(null);
@@ -1173,6 +1233,7 @@ export default function ManageTools({ embedded = false, onClose = null, initialS
                         <p className="eyebrow">Tools + shortcuts</p>
                         <h2>Extensions</h2>
                     </div>
+                    {configLocked && <span className="config-lock-badge"><Lock size={14} aria-hidden="true" /> Locked</span>}
                 </header>
 
                 <div className="tools-manager-layout">
@@ -1218,6 +1279,7 @@ export default function ManageTools({ embedded = false, onClose = null, initialS
                             <ToolListPanel
                                 type={TOOL_TYPES.LINK}
                                 tools={linkTools}
+                                locked={configLocked}
                                 onCreate={createTool}
                                 onEdit={editTool}
                                 onDelete={requestDelete}
@@ -1227,6 +1289,7 @@ export default function ManageTools({ embedded = false, onClose = null, initialS
                             <ToolListPanel
                                 type={TOOL_TYPES.MODULE}
                                 tools={moduleTools}
+                                locked={configLocked}
                                 onCreate={createTool}
                                 onEdit={editTool}
                                 onDelete={requestDelete}
@@ -1238,7 +1301,7 @@ export default function ManageTools({ embedded = false, onClose = null, initialS
                 </div>
             </div>
 
-            {editorDraft && (
+            {editorDraft && !configLocked && (
                 <ToolEditorModal
                     draft={editorDraft}
                     tokens={tokens}
@@ -1249,7 +1312,7 @@ export default function ManageTools({ embedded = false, onClose = null, initialS
                 />
             )}
 
-            {confirmDelete !== null && (
+            {confirmDelete !== null && !configLocked && (
                 <ConfirmDialog
                     title="Delete tool"
                     message="Are you sure you want to delete this tool?"

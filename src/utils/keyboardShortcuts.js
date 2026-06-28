@@ -1,6 +1,5 @@
 export const KEYBOARD_SHORTCUTS = Object.freeze([
-    { id: "importVti", label: "Import VTI data", key: "q", code: "KeyQ", altKey: true },
-    { id: "importSo", label: "Import SO data", key: "w", code: "KeyW", altKey: true },
+    { id: "captureData", label: "Capture data", key: "q", code: "KeyQ", altKey: true },
     { id: "clearData", label: "Clear imported data", key: "e", code: "KeyE", altKey: true }
 ]);
 

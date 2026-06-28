@@ -13,7 +13,7 @@ export const DATA_SHORTCUTS = Object.freeze([
         steps: [
             "Open the customer in VTI on Billing Account information.",
             "Click the saved bookmarklet in the bookmarks bar.",
-            "Wait until it copies the JSON, then import customer data from the main screen."
+            "Wait until it copies the JSON. The main Capture data popup will detect it automatically."
         ]
     },
     {
@@ -22,11 +22,11 @@ export const DATA_SHORTCUTS = Object.freeze([
         title: "Capture SO info",
         buttonLabel: "Capture SO info",
         bookmarklet: superOfficeBookmarklet.trim(),
-        description: "Extracts the SuperOffice ticket number, External ticket ID, attachments and message dates, then copies the JSON used by Import data from SO.",
+        description: "Extracts the SuperOffice ticket number, External ticket ID, attachments and message dates, then copies the JSON used by Capture data.",
         steps: [
             "Open the ticket in SuperOffice.",
             "Click the saved bookmarklet in the bookmarks bar.",
-            "Come back to Salt Templater and click Import data from SO.",
+            "Come back to Salt Templater with the Capture data popup open.",
             "Ticket photos will appear in the Photos SO tool when image attachments are present."
         ]
     },
@@ -38,8 +38,8 @@ export const DATA_SHORTCUTS = Object.freeze([
         bookmarklet: buildAloAutofillBookmarklet(),
         description: "Reads the structured ALO fill data copied from Salt Templater and fills the ticket, end-user and ISP contact fields.",
         steps: [
-            "Import VTI data in Salt Templater.",
-            "Import SO data if you want the SO ticket copied into Ext. reference.",
+            "Capture VTI data in Salt Templater.",
+            "Capture SO data if you want the SO ticket copied into Ext. reference.",
             "Click ALO fill in the tools bar to copy the structured data.",
             "Open the ALO ticket form, then click this bookmarklet from the bookmarks bar."
         ]

@@ -6,6 +6,7 @@ import {
     Download,
     FileJson,
     HardDrive,
+    Lock,
     Monitor,
     Moon,
     Palette,
@@ -22,7 +23,12 @@ import { loadTemplateTreeData, saveTemplateTreeData } from "../services/template
 import { clearAppIndexedDB } from "../services/indexedDbService.js";
 import { loadTemplateImages, saveTemplateImages } from "../services/templateImageService.js";
 import { buildConfigPayload, mergeConfigData, validateImportedConfig } from "../services/configService.js";
-import { loadConfigName, saveConfigName } from "../services/appConfigService.js";
+import {
+    loadConfigLocked,
+    loadConfigName,
+    saveConfigLocked,
+    saveConfigName
+} from "../services/appConfigService.js";
 import {
     loadChatGptPromptSettings,
     saveChatGptPromptSettings
@@ -30,11 +36,12 @@ import {
 import { copyText, showToast } from "../services/clipboardService.js";
 import { getStorageInfo, requestPersistentStorage } from "../services/storageInfoService.js";
 import { AGENT_PROFILE_FIELDS, loadAgentProfile, saveAgentProfile } from "../services/agentProfileService.js";
+import { loadTools, saveTools } from "../services/toolsService.js";
 import {
     formatTestImportPayload,
-    TEST_SO_IMPORT_PAYLOAD,
-    TEST_VTI_IMPORT_PAYLOAD
+    TEST_IMPORT_SCENARIOS
 } from "../data/testImportPayloads.js";
+import { extractTemplateImageIdsFromHtml } from "../utils/templateImages.js";
 import Modal from "../components/Modal.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import ManageTokens from "./ManageTokens.jsx";
@@ -143,6 +150,152 @@ const THEME_OPTIONS = [
 ];
 
 const DEFAULT_CONFIG_NAME = "No configuration";
+const DEFAULT_EXPORT_OPTIONS = Object.freeze({
+    templates: true,
+    tools: true,
+    tokens: true,
+    templateImages: true,
+    chatGptPromptSettings: true
+});
+const EXPORT_CONTENT_OPTIONS = Object.freeze([
+    {
+        id: "templates",
+        label: "Templates and topics",
+        summary: "Playbook topic tree and templates."
+    },
+    {
+        id: "tools",
+        label: "Tools and modules",
+        summary: "Customer links and HTML modules."
+    },
+    {
+        id: "tokens",
+        label: "Custom tokens",
+        summary: "User-created token definitions."
+    },
+    {
+        id: "templateImages",
+        label: "Template images",
+        summary: "Images used inside exported templates."
+    },
+    {
+        id: "chatGptPromptSettings",
+        label: "AI prompt guidance",
+        summary: "Saved template-writing instruction."
+    }
+]);
+const TEST_DATA_SOURCES = Object.freeze([
+    {
+        id: "so",
+        payloadKey: "soPayload",
+        label: "SuperOffice capture",
+        buttonLabel: "Copy SuperOffice"
+    },
+    {
+        id: "vti",
+        payloadKey: "vtiPayload",
+        label: "VTI capture",
+        buttonLabel: "Copy VTI"
+    }
+]);
+
+function sortByOrderAndTitle(left, right) {
+    const leftOrder = Number.isFinite(Number(left?.order)) ? Number(left.order) : 0;
+    const rightOrder = Number.isFinite(Number(right?.order)) ? Number(right.order) : 0;
+    if (leftOrder !== rightOrder) return leftOrder - rightOrder;
+    return String(left?.title || "").localeCompare(String(right?.title || ""));
+}
+
+function buildTopicExportOptions(nodes = [], parentId = null, depth = 0) {
+    return nodes
+        .filter((node) => (node.parentId || null) === (parentId || null))
+        .sort(sortByOrderAndTitle)
+        .flatMap((node) => [
+            { node, depth },
+            ...buildTopicExportOptions(nodes, node.id, depth + 1)
+        ]);
+}
+
+function collectDescendantTopicIds(nodes = [], selectedIds = new Set()) {
+    const result = new Set(selectedIds);
+    let changed = true;
+    while (changed) {
+        changed = false;
+        nodes.forEach((node) => {
+            if (node.parentId && result.has(node.parentId) && !result.has(node.id)) {
+                result.add(node.id);
+                changed = true;
+            }
+        });
+    }
+    return result;
+}
+
+function collectAncestorTopicIds(nodes = [], topicIds = new Set()) {
+    const result = new Set(topicIds);
+    const byId = new Map(nodes.map((node) => [node.id, node]));
+    topicIds.forEach((topicId) => {
+        let current = byId.get(topicId);
+        while (current?.parentId) {
+            result.add(current.parentId);
+            current = byId.get(current.parentId);
+        }
+    });
+    return result;
+}
+
+function getTemplateTextFields(template = {}) {
+    const values = [];
+    Object.values(template.contentByChannel || {}).forEach((content) => {
+        ["text_fr", "text_en", "text_de", "text_it"].forEach((field) => values.push(content?.[field] || ""));
+        (Array.isArray(content?.variants) ? content.variants : []).forEach((variant) => {
+            ["text_fr", "text_en", "text_de", "text_it"].forEach((field) => values.push(variant?.[field] || ""));
+        });
+    });
+    return values;
+}
+
+function filterTemplateLinksForExport(template, exportedNodeIds) {
+    const nodeIds = (Array.isArray(template.nodeIds) ? template.nodeIds : [])
+        .filter((nodeId) => exportedNodeIds.has(nodeId));
+    if (nodeIds.length === 0 && exportedNodeIds.has(template.parentNodeId)) {
+        nodeIds.push(template.parentNodeId);
+    }
+    const parentNodeId = nodeIds.includes(template.parentNodeId) ? template.parentNodeId : nodeIds[0] || "";
+    return {
+        ...template,
+        nodeIds,
+        parentNodeId
+    };
+}
+
+function buildSelectedTemplateTreeData(treeData = {}, selectedTopicIds = new Set()) {
+    const nodes = Array.isArray(treeData.nodes) ? treeData.nodes : [];
+    const templates = Array.isArray(treeData.templates) ? treeData.templates : [];
+    const contentTopicIds = collectDescendantTopicIds(nodes, selectedTopicIds);
+    const exportedNodeIds = collectAncestorTopicIds(nodes, contentTopicIds);
+    const exportedNodes = nodes.filter((node) => exportedNodeIds.has(node.id));
+    const exportedTemplates = templates
+        .filter((template) => {
+            const nodeIds = Array.isArray(template.nodeIds) ? template.nodeIds : [];
+            return nodeIds.some((nodeId) => contentTopicIds.has(nodeId))
+                || contentTopicIds.has(template.parentNodeId);
+        })
+        .map((template) => filterTemplateLinksForExport(template, exportedNodeIds))
+        .filter((template) => template.nodeIds.length > 0 || template.parentNodeId);
+    return { nodes: exportedNodes, templates: exportedTemplates };
+}
+
+function filterTemplateImagesForExport(templateImages = [], templates = []) {
+    const imageIds = new Set();
+    templates.forEach((template) => {
+        getTemplateTextFields(template).forEach((html) => {
+            extractTemplateImageIdsFromHtml(html).forEach((imageId) => imageIds.add(imageId));
+        });
+    });
+    if (imageIds.size === 0) return [];
+    return templateImages.filter((image) => imageIds.has(image?.id));
+}
 
 export default function Settings({ embedded = false, onClose = null }) {
     const navigate = useNavigate();
@@ -160,10 +313,15 @@ export default function Settings({ embedded = false, onClose = null }) {
     const [activeSection, setActiveSection] = useState("agent");
     const [themePreference, setThemePreference] = useState(() => getInitialTheme());
     const [resolvedTheme, setResolvedTheme] = useState(() => getResolvedTheme(getInitialTheme()));
+    const [configLocked, setConfigLocked] = useState(false);
+    const [exportLocked, setExportLocked] = useState(false);
+    const [exportOptions, setExportOptions] = useState(DEFAULT_EXPORT_OPTIONS);
+    const [exportTopicIds, setExportTopicIds] = useState(() => new Set());
     useEffect(() => {
         loadTokens().then(setTokens);
         loadTemplateTreeData().then(setTreeData);
         loadConfigName().then(setConfigName);
+        loadConfigLocked().then(setConfigLocked);
         loadAgentProfile().then(setAgentProfile);
         loadChatGptPromptSettings().then(setChatGptPromptSettings);
         getStorageInfo().then(setStorageInfo).catch(() => setStorageInfo(null));
@@ -200,20 +358,40 @@ export default function Settings({ embedded = false, onClose = null }) {
 
     const startExport = useCallback(() => {
         setExportNameValue(configName);
+        setExportLocked(configLocked);
+        setExportOptions(DEFAULT_EXPORT_OPTIONS);
+        setExportTopicIds(new Set(treeData.nodes.map((node) => node.id)));
         setExportNameOpen(true);
-    }, [configName]);
+    }, [configLocked, configName, treeData.nodes]);
 
     const doExport = useCallback(async () => {
         const nextName = exportNameValue.trim() || configName;
+        const nextExportLocked = configLocked || exportLocked;
+        const effectiveExportOptions = {
+            ...exportOptions,
+            templateImages: Boolean(exportOptions.templates && exportOptions.templateImages)
+        };
+        const exportTreeData = effectiveExportOptions.templates
+            ? buildSelectedTemplateTreeData(treeData, exportTopicIds)
+            : { nodes: [], templates: [] };
+        const [templateImages, tools] = await Promise.all([
+            loadTemplateImages(),
+            loadTools()
+        ]);
+        const exportTemplateImages = effectiveExportOptions.templateImages
+            ? filterTemplateImagesForExport(templateImages, exportTreeData.templates)
+            : [];
         setExportNameOpen(false);
         setConfigName(nextName);
         await saveConfigName(nextName);
         const payload = buildConfigPayload(
             nextName,
-            tokens.filter((tokenDef) => !tokenDef.system),
-            treeData,
-            await loadTemplateImages(),
-            chatGptPromptSettings
+            effectiveExportOptions.tokens ? tokens.filter((tokenDef) => !tokenDef.system) : [],
+            exportTreeData,
+            exportTemplateImages,
+            effectiveExportOptions.chatGptPromptSettings ? chatGptPromptSettings : {},
+            effectiveExportOptions.tools ? tools : [],
+            { locked: nextExportLocked, include: effectiveExportOptions }
         );
         const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
         const url = URL.createObjectURL(blob);
@@ -222,7 +400,7 @@ export default function Settings({ embedded = false, onClose = null }) {
         a.download = `${nextName || "config"}.templageConfig`;
         a.click();
         URL.revokeObjectURL(url);
-    }, [chatGptPromptSettings, configName, exportNameValue, tokens, treeData]);
+    }, [chatGptPromptSettings, configLocked, configName, exportLocked, exportNameValue, exportOptions, exportTopicIds, tokens, treeData]);
 
     const importConfig = useCallback(() => {
         if (fileInputRef.current) {
@@ -239,19 +417,35 @@ export default function Settings({ embedded = false, onClose = null }) {
             const json = JSON.parse(text);
             const {
                 tokens: importedTokens,
+                hasTokens: importedHasTokens,
                 nodes: importedNodes,
                 templates: importedTemplates,
+                hasTreeData: importedHasTreeData,
                 templateImages: importedTemplateImages,
+                hasTemplateImages: importedHasTemplateImages,
                 chatGptPromptSettings: importedChatGptPromptSettings,
+                hasChatGptPromptSettings: importedHasChatGptPromptSettings,
+                tools: importedTools,
+                hasTools: importedHasTools,
+                locked: importedLocked,
+                hasLock: importedHasLock,
                 configName: importedName
             } = validateImportedConfig(json);
             setPendingImportConfig({
                 fileName: file.name,
                 tokens: importedTokens,
+                hasTokens: importedHasTokens,
                 nodes: importedNodes,
                 templates: importedTemplates,
+                hasTreeData: importedHasTreeData,
                 templateImages: importedTemplateImages,
+                hasTemplateImages: importedHasTemplateImages,
                 chatGptPromptSettings: importedChatGptPromptSettings,
+                hasChatGptPromptSettings: importedHasChatGptPromptSettings,
+                tools: importedTools,
+                hasTools: importedHasTools,
+                locked: importedLocked,
+                hasLock: importedHasLock,
                 configName: importedName || "Imported configuration"
             });
         } catch (err) {
@@ -268,29 +462,54 @@ export default function Settings({ embedded = false, onClose = null }) {
         if (!pendingImportConfig) return;
 
         try {
-            const currentTemplateImages = await loadTemplateImages();
+            const [currentTemplateImages, currentTools] = await Promise.all([
+                loadTemplateImages(),
+                loadTools()
+            ]);
             const currentConfig = {
                 tokens: tokens.filter((tokenDef) => !tokenDef.system && !tokenDef.internal),
                 nodes: treeData.nodes,
                 templates: treeData.templates,
                 templateImages: currentTemplateImages,
-                chatGptPromptSettings
+                chatGptPromptSettings,
+                tools: currentTools
             };
             const importedConfig = {
                 tokens: pendingImportConfig.tokens,
+                hasTokens: pendingImportConfig.hasTokens,
                 nodes: pendingImportConfig.nodes,
                 templates: pendingImportConfig.templates,
+                hasTreeData: pendingImportConfig.hasTreeData,
                 templateImages: pendingImportConfig.templateImages,
-                chatGptPromptSettings: pendingImportConfig.chatGptPromptSettings
+                hasTemplateImages: pendingImportConfig.hasTemplateImages,
+                chatGptPromptSettings: pendingImportConfig.chatGptPromptSettings,
+                hasChatGptPromptSettings: pendingImportConfig.hasChatGptPromptSettings,
+                tools: pendingImportConfig.tools,
+                hasTools: pendingImportConfig.hasTools
             };
             const nextConfig = mode === "merge"
                 ? mergeConfigData(currentConfig, importedConfig)
-                : importedConfig;
+                : {
+                    tokens: pendingImportConfig.hasTokens ? importedConfig.tokens : currentConfig.tokens,
+                    nodes: pendingImportConfig.hasTreeData ? importedConfig.nodes : currentConfig.nodes,
+                    templates: pendingImportConfig.hasTreeData ? importedConfig.templates : currentConfig.templates,
+                    templateImages: pendingImportConfig.hasTemplateImages ? importedConfig.templateImages : currentConfig.templateImages,
+                    chatGptPromptSettings: pendingImportConfig.hasChatGptPromptSettings
+                        ? importedConfig.chatGptPromptSettings
+                        : currentConfig.chatGptPromptSettings,
+                    tools: pendingImportConfig.hasTools ? importedConfig.tools : currentConfig.tools
+                };
+            const nextConfigLocked = mode === "merge"
+                ? Boolean(configLocked || (pendingImportConfig.hasLock && pendingImportConfig.locked))
+                : Boolean(pendingImportConfig.hasLock && pendingImportConfig.locked);
 
             await saveTokens(nextConfig.tokens);
             await saveTemplateTreeData({ nodes: nextConfig.nodes, templates: nextConfig.templates });
             await saveTemplateImages(nextConfig.templateImages);
+            await saveTools(nextConfig.tools);
+            const savedConfigLocked = await saveConfigLocked(nextConfigLocked);
             const savedChatGptPromptSettings = await saveChatGptPromptSettings(nextConfig.chatGptPromptSettings);
+            window.dispatchEvent(new CustomEvent("tools-updated"));
 
             const [normalizedTokens, normalizedTreeData] = await Promise.all([
                 loadTokens(),
@@ -299,6 +518,7 @@ export default function Settings({ embedded = false, onClose = null }) {
             setTokens(normalizedTokens);
             setTreeData(normalizedTreeData);
             setChatGptPromptSettings(savedChatGptPromptSettings);
+            setConfigLocked(savedConfigLocked);
             refreshStorageInfo();
 
             const importedName = pendingImportConfig.configName || "Imported configuration";
@@ -313,7 +533,7 @@ export default function Settings({ embedded = false, onClose = null }) {
             console.error(err);
             showToast("Import failed", "error");
         }
-    }, [chatGptPromptSettings, configName, navigate, pendingImportConfig, refreshStorageInfo, tokens, treeData]);
+    }, [chatGptPromptSettings, configLocked, configName, navigate, pendingImportConfig, refreshStorageInfo, tokens, treeData]);
 
     const triggerReset = useCallback(() => {
         setConfirmReset(true);
@@ -358,11 +578,13 @@ export default function Settings({ embedded = false, onClose = null }) {
         showToast("AI prompt settings saved", "success");
     }, [chatGptPromptSettings]);
 
-    const copyTestData = useCallback((kind) => {
-        const isVti = kind === "vti";
-        const payload = isVti ? TEST_VTI_IMPORT_PAYLOAD : TEST_SO_IMPORT_PAYLOAD;
+    const copyTestData = useCallback((scenario, sourceId) => {
+        const source = TEST_DATA_SOURCES.find((entry) => entry.id === sourceId);
+        const payload = source ? scenario?.[source.payloadKey] : null;
+        if (!source || !payload) return;
+
         copyText(formatTestImportPayload(payload), {
-            message: `${isVti ? "VTI" : "SO"} test JSON copied`,
+            message: `${scenario.title}: ${source.label} copied`,
             variant: "success"
         });
     }, []);
@@ -370,7 +592,7 @@ export default function Settings({ embedded = false, onClose = null }) {
     const resetStorage = useCallback(async () => {
         setConfirmReset(false);
         const keysToDelete = [];
-        const appScopedLegacyKeys = new Set(["tokens", "models", "theme_pref", "active_client_payload", "agent_profile", "chatgpt_prompt_settings"]);
+        const appScopedLegacyKeys = new Set(["tokens", "models", "theme_pref", "active_client_payload", "agent_profile", "chatgpt_prompt_settings", "config_locked"]);
         try {
             const storage = globalThis.localStorage || null;
             if (storage) {
@@ -403,6 +625,50 @@ export default function Settings({ embedded = false, onClose = null }) {
         setExportNameValue(event.target.value);
     }, []);
 
+    const handleExportLockedChange = useCallback((event) => {
+        setExportLocked(event.target.checked);
+    }, []);
+
+    const toggleExportOption = useCallback((optionId) => {
+        const nextValue = !exportOptions[optionId];
+        const allTopicIds = new Set(treeData.nodes.map((node) => node.id));
+        setExportOptions((prev) => {
+            const resolvedNextValue = !prev[optionId];
+            const next = { ...prev, [optionId]: resolvedNextValue };
+            if (optionId === "templates" && !resolvedNextValue) {
+                next.templateImages = false;
+            }
+            if (optionId === "templateImages" && resolvedNextValue) {
+                next.templates = true;
+            }
+            return next;
+        });
+        if (nextValue && (optionId === "templates" || optionId === "templateImages")) {
+            setExportTopicIds((prev) => prev.size > 0 ? prev : allTopicIds);
+        }
+    }, [exportOptions, treeData.nodes]);
+
+    const toggleExportTopic = useCallback((topicId) => {
+        const affectedTopicIds = collectDescendantTopicIds(treeData.nodes, new Set([topicId]));
+        setExportTopicIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(topicId)) {
+                affectedTopicIds.forEach((id) => next.delete(id));
+            } else {
+                affectedTopicIds.forEach((id) => next.add(id));
+            }
+            return next;
+        });
+    }, [treeData.nodes]);
+
+    const selectAllExportTopics = useCallback(() => {
+        setExportTopicIds(new Set(treeData.nodes.map((node) => node.id)));
+    }, [treeData.nodes]);
+
+    const clearExportTopics = useCallback(() => {
+        setExportTopicIds(new Set());
+    }, []);
+
     const handleExportNameKeyDown = useCallback((event) => {
         if (event.key === "Enter") doExport();
     }, [doExport]);
@@ -414,6 +680,9 @@ export default function Settings({ embedded = false, onClose = null }) {
     const activeSectionConfig = SETTINGS_SECTIONS.find((section) => section.id === activeSection) || SETTINGS_SECTIONS[0];
     const ActiveSectionIcon = activeSectionConfig.icon;
     const customTokenCount = tokens.filter((tokenDef) => !tokenDef.system && !tokenDef.internal).length;
+    const exportTopicOptions = buildTopicExportOptions(treeData.nodes);
+    const selectedExportTopicCount = exportTopicOptions.filter(({ node }) => exportTopicIds.has(node.id)).length;
+    const exportTopicCount = exportTopicOptions.length;
 
     const renderSettingsDetail = () => {
         switch (activeSection) {
@@ -500,6 +769,10 @@ export default function Settings({ embedded = false, onClose = null }) {
                             <span>Current configuration</span>
                             <strong>{configName}</strong>
                         </div>
+                        <div className="settings-info-card">
+                            <span>Modification lock</span>
+                            <strong>{configLocked ? "Templates and tools are locked" : "Templates and tools are editable"}</strong>
+                        </div>
                         <div className="settings-action-grid">
                             <button type="button" className="settings-action-btn settings-action-btn--import" onClick={importConfig}>
                                 <Upload size={16} aria-hidden="true" />
@@ -515,23 +788,36 @@ export default function Settings({ embedded = false, onClose = null }) {
             case "testData":
                 return (
                     <div className="settings-detail-stack">
-                        <div className="settings-action-grid">
-                            <button
-                                type="button"
-                                className="settings-action-btn settings-action-btn--vti"
-                                onClick={() => copyTestData("vti")}
-                            >
-                                <Copy size={16} strokeWidth={2} aria-hidden="true" />
-                                <span>VTI data</span>
-                            </button>
-                            <button
-                                type="button"
-                                className="settings-action-btn settings-action-btn--so"
-                                onClick={() => copyTestData("so")}
-                            >
-                                <Copy size={16} strokeWidth={2} aria-hidden="true" />
-                                <span>SO data</span>
-                            </button>
+                        <div className="settings-info-card">
+                            <span>Capture order</span>
+                            <strong>Copy SuperOffice first, then VTI, to test the full import popup.</strong>
+                        </div>
+                        <div className="settings-test-scenarios">
+                            {TEST_IMPORT_SCENARIOS.map((scenario) => (
+                                <article key={scenario.id} className="settings-test-scenario-card">
+                                    <div className="settings-test-scenario-copy">
+                                        <strong>{scenario.title}</strong>
+                                        <span>{scenario.summary}</span>
+                                    </div>
+                                    <div className="settings-test-scenario-actions">
+                                        {TEST_DATA_SOURCES.map((source) => {
+                                            const hasPayload = Boolean(scenario[source.payloadKey]);
+                                            if (!hasPayload) return null;
+                                            return (
+                                                <button
+                                                    key={source.id}
+                                                    type="button"
+                                                    className={`settings-action-btn settings-action-btn--${source.id}`}
+                                                    onClick={() => copyTestData(scenario, source.id)}
+                                                >
+                                                    <Copy size={16} strokeWidth={2} aria-hidden="true" />
+                                                    <span>{source.buttonLabel}</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </article>
+                            ))}
                         </div>
                     </div>
                 );
@@ -659,7 +945,7 @@ export default function Settings({ embedded = false, onClose = null }) {
                 </div>
             </div>
             {exportNameOpen && (
-                <Modal onClose={closeExportNameModal} ariaLabel="Configuration name">
+                <Modal onClose={closeExportNameModal} ariaLabel="Configuration export" dialogClassName="popup-box settings-export-modal">
                     <div className="popup-header">
                         <h2>Export configuration</h2>
                     </div>
@@ -674,6 +960,69 @@ export default function Settings({ embedded = false, onClose = null }) {
                                 placeholder="My configuration"
                             />
                         </div>
+                        <div className="settings-export-options" role="group" aria-label="Content to export">
+                            {EXPORT_CONTENT_OPTIONS.map((option) => (
+                                <label
+                                    key={option.id}
+                                    className={`settings-export-option${exportOptions[option.id] ? " is-selected" : ""}`}
+                                >
+                                    <input
+                                        type="checkbox"
+                                        checked={Boolean(exportOptions[option.id])}
+                                        onChange={() => toggleExportOption(option.id)}
+                                    />
+                                    <span>
+                                        <strong>{option.label}</strong>
+                                        <small>{option.summary}</small>
+                                    </span>
+                                </label>
+                            ))}
+                        </div>
+                        {exportOptions.templates && (
+                            <div className="settings-export-topic-panel">
+                                <div className="settings-export-topic-head">
+                                    <span>
+                                        <strong>Topics to export</strong>
+                                        <small>{selectedExportTopicCount} of {exportTopicCount} selected</small>
+                                    </span>
+                                    <div className="settings-export-topic-actions">
+                                        <button type="button" className="secondary-btn" onClick={selectAllExportTopics}>All</button>
+                                        <button type="button" className="secondary-btn" onClick={clearExportTopics}>None</button>
+                                    </div>
+                                </div>
+                                <div className="settings-export-topic-list">
+                                    {exportTopicOptions.length === 0 ? (
+                                        <div className="settings-export-topic-empty">No topics to export.</div>
+                                    ) : exportTopicOptions.map(({ node, depth }) => (
+                                        <label
+                                            key={node.id}
+                                            className="settings-export-topic-row"
+                                            style={{ "--topic-depth": depth }}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={exportTopicIds.has(node.id)}
+                                                onChange={() => toggleExportTopic(node.id)}
+                                            />
+                                            <span>{node.title || "Untitled topic"}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        <label className={`settings-lock-option${configLocked ? " is-forced" : ""}`}>
+                            <input
+                                type="checkbox"
+                                checked={configLocked || exportLocked}
+                                disabled={configLocked}
+                                onChange={handleExportLockedChange}
+                            />
+                            <span className="settings-lock-option-icon"><Lock size={18} aria-hidden="true" /></span>
+                            <span>
+                                <strong>Lock templates and tools in this export</strong>
+                                <small>Imported users can use templates and tools, but cannot edit templates or inspect tool URLs/modules.</small>
+                            </span>
+                        </label>
                     </div>
                     <div className="popup-actions">
                         <button type="button" className="primary-btn" onClick={doExport}>Export</button>
@@ -702,9 +1051,9 @@ export default function Settings({ embedded = false, onClose = null }) {
                             <strong>{pendingImportConfig.configName}</strong>.
                         </p>
                         <p className="hint">
-                            Merge keeps existing content, adds new imported items, and updates matching
-                            tokens or IDs. Replace removes existing templates, tokens and images before
-                            importing this configuration.
+                            Merge keeps existing content, adds new imported items, and updates matching IDs.
+                            Replace overwrites only the sections included in the file, so partial exports
+                            leave omitted sections untouched.
                         </p>
                     </div>
                     <div className="popup-actions">

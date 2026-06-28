@@ -60,14 +60,46 @@ function computeTestChecksum(serialized) {
     [],
     { nodes: [], templates: [] },
     [image],
-    { templateInstruction: "Start with Hello {customer_name}." }
+    { templateInstruction: "Start with Hello {customer_name}." },
+    [
+      {
+        id: "tool-1",
+        title: "Customer search",
+        url: "https://example.com?q={client_name}",
+        color: "rose"
+      },
+      {
+        id: "module-1",
+        type: "module",
+        title: "Refund helper",
+        html: "<main>Refund</main>",
+        color: "violet"
+      }
+    ],
+    { locked: true }
   );
   const imported = validateImportedConfig(payload);
 
   assert.equal(payload.meta.schemaVersion, 3);
+  assert.equal(payload.meta.locked, true);
+  assert.equal(payload.meta.includes.templates, true);
+  assert.equal(payload.meta.includes.templateImages, true);
+  assert.equal(payload.meta.includes.tools, true);
   assert.equal(imported.templateImages.length, 1);
   assert.equal(imported.templateImages[0].dataUrl, image.dataUrl);
   assert.equal(imported.chatGptPromptSettings.templateInstruction, "Start with Hello {customer_name}.");
+  assert.equal(imported.hasTokens, true);
+  assert.equal(imported.hasTreeData, true);
+  assert.equal(imported.hasTemplateImages, true);
+  assert.equal(imported.hasChatGptPromptSettings, true);
+  assert.equal(imported.hasTools, true);
+  assert.equal(imported.tools.length, 2);
+  assert.equal(imported.tools[0].title, "Customer search");
+  assert.equal(imported.tools[1].type, "module");
+  assert.equal(imported.tools[1].beta, true);
+  assert.equal(imported.tools[1].url, "");
+  assert.equal(imported.hasLock, true);
+  assert.equal(imported.locked, true);
 
   const previousPayload = {
     meta: { ...payload.meta, checksum: 0 },
@@ -77,6 +109,7 @@ function computeTestChecksum(serialized) {
     templateImages: payload.templateImages,
     configName: payload.configName
   };
+  delete previousPayload.meta.includes;
   previousPayload.meta.checksum = computeTestChecksum(JSON.stringify({
     meta: previousPayload.meta,
     tokens: previousPayload.tokens,
@@ -88,6 +121,49 @@ function computeTestChecksum(serialized) {
   const previousImported = validateImportedConfig(previousPayload);
   assert.equal(previousImported.templateImages.length, 1);
   assert.equal(previousImported.chatGptPromptSettings.templateInstruction, "");
+  assert.equal(previousImported.hasTools, false);
+  assert.equal(previousImported.tools.length, 0);
+  assert.equal(previousImported.hasLock, true);
+  assert.equal(previousImported.locked, true);
+}
+
+{
+  const partial = buildConfigPayload(
+    "Tools only",
+    [{ token: "{customer}", label: "Customer" }],
+    {
+      nodes: [{ id: "node-1", title: "Topic" }],
+      templates: [{ id: "template-1", nodeIds: ["node-1"], parentNodeId: "node-1", title: "Template" }]
+    },
+    [image],
+    { templateInstruction: "Keep short." },
+    [{ id: "tool-1", title: "Customer search", url: "https://example.com?q={customer}" }],
+    {
+      include: {
+        templates: false,
+        templateImages: false,
+        tokens: false,
+        chatGptPromptSettings: false,
+        tools: true
+      }
+    }
+  );
+  const importedPartial = validateImportedConfig(partial);
+
+  assert.equal(partial.meta.includes.templates, false);
+  assert.equal(partial.meta.includes.tools, true);
+  assert.equal(partial.tokens.length, 0);
+  assert.equal(partial.nodes.length, 0);
+  assert.equal(partial.templates.length, 0);
+  assert.equal(partial.templateImages.length, 0);
+  assert.equal(partial.chatGptPromptSettings.templateInstruction, "");
+  assert.equal(partial.tools.length, 1);
+  assert.equal(importedPartial.hasTokens, false);
+  assert.equal(importedPartial.hasTreeData, false);
+  assert.equal(importedPartial.hasTemplateImages, false);
+  assert.equal(importedPartial.hasChatGptPromptSettings, false);
+  assert.equal(importedPartial.hasTools, true);
+  assert.equal(importedPartial.tools.length, 1);
 }
 
 {

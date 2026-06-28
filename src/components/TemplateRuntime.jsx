@@ -1,5 +1,19 @@
 import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, Check, Copy, Edit3, ExternalLink, RotateCcw, Sparkles, Star } from "lucide-react";
+import {
+    AlertTriangle,
+    ArrowRight,
+    Check,
+    CheckCircle2,
+    ClipboardList,
+    Copy,
+    Database,
+    Edit3,
+    ExternalLink,
+    Loader2,
+    RotateCcw,
+    Sparkles,
+    Star
+} from "lucide-react";
 import { generateFinalText, getTemplateTextByLang } from "../core/tokenEngine.js";
 import {
     ACTIVE_CLIENT_PAYLOAD_UPDATED_EVENT,
@@ -53,6 +67,7 @@ import {
     applyExternalIdSourceCorrectionsToImportResult,
     getExternalIdSourceConflicts
 } from "../utils/externalIdConflicts.js";
+import { CAPTURE_DATA_TYPE, classifyCaptureClipboardText } from "../utils/captureDataDetection.js";
 import { parseSuperOfficeInfoPayload } from "../utils/superOfficeImport.js";
 import {
     clearSuperOfficeTicketPayload,
@@ -73,9 +88,88 @@ import {
 import Modal from "./Modal.jsx";
 
 const CLIENT_CLIPBOARD_READ_TIMEOUT_MS = 3500;
+const CAPTURE_DATA_POLL_INTERVAL_MS = 1400;
+const CAPTURE_DATA_COMPLETE_CLOSE_DELAY_MS = 1300;
+const CAPTURE_DATA_STEP_ADVANCE_DELAY_MS = 900;
 const CLIENT_BAR_FIELDS_KEY = "client_bar_fields";
 const CLIENT_BAR_FIELD_LIMIT = 8;
 const RichTextEditor = lazy(() => import("./RichTextEditor.jsx"));
+
+function createCaptureDataState(options = {}) {
+    const hasVtiData = Boolean(options.hasVtiData);
+    const hasSuperOfficeData = Boolean(options.hasSuperOfficeData);
+    const complete = hasVtiData && hasSuperOfficeData;
+
+    return {
+        phase: complete ? "complete" : hasSuperOfficeData && !hasVtiData ? "vti" : "so",
+        soStatus: hasSuperOfficeData ? "done" : "active",
+        contractorStatus: "idle",
+        vtiStatus: hasVtiData ? "done" : hasSuperOfficeData ? "active" : "waiting",
+        contractorNumber: "",
+        lastDetectedType: "",
+        message: complete
+            ? "Capture complete."
+            : hasSuperOfficeData
+                ? "Waiting for VTI data."
+                : "Waiting for SuperOffice data.",
+        detail: complete
+            ? "Everything needed is already loaded."
+            : hasSuperOfficeData
+                ? "Open the customer in VTI, click the VTI Capture bookmark, then copy the result."
+                : "Open the BO/SuperOffice ticket, click the BO Capture bookmark, then copy the result.",
+        error: "",
+        isReading: false,
+        isPaused: false,
+        completedAt: null
+    };
+}
+
+function isCaptureDataComplete(state) {
+    return state?.soStatus === "done" && state?.vtiStatus === "done";
+}
+
+function getCaptureDataVisualState(state, hasConflict = false) {
+    if (hasConflict) {
+        return {
+            mode: "conflict",
+            Icon: AlertTriangle,
+            title: "Import conflict",
+            detail: "Some ticket fields do not match the customer. Choose the correct values below."
+        };
+    }
+    if (isCaptureDataComplete(state)) {
+        return {
+            mode: "done",
+            Icon: CheckCircle2,
+            title: "Capture complete",
+            detail: "SuperOffice and VTI data are ready."
+        };
+    }
+    if (state.phase === "contractor" || state.phase === "so-done") {
+        return {
+            mode: "done",
+            Icon: CheckCircle2,
+            title: state.contractorStatus === "done" ? "Contractor copied" : "SO data captured",
+            detail: state.contractorStatus === "done"
+                ? `${state.contractorNumber} copied. Search this contractor in VTI, then click the VTI Capture bookmark.`
+                : "Ticket data imported. Now open the customer in VTI and click the VTI Capture bookmark."
+        };
+    }
+    if (state.phase === "vti" || state.vtiStatus === "active") {
+        return {
+            mode: "scanning",
+            Icon: Loader2,
+            title: "Waiting for VTI data",
+            detail: "Open the customer in VTI, click the VTI Capture bookmark, then copy the result."
+        };
+    }
+    return {
+        mode: "scanning",
+        Icon: Loader2,
+        title: "Waiting for SuperOffice data",
+        detail: "Open the BO/SuperOffice ticket, click the BO Capture bookmark, then copy the result."
+    };
+}
 
 function sanitizeGeneratedTemplateHtml(model, html = "") {
     return model?.type === "sms" ? stripImagesFromHtml(html) : html;
@@ -1034,8 +1128,7 @@ export const ClientInfoPanel = memo(function ClientInfoPanel({
     hasVtiData = false,
     hasSuperOfficeData = false,
     onChangeLang,
-    onReadClipboard,
-    onReadSuperOffice,
+    onOpenCaptureData,
     onOpenPaste,
     onClearClient,
     onCustomizeBar,
@@ -1045,6 +1138,13 @@ export const ClientInfoPanel = memo(function ClientInfoPanel({
     const hasInfo = sections.length > 0;
     const isError = status.type === "error";
     const hasAnyImportedData = hasVtiData || hasSuperOfficeData;
+    const missingCaptureLabel = !hasVtiData && !hasSuperOfficeData
+        ? "SO + VTI"
+        : !hasSuperOfficeData
+            ? "SO missing"
+            : !hasVtiData
+                ? "VTI missing"
+                : "Ready";
     const externalIdSegments = useMemo(() => buildExternalIdSegments(externalId), [externalId]);
     const copyExternalId = async () => {
         try {
@@ -1058,30 +1158,17 @@ export const ClientInfoPanel = memo(function ClientInfoPanel({
     return (
         <section className="client-info-panel" aria-label="Client information">
             <div className="client-import-status-row" aria-label="Data imports">
-                {!hasVtiData && (
-                    <button
-                        type="button"
-                        className="client-import-status-btn client-import-status-btn--vti is-missing"
-                        onClick={onReadClipboard}
-                        disabled={loading}
-                        title="Import missing VTI data. Alt+Q"
-                    >
-                        <span>{loading ? "Importing..." : "VTI"}</span>
-                        <small>Missing</small>
-                    </button>
-                )}
-                {!hasSuperOfficeData && (
-                    <button
-                        type="button"
-                        className="client-import-status-btn client-import-status-btn--so is-missing"
-                        onClick={onReadSuperOffice}
-                        disabled={loading}
-                        title="Import missing SO data. Alt+W"
-                    >
-                        <span>SO</span>
-                        <small>Missing</small>
-                    </button>
-                )}
+                <button
+                    type="button"
+                    className={`client-import-status-btn client-import-status-btn--capture${hasVtiData && hasSuperOfficeData ? " is-loaded" : " is-missing"}`}
+                    onClick={onOpenCaptureData}
+                    disabled={loading}
+                    title="Capture SO/BO and VTI data. Alt+Q"
+                >
+                    <ClipboardList size={14} aria-hidden="true" />
+                    <span>{loading ? "Capturing..." : "Capture data"}</span>
+                    <small>{missingCaptureLabel}</small>
+                </button>
                 <button
                     type="button"
                     className="client-import-clear-btn"
@@ -1258,7 +1345,7 @@ export function ClientPasteModal({ onClose, onImport, initialError = "" }) {
             <div className="popup-header">
                 <h2>Paste customer data</h2>
             </div>
-            <p className="hint">Paste the VTI customer data here when clipboard access is blocked.</p>
+            <p className="hint">After clicking the VTI Capture bookmark in VTI, paste the copied result here.</p>
             {error && <p className="client-info-status client-info-status--error">{error}</p>}
             <textarea
                 autoFocus
@@ -1268,7 +1355,7 @@ export function ClientPasteModal({ onClose, onImport, initialError = "" }) {
                     setText(event.target.value);
                     if (error) setError("");
                 }}
-                placeholder='{"client": {...}, "contact": {...}, "healthcheck": {...}}'
+                placeholder="Paste the result copied by the VTI Capture bookmark..."
             />
             <div className="popup-actions">
                 <button type="button" className="primary-btn" onClick={submit}>Import</button>
@@ -1277,7 +1364,103 @@ export function ClientPasteModal({ onClose, onImport, initialError = "" }) {
     );
 }
 
-export function ExternalIdConflictModal({ conflicts = [], onApplySelections, onCancel }) {
+export function CaptureDataModal({
+    state,
+    conflictPrompt = null,
+    onApplyConflictSelections,
+    onCancelConflict,
+    onClose,
+    onReadNow,
+    onOpenPaste
+}) {
+    const visual = getCaptureDataVisualState(state, Boolean(conflictPrompt));
+    const VisualIcon = visual.Icon;
+    const timelineSteps = [
+        {
+            id: "so",
+            label: "SO",
+            status: state.soStatus,
+            note: state.contractorStatus === "done"
+                ? "Contractor copied"
+                : state.soStatus === "done" ? "Ticket imported" : "Do this first"
+        },
+        {
+            id: "vti",
+            label: "VTI",
+            status: state.vtiStatus,
+            note: state.vtiStatus === "done" ? "Customer imported" : state.soStatus === "done" ? "Do this next" : "Next"
+        }
+    ];
+    const isBusy = visual.mode === "scanning" || state.isReading;
+    const timelineProgressClass = state.vtiStatus === "done"
+        ? "is-complete"
+        : state.soStatus === "done"
+            ? "is-half"
+            : "is-start";
+
+    return (
+        <Modal onClose={onClose} dialogClassName="popup-box capture-data-modal" ariaLabel="Capture data">
+            <div className="capture-data-header">
+                <div className="capture-data-orb" aria-hidden="true">
+                    <Database size={22} />
+                </div>
+                <div>
+                    <p className="eyebrow">Clipboard capture</p>
+                    <h2>Capture data</h2>
+                    <p>{state.message}</p>
+                </div>
+            </div>
+
+            <div className={`capture-data-focus is-${visual.mode}${isBusy ? " is-busy" : ""}`} aria-live="polite">
+                <strong>{visual.title}</strong>
+                <div className="capture-data-focus-ring" aria-hidden="true" />
+                <div className="capture-data-focus-icon">
+                    <VisualIcon size={34} aria-hidden="true" />
+                </div>
+                <span>{visual.detail}</span>
+            </div>
+
+            <div className={`capture-data-timeline ${timelineProgressClass}`} aria-label="Capture progress">
+                <div className="capture-data-timeline-line" aria-hidden="true">
+                    <span />
+                </div>
+                {timelineSteps.map((step) => (
+                    <div key={step.id} className={`capture-data-timeline-step is-${step.status}`}>
+                        <span className="capture-data-timeline-dot" aria-hidden="true" />
+                        <strong>{step.label}</strong>
+                        <small>{step.note}</small>
+                    </div>
+                ))}
+            </div>
+
+            <div className={`capture-data-status${state.error ? " is-error" : ""}${state.isPaused ? " is-paused" : ""}`}>
+                {state.isReading && <Loader2 size={16} aria-hidden="true" className="capture-data-spinner" />}
+                <span>{state.error || state.detail}</span>
+            </div>
+
+            {conflictPrompt && (
+                <div className="capture-data-conflict-panel">
+                    <ExternalIdConflictContent
+                        conflicts={conflictPrompt.conflicts}
+                        onApplySelections={onApplyConflictSelections}
+                        onCancel={onCancelConflict}
+                    />
+                </div>
+            )}
+
+            <div className="popup-actions capture-data-actions">
+                <button type="button" className="secondary-btn" onClick={onOpenPaste}>
+                    Paste manually
+                </button>
+                <button type="button" className="primary-btn" onClick={onReadNow} disabled={state.isReading || state.isPaused || Boolean(conflictPrompt)}>
+                    Read clipboard now
+                </button>
+            </div>
+        </Modal>
+    );
+}
+
+function ExternalIdConflictContent({ conflicts = [], onApplySelections, onCancel }) {
     const [selectionByField, setSelectionByField] = useState(() => (
         Object.fromEntries(conflicts.map((conflict) => [conflict.field, "source"]))
     ));
@@ -1294,11 +1477,11 @@ export function ExternalIdConflictModal({ conflicts = [], onApplySelections, onC
     };
 
     return (
-        <Modal onClose={onCancel} dialogClassName="popup-box external-id-conflict-modal" ariaLabel="Import data conflict">
+        <>
             <div className="popup-header">
                 <div>
-                    <h2>Import data conflict</h2>
-                    <p className="hint">Click the value to keep for each conflicting field.</p>
+                    <h2>Ticket/customer mismatch</h2>
+                    <p className="hint">The ticket and customer do not fully match. Pick the value that is correct for this case.</p>
                 </div>
             </div>
             <div className="external-id-conflict-list">
@@ -1335,9 +1518,21 @@ export function ExternalIdConflictModal({ conflicts = [], onApplySelections, onC
                 })}
             </div>
             <div className="popup-actions">
-                <button type="button" className="secondary-btn" onClick={onCancel}>Cancel import</button>
-                <button type="button" className="primary-btn" onClick={() => onApplySelections(selectionByField)}>Import selected data</button>
+                <button type="button" className="secondary-btn" onClick={onCancel}>Cancel ticket data</button>
+                <button type="button" className="primary-btn" onClick={() => onApplySelections(selectionByField)}>Keep selected values</button>
             </div>
+        </>
+    );
+}
+
+export function ExternalIdConflictModal({ conflicts = [], onApplySelections, onCancel }) {
+    return (
+        <Modal onClose={onCancel} dialogClassName="popup-box external-id-conflict-modal" ariaLabel="Import data conflict">
+            <ExternalIdConflictContent
+                conflicts={conflicts}
+                onApplySelections={onApplySelections}
+                onCancel={onCancel}
+            />
         </Modal>
     );
 }
@@ -1365,6 +1560,15 @@ export function useTemplateRuntime() {
     const [clientBarFieldKeys, setClientBarFieldKeys] = useState(null);
     const [clientBarCustomizeOpen, setClientBarCustomizeOpen] = useState(false);
     const [externalIdConflictPrompt, setExternalIdConflictPrompt] = useState(null);
+    const [captureDataOpen, setCaptureDataOpen] = useState(false);
+    const [captureDataState, setCaptureDataState] = useState(() => createCaptureDataState());
+    const captureCompletedTypes = useRef(new Set());
+    const captureLastClipboardText = useRef("");
+    const captureImportCallback = useRef(null);
+    const captureCompleteCloseTimer = useRef(null);
+    const captureStepAdvanceTimer = useRef(null);
+    const captureReadInFlight = useRef(false);
+    const captureConflictType = useRef(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -1558,6 +1762,7 @@ export function useTemplateRuntime() {
             { corrected: true }
         );
         setExternalIdConflictPrompt(null);
+        await resolveCaptureConflict();
     };
 
     const keepExternalIdValues = async () => {
@@ -1569,6 +1774,7 @@ export function useTemplateRuntime() {
             { keptExternalId: true }
         );
         setExternalIdConflictPrompt(null);
+        await resolveCaptureConflict();
     };
 
     const applyExternalIdConflictSelections = async (selections = {}) => {
@@ -1591,11 +1797,25 @@ export function useTemplateRuntime() {
             }
         );
         setExternalIdConflictPrompt(null);
+        await resolveCaptureConflict();
     };
 
 
     const cancelExternalIdConflictCorrection = () => {
+        const wasCaptureConflict = Boolean(captureConflictType.current);
         setExternalIdConflictPrompt(null);
+        captureConflictType.current = null;
+        if (wasCaptureConflict) {
+            captureCompletedTypes.current.delete(CAPTURE_DATA_TYPE.SUPER_OFFICE);
+            setCaptureDataState((current) => ({
+                ...current,
+                phase: "so",
+                soStatus: "active",
+                isPaused: false,
+                detail: "SuperOffice import canceled. Open the BO/SuperOffice ticket and click BO Capture again.",
+                error: ""
+            }));
+        }
         showToast("SuperOffice import canceled.", "info");
     };
 
@@ -1649,6 +1869,7 @@ export function useTemplateRuntime() {
         setPromptMissingTokens([]);
         setVariantPicker(null);
         setExternalIdConflictPrompt(null);
+        closeCaptureDataFlow();
         setClientImportStatus({ type: "idle", message: "" });
         lastSectionClickVersion.current = {};
         inputChangeVersion.current++;
@@ -1700,6 +1921,7 @@ export function useTemplateRuntime() {
         let activeSuperOfficeTicket = candidateSuperOfficeTicket;
         let superOfficeTokenValues = candidateSuperOfficeTicket?.tokenValues || {};
         let savedSuperOfficeValues = null;
+        let pendingSuperOfficeConflict = false;
         if (candidateSuperOfficeTicket && Object.keys(superOfficeTokenValues).length > 0) {
             const conflictPrompt = buildExternalIdConflictPrompt(candidateSuperOfficeTicket, payload);
             if (conflictPrompt) {
@@ -1707,6 +1929,7 @@ export function useTemplateRuntime() {
                 showToast("Import data conflict detected.", "warning");
                 superOfficeTokenValues = {};
                 activeSuperOfficeTicket = null;
+                pendingSuperOfficeConflict = true;
             } else {
                 if (pendingSuperOfficeTicket) {
                     activeSuperOfficeTicket = await consumePendingSuperOfficeTicketPayload();
@@ -1736,6 +1959,7 @@ export function useTemplateRuntime() {
         setValues({ ...agentValues, ...nextValues, ...(savedSuperOfficeValues?.values || superOfficeTokenValues) });
         inputChangeVersion.current++;
         setClientImportStatus({ type: "success", message: "" });
+        return { pendingSuperOfficeConflict };
     };
 
     const readClientClipboard = async (event) => {
@@ -1784,6 +2008,308 @@ export function useTemplateRuntime() {
             setClientImportLoading(false);
         }
     };
+
+    const notifyCaptureImport = async (type) => {
+        try {
+            await captureImportCallback.current?.(type);
+        } catch (error) {
+            console.error("capture import callback error", error);
+        }
+    };
+
+    const scheduleCaptureVtiStep = () => {
+        window.clearTimeout(captureStepAdvanceTimer.current);
+        captureStepAdvanceTimer.current = window.setTimeout(() => {
+            setCaptureDataState((current) => {
+                if (current.isPaused || current.vtiStatus === "done" || current.soStatus !== "done") {
+                    return current;
+                }
+                return {
+                    ...current,
+                    phase: "vti",
+                    vtiStatus: "active",
+                    message: "Waiting for VTI data.",
+                    detail: "Open the customer in VTI, click the VTI Capture bookmark, then copy the result.",
+                    error: ""
+                };
+            });
+        }, CAPTURE_DATA_STEP_ADVANCE_DELAY_MS);
+    };
+
+    const updateCaptureCompletionState = (updates) => {
+        setCaptureDataState((current) => {
+            const next = { ...current, ...updates };
+            if (isCaptureDataComplete(next)) {
+                if (next.isPaused) {
+                    return {
+                        ...next,
+                    phase: "complete",
+                    soStatus: "done",
+                    vtiStatus: "done",
+                    message: "SO and VTI data captured.",
+                    detail: next.detail || "Choose the correct values below before capture can finish.",
+                    error: "",
+                    completedAt: null
+                };
+                }
+                return {
+                    ...next,
+                    phase: "complete",
+                    soStatus: "done",
+                    vtiStatus: "done",
+                    message: "SO and VTI data captured.",
+                    detail: "Capture complete. Closing automatically...",
+                    error: "",
+                    completedAt: Date.now()
+                };
+            }
+            return next;
+        });
+    };
+
+    const resolveCaptureConflict = async () => {
+        const conflictType = captureConflictType.current;
+        if (!conflictType) return;
+
+        captureConflictType.current = null;
+        captureCompletedTypes.current.add(conflictType);
+        await notifyCaptureImport(conflictType);
+        updateCaptureCompletionState({
+            phase: captureCompletedTypes.current.has(CAPTURE_DATA_TYPE.CLIENT) ? "complete" : "vti",
+            soStatus: captureCompletedTypes.current.has(CAPTURE_DATA_TYPE.SUPER_OFFICE) ? "done" : "active",
+            vtiStatus: captureCompletedTypes.current.has(CAPTURE_DATA_TYPE.CLIENT) ? "done" : "active",
+            contractorStatus: "done",
+            isPaused: false,
+            detail: "Conflict resolved. Capture can finish now.",
+            error: ""
+        });
+    };
+
+    const describeRemainingCaptureStep = () => {
+        const completed = captureCompletedTypes.current;
+        if (!completed.has(CAPTURE_DATA_TYPE.SUPER_OFFICE)) {
+            return "Open the BO/SuperOffice ticket, click the BO Capture bookmark, then copy the result.";
+        }
+        if (!completed.has(CAPTURE_DATA_TYPE.CLIENT)) {
+            return "Open the customer in VTI, click the VTI Capture bookmark, then copy the result.";
+        }
+        return "Capture complete.";
+    };
+
+    const handleCaptureClipboardText = async (clipboardText, source = "auto") => {
+        const trimmed = String(clipboardText ?? "").trim();
+        if (!trimmed) {
+            setCaptureDataState((current) => ({
+                ...current,
+                detail: "Clipboard is empty. Click a Capture bookmark first, then copy its result.",
+                error: source === "manual" ? "Clipboard is empty." : ""
+            }));
+            return false;
+        }
+
+        if (trimmed === captureLastClipboardText.current) {
+            setCaptureDataState((current) => ({
+                ...current,
+                detail: current.error ? current.detail : describeRemainingCaptureStep()
+            }));
+            return false;
+        }
+        captureLastClipboardText.current = trimmed;
+
+        const detected = classifyCaptureClipboardText(trimmed);
+        if (detected.type === CAPTURE_DATA_TYPE.UNKNOWN) {
+            setCaptureDataState((current) => ({
+                ...current,
+                detail: "Clipboard changed, but it is not a result from the BO Capture or VTI Capture bookmark.",
+                error: source === "manual" ? detected.error : "",
+                lastDetectedType: ""
+            }));
+            return false;
+        }
+
+        if (captureCompletedTypes.current.has(detected.type)) {
+            setCaptureDataState((current) => ({
+                ...current,
+                detail: `${detected.type === CAPTURE_DATA_TYPE.CLIENT ? "VTI" : "SO/BO"} data is already captured. ${describeRemainingCaptureStep()}`,
+                error: "",
+                lastDetectedType: detected.type
+            }));
+            return false;
+        }
+
+        if (detected.type === CAPTURE_DATA_TYPE.SUPER_OFFICE) {
+            const activeClientPayload = await loadActiveClientPayload();
+            if (openExternalIdConflictPrompt(detected.result, activeClientPayload)) {
+                window.clearTimeout(captureStepAdvanceTimer.current);
+                captureStepAdvanceTimer.current = null;
+                captureConflictType.current = CAPTURE_DATA_TYPE.SUPER_OFFICE;
+                setCaptureDataState((current) => ({
+                    ...current,
+                    isPaused: true,
+                    error: "",
+                    detail: "Some ticket fields do not match the customer. Choose the correct values below."
+                }));
+                return false;
+            }
+
+            const contractorNumber = getSuperOfficeContractorNumber(detected.result, detected.result?.tokenValues || {});
+            const imported = await completeSuperOfficeImport(detected.result);
+            if (!imported) return false;
+
+            captureCompletedTypes.current.add(CAPTURE_DATA_TYPE.SUPER_OFFICE);
+            await notifyCaptureImport(CAPTURE_DATA_TYPE.SUPER_OFFICE);
+            updateCaptureCompletionState({
+                phase: captureCompletedTypes.current.has(CAPTURE_DATA_TYPE.CLIENT)
+                    ? "complete"
+                    : contractorNumber ? "contractor" : "so-done",
+                soStatus: "done",
+                contractorStatus: contractorNumber ? "done" : "skipped",
+                vtiStatus: captureCompletedTypes.current.has(CAPTURE_DATA_TYPE.CLIENT) ? "done" : "waiting",
+                contractorNumber,
+                lastDetectedType: detected.type,
+                message: contractorNumber
+                    ? "Contractor copied."
+                    : "SO data captured.",
+                detail: contractorNumber
+                    ? "Contractor copied. Search it in VTI, open the customer, then click VTI Capture."
+                    : "Ticket data imported. Open the customer in VTI, then click VTI Capture.",
+                error: ""
+            });
+            if (!captureCompletedTypes.current.has(CAPTURE_DATA_TYPE.CLIENT)) {
+                scheduleCaptureVtiStep();
+            }
+            return true;
+        }
+
+        window.clearTimeout(captureStepAdvanceTimer.current);
+        captureStepAdvanceTimer.current = null;
+        const clientImportResult = await loadClientFromText(trimmed);
+        captureCompletedTypes.current.add(CAPTURE_DATA_TYPE.CLIENT);
+        await notifyCaptureImport(CAPTURE_DATA_TYPE.CLIENT);
+        const hasPendingSuperOfficeConflict = Boolean(clientImportResult?.pendingSuperOfficeConflict);
+        if (hasPendingSuperOfficeConflict) {
+            captureConflictType.current = CAPTURE_DATA_TYPE.SUPER_OFFICE;
+        }
+        updateCaptureCompletionState({
+            phase: captureCompletedTypes.current.has(CAPTURE_DATA_TYPE.SUPER_OFFICE) ? "complete" : "so",
+            vtiStatus: "done",
+            soStatus: captureCompletedTypes.current.has(CAPTURE_DATA_TYPE.SUPER_OFFICE) ? "done" : "active",
+            lastDetectedType: detected.type,
+            isPaused: hasPendingSuperOfficeConflict,
+            message: captureCompletedTypes.current.has(CAPTURE_DATA_TYPE.SUPER_OFFICE)
+                ? "VTI data captured."
+                : "VTI data captured. Waiting for SuperOffice data.",
+            detail: hasPendingSuperOfficeConflict
+                ? "Some ticket fields do not match the customer. Choose the correct values below."
+                : captureCompletedTypes.current.has(CAPTURE_DATA_TYPE.SUPER_OFFICE)
+                ? "Customer data imported."
+                : "Customer data imported. Now open the BO/SuperOffice ticket and click BO Capture.",
+            error: ""
+        });
+        return true;
+    };
+
+    const readCaptureDataClipboard = async (source = "auto") => {
+        if (captureReadInFlight.current) return false;
+        captureReadInFlight.current = true;
+        setCaptureDataState((current) => ({
+            ...current,
+            isReading: true,
+            error: "",
+            detail: source === "manual" ? "Reading copied capture result..." : "Watching for the next copied capture result..."
+        }));
+
+        try {
+            const clipboardText = await readClipboardText();
+            return await handleCaptureClipboardText(clipboardText, source);
+        } catch (error) {
+            const message = error?.message || "Unable to read clipboard.";
+            setCaptureDataState((current) => ({
+                ...current,
+                error: message,
+                detail: "Clipboard access is blocked. Click Paste manually and paste the result from the Capture bookmark."
+            }));
+            return false;
+        } finally {
+            captureReadInFlight.current = false;
+            setCaptureDataState((current) => ({
+                ...current,
+                isReading: false
+            }));
+        }
+    };
+
+    const openCaptureDataFlow = (options = {}) => {
+        window.clearTimeout(captureCompleteCloseTimer.current);
+        captureCompleteCloseTimer.current = null;
+        window.clearTimeout(captureStepAdvanceTimer.current);
+        captureStepAdvanceTimer.current = null;
+        captureConflictType.current = null;
+        captureImportCallback.current = typeof options.onImported === "function" ? options.onImported : null;
+        captureLastClipboardText.current = "";
+        captureCompletedTypes.current = new Set([
+            ...(options.hasSuperOfficeData ? [CAPTURE_DATA_TYPE.SUPER_OFFICE] : []),
+            ...(options.hasVtiData ? [CAPTURE_DATA_TYPE.CLIENT] : [])
+        ]);
+        setCaptureDataState(createCaptureDataState(options));
+        setCaptureDataOpen(true);
+    };
+
+    const closeCaptureDataFlow = () => {
+        window.clearTimeout(captureCompleteCloseTimer.current);
+        captureCompleteCloseTimer.current = null;
+        window.clearTimeout(captureStepAdvanceTimer.current);
+        captureStepAdvanceTimer.current = null;
+        captureConflictType.current = null;
+        captureImportCallback.current = null;
+        setCaptureDataOpen(false);
+        setCaptureDataState(createCaptureDataState());
+    };
+
+    useEffect(() => {
+        if (!captureDataOpen || captureDataState.isPaused || isCaptureDataComplete(captureDataState)) {
+            return undefined;
+        }
+
+        let cancelled = false;
+        let pollTimer = null;
+
+        const pollClipboard = async () => {
+            if (cancelled) return;
+            await readCaptureDataClipboard("auto");
+            if (!cancelled) {
+                pollTimer = window.setTimeout(pollClipboard, CAPTURE_DATA_POLL_INTERVAL_MS);
+            }
+        };
+
+        const handleFocus = () => {
+            if (!cancelled) readCaptureDataClipboard("focus");
+        };
+
+        pollClipboard();
+        window.addEventListener("focus", handleFocus);
+
+        return () => {
+            cancelled = true;
+            window.clearTimeout(pollTimer);
+            window.removeEventListener("focus", handleFocus);
+        };
+    }, [captureDataOpen, captureDataState.isPaused, captureDataState.soStatus, captureDataState.vtiStatus]);
+
+    useEffect(() => {
+        if (!captureDataOpen || captureDataState.isPaused || externalIdConflictPrompt || !isCaptureDataComplete(captureDataState)) {
+            return undefined;
+        }
+
+        window.clearTimeout(captureCompleteCloseTimer.current);
+        captureCompleteCloseTimer.current = window.setTimeout(() => {
+            closeCaptureDataFlow();
+        }, CAPTURE_DATA_COMPLETE_CLOSE_DELAY_MS);
+
+        return () => {
+            window.clearTimeout(captureCompleteCloseTimer.current);
+        };
+    }, [captureDataOpen, captureDataState.completedAt, captureDataState.isPaused, externalIdConflictPrompt]);
 
     const importClientFromPaste = async (text) => {
         await loadClientFromText(text);
@@ -2059,6 +2585,11 @@ export function useTemplateRuntime() {
         clientImportLoading,
         clientImportErrorModal,
         setClientImportErrorModal,
+        captureDataOpen,
+        captureDataState,
+        openCaptureDataFlow,
+        closeCaptureDataFlow,
+        readCaptureDataClipboard,
         clientDetailsExpanded,
         setClientDetailsExpanded,
         clientBarFieldGroups,
