@@ -161,7 +161,7 @@ function getCaptureDataVisualState(state, hasConflict = false) {
             Icon: Loader2,
             waitingTarget: "VTI",
             title: "Waiting for VTI data",
-            detail: "Open VTI, capture, copy."
+            detail: "Click the Import data VTI bookmarklet."
         };
     }
     return {
@@ -169,7 +169,7 @@ function getCaptureDataVisualState(state, hasConflict = false) {
         Icon: Loader2,
         waitingTarget: "SO",
         title: "Waiting for SuperOffice data",
-        detail: "Open SO, capture, copy."
+        detail: "Click the Import data SO bookmarklet."
     };
 }
 
@@ -1395,11 +1395,7 @@ export function CaptureDataModal({
         : state.soStatus === "done"
             ? "is-half"
             : "is-start";
-    const statusText = state.error || (state.isReading
-        ? "Reading clipboard..."
-        : visual.waitingTarget
-            ? visual.detail
-            : state.detail);
+    const statusText = state.error || (visual.waitingTarget ? visual.detail : state.detail);
 
     return (
         <Modal onClose={onClose} dialogClassName="popup-box capture-data-modal" ariaLabel="Capture data">
