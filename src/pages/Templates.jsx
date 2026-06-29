@@ -1758,6 +1758,7 @@ export default function Templates() {
                 onCopyAloAutofillData={copyAloAutofillData}
                 hasAloAutofillData={Boolean(runtime.clientPayload)}
                 onOpenSuperOfficePhotos={openSuperOfficeGallery}
+                superOfficeMediaCount={superOfficeTicket?.mediaAttachments?.length || superOfficeTicket?.imageAttachments?.length || 0}
                 superOfficePhotoCount={superOfficeTicket?.imageAttachments?.length || 0}
                 onManageTools={openToolsWorkspace}
             />

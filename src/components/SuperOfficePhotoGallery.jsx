@@ -4,16 +4,18 @@ import {
     ChevronRight,
     Edit3,
     ExternalLink,
+    FileText,
     Image as ImageIcon,
     RotateCcw,
+    Video,
     ZoomIn,
     ZoomOut
 } from "lucide-react";
 import Modal from "./Modal.jsx";
 import SuperOfficeImageAnnotator from "./SuperOfficeImageAnnotator.jsx";
 import {
-    getSuperOfficeImageAttachments,
-    groupSuperOfficeImageAttachmentsByPost
+    getSuperOfficeMediaAttachments,
+    groupSuperOfficeMediaAttachmentsByPost
 } from "../utils/superOfficeImport.js";
 
 const VIEWER_MIN_ZOOM = 1;
@@ -33,8 +35,8 @@ function firstValue(...values) {
     return "";
 }
 
-function imageKey(image) {
-    return `${image?.name || ""}|${image?.url || ""}`;
+function attachmentKey(attachment) {
+    return `${attachment?.type || ""}|${attachment?.name || ""}|${attachment?.url || ""}`;
 }
 
 function clamp(value, min, max) {
@@ -43,6 +45,34 @@ function clamp(value, min, max) {
 
 function getDefaultViewerTransform() {
     return { scale: 1, x: 0, y: 0 };
+}
+
+function getMediaTypeLabel(attachment = {}) {
+    if (attachment.type === "video") return "Vidéo";
+    if (attachment.type === "pdf") return "PDF";
+    return "Photo";
+}
+
+function getMediaIcon(attachment = {}) {
+    if (attachment.type === "video") return Video;
+    if (attachment.type === "pdf") return FileText;
+    return ImageIcon;
+}
+
+function getOpenMediaLabel(attachment = {}) {
+    if (attachment.type === "video") return "Ouvrir la vidéo";
+    if (attachment.type === "pdf") return "Ouvrir le PDF";
+    return "Ouvrir l’image";
+}
+
+function getVideoContentType(attachment = {}) {
+    const contentType = displayValue(attachment.contentType).toLowerCase();
+    if (contentType.startsWith("video/")) return contentType;
+
+    const source = `${attachment.name || ""} ${attachment.url || ""}`;
+    if (/\.mov(?:$|[?#])/i.test(source)) return "video/quicktime";
+    if (/\.mp4(?:$|[?#])/i.test(source)) return "video/mp4";
+    return undefined;
 }
 
 function inferRouterModelFromSerial(serial = "") {
@@ -140,65 +170,88 @@ function getZoomedViewerTransform(currentTransform, nextScaleValue, anchorPoint,
     }, bounds);
 }
 
-function SuperOfficePhotoThumb({ image, onOpen, hasFailed, onImageError }) {
+function SuperOfficePhotoThumb({ attachment, onOpen, hasFailed, onMediaError }) {
     const handleClick = useCallback(() => {
-        onOpen(image.galleryIndex);
-    }, [image.galleryIndex, onOpen]);
+        onOpen(attachment.galleryIndex);
+    }, [attachment.galleryIndex, onOpen]);
+
+    const mediaTypeLabel = getMediaTypeLabel(attachment);
+    const MediaIcon = getMediaIcon(attachment);
+    const isImage = attachment.type === "image";
 
     return (
         <button
             type="button"
             className="so-photo-thumb"
             onClick={handleClick}
-            title={image.name}
+            title={`${attachment.name} · ${mediaTypeLabel}`}
         >
-            {hasFailed ? (
-                <span className="so-photo-thumb__fallback" aria-hidden="true">
-                    <ImageIcon size={28} strokeWidth={1.7} />
-                </span>
-            ) : (
+            {isImage && !hasFailed ? (
                 <img
-                    src={image.url}
+                    src={attachment.url}
                     alt=""
                     aria-hidden="true"
                     loading="lazy"
-                    onError={() => onImageError(image)}
+                    onError={() => onMediaError(attachment)}
                 />
+            ) : (
+                <span className={`so-photo-thumb__fallback so-photo-thumb__fallback--${attachment.type}`} aria-hidden="true">
+                    <MediaIcon size={30} strokeWidth={1.7} />
+                </span>
             )}
-            <span className="so-photo-thumb__name">{image.name}</span>
+            <span className={`so-photo-thumb__type so-photo-thumb__type--${attachment.type}`}>{mediaTypeLabel}</span>
+            <span className="so-photo-thumb__name">{attachment.name}</span>
         </button>
+    );
+}
+
+function SuperOfficeViewerFallback({ attachment, message = "Aperçu indisponible." }) {
+    const MediaIcon = getMediaIcon(attachment);
+
+    return (
+        <div className="so-photo-viewer__fallback">
+            <MediaIcon size={48} strokeWidth={1.6} />
+            <span>{message}</span>
+            <a href={attachment.url} target="_blank" rel="noreferrer">
+                {getOpenMediaLabel(attachment)}
+                <ExternalLink size={15} aria-hidden="true" />
+            </a>
+        </div>
     );
 }
 
 export default function SuperOfficePhotoGallery({ ticket, profile = null, onClose }) {
     const sourceAttachments = useMemo(() => (
-        ticket?.attachments?.length ? ticket.attachments : ticket?.imageAttachments || []
+        ticket?.attachments?.length ? ticket.attachments : ticket?.mediaAttachments || ticket?.imageAttachments || []
     ), [ticket]);
-    const images = useMemo(() => getSuperOfficeImageAttachments(sourceAttachments), [sourceAttachments]);
-    const groups = useMemo(() => groupSuperOfficeImageAttachmentsByPost(images), [images]);
+    const mediaItems = useMemo(() => getSuperOfficeMediaAttachments(sourceAttachments), [sourceAttachments]);
+    const groups = useMemo(() => groupSuperOfficeMediaAttachmentsByPost(mediaItems), [mediaItems]);
     const contextBadges = useMemo(() => buildPhotoContextBadges(profile), [profile]);
     const [activeIndex, setActiveIndex] = useState(null);
     const [annotatorOpen, setAnnotatorOpen] = useState(false);
     const [annotationsByImage, setAnnotationsByImage] = useState({});
     const [cropsByImage, setCropsByImage] = useState({});
-    const [failedImages, setFailedImages] = useState(() => new Set());
+    const [failedAttachments, setFailedAttachments] = useState(() => new Set());
     const [viewerTransform, setViewerTransform] = useState(getDefaultViewerTransform);
     const [isViewerPanning, setIsViewerPanning] = useState(false);
     const viewerImageWrapRef = useRef(null);
     const viewerPanRef = useRef(null);
-    const activeImage = activeIndex === null ? null : images[activeIndex] || null;
-    const activeImageKey = activeImage ? imageKey(activeImage) : "";
+    const activeAttachment = activeIndex === null ? null : mediaItems[activeIndex] || null;
+    const activeAttachmentKey = activeAttachment ? attachmentKey(activeAttachment) : "";
+    const activeIsImage = activeAttachment?.type === "image";
+    const activeImageKey = activeIsImage ? activeAttachmentKey : "";
     const activeAnnotations = activeImageKey ? annotationsByImage[activeImageKey] || [] : [];
     const activeCrop = activeImageKey ? cropsByImage[activeImageKey] || null : null;
-    const activeImageFailed = activeImageKey ? failedImages.has(activeImageKey) : false;
+    const activeAttachmentFailed = activeAttachmentKey ? failedAttachments.has(activeAttachmentKey) : false;
+    const activeImageFailed = activeIsImage && activeAttachmentFailed;
     const viewerZoomPercent = Math.round(viewerTransform.scale * 100);
     const ticketSignature = `${ticket?.clientSignature || ""}|${ticket?.ticketId || ""}|${ticket?.importedAt || ""}`;
 
-    const openImage = useCallback((index) => {
+    const openAttachment = useCallback((index) => {
         setActiveIndex(index);
     }, []);
 
-    const closeImage = useCallback(() => {
+    const closeAttachment = useCallback(() => {
         setAnnotatorOpen(false);
         setActiveIndex(null);
     }, []);
@@ -206,23 +259,23 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
     const goToPrevious = useCallback(() => {
         setAnnotatorOpen(false);
         setActiveIndex((current) => {
-            if (current === null || images.length === 0) return current;
-            return (current - 1 + images.length) % images.length;
+            if (current === null || mediaItems.length === 0) return current;
+            return (current - 1 + mediaItems.length) % mediaItems.length;
         });
-    }, [images.length]);
+    }, [mediaItems.length]);
 
     const goToNext = useCallback(() => {
         setAnnotatorOpen(false);
         setActiveIndex((current) => {
-            if (current === null || images.length === 0) return current;
-            return (current + 1) % images.length;
+            if (current === null || mediaItems.length === 0) return current;
+            return (current + 1) % mediaItems.length;
         });
-    }, [images.length]);
+    }, [mediaItems.length]);
 
-    const handleImageError = useCallback((image) => {
-        setFailedImages((current) => {
+    const handleMediaError = useCallback((attachment) => {
+        setFailedAttachments((current) => {
             const next = new Set(current);
-            next.add(imageKey(image));
+            next.add(attachmentKey(attachment));
             return next;
         });
     }, []);
@@ -266,7 +319,7 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
     }, [updateViewerZoom, viewerTransform.scale]);
 
     const handleViewerWheel = useCallback((event) => {
-        if (activeImageFailed) return;
+        if (!activeIsImage || activeImageFailed) return;
         event.preventDefault();
         event.stopPropagation();
 
@@ -283,10 +336,10 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
             anchorPoint,
             bounds
         ));
-    }, [activeImageFailed]);
+    }, [activeImageFailed, activeIsImage]);
 
     const handleViewerDoubleClick = useCallback((event) => {
-        if (activeImageFailed) return;
+        if (!activeIsImage || activeImageFailed) return;
         event.preventDefault();
         event.stopPropagation();
 
@@ -300,10 +353,10 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
             x: event.clientX - bounds.left,
             y: event.clientY - bounds.top
         });
-    }, [activeImageFailed, resetViewerZoom, updateViewerZoom, viewerTransform.scale]);
+    }, [activeImageFailed, activeIsImage, resetViewerZoom, updateViewerZoom, viewerTransform.scale]);
 
     const handleViewerPointerDown = useCallback((event) => {
-        if (activeImageFailed || viewerTransform.scale <= VIEWER_MIN_ZOOM || event.button !== 0) return;
+        if (!activeIsImage || activeImageFailed || viewerTransform.scale <= VIEWER_MIN_ZOOM || event.button !== 0) return;
         event.preventDefault();
         event.stopPropagation();
         event.currentTarget.setPointerCapture?.(event.pointerId);
@@ -315,7 +368,7 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
             originY: viewerTransform.y
         };
         setIsViewerPanning(true);
-    }, [activeImageFailed, viewerTransform]);
+    }, [activeImageFailed, activeIsImage, viewerTransform]);
 
     const handleViewerPointerMove = useCallback((event) => {
         const pan = viewerPanRef.current;
@@ -345,7 +398,7 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
         const handleKeyDown = (event) => {
             if (event.key === "Escape") {
                 event.preventDefault();
-                closeImage();
+                closeAttachment();
             }
             if (event.key === "ArrowLeft") {
                 event.preventDefault();
@@ -355,15 +408,15 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
                 event.preventDefault();
                 goToNext();
             }
-            if (event.key === "+" || event.key === "=") {
+            if (activeIsImage && (event.key === "+" || event.key === "=")) {
                 event.preventDefault();
                 zoomViewerBy(1);
             }
-            if (event.key === "-") {
+            if (activeIsImage && event.key === "-") {
                 event.preventDefault();
                 zoomViewerBy(-1);
             }
-            if (event.key === "0") {
+            if (activeIsImage && event.key === "0") {
                 event.preventDefault();
                 resetViewerZoom();
             }
@@ -371,16 +424,16 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
 
         document.addEventListener("keydown", handleKeyDown);
         return () => document.removeEventListener("keydown", handleKeyDown);
-    }, [activeIndex, annotatorOpen, closeImage, goToNext, goToPrevious, resetViewerZoom, zoomViewerBy]);
+    }, [activeIndex, activeIsImage, annotatorOpen, closeAttachment, goToNext, goToPrevious, resetViewerZoom, zoomViewerBy]);
 
     useEffect(() => {
         resetViewerZoom();
-    }, [activeImageKey, resetViewerZoom]);
+    }, [activeAttachmentKey, resetViewerZoom]);
 
     useEffect(() => {
         setAnnotatorOpen(false);
         setActiveIndex(null);
-        setFailedImages(new Set());
+        setFailedAttachments(new Set());
         setAnnotationsByImage({});
         setCropsByImage({});
     }, [ticketSignature]);
@@ -389,15 +442,15 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
         <Modal
             onClose={onClose}
             dialogClassName="popup-box so-photo-gallery-modal"
-            ariaLabel="SuperOffice ticket photos"
+            ariaLabel="SuperOffice ticket media"
             disableEscapeClose={activeIndex !== null}
         >
             <div className="popup-header so-photo-gallery-header">
                 <div>
                     <p className="eyebrow">SuperOffice</p>
-                    <h2>Photos du ticket{ticket?.ticketId ? ` ${ticket.ticketId}` : ""}</h2>
+                    <h2>Médias du ticket{ticket?.ticketId ? ` ${ticket.ticketId}` : ""}</h2>
                 </div>
-                <span className="so-photo-gallery-count">{images.length} photo{images.length > 1 ? "s" : ""}</span>
+                <span className="so-photo-gallery-count">{mediaItems.length} média{mediaItems.length > 1 ? "s" : ""}</span>
             </div>
 
             <div className="so-photo-gallery-body">
@@ -411,72 +464,85 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
                             <span>{group.attachments.length}</span>
                         </div>
                         <div className="so-photo-grid">
-                            {group.attachments.map((image) => (
+                            {group.attachments.map((attachment) => (
                                 <SuperOfficePhotoThumb
-                                    key={imageKey(image)}
-                                    image={image}
-                                    hasFailed={failedImages.has(imageKey(image))}
-                                    onOpen={openImage}
-                                    onImageError={handleImageError}
+                                    key={attachmentKey(attachment)}
+                                    attachment={attachment}
+                                    hasFailed={failedAttachments.has(attachmentKey(attachment))}
+                                    onOpen={openAttachment}
+                                    onMediaError={handleMediaError}
                                 />
                             ))}
                         </div>
                     </section>
                 )) : (
                     <div className="so-photo-gallery-empty">
-                        <ImageIcon size={34} strokeWidth={1.7} />
-                        <span>Aucune photo dans le dernier ticket importé.</span>
+                        <FileText size={34} strokeWidth={1.7} />
+                        <span>Aucune photo, vidéo ou PDF dans le dernier ticket importé.</span>
                     </div>
                 )}
             </div>
 
-            {activeImage && (
-                <div className="so-photo-viewer" role="dialog" aria-modal="true" aria-label={activeImage.name} onMouseDown={closeImage}>
+            {activeAttachment && (
+                <div className="so-photo-viewer" role="dialog" aria-modal="true" aria-label={activeAttachment.name} onMouseDown={closeAttachment}>
                     <div className="so-photo-viewer__stage" onMouseDown={(event) => event.stopPropagation()}>
                         <div className="so-photo-viewer__meta">
                             <div className="so-photo-viewer__meta-main">
-                                <strong>{activeImage.name}</strong>
+                                <strong>{activeAttachment.name}</strong>
                                 <div className="so-photo-viewer__meta-actions">
-                                    <div className="so-photo-viewer__zoom-controls" role="group" aria-label="Zoom image">
+                                    {activeIsImage && (
+                                        <div className="so-photo-viewer__zoom-controls" role="group" aria-label="Zoom image">
+                                            <button
+                                                type="button"
+                                                onClick={() => zoomViewerBy(-1)}
+                                                disabled={activeImageFailed || viewerTransform.scale <= VIEWER_MIN_ZOOM}
+                                                title="Zoom arrière"
+                                                aria-label="Zoom arrière"
+                                            >
+                                                <ZoomOut size={15} aria-hidden="true" />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={resetViewerZoom}
+                                                disabled={activeImageFailed || viewerTransform.scale <= VIEWER_MIN_ZOOM}
+                                                title="Réinitialiser le zoom"
+                                                aria-label="Réinitialiser le zoom"
+                                            >
+                                                <RotateCcw size={14} aria-hidden="true" />
+                                                <span>{viewerZoomPercent}%</span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => zoomViewerBy(1)}
+                                                disabled={activeImageFailed || viewerTransform.scale >= VIEWER_MAX_ZOOM}
+                                                title="Zoom avant"
+                                                aria-label="Zoom avant"
+                                            >
+                                                <ZoomIn size={15} aria-hidden="true" />
+                                            </button>
+                                        </div>
+                                    )}
+                                    {activeIsImage && !activeAttachmentFailed && (
                                         <button
                                             type="button"
-                                            onClick={() => zoomViewerBy(-1)}
-                                            disabled={activeImageFailed || viewerTransform.scale <= VIEWER_MIN_ZOOM}
-                                            title="Zoom arrière"
-                                            aria-label="Zoom arrière"
+                                            onClick={() => setAnnotatorOpen(true)}
+                                            title="Annoter"
+                                            aria-label="Annoter l'image"
                                         >
-                                            <ZoomOut size={15} aria-hidden="true" />
+                                            <Edit3 size={15} aria-hidden="true" />
+                                            <span>Annoter</span>
                                         </button>
-                                        <button
-                                            type="button"
-                                            onClick={resetViewerZoom}
-                                            disabled={activeImageFailed || viewerTransform.scale <= VIEWER_MIN_ZOOM}
-                                            title="Réinitialiser le zoom"
-                                            aria-label="Réinitialiser le zoom"
-                                        >
-                                            <RotateCcw size={14} aria-hidden="true" />
-                                            <span>{viewerZoomPercent}%</span>
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => zoomViewerBy(1)}
-                                            disabled={activeImageFailed || viewerTransform.scale >= VIEWER_MAX_ZOOM}
-                                            title="Zoom avant"
-                                            aria-label="Zoom avant"
-                                        >
-                                            <ZoomIn size={15} aria-hidden="true" />
-                                        </button>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => setAnnotatorOpen(true)}
-                                        title="Annoter"
-                                        aria-label="Annoter l'image"
+                                    )}
+                                    <a
+                                        className="so-photo-viewer__open-link"
+                                        href={activeAttachment.url}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        title={getOpenMediaLabel(activeAttachment)}
                                     >
-                                        <Edit3 size={15} aria-hidden="true" />
-                                        <span>Annoter</span>
-                                    </button>
-                                    <span>{activeIndex + 1} / {images.length}</span>
+                                        <ExternalLink size={15} aria-hidden="true" />
+                                    </a>
+                                    <span>{activeIndex + 1} / {mediaItems.length}</span>
                                 </div>
                             </div>
                             {contextBadges.length > 0 && (
@@ -495,14 +561,14 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
                                 type="button"
                                 className="so-photo-viewer__nav so-photo-viewer__nav--prev"
                                 onClick={goToPrevious}
-                                aria-label="Photo précédente"
-                                title="Photo précédente"
+                                aria-label="Média précédent"
+                                title="Média précédent"
                             >
                                 <ChevronLeft size={26} aria-hidden="true" />
                             </button>
                             <div
                                 ref={viewerImageWrapRef}
-                                className={`so-photo-viewer__image-wrap ${viewerTransform.scale > VIEWER_MIN_ZOOM ? "is-zoomed" : ""} ${isViewerPanning ? "is-panning" : ""}`}
+                                className={`so-photo-viewer__image-wrap so-photo-viewer__image-wrap--${activeAttachment.type} ${activeIsImage && viewerTransform.scale > VIEWER_MIN_ZOOM ? "is-zoomed" : ""} ${isViewerPanning ? "is-panning" : ""}`}
                                 onWheel={handleViewerWheel}
                                 onDoubleClick={handleViewerDoubleClick}
                                 onPointerDown={handleViewerPointerDown}
@@ -511,40 +577,59 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
                                 onPointerCancel={endViewerPan}
                                 onLostPointerCapture={endViewerPan}
                             >
-                                {activeImageFailed ? (
-                                    <div className="so-photo-viewer__fallback">
-                                        <ImageIcon size={48} strokeWidth={1.6} />
-                                        <a href={activeImage.url} target="_blank" rel="noreferrer">
-                                            Ouvrir l’image
-                                            <ExternalLink size={15} aria-hidden="true" />
-                                        </a>
-                                    </div>
-                                ) : (
+                                {activeAttachmentFailed ? (
+                                    <SuperOfficeViewerFallback attachment={activeAttachment} />
+                                ) : activeIsImage ? (
                                     <img
-                                        src={activeImage.url}
-                                        alt={activeImage.name}
+                                        src={activeAttachment.url}
+                                        alt={activeAttachment.name}
                                         draggable="false"
                                         style={{
                                             transform: `translate3d(${viewerTransform.x}px, ${viewerTransform.y}px, 0) scale(${viewerTransform.scale})`
                                         }}
-                                        onError={() => handleImageError(activeImage)}
+                                        onError={() => handleMediaError(activeAttachment)}
                                     />
+                                ) : activeAttachment.type === "video" ? (
+                                    <video
+                                        className="so-photo-viewer__video"
+                                        controls
+                                        playsInline
+                                        preload="metadata"
+                                        onError={() => handleMediaError(activeAttachment)}
+                                    >
+                                        <source src={activeAttachment.url} type={getVideoContentType(activeAttachment)} />
+                                        Votre navigateur ne peut pas lire cette vidéo.
+                                    </video>
+                                ) : activeAttachment.type === "pdf" ? (
+                                    <object
+                                        className="so-photo-viewer__pdf"
+                                        data={activeAttachment.url}
+                                        type="application/pdf"
+                                        aria-label={activeAttachment.name}
+                                    >
+                                        <SuperOfficeViewerFallback
+                                            attachment={activeAttachment}
+                                            message="Prévisualisation PDF indisponible."
+                                        />
+                                    </object>
+                                ) : (
+                                    <SuperOfficeViewerFallback attachment={activeAttachment} />
                                 )}
                             </div>
                             <button
                                 type="button"
                                 className="so-photo-viewer__nav so-photo-viewer__nav--next"
                                 onClick={goToNext}
-                                aria-label="Photo suivante"
-                                title="Photo suivante"
+                                aria-label="Média suivant"
+                                title="Média suivant"
                             >
                                 <ChevronRight size={26} aria-hidden="true" />
                             </button>
                         </div>
                     </div>
-                    {annotatorOpen && (
+                    {annotatorOpen && activeIsImage && (
                         <SuperOfficeImageAnnotator
-                            image={activeImage}
+                            image={activeAttachment}
                             annotations={activeAnnotations}
                             crop={activeCrop}
                             onChangeAnnotations={updateActiveAnnotations}

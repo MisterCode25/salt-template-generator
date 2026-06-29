@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ClipboardPaste, ExternalLink, Image as ImageIcon, Puzzle, Settings2, Users } from "lucide-react";
+import { ClipboardPaste, ExternalLink, Files, Puzzle, Settings2, Users } from "lucide-react";
 import Modal from "./Modal.jsx";
 import PartnersModal from "./PartnersModal.jsx";
 import { copyHtml, copyText, showToast } from "../services/clipboardService.js";
@@ -270,6 +270,7 @@ function ToolsBar({
     onCopyAloAutofillData,
     hasAloAutofillData = false,
     onOpenSuperOfficePhotos,
+    superOfficeMediaCount = 0,
     superOfficePhotoCount = 0,
     onManageTools
 }) {
@@ -320,6 +321,7 @@ function ToolsBar({
     const hasInternalTools = true;
     const hasConfiguredTools = tools.length > 0;
     const hasExternalTools = visibleTools.length > 0;
+    const superOfficeAttachmentCount = superOfficeMediaCount || superOfficePhotoCount;
 
     if (!hasInternalTools && !hasExternalTools && !onManageTools) return null;
 
@@ -363,16 +365,16 @@ function ToolsBar({
                                     ALO fill
                                 </button>
                             )}
-                            {onOpenSuperOfficePhotos && superOfficePhotoCount > 0 && (
+                            {onOpenSuperOfficePhotos && superOfficeAttachmentCount > 0 && (
                                 <button
                                     type="button"
                                     className="tools-bar-btn tools-bar-btn--system tools-bar-btn--photos"
                                     onClick={onOpenSuperOfficePhotos}
-                                    title="Afficher les photos du dernier ticket SuperOffice importé"
+                                    title="Afficher les photos, vidéos et PDF du dernier ticket SuperOffice importé"
                                 >
-                                    <ImageIcon size={14} strokeWidth={2} aria-hidden="true" />
-                                    Photos SO
-                                    <span className="tools-bar-count">{superOfficePhotoCount}</span>
+                                    <Files size={14} strokeWidth={2} aria-hidden="true" />
+                                    Médias SO
+                                    <span className="tools-bar-count">{superOfficeAttachmentCount}</span>
                                 </button>
                             )}
                         </div>
@@ -432,6 +434,7 @@ export default memo(ToolsBar, (prevProps, nextProps) => {
         && prevProps.onCopyAloAutofillData === nextProps.onCopyAloAutofillData
         && prevProps.hasAloAutofillData === nextProps.hasAloAutofillData
         && prevProps.onOpenSuperOfficePhotos === nextProps.onOpenSuperOfficePhotos
+        && prevProps.superOfficeMediaCount === nextProps.superOfficeMediaCount
         && prevProps.superOfficePhotoCount === nextProps.superOfficePhotoCount
         && prevProps.onManageTools === nextProps.onManageTools;
 });

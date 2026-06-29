@@ -1,5 +1,6 @@
 import {
     getSuperOfficeImageAttachments,
+    getSuperOfficeMediaAttachments,
     normalizeSuperOfficeAttachments
 } from "../utils/superOfficeImport.js";
 import {
@@ -78,7 +79,8 @@ function normalizeStoredTicketPayload(payload) {
         clientSignature,
         tokenValues,
         attachments,
-        imageAttachments: getSuperOfficeImageAttachments(attachments)
+        imageAttachments: getSuperOfficeImageAttachments(attachments),
+        mediaAttachments: getSuperOfficeMediaAttachments(attachments)
     };
 }
 

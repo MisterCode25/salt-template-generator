@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   groupSuperOfficeImageAttachmentsByDate,
   groupSuperOfficeImageAttachmentsByPost,
+  groupSuperOfficeMediaAttachmentsByPost,
   parseSuperOfficeInfoPayload
 } from "../src/utils/superOfficeImport.js";
 import {
@@ -278,6 +279,7 @@ import { parseExternalId } from "../src/utils/externalGenerator.js";
   assert.equal(result.ok, true);
   assert.equal(result.attachments.length, 3);
   assert.equal(result.imageAttachments.length, 2);
+  assert.equal(result.mediaAttachments.length, 3);
   assert.equal(result.imageAttachments[0].date, "13.06.2026 14:45");
 
   const groups = groupSuperOfficeImageAttachmentsByDate(result.attachments);
@@ -285,6 +287,46 @@ import { parseExternalId } from "../src/utils/externalGenerator.js";
   assert.equal(groups[0].dateKey, "2026-06-13");
   assert.equal(groups[0].attachments[0].galleryIndex, 0);
   assert.equal(groups[1].dateKey, "2026-06-12");
+}
+
+{
+  const result = parseSuperOfficeInfoPayload({
+    ticketId: "31436062",
+    attachments: [
+      {
+        name: "diagnostic.mov",
+        url: "https://example.test/download?id=video-a",
+        type: "attachment",
+        contentType: "video/quicktime",
+        messageId: "message-1",
+        messageIndex: 0
+      },
+      {
+        name: "signal-test.mp4",
+        url: "https://example.test/signal-test.mp4",
+        messageId: "message-1",
+        messageIndex: 0
+      },
+      {
+        name: "rapport",
+        url: "https://example.test/download?id=pdf-a",
+        type: "application/pdf",
+        messageId: "message-2",
+        messageIndex: 1
+      }
+    ]
+  });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.mediaAttachments.map((attachment) => attachment.type), ["video", "video", "pdf"]);
+  assert.equal(result.mediaAttachments[0].contentType, "video/quicktime");
+  assert.equal(result.mediaAttachments[2].contentType, "application/pdf");
+  assert.equal(result.imageAttachments.length, 0);
+
+  const mediaGroups = groupSuperOfficeMediaAttachmentsByPost(result.attachments);
+  assert.equal(mediaGroups.length, 2);
+  assert.deepEqual(mediaGroups[0].attachments.map((attachment) => attachment.galleryIndex), [0, 1]);
+  assert.deepEqual(mediaGroups[1].attachments.map((attachment) => attachment.type), ["pdf"]);
 }
 
 {

@@ -116,14 +116,18 @@ const saved = await saveSuperOfficeTicketPayload({
     "{so_ticket_num}": "31436062"
   },
   attachments: [
-    { name: "photo.jpg", url: "https://example.test/photo.jpg", type: "image" }
+    { name: "photo.jpg", url: "https://example.test/photo.jpg", type: "image" },
+    { name: "preuve.mp4", url: "https://example.test/preuve.mp4" },
+    { name: "rapport", url: "https://example.test/download?id=pdf", type: "application/pdf" }
   ]
 });
 
 assert.equal(saved.imageAttachments.length, 1);
+assert.equal(saved.mediaAttachments.length, 3);
 assert.equal(saved.createdAt, "6/4/2026 12:07 PM");
 assert.equal(saved.tokenValues["{so_ticket_num}"], "31436062");
 assert.equal((await loadSuperOfficeTicketPayload()).imageAttachments.length, 1);
+assert.equal((await loadSuperOfficeTicketPayload()).mediaAttachments.length, 3);
 assert.equal((await loadSuperOfficeTicketPayload()).createdAt, "6/4/2026 12:07 PM");
 
 const updatedStored = await saveDisplaySuperOfficeExternalId(storedExternalId);

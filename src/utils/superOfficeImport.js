@@ -2,6 +2,7 @@ import { canonicalizeInputTokenValue, SO_TICKET_NUM_TOKEN } from "./tokenCanonic
 import { buildExternalTokenValues, parseExternalId } from "./externalGenerator.js";
 
 const IMAGE_ATTACHMENT_PATTERN = /\.(jpe?g|png|webp|gif|bmp|avif)(?:$|[?#])/i;
+const VIDEO_ATTACHMENT_PATTERN = /\.(mp4|mov)(?:$|[?#])/i;
 const PDF_ATTACHMENT_PATTERN = /\.pdf(?:$|[?#])/i;
 const CONTRACTOR_TOKENS = ["{contractor}", "{contractor_number}", "{client_contractor_number}"];
 
@@ -28,6 +29,7 @@ function parsePayload(input) {
 function extensionTypeFor(name = "", url = "") {
     const source = `${name} ${url}`;
     if (IMAGE_ATTACHMENT_PATTERN.test(source)) return "image";
+    if (VIDEO_ATTACHMENT_PATTERN.test(source)) return "video";
     if (PDF_ATTACHMENT_PATTERN.test(source)) return "pdf";
     return "file";
 }
@@ -35,6 +37,38 @@ function extensionTypeFor(name = "", url = "") {
 function isImageAttachmentType(value = "") {
     const type = String(value || "").trim().toLowerCase();
     return type === "image" || type.startsWith("image/");
+}
+
+function isVideoAttachmentType(value = "") {
+    const type = String(value || "").trim().toLowerCase();
+    return type === "video" || type === "mp4" || type === "mov" || type.startsWith("video/");
+}
+
+function isPdfAttachmentType(value = "") {
+    const type = String(value || "").trim().toLowerCase();
+    return type === "pdf" || type === "application/pdf";
+}
+
+function declaredAttachmentTypeFor(...values) {
+    for (const value of values) {
+        if (isImageAttachmentType(value)) return "image";
+        if (isVideoAttachmentType(value)) return "video";
+        if (isPdfAttachmentType(value)) return "pdf";
+    }
+    return "";
+}
+
+function attachmentContentTypeFor(...values) {
+    for (const value of values) {
+        const text = valueOf(value);
+        const type = text.toLowerCase();
+        if (!type) continue;
+        if (type.includes("/")) return text;
+        if (type === "pdf") return "application/pdf";
+        if (type === "mp4") return "video/mp4";
+        if (type === "mov") return "video/quicktime";
+    }
+    return "";
 }
 
 function getAttachmentDateValue(attachment = {}) {
@@ -73,7 +107,18 @@ function normalizeAttachment(attachment, index) {
         decodeURIComponent(String(url).split("/").pop()?.split("?")[0] || "")
     ) || `Attachment ${index + 1}`;
     const declaredType = valueOf(attachment.type, attachment.contentType, attachment.mimeType);
-    const type = isImageAttachmentType(declaredType) ? "image" : extensionTypeFor(name, url);
+    const contentType = attachmentContentTypeFor(
+        attachment.contentType,
+        attachment.mimeType,
+        attachment.type,
+        attachment.mediaType
+    );
+    const type = declaredAttachmentTypeFor(
+        attachment.type,
+        attachment.contentType,
+        attachment.mimeType,
+        attachment.mediaType
+    ) || extensionTypeFor(name, url);
     const messageId = valueOf(attachment.messageId, attachment.messageID, attachment.postId, attachment.message?.id) || null;
 
     return {
@@ -81,6 +126,7 @@ function normalizeAttachment(attachment, index) {
         name,
         url,
         type,
+        contentType: contentType || declaredType || null,
         size: valueOf(attachment.size, attachment.sizeText, attachment.fileSize) || null,
         messageId,
         postId: valueOf(attachment.postId, messageId) || null,
@@ -248,9 +294,14 @@ export function getSuperOfficeImageAttachments(attachments = []) {
     return normalizeSuperOfficeAttachments(attachments).filter((attachment) => attachment.type === "image");
 }
 
-export function groupSuperOfficeImageAttachmentsByDate(attachments = []) {
+export function getSuperOfficeMediaAttachments(attachments = []) {
+    return normalizeSuperOfficeAttachments(attachments)
+        .filter((attachment) => ["image", "video", "pdf"].includes(attachment.type));
+}
+
+function groupAttachmentsByDate(attachments = []) {
     const groups = new Map();
-    getSuperOfficeImageAttachments(attachments).forEach((attachment, index) => {
+    attachments.forEach((attachment, index) => {
         const meta = getAttachmentDateMeta(attachment);
         if (!groups.has(meta.dateKey)) {
             groups.set(meta.dateKey, {
@@ -263,6 +314,14 @@ export function groupSuperOfficeImageAttachmentsByDate(attachments = []) {
 
     return Array.from(groups.values())
         .sort((a, b) => b.sortValue - a.sortValue);
+}
+
+export function groupSuperOfficeImageAttachmentsByDate(attachments = []) {
+    return groupAttachmentsByDate(getSuperOfficeImageAttachments(attachments));
+}
+
+export function groupSuperOfficeMediaAttachmentsByDate(attachments = []) {
+    return groupAttachmentsByDate(getSuperOfficeMediaAttachments(attachments));
 }
 
 function getAttachmentPostKey(attachment = {}) {
@@ -286,11 +345,39 @@ function buildPostGroupMetaLabel(attachment = {}) {
 export function groupSuperOfficeImageAttachmentsByPost(attachments = []) {
     const images = getSuperOfficeImageAttachments(attachments);
     if (!images.some((attachment) => getAttachmentPostKey(attachment))) {
-        return groupSuperOfficeImageAttachmentsByDate(images);
+        return groupAttachmentsByDate(images);
     }
 
     const groups = new Map();
     images.forEach((attachment, index) => {
+        const postKey = getAttachmentPostKey(attachment);
+        const dateMeta = getAttachmentDateMeta(attachment);
+        const groupKey = postKey || `unassigned:${dateMeta.dateKey}`;
+        if (!groups.has(groupKey)) {
+            const fallbackIndex = groups.size;
+            groups.set(groupKey, {
+                dateKey: groupKey,
+                label: postKey ? buildPostGroupLabel(attachment, fallbackIndex) : dateMeta.label,
+                metaLabel: postKey ? buildPostGroupMetaLabel(attachment) : "",
+                sortValue: normalizeOptionalInteger(attachment.messageIndex) ?? index,
+                attachments: []
+            });
+        }
+        groups.get(groupKey).attachments.push({ ...attachment, galleryIndex: index });
+    });
+
+    return Array.from(groups.values())
+        .sort((a, b) => a.sortValue - b.sortValue);
+}
+
+export function groupSuperOfficeMediaAttachmentsByPost(attachments = []) {
+    const media = getSuperOfficeMediaAttachments(attachments);
+    if (!media.some((attachment) => getAttachmentPostKey(attachment))) {
+        return groupAttachmentsByDate(media);
+    }
+
+    const groups = new Map();
+    media.forEach((attachment, index) => {
         const postKey = getAttachmentPostKey(attachment);
         const dateMeta = getAttachmentDateMeta(attachment);
         const groupKey = postKey || `unassigned:${dateMeta.dateKey}`;
@@ -350,6 +437,7 @@ export function parseSuperOfficeInfoPayload(input) {
     let externalIdValid = false;
     const attachments = normalizeSuperOfficeAttachments(payload.attachments);
     const imageAttachments = getSuperOfficeImageAttachments(attachments);
+    const mediaAttachments = getSuperOfficeMediaAttachments(attachments);
 
     if (externalTicketId) {
         const parsedExternalId = parseExternalId(externalTicketId);
@@ -393,6 +481,7 @@ export function parseSuperOfficeInfoPayload(input) {
         tokenValues,
         attachments,
         imageAttachments,
+        mediaAttachments,
         ignoredExternalId: Boolean(externalTicketId && !externalIdValid)
     };
 }
