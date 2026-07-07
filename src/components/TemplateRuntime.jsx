@@ -434,6 +434,50 @@ const TemplateResultEditorFallback = memo(function TemplateResultEditorFallback(
     );
 });
 
+function normalizeSmsRecipientNumber(value = "") {
+    const text = String(value || "").trim();
+    if (!text) return "";
+
+    let digits = text.replace(/\D+/g, "");
+    if (digits.startsWith("0041") && digits.length > 4) {
+        digits = `0${digits.slice(4)}`;
+    } else if (digits.startsWith("41") && digits.length > 2) {
+        digits = `0${digits.slice(2)}`;
+    }
+    return digits;
+}
+
+function findClientInfoValue(sections = [], preferredLabels = []) {
+    const normalizedLabels = preferredLabels.map((label) => String(label).toLowerCase());
+    const fields = sections.flatMap((section) => Array.isArray(section?.fields) ? section.fields : []);
+
+    for (const label of normalizedLabels) {
+        const exact = fields.find((field) => String(field?.label || "").toLowerCase() === label && field?.value && field.value !== "-");
+        if (exact) return String(exact.value).trim();
+    }
+
+    for (const label of normalizedLabels) {
+        const partial = fields.find((field) => String(field?.label || "").toLowerCase().includes(label) && field?.value && field.value !== "-");
+        if (partial) return String(partial.value).trim();
+    }
+
+    return "";
+}
+
+function buildTemplateRecipientInfo(type, clientInfoSections = []) {
+    if (type === "email") {
+        const value = findClientInfoValue(clientInfoSections, ["Email", "Mail"]);
+        return value ? { label: "Email client", value } : null;
+    }
+
+    if (type === "sms") {
+        const value = normalizeSmsRecipientNumber(findClientInfoValue(clientInfoSections, ["Mobile raw", "Mobile", "Phone", "Telephone"]));
+        return value ? { label: "SMS client", value } : null;
+    }
+
+    return null;
+}
+
 async function copyRawTextToClipboard(text, { message = "Prompt copied.", variant = "success" } = {}) {
     const value = String(text || "");
     if (!value) return false;
@@ -847,6 +891,7 @@ export const TemplateResultModal = memo(function TemplateResultModal({
         ? isDirty ? "Local draft" : "Editing"
         : result.copied ? "✓ Already copied" : "Copying...";
     const canToggleFavorite = typeof onToggleFavorite === "function";
+    const recipientInfo = result.recipientInfo;
 
     const resetDraft = () => {
         setDraftHtml(sourceHtml);
@@ -887,6 +932,12 @@ export const TemplateResultModal = memo(function TemplateResultModal({
                         </span>
                     </div>
                 </div>
+                {recipientInfo && (
+                    <div className="template-result-recipient" aria-label={recipientInfo.label}>
+                        <span className="template-result-recipient-label">{recipientInfo.label}</span>
+                        <span className="template-result-recipient-value">{recipientInfo.value}</span>
+                    </div>
+                )}
                 {showChannelControls && (
                     <div className="template-result-toolbar">
                         <div className="template-result-channel-segments" role="tablist" aria-label="Channel">
@@ -2429,7 +2480,8 @@ export function useTemplateRuntime() {
             title: getTemplateDisplayTitle(effectiveModel),
             type: effectiveModel?.type || "",
             html: finalText,
-            copied: false
+            copied: false,
+            recipientInfo: buildTemplateRecipientInfo(effectiveModel?.type || "", clientInfoSections)
         });
         lastSectionClickVersion.current[sectionKey] = inputChangeVersion.current;
         await copyPreviewHtml(finalText, id);
