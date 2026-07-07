@@ -294,6 +294,36 @@ import { parseExternalId } from "../src/utils/externalGenerator.js";
     ticketId: "31436062",
     attachments: [
       {
+        name: "client-oto.heic",
+        url: "https://example.test/client-oto.heic",
+        type: "attachment",
+        messageId: "message-1"
+      },
+      {
+        name: "router-signal",
+        url: "https://example.test/download?id=router-signal",
+        contentType: "image/heif",
+        messageId: "message-1"
+      },
+      {
+        name: "installation-plan.tiff",
+        url: "https://example.test/installation-plan.tiff",
+        messageId: "message-2"
+      }
+    ]
+  });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.mediaAttachments.map((attachment) => attachment.type), ["image", "image", "image"]);
+  assert.equal(result.imageAttachments.length, 3);
+  assert.equal(result.imageAttachments[1].contentType, "image/heif");
+}
+
+{
+  const result = parseSuperOfficeInfoPayload({
+    ticketId: "31436062",
+    attachments: [
+      {
         name: "diagnostic.mov",
         url: "https://example.test/download?id=video-a",
         type: "attachment",
