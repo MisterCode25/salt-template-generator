@@ -1951,6 +1951,35 @@ textarea:focus {
     color: #fbbf24;
 }
 
+.template-result-recipient {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    margin-top: 12px;
+    padding: 8px 10px;
+    border: 1px solid rgba(129, 153, 214, 0.2);
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.template-result-recipient-label {
+    flex: 0 0 auto;
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.template-result-recipient-value {
+    min-width: 0;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 800;
+    overflow-wrap: anywhere;
+}
+
 .template-result-toolbar {
     display: flex;
     align-items: center;
@@ -10440,6 +10469,19 @@ textarea::placeholder,
     background: #fff1f2 !important;
     border-color: #fecdd3 !important;
     color: #7f1d1d !important;
+}
+
+.light-theme .template-result-recipient {
+    background: #f8fafc !important;
+    border-color: #dbe3ef !important;
+}
+
+.light-theme .template-result-recipient-label {
+    color: #64748b !important;
+}
+
+.light-theme .template-result-recipient-value {
+    color: #172033 !important;
 }
 
 .light-theme .template-result-channel-segments {
