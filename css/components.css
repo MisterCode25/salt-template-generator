@@ -8615,10 +8615,13 @@ textarea:focus {
 }
 
 .templates-page {
+    height: 100vh;
     min-height: 100vh;
     max-width: none;
+    display: flex;
+    flex-direction: column;
     padding-bottom: 22px;
-    overflow-x: hidden;
+    overflow: hidden;
     background: var(--bg-body);
 }
 
@@ -8727,6 +8730,8 @@ textarea:focus {
 .templates-workbench {
     width: calc(100vw - 36px);
     box-sizing: border-box;
+    flex: 1 1 auto;
+    min-height: 0;
     margin: 8px auto 0;
     display: grid;
     grid-template-columns: minmax(0, 1.25fr) minmax(500px, 0.95fr);
@@ -8751,10 +8756,19 @@ textarea:focus {
 }
 
 .templates-playbook-head {
+    flex: 0 0 auto;
     display: flex;
     justify-content: flex-start;
     padding: 10px 14px;
     border-bottom: 1px solid rgba(72, 112, 190, 0.2);
+}
+
+.templates-playbook-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
 }
 
 .templates-detail-title {

@@ -1773,38 +1773,40 @@ export default function Templates() {
                         />
                     </div>
 
-                    <div className="templates-quick-sections" aria-label="Quick templates">
-                        <QuickTemplateSection
-                            id="favorites"
-                            title="Favorites"
-                            Icon={Star}
-                            entries={favoriteTemplateEntries}
-                            collapsed={quickSectionsCollapsed.favorites}
-                            activeTemplateId={activeTemplateId}
-                            templateChannelsById={templateChannelsById}
-                            onOpenTemplate={openTemplate}
-                            onToggle={toggleQuickSection}
-                        />
-                    </div>
-
-                    <div className="templates-columns" aria-label="Playbook columns">
-                        {navigationColumns.map((column) => (
-                            <PlaybookColumn
-                                key={column.id}
-                                title={column.title}
-                                nodeGroupTitle={column.nodeGroupTitle}
-                                nodes={column.nodes}
-                                templates={column.templates}
-                                nodeSummaryById={nodeSummaryById}
-                                activeNodeId={activeNodeId}
+                    <div className="templates-playbook-scroll">
+                        <div className="templates-quick-sections" aria-label="Quick templates">
+                            <QuickTemplateSection
+                                id="favorites"
+                                title="Favorites"
+                                Icon={Star}
+                                entries={favoriteTemplateEntries}
+                                collapsed={quickSectionsCollapsed.favorites}
                                 activeTemplateId={activeTemplateId}
                                 templateChannelsById={templateChannelsById}
-                                onOpenNode={openNode}
                                 onOpenTemplate={openTemplate}
-                                emptyMessage={column.emptyMessage}
-                                templatesFirst={column.templatesFirst}
+                                onToggle={toggleQuickSection}
                             />
-                        ))}
+                        </div>
+
+                        <div className="templates-columns" aria-label="Playbook columns">
+                            {navigationColumns.map((column) => (
+                                <PlaybookColumn
+                                    key={column.id}
+                                    title={column.title}
+                                    nodeGroupTitle={column.nodeGroupTitle}
+                                    nodes={column.nodes}
+                                    templates={column.templates}
+                                    nodeSummaryById={nodeSummaryById}
+                                    activeNodeId={activeNodeId}
+                                    activeTemplateId={activeTemplateId}
+                                    templateChannelsById={templateChannelsById}
+                                    onOpenNode={openNode}
+                                    onOpenTemplate={openTemplate}
+                                    emptyMessage={column.emptyMessage}
+                                    templatesFirst={column.templatesFirst}
+                                />
+                            ))}
+                        </div>
                     </div>
 
                 </section>
