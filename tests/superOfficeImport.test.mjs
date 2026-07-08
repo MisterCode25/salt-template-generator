@@ -309,13 +309,18 @@ import { parseExternalId } from "../src/utils/externalGenerator.js";
         name: "installation-plan.tiff",
         url: "https://example.test/installation-plan.tiff",
         messageId: "message-2"
+      },
+      {
+        name: "network-diagram.svg",
+        url: "https://example.test/network-diagram.svg",
+        messageId: "message-2"
       }
     ]
   });
 
   assert.equal(result.ok, true);
-  assert.deepEqual(result.mediaAttachments.map((attachment) => attachment.type), ["image", "image", "image"]);
-  assert.equal(result.imageAttachments.length, 3);
+  assert.deepEqual(result.mediaAttachments.map((attachment) => attachment.type), ["image", "image", "image", "image"]);
+  assert.equal(result.imageAttachments.length, 4);
   assert.equal(result.imageAttachments[1].contentType, "image/heif");
 }
 

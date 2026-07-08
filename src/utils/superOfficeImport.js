@@ -1,7 +1,7 @@
 import { canonicalizeInputTokenValue, SO_TICKET_NUM_TOKEN } from "./tokenCanonicalization.js";
 import { buildExternalTokenValues, parseExternalId } from "./externalGenerator.js";
 
-const IMAGE_ATTACHMENT_PATTERN = /\.(jpe?g|png|webp|gif|bmp|avif|heic|heif|tiff?|ico)(?:$|[?#])/i;
+const IMAGE_ATTACHMENT_PATTERN = /\.(jpe?g|png|webp|gif|bmp|avif|heic|heif|tiff?|ico|svg)(?:$|[?#])/i;
 const VIDEO_ATTACHMENT_PATTERN = /\.(mp4|mov)(?:$|[?#])/i;
 const PDF_ATTACHMENT_PATTERN = /\.pdf(?:$|[?#])/i;
 const CONTRACTOR_TOKENS = ["{contractor}", "{contractor_number}", "{client_contractor_number}"];
