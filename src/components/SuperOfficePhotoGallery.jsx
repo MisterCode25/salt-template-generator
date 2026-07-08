@@ -21,6 +21,10 @@ import {
 const VIEWER_MIN_ZOOM = 1;
 const VIEWER_MAX_ZOOM = 5;
 const VIEWER_ZOOM_STEP = 0.35;
+const BROWSER_PREVIEWABLE_IMAGE_PATTERN = /\.(jpe?g|png|webp|gif|bmp|avif|ico|svg)(?:$|[?#])/i;
+const CONVERTIBLE_IMAGE_PATTERN = /\.(heic|heif|tiff?|tif)(?:$|[?#])/i;
+
+const convertedImageUrlCache = new Map();
 
 function displayValue(value) {
     if (value === null || value === undefined) return "";
@@ -73,6 +77,91 @@ function getVideoContentType(attachment = {}) {
     if (/\.mov(?:$|[?#])/i.test(source)) return "video/quicktime";
     if (/\.mp4(?:$|[?#])/i.test(source)) return "video/mp4";
     return undefined;
+}
+
+function isBrowserPreviewableImage(attachment = {}) {
+    const contentType = displayValue(attachment.contentType).toLowerCase();
+    if (contentType === "image/svg+xml") return true;
+    if (/^image\/(jpeg|jpg|png|webp|gif|bmp|avif|x-icon|vnd\.microsoft\.icon)$/.test(contentType)) return true;
+
+    const source = `${attachment.name || ""} ${attachment.url || ""}`;
+    return BROWSER_PREVIEWABLE_IMAGE_PATTERN.test(source);
+}
+
+function isConvertibleImage(attachment = {}) {
+    const contentType = displayValue(attachment.contentType).toLowerCase();
+    if (["image/heic", "image/heif", "image/tiff", "image/tif"].includes(contentType)) return true;
+
+    const source = `${attachment.name || ""} ${attachment.url || ""}`;
+    return CONVERTIBLE_IMAGE_PATTERN.test(source);
+}
+
+async function buildConvertedImageUrl(attachment = {}) {
+    if (!attachment.url || typeof fetch !== "function" || typeof createImageBitmap !== "function") {
+        throw new Error("IMAGE_CONVERSION_UNAVAILABLE");
+    }
+
+    const cacheKey = attachmentKey(attachment);
+    const cached = convertedImageUrlCache.get(cacheKey);
+    if (cached) return cached;
+
+    const response = await fetch(attachment.url, { credentials: "include" });
+    if (!response.ok) throw new Error("IMAGE_FETCH_FAILED");
+
+    const blob = await response.blob();
+    const bitmap = await createImageBitmap(blob);
+    const canvas = document.createElement("canvas");
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("IMAGE_CANVAS_UNAVAILABLE");
+    context.drawImage(bitmap, 0, 0);
+    bitmap.close?.();
+
+    const convertedBlob = await new Promise((resolve, reject) => {
+        canvas.toBlob((nextBlob) => {
+            if (nextBlob) resolve(nextBlob);
+            else reject(new Error("IMAGE_EXPORT_FAILED"));
+        }, "image/png");
+    });
+    const objectUrl = URL.createObjectURL(convertedBlob);
+    convertedImageUrlCache.set(cacheKey, objectUrl);
+    return objectUrl;
+}
+
+function useDisplayImageUrl(attachment) {
+    const [displayUrl, setDisplayUrl] = useState(attachment?.url || "");
+
+    useEffect(() => {
+        let cancelled = false;
+
+        if (!attachment?.url) {
+            setDisplayUrl("");
+            return undefined;
+        }
+
+        if (isBrowserPreviewableImage(attachment) || !isConvertibleImage(attachment)) {
+            setDisplayUrl(attachment.url);
+            return undefined;
+        }
+
+        setDisplayUrl("");
+        buildConvertedImageUrl(attachment)
+            .then((nextUrl) => {
+                if (!cancelled) setDisplayUrl(nextUrl);
+            })
+            .catch(() => {
+                if (!cancelled) {
+                    setDisplayUrl(attachment.url);
+                }
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [attachment]);
+
+    return displayUrl;
 }
 
 function inferRouterModelFromSerial(serial = "") {
@@ -178,6 +267,7 @@ function SuperOfficePhotoThumb({ attachment, onOpen, hasFailed, onMediaError }) 
     const mediaTypeLabel = getMediaTypeLabel(attachment);
     const MediaIcon = getMediaIcon(attachment);
     const isImage = attachment.type === "image";
+    const displayUrl = useDisplayImageUrl(attachment);
 
     return (
         <button
@@ -186,9 +276,9 @@ function SuperOfficePhotoThumb({ attachment, onOpen, hasFailed, onMediaError }) 
             onClick={handleClick}
             title={`${attachment.name} · ${mediaTypeLabel}`}
         >
-            {isImage && !hasFailed ? (
+            {isImage && !hasFailed && displayUrl ? (
                 <img
-                    src={attachment.url}
+                    src={displayUrl}
                     alt=""
                     aria-hidden="true"
                     loading="lazy"
@@ -217,6 +307,31 @@ function SuperOfficeViewerFallback({ attachment, message = "Aperçu indisponible
                 <ExternalLink size={15} aria-hidden="true" />
             </a>
         </div>
+    );
+}
+
+function SuperOfficeImagePreview({ attachment, viewerTransform, onMediaError }) {
+    const displayUrl = useDisplayImageUrl(attachment);
+
+    if (!displayUrl) {
+        return (
+            <SuperOfficeViewerFallback
+                attachment={attachment}
+                message="Conversion de l’image en cours…"
+            />
+        );
+    }
+
+    return (
+        <img
+            src={displayUrl}
+            alt={attachment.name}
+            draggable="false"
+            style={{
+                transform: `translate3d(${viewerTransform.x}px, ${viewerTransform.y}px, 0) scale(${viewerTransform.scale})`
+            }}
+            onError={() => onMediaError(attachment)}
+        />
     );
 }
 
@@ -580,14 +695,10 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
                                 {activeAttachmentFailed ? (
                                     <SuperOfficeViewerFallback attachment={activeAttachment} />
                                 ) : activeIsImage ? (
-                                    <img
-                                        src={activeAttachment.url}
-                                        alt={activeAttachment.name}
-                                        draggable="false"
-                                        style={{
-                                            transform: `translate3d(${viewerTransform.x}px, ${viewerTransform.y}px, 0) scale(${viewerTransform.scale})`
-                                        }}
-                                        onError={() => handleMediaError(activeAttachment)}
+                                    <SuperOfficeImagePreview
+                                        attachment={activeAttachment}
+                                        viewerTransform={viewerTransform}
+                                        onMediaError={handleMediaError}
                                     />
                                 ) : activeAttachment.type === "video" ? (
                                     <video
