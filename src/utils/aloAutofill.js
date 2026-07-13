@@ -342,7 +342,7 @@ function aloAutofillBookmarkletRunner(expectedSource) {
             return;
         }
         if (payload.source && payload.source !== expectedSource) {
-            show("ALO fill", "Clipboard does not contain ALO fill data from Salt Templater.", "error");
+            show("ALO fill", "Clipboard does not contain ALO fill data from Salt BO tools.", "error");
             return;
         }
 
@@ -395,7 +395,7 @@ function aloAutofillBookmarkletRunner(expectedSource) {
 
     navigator.clipboard.readText().then(function handleClipboard(raw) {
         if (!text(raw)) {
-            show("ALO fill", "Clipboard empty. Click ALO fill in Salt Templater first.", "error");
+            show("ALO fill", "Clipboard empty. Click ALO fill in Salt BO tools first.", "error");
             return;
         }
 

@@ -1703,7 +1703,7 @@ export default function Templates() {
         <main className="page-container page-container--home templates-page">
             <header className="app-header templates-app-header">
                 <div className="app-title">
-                    Salt Templater
+                    Salt BO tools
                     {configName && configName !== "No configuration" && (
                         <span className="app-title-config"> ({configName})</span>
                     )}
