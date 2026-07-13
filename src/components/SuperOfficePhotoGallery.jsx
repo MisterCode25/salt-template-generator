@@ -23,6 +23,8 @@ const VIEWER_MAX_ZOOM = 5;
 const VIEWER_ZOOM_STEP = 0.35;
 const BROWSER_PREVIEWABLE_IMAGE_PATTERN = /\.(jpe?g|png|webp|gif|bmp|avif|ico|svg)(?:$|[?#])/i;
 const CONVERTIBLE_IMAGE_PATTERN = /\.(heic|heif|tiff?|tif)(?:$|[?#])/i;
+const INITIAL_VISIBLE_MEDIA_COUNT = 72;
+const VISIBLE_MEDIA_BATCH_SIZE = 72;
 
 const convertedImageUrlCache = new Map();
 
@@ -259,7 +261,29 @@ function getZoomedViewerTransform(currentTransform, nextScaleValue, anchorPoint,
     }, bounds);
 }
 
+function limitMediaGroups(groups = [], visibleCount = INITIAL_VISIBLE_MEDIA_COUNT) {
+    let remaining = visibleCount;
+    const visibleGroups = [];
+
+    for (const group of groups) {
+        if (remaining <= 0) break;
+        const visibleAttachments = group.attachments.slice(0, remaining);
+        if (visibleAttachments.length > 0) {
+            visibleGroups.push({
+                ...group,
+                attachments: visibleAttachments,
+                hiddenCount: Math.max(group.attachments.length - visibleAttachments.length, 0)
+            });
+            remaining -= visibleAttachments.length;
+        }
+    }
+
+    return visibleGroups;
+}
+
 function SuperOfficePhotoThumb({ attachment, onOpen, hasFailed, onMediaError }) {
+    const [isImageLoading, setIsImageLoading] = useState(false);
+
     const handleClick = useCallback(() => {
         onOpen(attachment.galleryIndex);
     }, [attachment.galleryIndex, onOpen]);
@@ -268,6 +292,11 @@ function SuperOfficePhotoThumb({ attachment, onOpen, hasFailed, onMediaError }) 
     const MediaIcon = getMediaIcon(attachment);
     const isImage = attachment.type === "image";
     const displayUrl = useDisplayImageUrl(attachment);
+    const shouldRenderImage = isImage && !hasFailed && displayUrl;
+
+    useEffect(() => {
+        setIsImageLoading(Boolean(shouldRenderImage));
+    }, [shouldRenderImage, displayUrl]);
 
     return (
         <button
@@ -276,14 +305,26 @@ function SuperOfficePhotoThumb({ attachment, onOpen, hasFailed, onMediaError }) 
             onClick={handleClick}
             title={`${attachment.name} · ${mediaTypeLabel}`}
         >
-            {isImage && !hasFailed && displayUrl ? (
-                <img
-                    src={displayUrl}
-                    alt=""
-                    aria-hidden="true"
-                    loading="lazy"
-                    onError={() => onMediaError(attachment)}
-                />
+            {shouldRenderImage ? (
+                <>
+                    {isImageLoading && (
+                        <span className="so-photo-loading" aria-hidden="true">
+                            <span className="so-photo-loading__spinner" />
+                        </span>
+                    )}
+                    <img
+                        src={displayUrl}
+                        alt=""
+                        aria-hidden="true"
+                        loading="lazy"
+                        decoding="async"
+                        onLoad={() => setIsImageLoading(false)}
+                        onError={() => {
+                            setIsImageLoading(false);
+                            onMediaError(attachment);
+                        }}
+                    />
+                </>
             ) : (
                 <span className={`so-photo-thumb__fallback so-photo-thumb__fallback--${attachment.type}`} aria-hidden="true">
                     <MediaIcon size={30} strokeWidth={1.7} />
@@ -311,7 +352,12 @@ function SuperOfficeViewerFallback({ attachment, message = "Aperçu indisponible
 }
 
 function SuperOfficeImagePreview({ attachment, viewerTransform, onMediaError }) {
+    const [isLoading, setIsLoading] = useState(false);
     const displayUrl = useDisplayImageUrl(attachment);
+
+    useEffect(() => {
+        setIsLoading(Boolean(displayUrl));
+    }, [displayUrl]);
 
     if (!displayUrl) {
         return (
@@ -323,15 +369,27 @@ function SuperOfficeImagePreview({ attachment, viewerTransform, onMediaError }) 
     }
 
     return (
-        <img
-            src={displayUrl}
-            alt={attachment.name}
-            draggable="false"
-            style={{
-                transform: `translate3d(${viewerTransform.x}px, ${viewerTransform.y}px, 0) scale(${viewerTransform.scale})`
-            }}
-            onError={() => onMediaError(attachment)}
-        />
+        <>
+            {isLoading && (
+                <span className="so-photo-viewer__loading" aria-live="polite">
+                    <span className="so-photo-loading__spinner" aria-hidden="true" />
+                    Chargement de l’image…
+                </span>
+            )}
+            <img
+                src={displayUrl}
+                alt={attachment.name}
+                draggable="false"
+                style={{
+                    transform: `translate3d(${viewerTransform.x}px, ${viewerTransform.y}px, 0) scale(${viewerTransform.scale})`
+                }}
+                onLoad={() => setIsLoading(false)}
+                onError={() => {
+                    setIsLoading(false);
+                    onMediaError(attachment);
+                }}
+            />
+        </>
     );
 }
 
@@ -341,6 +399,10 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
     ), [ticket]);
     const mediaItems = useMemo(() => getSuperOfficeMediaAttachments(sourceAttachments), [sourceAttachments]);
     const groups = useMemo(() => groupSuperOfficeMediaAttachmentsByPost(mediaItems), [mediaItems]);
+    const [visibleMediaCount, setVisibleMediaCount] = useState(INITIAL_VISIBLE_MEDIA_COUNT);
+    const visibleGroups = useMemo(() => limitMediaGroups(groups, visibleMediaCount), [groups, visibleMediaCount]);
+    const hasHiddenMedia = visibleMediaCount < mediaItems.length;
+    const visibleMediaTotal = Math.min(visibleMediaCount, mediaItems.length);
     const contextBadges = useMemo(() => buildPhotoContextBadges(profile), [profile]);
     const [activeIndex, setActiveIndex] = useState(null);
     const [annotatorOpen, setAnnotatorOpen] = useState(false);
@@ -365,6 +427,10 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
     const openAttachment = useCallback((index) => {
         setActiveIndex(index);
     }, []);
+
+    const showMoreMedia = useCallback(() => {
+        setVisibleMediaCount((current) => Math.min(current + VISIBLE_MEDIA_BATCH_SIZE, mediaItems.length));
+    }, [mediaItems.length]);
 
     const closeAttachment = useCallback(() => {
         setAnnotatorOpen(false);
@@ -551,6 +617,7 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
         setFailedAttachments(new Set());
         setAnnotationsByImage({});
         setCropsByImage({});
+        setVisibleMediaCount(INITIAL_VISIBLE_MEDIA_COUNT);
     }, [ticketSignature]);
 
     return (
@@ -569,14 +636,14 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
             </div>
 
             <div className="so-photo-gallery-body">
-                {groups.length > 0 ? groups.map((group) => (
+                {visibleGroups.length > 0 ? visibleGroups.map((group) => (
                     <section key={group.dateKey} className="so-photo-date-section">
                         <div className="so-photo-date-section__head">
                             <div>
                                 <h3>{group.label}</h3>
                                 {group.metaLabel && <small>{group.metaLabel}</small>}
                             </div>
-                            <span>{group.attachments.length}</span>
+                            <span>{group.attachments.length}{group.hiddenCount ? ` / ${group.attachments.length + group.hiddenCount}` : ""}</span>
                         </div>
                         <div className="so-photo-grid">
                             {group.attachments.map((attachment) => (
@@ -594,6 +661,14 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
                     <div className="so-photo-gallery-empty">
                         <FileText size={34} strokeWidth={1.7} />
                         <span>Aucune photo, vidéo ou PDF dans le dernier ticket importé.</span>
+                    </div>
+                )}
+                {hasHiddenMedia && (
+                    <div className="so-photo-gallery-more">
+                        <button type="button" onClick={showMoreMedia}>
+                            Charger {Math.min(VISIBLE_MEDIA_BATCH_SIZE, mediaItems.length - visibleMediaTotal)} média{mediaItems.length - visibleMediaTotal > 1 ? "s" : ""} de plus
+                        </button>
+                        <span>{visibleMediaTotal} / {mediaItems.length} médias affichés</span>
                     </div>
                 )}
             </div>
