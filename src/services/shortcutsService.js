@@ -9,7 +9,7 @@ export const DATA_SHORTCUTS = Object.freeze([
         title: "Capture VTI data",
         buttonLabel: "Capture VTI data",
         bookmarklet: vtiHealthcheckBookmarklet.trim(),
-        description: "Extracts Billing, Contact Details and Healthcheck data, then copies the customer JSON used by Salt Templater.",
+        description: "Extracts Billing, Contact Details and Healthcheck data, then copies the customer JSON used by Salt BO tools.",
         steps: [
             "Open the customer in VTI on Billing Account information.",
             "Click the saved bookmarklet in the bookmarks bar.",
@@ -26,7 +26,7 @@ export const DATA_SHORTCUTS = Object.freeze([
         steps: [
             "Open the ticket in SuperOffice.",
             "Click the saved bookmarklet in the bookmarks bar.",
-            "Come back to Salt Templater with the Capture data popup open.",
+            "Come back to Salt BO tools with the Capture data popup open.",
             "Ticket photos, videos and PDFs will appear in the Médias SO tool when compatible attachments are present."
         ]
     },
@@ -36,9 +36,9 @@ export const DATA_SHORTCUTS = Object.freeze([
         title: "Fill ALO site",
         buttonLabel: "Fill ALO site",
         bookmarklet: buildAloAutofillBookmarklet(),
-        description: "Reads the structured ALO fill data copied from Salt Templater and fills the ticket, end-user and ISP contact fields.",
+        description: "Reads the structured ALO fill data copied from Salt BO tools and fills the ticket, end-user and ISP contact fields.",
         steps: [
-            "Capture VTI data in Salt Templater.",
+            "Capture VTI data in Salt BO tools.",
             "Capture SO data if you want the SO ticket copied into Ext. reference.",
             "Click ALO fill in the tools bar to copy the structured data.",
             "Open the ALO ticket form, then click this bookmarklet from the bookmarks bar."
