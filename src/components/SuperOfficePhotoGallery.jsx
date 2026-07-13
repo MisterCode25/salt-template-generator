@@ -7,6 +7,7 @@ import {
     FileText,
     Image as ImageIcon,
     RotateCcw,
+    RotateCw,
     Video,
     ZoomIn,
     ZoomOut
@@ -351,7 +352,7 @@ function SuperOfficeViewerFallback({ attachment, message = "Aperçu indisponible
     );
 }
 
-function SuperOfficeImagePreview({ attachment, viewerTransform, onMediaError }) {
+function SuperOfficeImagePreview({ attachment, viewerTransform, rotation, onMediaError }) {
     const [isLoading, setIsLoading] = useState(false);
     const displayUrl = useDisplayImageUrl(attachment);
 
@@ -381,7 +382,7 @@ function SuperOfficeImagePreview({ attachment, viewerTransform, onMediaError }) 
                 alt={attachment.name}
                 draggable="false"
                 style={{
-                    transform: `translate3d(${viewerTransform.x}px, ${viewerTransform.y}px, 0) scale(${viewerTransform.scale})`
+                    transform: `translate3d(${viewerTransform.x}px, ${viewerTransform.y}px, 0) rotate(${rotation}deg) scale(${viewerTransform.scale})`
                 }}
                 onLoad={() => setIsLoading(false)}
                 onError={() => {
@@ -410,6 +411,7 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
     const [cropsByImage, setCropsByImage] = useState({});
     const [failedAttachments, setFailedAttachments] = useState(() => new Set());
     const [viewerTransform, setViewerTransform] = useState(getDefaultViewerTransform);
+    const [viewerRotation, setViewerRotation] = useState(0);
     const [isViewerPanning, setIsViewerPanning] = useState(false);
     const viewerImageWrapRef = useRef(null);
     const viewerPanRef = useRef(null);
@@ -487,6 +489,12 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
         viewerPanRef.current = null;
         setIsViewerPanning(false);
         setViewerTransform(getDefaultViewerTransform());
+    }, []);
+
+    const rotateViewerImage = useCallback(() => {
+        viewerPanRef.current = null;
+        setIsViewerPanning(false);
+        setViewerRotation((current) => (current + 90) % 360);
     }, []);
 
     const updateViewerZoom = useCallback((nextScaleValue, anchorPoint = null) => {
@@ -601,14 +609,19 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
                 event.preventDefault();
                 resetViewerZoom();
             }
+            if (activeIsImage && event.key.toLowerCase() === "r") {
+                event.preventDefault();
+                rotateViewerImage();
+            }
         };
 
         document.addEventListener("keydown", handleKeyDown);
         return () => document.removeEventListener("keydown", handleKeyDown);
-    }, [activeIndex, activeIsImage, annotatorOpen, closeAttachment, goToNext, goToPrevious, resetViewerZoom, zoomViewerBy]);
+    }, [activeIndex, activeIsImage, annotatorOpen, closeAttachment, goToNext, goToPrevious, resetViewerZoom, rotateViewerImage, zoomViewerBy]);
 
     useEffect(() => {
         resetViewerZoom();
+        setViewerRotation(0);
     }, [activeAttachmentKey, resetViewerZoom]);
 
     useEffect(() => {
@@ -681,7 +694,7 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
                                 <strong>{activeAttachment.name}</strong>
                                 <div className="so-photo-viewer__meta-actions">
                                     {activeIsImage && (
-                                        <div className="so-photo-viewer__zoom-controls" role="group" aria-label="Zoom image">
+                                        <div className="so-photo-viewer__zoom-controls" role="group" aria-label="Zoom et rotation image">
                                             <button
                                                 type="button"
                                                 onClick={() => zoomViewerBy(-1)}
@@ -709,6 +722,15 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
                                                 aria-label="Zoom avant"
                                             >
                                                 <ZoomIn size={15} aria-hidden="true" />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={rotateViewerImage}
+                                                disabled={activeImageFailed}
+                                                title="Tourner l’image de 90°"
+                                                aria-label="Tourner l’image de 90 degrés"
+                                            >
+                                                <RotateCw size={15} aria-hidden="true" />
                                             </button>
                                         </div>
                                     )}
@@ -773,6 +795,7 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
                                     <SuperOfficeImagePreview
                                         attachment={activeAttachment}
                                         viewerTransform={viewerTransform}
+                                        rotation={viewerRotation}
                                         onMediaError={handleMediaError}
                                     />
                                 ) : activeAttachment.type === "video" ? (
