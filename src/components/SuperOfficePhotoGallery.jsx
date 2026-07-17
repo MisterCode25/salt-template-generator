@@ -22,8 +22,8 @@ import {
 const VIEWER_MIN_ZOOM = 1;
 const VIEWER_MAX_ZOOM = 5;
 const VIEWER_ZOOM_STEP = 0.35;
-const BROWSER_PREVIEWABLE_IMAGE_PATTERN = /\.(jpe?g|jfif|pjpe?g|png|webp|gif|bmp|avif|ico|svg)(?:$|[?#])/i;
-const CONVERTIBLE_IMAGE_PATTERN = /\.(heic|heif|hif|tiff?|tif)(?:$|[?#])/i;
+const BROWSER_PREVIEWABLE_IMAGE_PATTERN = /\.(jpe?g|png|webp|gif|bmp|avif|ico|svg)(?:$|[?#])/i;
+const CONVERTIBLE_IMAGE_PATTERN = /\.(heic|heif|tiff?|tif)(?:$|[?#])/i;
 const INITIAL_VISIBLE_MEDIA_COUNT = 72;
 const VISIBLE_MEDIA_BATCH_SIZE = 72;
 
@@ -91,56 +91,21 @@ function getVideoContentType(attachment = {}) {
     return undefined;
 }
 
-export function isBrowserPreviewableSuperOfficeImage(attachment = {}) {
+function isBrowserPreviewableImage(attachment = {}) {
     const contentType = displayValue(attachment.contentType).toLowerCase();
     if (contentType === "image/svg+xml") return true;
-    if (/^image\/(jpeg|jpg|pjpeg|png|webp|gif|bmp|avif|x-icon|vnd\.microsoft\.icon)$/.test(contentType)) return true;
+    if (/^image\/(jpeg|jpg|png|webp|gif|bmp|avif|x-icon|vnd\.microsoft\.icon)$/.test(contentType)) return true;
 
     const source = `${attachment.name || ""} ${attachment.url || ""}`;
     return BROWSER_PREVIEWABLE_IMAGE_PATTERN.test(source);
 }
 
-export function isConvertibleSuperOfficeImage(attachment = {}) {
+function isConvertibleImage(attachment = {}) {
     const contentType = displayValue(attachment.contentType).toLowerCase();
-    if (["image/heic", "image/heif", "image/heic-sequence", "image/heif-sequence", "image/hif", "image/tiff", "image/tif"].includes(contentType)) return true;
+    if (["image/heic", "image/heif", "image/tiff", "image/tif"].includes(contentType)) return true;
 
     const source = `${attachment.name || ""} ${attachment.url || ""}`;
     return CONVERTIBLE_IMAGE_PATTERN.test(source);
-}
-
-async function decodeBlobWithImageDecoder(blob) {
-    if (typeof ImageDecoder !== "function" || typeof VideoFrame === "undefined") {
-        throw new Error("IMAGE_DECODER_UNAVAILABLE");
-    }
-
-    const contentType = blob?.type || "";
-    if (!contentType || (typeof ImageDecoder.isTypeSupported === "function" && !(await ImageDecoder.isTypeSupported(contentType)))) {
-        throw new Error("IMAGE_DECODER_TYPE_UNSUPPORTED");
-    }
-
-    const decoder = new ImageDecoder({ data: blob, type: contentType });
-    try {
-        const { image } = await decoder.decode({ frameIndex: 0 });
-        try {
-            const canvas = document.createElement("canvas");
-            canvas.width = image.displayWidth || image.codedWidth;
-            canvas.height = image.displayHeight || image.codedHeight;
-            const context = canvas.getContext("2d");
-            if (!context) throw new Error("IMAGE_CANVAS_UNAVAILABLE");
-            context.drawImage(image, 0, 0, canvas.width, canvas.height);
-
-            return await new Promise((resolve, reject) => {
-                canvas.toBlob((nextBlob) => {
-                    if (nextBlob) resolve(nextBlob);
-                    else reject(new Error("IMAGE_EXPORT_FAILED"));
-                }, "image/png");
-            });
-        } finally {
-            image.close?.();
-        }
-    } finally {
-        decoder.close?.();
-    }
 }
 
 async function fetchMediaBlob(attachment = {}) {
@@ -154,12 +119,6 @@ async function fetchMediaBlob(attachment = {}) {
 }
 
 async function convertImageBlobToPng(blob) {
-    try {
-        return await decodeBlobWithImageDecoder(blob);
-    } catch {
-        // Fall through to createImageBitmap for formats handled natively by the browser.
-    }
-
     if (typeof createImageBitmap !== "function") {
         throw new Error("IMAGE_CONVERSION_UNAVAILABLE");
     }
@@ -192,7 +151,7 @@ async function buildCachedImageUrl(attachment = {}) {
     if (cached?.promise) return cached.promise;
 
     const promise = fetchMediaBlob(attachment)
-        .then((blob) => (isConvertibleSuperOfficeImage(attachment) ? convertImageBlobToPng(blob) : blob))
+        .then((blob) => (isConvertibleImage(attachment) ? convertImageBlobToPng(blob) : blob))
         .then((blob) => {
             const objectUrl = URL.createObjectURL(blob);
             mediaObjectUrlCache.set(cacheKey, { objectUrl });
@@ -208,34 +167,25 @@ async function buildCachedImageUrl(attachment = {}) {
 }
 
 function useDisplayImageUrl(attachment) {
-    const [state, setState] = useState(() => ({
-        url: attachment?.url || "",
-        resolving: false,
-        fromCache: false
-    }));
+    const [displayUrl, setDisplayUrl] = useState(attachment?.url || "");
 
     useEffect(() => {
         let cancelled = false;
 
         if (!attachment?.url) {
-            setState({ url: "", resolving: false, fromCache: false });
+            setDisplayUrl("");
             return undefined;
         }
 
-        const canShowOriginalWhileCaching = isBrowserPreviewableSuperOfficeImage(attachment) && !isConvertibleSuperOfficeImage(attachment);
-        setState({
-            url: canShowOriginalWhileCaching ? attachment.url : "",
-            resolving: true,
-            fromCache: false
-        });
-
+        const canShowOriginalWhileCaching = isBrowserPreviewableImage(attachment) && !isConvertibleImage(attachment);
+        setDisplayUrl(canShowOriginalWhileCaching ? attachment.url : "");
         buildCachedImageUrl(attachment)
             .then((nextUrl) => {
-                if (!cancelled) setState({ url: nextUrl, resolving: false, fromCache: true });
+                if (!cancelled) setDisplayUrl(nextUrl);
             })
             .catch(() => {
                 if (!cancelled) {
-                    setState({ url: attachment.url, resolving: false, fromCache: false });
+                    setDisplayUrl(attachment.url);
                 }
             });
 
@@ -244,7 +194,7 @@ function useDisplayImageUrl(attachment) {
         };
     }, [attachment]);
 
-    return state;
+    return displayUrl;
 }
 
 function inferRouterModelFromSerial(serial = "") {
@@ -372,8 +322,7 @@ function SuperOfficePhotoThumb({ attachment, onOpen, hasFailed, onMediaError }) 
     const mediaTypeLabel = getMediaTypeLabel(attachment);
     const MediaIcon = getMediaIcon(attachment);
     const isImage = attachment.type === "image";
-    const displayImage = useDisplayImageUrl(attachment);
-    const displayUrl = displayImage.url;
+    const displayUrl = useDisplayImageUrl(attachment);
     const shouldRenderImage = isImage && !hasFailed && displayUrl;
 
     useEffect(() => {
@@ -403,7 +352,7 @@ function SuperOfficePhotoThumb({ attachment, onOpen, hasFailed, onMediaError }) 
                         onLoad={() => setIsImageLoading(false)}
                         onError={() => {
                             setIsImageLoading(false);
-                            if (!displayImage.resolving) onMediaError(attachment);
+                            onMediaError(attachment);
                         }}
                     />
                 </>
@@ -435,8 +384,7 @@ function SuperOfficeViewerFallback({ attachment, message = "Aperçu indisponible
 
 function SuperOfficeImagePreview({ attachment, viewerTransform, rotation, onMediaError }) {
     const [isLoading, setIsLoading] = useState(false);
-    const displayImage = useDisplayImageUrl(attachment);
-    const displayUrl = displayImage.url;
+    const displayUrl = useDisplayImageUrl(attachment);
 
     useEffect(() => {
         setIsLoading(Boolean(displayUrl));
@@ -469,7 +417,7 @@ function SuperOfficeImagePreview({ attachment, viewerTransform, rotation, onMedi
                 onLoad={() => setIsLoading(false)}
                 onError={() => {
                     setIsLoading(false);
-                    if (!displayImage.resolving) onMediaError(attachment);
+                    onMediaError(attachment);
                 }}
             />
         </>
