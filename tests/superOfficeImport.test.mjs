@@ -314,13 +314,23 @@ import { parseExternalId } from "../src/utils/externalGenerator.js";
         name: "network-diagram.svg",
         url: "https://example.test/network-diagram.svg",
         messageId: "message-2"
+      },
+      {
+        name: "customer-router.jfif",
+        url: "https://example.test/customer-router.jfif",
+        messageId: "message-3"
+      },
+      {
+        name: "mobile-photo.hif",
+        url: "https://example.test/mobile-photo.hif",
+        messageId: "message-3"
       }
     ]
   });
 
   assert.equal(result.ok, true);
-  assert.deepEqual(result.mediaAttachments.map((attachment) => attachment.type), ["image", "image", "image", "image"]);
-  assert.equal(result.imageAttachments.length, 4);
+  assert.deepEqual(result.mediaAttachments.map((attachment) => attachment.type), ["image", "image", "image", "image", "image", "image"]);
+  assert.equal(result.imageAttachments.length, 6);
   assert.equal(result.imageAttachments[1].contentType, "image/heif");
 }
 
