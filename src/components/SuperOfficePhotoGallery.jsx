@@ -27,7 +27,16 @@ const CONVERTIBLE_IMAGE_PATTERN = /\.(heic|heif|tiff?|tif)(?:$|[?#])/i;
 const INITIAL_VISIBLE_MEDIA_COUNT = 72;
 const VISIBLE_MEDIA_BATCH_SIZE = 72;
 
-const convertedImageUrlCache = new Map();
+const mediaObjectUrlCache = new Map();
+
+function revokeCachedMediaEntry(entry) {
+    if (entry?.objectUrl && typeof URL !== "undefined" && typeof URL.revokeObjectURL === "function") URL.revokeObjectURL(entry.objectUrl);
+}
+
+export function clearSuperOfficeMediaCache() {
+    mediaObjectUrlCache.forEach(revokeCachedMediaEntry);
+    mediaObjectUrlCache.clear();
+}
 
 function displayValue(value) {
     if (value === null || value === undefined) return "";
@@ -99,19 +108,21 @@ function isConvertibleImage(attachment = {}) {
     return CONVERTIBLE_IMAGE_PATTERN.test(source);
 }
 
-async function buildConvertedImageUrl(attachment = {}) {
-    if (!attachment.url || typeof fetch !== "function" || typeof createImageBitmap !== "function") {
+async function fetchMediaBlob(attachment = {}) {
+    if (!attachment.url || typeof fetch !== "function") {
+        throw new Error("MEDIA_FETCH_UNAVAILABLE");
+    }
+
+    const response = await fetch(attachment.url, { credentials: "include" });
+    if (!response.ok) throw new Error("MEDIA_FETCH_FAILED");
+    return response.blob();
+}
+
+async function convertImageBlobToPng(blob) {
+    if (typeof createImageBitmap !== "function") {
         throw new Error("IMAGE_CONVERSION_UNAVAILABLE");
     }
 
-    const cacheKey = attachmentKey(attachment);
-    const cached = convertedImageUrlCache.get(cacheKey);
-    if (cached) return cached;
-
-    const response = await fetch(attachment.url, { credentials: "include" });
-    if (!response.ok) throw new Error("IMAGE_FETCH_FAILED");
-
-    const blob = await response.blob();
     const bitmap = await createImageBitmap(blob);
     const canvas = document.createElement("canvas");
     canvas.width = bitmap.width;
@@ -121,15 +132,38 @@ async function buildConvertedImageUrl(attachment = {}) {
     context.drawImage(bitmap, 0, 0);
     bitmap.close?.();
 
-    const convertedBlob = await new Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => {
         canvas.toBlob((nextBlob) => {
             if (nextBlob) resolve(nextBlob);
             else reject(new Error("IMAGE_EXPORT_FAILED"));
         }, "image/png");
     });
-    const objectUrl = URL.createObjectURL(convertedBlob);
-    convertedImageUrlCache.set(cacheKey, objectUrl);
-    return objectUrl;
+}
+
+async function buildCachedImageUrl(attachment = {}) {
+    if (!attachment.url || typeof URL === "undefined" || typeof URL.createObjectURL !== "function") {
+        throw new Error("MEDIA_CACHE_UNAVAILABLE");
+    }
+
+    const cacheKey = attachmentKey(attachment);
+    const cached = mediaObjectUrlCache.get(cacheKey);
+    if (cached?.objectUrl) return cached.objectUrl;
+    if (cached?.promise) return cached.promise;
+
+    const promise = fetchMediaBlob(attachment)
+        .then((blob) => (isConvertibleImage(attachment) ? convertImageBlobToPng(blob) : blob))
+        .then((blob) => {
+            const objectUrl = URL.createObjectURL(blob);
+            mediaObjectUrlCache.set(cacheKey, { objectUrl });
+            return objectUrl;
+        })
+        .catch((error) => {
+            mediaObjectUrlCache.delete(cacheKey);
+            throw error;
+        });
+
+    mediaObjectUrlCache.set(cacheKey, { promise });
+    return promise;
 }
 
 function useDisplayImageUrl(attachment) {
@@ -143,13 +177,9 @@ function useDisplayImageUrl(attachment) {
             return undefined;
         }
 
-        if (isBrowserPreviewableImage(attachment) || !isConvertibleImage(attachment)) {
-            setDisplayUrl(attachment.url);
-            return undefined;
-        }
-
-        setDisplayUrl("");
-        buildConvertedImageUrl(attachment)
+        const canShowOriginalWhileCaching = isBrowserPreviewableImage(attachment) && !isConvertibleImage(attachment);
+        setDisplayUrl(canShowOriginalWhileCaching ? attachment.url : "");
+        buildCachedImageUrl(attachment)
             .then((nextUrl) => {
                 if (!cancelled) setDisplayUrl(nextUrl);
             })
