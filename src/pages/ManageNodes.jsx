@@ -385,6 +385,32 @@ function getAiPayloadName(payload = {}, fallback = "Variant") {
     return typeof value === "string" && value.trim() ? value.trim() : fallback;
 }
 
+function getAiTranslationFieldValue(payload = {}, field = "") {
+    if (!payload || typeof payload !== "object" || !field) return "";
+    const direct = payload[field];
+    if (typeof direct === "string" && direct.trim()) return direct;
+
+    const nestedContainers = [payload.translations, payload.languages, payload.values, payload.fields];
+    for (const container of nestedContainers) {
+        if (container && typeof container === "object" && typeof container[field] === "string" && container[field].trim()) {
+            return container[field];
+        }
+    }
+
+    return "";
+}
+
+function getAiPayloadVariants(payload = {}) {
+    const variants = payload?.variants;
+    if (Array.isArray(variants)) return variants;
+    if (variants && typeof variants === "object") {
+        return Object.entries(variants).map(([id, value]) => (
+            value && typeof value === "object" ? { id, ...value } : { id, html: value }
+        ));
+    }
+    return [];
+}
+
 function collectMissingTranslationTargets(content = {}, variants = [], preferredCode = "fr") {
     const mainSource = getBestSourceLanguage(content, preferredCode);
     const mainTargets = mainSource
@@ -1601,18 +1627,17 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave, inline = fal
             ));
             if (mainHasValue) return true;
 
-            const payloadVariants = Array.isArray(channelPayload.variants) ? channelPayload.variants : [];
+            const payloadVariants = getAiPayloadVariants(channelPayload);
             const payloadByVariantId = new Map(
                 payloadVariants
-                    .filter((variant) => typeof variant?.id === "string")
-                    .map((variant) => [variant.id, variant])
+                    .filter((variant) => typeof variant?.id === "string" || typeof variant?.id === "number")
+                    .map((variant) => [String(variant.id), variant])
             );
             return item.targets.variants.some(({ variant, targets }) => {
                 const payloadVariant = payloadByVariantId.get(variant.id);
                 if (!payloadVariant) return false;
                 return targets.some((language) => (
-                    typeof payloadVariant[language.field] === "string"
-                    && payloadVariant[language.field].trim()
+                    getAiTranslationFieldValue(payloadVariant, language.field)
                     && !hasRichTextContent(variant[language.field])
                 ));
             });
@@ -1636,6 +1661,9 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave, inline = fal
                     "Preserve all HTML tag structure unless the target language requires minor punctuation spacing.",
                     "Preserve placeholders, IDs, product names, ticket references, brand names and technical values exactly.",
                     "Do not return translations for fields that are not listed as targets.",
+                    "Return variant translations inside the variants array only, one object per source variant.",
+                    "Each variant translation object must keep the exact source id string and put translated text directly in the requested text_* fields.",
+                    "Do not nest variant translations under html, text, content, translations, languages, or values keys.",
                     "Do not rewrite existing non-empty fields.",
                     "Keep the tone, intent and level of detail of the source text."
                 ],
@@ -1646,6 +1674,7 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave, inline = fal
                             `Template title: ${currentTitle}`,
                             `Channels: ${translationItems.map((item) => CHANNEL_LABELS[item.channel] || item.channel).join(", ")}`,
                             "Translate only the requested empty fields.",
+                            "Use the JSON shape exactly. For variants, return { id, text_fr/text_en/text_de/text_it } at the same object level.",
                             "Do not return fields that are not listed as targets."
                         ].join("\n")
                     },
@@ -1691,11 +1720,11 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave, inline = fal
                             });
                         }
 
-                        const payloadVariants = Array.isArray(channelPayload.variants) ? channelPayload.variants : [];
+                        const payloadVariants = getAiPayloadVariants(channelPayload);
                         const payloadByVariantId = new Map(
                             payloadVariants
-                                .filter((variant) => typeof variant?.id === "string")
-                                .map((variant) => [variant.id, variant])
+                                .filter((variant) => typeof variant?.id === "string" || typeof variant?.id === "number")
+                                .map((variant) => [String(variant.id), variant])
                         );
                         const targetsByVariantId = new Map(
                             item.targets.variants.map((target) => [target.variant.id, target])
@@ -1707,10 +1736,9 @@ function TemplateFormModal({ initial, parentTitle, onClose, onSave, inline = fal
                                 if (!target || !payloadVariant) return variant;
                                 const nextVariant = { ...variant };
                                 target.targets.forEach((language) => {
-                                    const nextValue = payloadVariant[language.field];
+                                    const nextValue = getAiTranslationFieldValue(payloadVariant, language.field);
                                     if (
-                                        typeof nextValue === "string"
-                                        && nextValue.trim()
+                                        nextValue
                                         && !hasRichTextContent(nextVariant[language.field])
                                     ) {
                                         nextVariant[language.field] = sanitizeGeneratedHtmlForChannel(item.channel, nextValue);

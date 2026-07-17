@@ -108,6 +108,47 @@ export function buildChatGptEditorPrompt({
     ].join("\n");
 }
 
+function extractFirstJsonObject(value = "") {
+    const text = String(value || "").trim();
+    if (!text) return "";
+
+    const fencedJson = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+    const source = fencedJson ? fencedJson[1].trim() : text;
+    const startIndex = source.indexOf("{");
+    if (startIndex === -1) return "";
+
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+
+    for (let index = startIndex; index < source.length; index += 1) {
+        const char = source[index];
+
+        if (inString) {
+            if (escaped) {
+                escaped = false;
+            } else if (char === "\\") {
+                escaped = true;
+            } else if (char === "\"") {
+                inString = false;
+            }
+            continue;
+        }
+
+        if (char === "\"") {
+            inString = true;
+        } else if (char === "{") {
+            depth += 1;
+        } else if (char === "}") {
+            depth -= 1;
+            if (depth === 0) return source.slice(startIndex, index + 1);
+            if (depth < 0) return "";
+        }
+    }
+
+    return "";
+}
+
 export function parseChatGptEditorJsonResult(value = "", { requestId = "" } = {}) {
     const payload = extractChatGptJsonPayload(value, {
         requestId,
@@ -115,12 +156,20 @@ export function parseChatGptEditorJsonResult(value = "", { requestId = "" } = {}
     });
     if (!payload) return null;
 
-    try {
-        const parsed = JSON.parse(payload);
-        return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
-    } catch {
-        return null;
+    const candidates = [payload, extractFirstJsonObject(payload)]
+        .map((candidate) => String(candidate || "").trim())
+        .filter(Boolean);
+
+    for (const candidate of candidates) {
+        try {
+            const parsed = JSON.parse(candidate);
+            if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
+        } catch {
+            // Try the next recovery candidate.
+        }
     }
+
+    return null;
 }
 
 export function sanitizeEditorPromptHtml(html = "") {
