@@ -140,6 +140,17 @@ async function convertImageBlobToPng(blob) {
     });
 }
 
+function getCachedMediaObjectUrl(attachment = {}) {
+    return mediaObjectUrlCache.get(attachmentKey(attachment))?.objectUrl || "";
+}
+
+function getImmediateDisplayImageUrl(attachment = {}) {
+    if (!attachment?.url) return "";
+    const cachedUrl = getCachedMediaObjectUrl(attachment);
+    if (cachedUrl) return cachedUrl;
+    return isBrowserPreviewableImage(attachment) && !isConvertibleImage(attachment) ? attachment.url : "";
+}
+
 async function buildCachedImageUrl(attachment = {}) {
     if (!attachment.url || typeof URL === "undefined" || typeof URL.createObjectURL !== "function") {
         throw new Error("MEDIA_CACHE_UNAVAILABLE");
@@ -167,7 +178,8 @@ async function buildCachedImageUrl(attachment = {}) {
 }
 
 function useDisplayImageUrl(attachment) {
-    const [displayUrl, setDisplayUrl] = useState(attachment?.url || "");
+    const cacheKey = attachmentKey(attachment);
+    const [displayUrl, setDisplayUrl] = useState(() => getImmediateDisplayImageUrl(attachment));
 
     useEffect(() => {
         let cancelled = false;
@@ -177,22 +189,24 @@ function useDisplayImageUrl(attachment) {
             return undefined;
         }
 
-        const canShowOriginalWhileCaching = isBrowserPreviewableImage(attachment) && !isConvertibleImage(attachment);
-        setDisplayUrl(canShowOriginalWhileCaching ? attachment.url : "");
+        const immediateUrl = getImmediateDisplayImageUrl(attachment);
+        setDisplayUrl(immediateUrl);
+
         buildCachedImageUrl(attachment)
             .then((nextUrl) => {
-                if (!cancelled) setDisplayUrl(nextUrl);
+                if (cancelled) return;
+
+                const canKeepOriginalVisible = isBrowserPreviewableImage(attachment) && !isConvertibleImage(attachment);
+                if (!canKeepOriginalVisible || !immediateUrl) setDisplayUrl(nextUrl);
             })
             .catch(() => {
-                if (!cancelled) {
-                    setDisplayUrl(attachment.url);
-                }
+                if (!cancelled) setDisplayUrl(attachment.url);
             });
 
         return () => {
             cancelled = true;
         };
-    }, [attachment]);
+    }, [attachment, cacheKey]);
 
     return displayUrl;
 }
