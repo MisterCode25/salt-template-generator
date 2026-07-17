@@ -208,25 +208,34 @@ async function buildCachedImageUrl(attachment = {}) {
 }
 
 function useDisplayImageUrl(attachment) {
-    const [displayUrl, setDisplayUrl] = useState(attachment?.url || "");
+    const [state, setState] = useState(() => ({
+        url: attachment?.url || "",
+        resolving: false,
+        fromCache: false
+    }));
 
     useEffect(() => {
         let cancelled = false;
 
         if (!attachment?.url) {
-            setDisplayUrl("");
+            setState({ url: "", resolving: false, fromCache: false });
             return undefined;
         }
 
         const canShowOriginalWhileCaching = isBrowserPreviewableSuperOfficeImage(attachment) && !isConvertibleSuperOfficeImage(attachment);
-        setDisplayUrl(canShowOriginalWhileCaching ? attachment.url : "");
+        setState({
+            url: canShowOriginalWhileCaching ? attachment.url : "",
+            resolving: true,
+            fromCache: false
+        });
+
         buildCachedImageUrl(attachment)
             .then((nextUrl) => {
-                if (!cancelled) setDisplayUrl(nextUrl);
+                if (!cancelled) setState({ url: nextUrl, resolving: false, fromCache: true });
             })
             .catch(() => {
                 if (!cancelled) {
-                    setDisplayUrl(attachment.url);
+                    setState({ url: attachment.url, resolving: false, fromCache: false });
                 }
             });
 
@@ -235,7 +244,7 @@ function useDisplayImageUrl(attachment) {
         };
     }, [attachment]);
 
-    return displayUrl;
+    return state;
 }
 
 function inferRouterModelFromSerial(serial = "") {
@@ -363,7 +372,8 @@ function SuperOfficePhotoThumb({ attachment, onOpen, hasFailed, onMediaError }) 
     const mediaTypeLabel = getMediaTypeLabel(attachment);
     const MediaIcon = getMediaIcon(attachment);
     const isImage = attachment.type === "image";
-    const displayUrl = useDisplayImageUrl(attachment);
+    const displayImage = useDisplayImageUrl(attachment);
+    const displayUrl = displayImage.url;
     const shouldRenderImage = isImage && !hasFailed && displayUrl;
 
     useEffect(() => {
@@ -393,7 +403,7 @@ function SuperOfficePhotoThumb({ attachment, onOpen, hasFailed, onMediaError }) 
                         onLoad={() => setIsImageLoading(false)}
                         onError={() => {
                             setIsImageLoading(false);
-                            onMediaError(attachment);
+                            if (!displayImage.resolving) onMediaError(attachment);
                         }}
                     />
                 </>
@@ -425,7 +435,8 @@ function SuperOfficeViewerFallback({ attachment, message = "Aperçu indisponible
 
 function SuperOfficeImagePreview({ attachment, viewerTransform, rotation, onMediaError }) {
     const [isLoading, setIsLoading] = useState(false);
-    const displayUrl = useDisplayImageUrl(attachment);
+    const displayImage = useDisplayImageUrl(attachment);
+    const displayUrl = displayImage.url;
 
     useEffect(() => {
         setIsLoading(Boolean(displayUrl));
@@ -458,7 +469,7 @@ function SuperOfficeImagePreview({ attachment, viewerTransform, rotation, onMedi
                 onLoad={() => setIsLoading(false)}
                 onError={() => {
                     setIsLoading(false);
-                    onMediaError(attachment);
+                    if (!displayImage.resolving) onMediaError(attachment);
                 }}
             />
         </>
