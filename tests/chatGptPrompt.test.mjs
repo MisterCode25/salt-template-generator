@@ -112,6 +112,35 @@ import {
     { html: "<p>Generated</p>" }
   );
   assert.equal(parseChatGptEditorJsonResult(result, { requestId: "wrong-id" }), null);
+
+  const fencedResult = `${markers.start}
+Here is the JSON:
+\`\`\`json
+{
+  "channels": [
+    {
+      "channel": "email",
+      "variants": [
+        { "id": "variant-1", "text_en": "<p>Hello</p>" }
+      ]
+    }
+  ]
+}
+\`\`\`
+${markers.end}`;
+  assert.deepEqual(
+    parseChatGptEditorJsonResult(fencedResult, { requestId: "editor-123" }),
+    {
+      channels: [
+        {
+          channel: "email",
+          variants: [
+            { id: "variant-1", text_en: "<p>Hello</p>" }
+          ]
+        }
+      ]
+    }
+  );
 }
 
 {
