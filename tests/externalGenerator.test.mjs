@@ -54,10 +54,10 @@ import { setTokenInputValues } from "../src/services/tokenInputValueService.js";
         soTicket: "",
         comment: "ok"
     });
-    assert.equal(code.split("//")[0], "VALID");
-    assert.equal(code.split("//")[1], "26.02.2026");
-    assert.equal(code.split("//")[3], " ");
-    assert.equal(code.split("//")[14], "ok");
+    assert.equal(code.split("//").length, 14);
+    assert.equal(code.split("//")[0], "26.02.2026");
+    assert.equal(code.split("//")[2], " ");
+    assert.equal(code.split("//")[13], "ok");
 }
 
 {

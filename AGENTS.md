@@ -172,7 +172,7 @@ External ID fields and order live in `externalGenerator.js`.
 
 The generated/imported code is a `//`-separated string with fields in `EXTERNAL_FIELD_ORDER`:
 
-`flagging`, `data`, `customer`, `soTicket`, `SignalStatus`, `LedStatus`, `treatmentStep`, `boxType`, `partner`, `partnerTicketNumber`, `lexId`, `oltName`, `oltBoard`, `bokBof`, `comment`.
+`data`, `customer`, `soTicket`, `SignalStatus`, `LedStatus`, `treatmentStep`, `boxType`, `partner`, `partnerTicketNumber`, `lexId`, `oltName`, `oltBoard`, `bokBof`, `comment`. Legacy imported External IDs may still include the previous leading `flagging` segment and must remain parseable.
 
 Date display inside an External ID is `DD.MM.YYYY`; stored form for the generator is `YYYY-MM-DD`.
 
