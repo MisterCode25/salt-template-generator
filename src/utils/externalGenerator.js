@@ -28,6 +28,8 @@ export const EXTERNAL_FIELD_ORDER = [
     "comment"
 ];
 
+export const EXTERNAL_GENERATED_FIELD_ORDER = EXTERNAL_FIELD_ORDER.filter((field) => field !== "flagging");
+
 export const EXTERNAL_DEFAULT_FIELDS = {
     flagging: "",
     data: "",
@@ -93,7 +95,7 @@ export function buildExternalCode(fields) {
         ...fields,
         data: displayDate
     };
-    return EXTERNAL_FIELD_ORDER
+    return EXTERNAL_GENERATED_FIELD_ORDER
         .map((field) => normalizeSegment(valuesByField[field]))
         .join("//");
 }

@@ -20,7 +20,6 @@ import {
 
 // Stable key used to link the canonical SO ticket token to the soTicket field.
 
-const FLAGGING_OPTIONS = ["VALID", "MINFO", "WRCAT", "UNTKT"];
 const PROMPT_BACK = "__PROMPT_BACK__";
 const SIGNAL_OPTIONS = ["Lost", "Never", "Low RX|TX "];
 const SIGNAL_OPTIONS_ESCALATION = ["Lost", "Never", "Low RX|TX", "Other"];
@@ -59,7 +58,6 @@ const ESCALATION_DETAIL_OPTIONS = [
 ];
 
 const FIELD_PLACEHOLDERS = {
-    flagging: "VALID / MINFO / WRCAT / UNTKT",
     data: "YYYY-MM-DD",
     customer: "Contractor number",
     soTicket: "SO Ticket number",
@@ -255,7 +253,6 @@ export default function ExternalGenerator({
     const navigate = useNavigate();
     const [fields, setFields] = useState(() => ({
         ...EXTERNAL_DEFAULT_FIELDS,
-        flagging: "VALID",
         data: formatDateForInput(new Date())
     }));
     const [externalIdFieldValue, setExternalIdFieldValue] = useState("");
@@ -445,7 +442,6 @@ export default function ExternalGenerator({
         let draft = { ...initialFields };
         let meta = initialMeta || {
             mode: null,
-            flaggingConfirmed: false,
             boxSwapStatus: null,
             escalationType: null,
             escalationCaseType: null,
@@ -470,9 +466,6 @@ export default function ExternalGenerator({
         };
 
         const nextStep = () => {
-            if (!meta.flaggingConfirmed) {
-                return { kind: "choice", key: "flagging", title: "Flagging", options: FLAGGING_OPTIONS, markMeta: "flaggingConfirmed" };
-            }
             if (isBlank(draft.soTicket)) {
                 return { kind: "input", key: "soTicket", title: "SO Ticket", placeholder: "e.g. 31436062" };
             }
@@ -767,10 +760,6 @@ export default function ExternalGenerator({
     }, [clientPayload, storedClientPayload]);
 
     const copyCode = async () => {
-        if (!fields.flagging.trim()) {
-            showToast("Flagging required", "error");
-            return;
-        }
         await copyText(generatedCode, { message: "Code copied", variant: "info" });
         await saveCopiedExternalId(generatedCode);
     };
@@ -778,7 +767,7 @@ export default function ExternalGenerator({
     const fillFromExternalIdValue = (value, { silent = false } = {}) => {
         const parsed = parseExternalId(value);
         if (!parsed.ok) {
-            if (!silent) showToast("Invalid External ID (15 segments expected)", "error");
+            if (!silent) showToast("Invalid External ID (14 segments, or legacy 15 segments, expected)", "error");
             return false;
         }
         patchFields(parsed.fields);
@@ -804,7 +793,6 @@ export default function ExternalGenerator({
     const clearAllFields = () => {
         setFields({
             ...EXTERNAL_DEFAULT_FIELDS,
-            flagging: "VALID",
             data: formatDateForInput(new Date())
         });
         setExternalIdFieldValue("");
@@ -820,7 +808,6 @@ export default function ExternalGenerator({
     // meta questions (e.g. boxSwapStatus, mode, escalationType).
     const inferMetaFromFields = (f) => {
         const meta = {
-            flaggingConfirmed: !isBlank(f.flagging),
             mode: null,
             boxSwapStatus: null,
             escalationType: null,
@@ -872,12 +859,10 @@ export default function ExternalGenerator({
     // When the user modifies a branching field via field click, clear the fields that
     // logically come after it in the wizard so the flow re-asks for them.
     const WIZARD_DOWNSTREAM_FIELDS = {
-        flagging: ["treatmentStep", "SignalStatus", "LedStatus", "partner", "partnerTicketNumber", "comment"],
         treatmentStep: ["SignalStatus", "LedStatus", "partner", "partnerTicketNumber", "comment"],
     };
 
     const FIELD_POPUP_CONFIG = {
-        flagging: { type: "choice", options: FLAGGING_OPTIONS, title: "Flagging" },
         data: { type: "input", inputType: "date", title: "Date", placeholder: "YYYY-MM-DD" },
         SignalStatus: { type: "choice", options: SIGNAL_OPTIONS_ESCALATION, title: "Signal Status" },
         LedStatus: { type: "choice", options: LED_OPTIONS, title: "LED Status" },
@@ -1013,7 +998,6 @@ export default function ExternalGenerator({
                 <div className="external-generator-layout">
                     <section className="popup-card external-generator-form">
                         <div className="popup-grid">
-                            <InputField id="flagging" label="Flagging" />
                             <InputField id="data" label="Date" type="date" />
                             <InputField id="customer" label="Customer" />
                             <InputField id="soTicket" label="SO Ticket" />
@@ -1063,7 +1047,7 @@ export default function ExternalGenerator({
                                 ref={externalIdFieldRef}
                                 className="external-id-field"
                                 value={externalIdDisplayValue}
-                                placeholder="HCAMP External ID (15 segments séparés par //)"
+                                placeholder="HCAMP External ID (14 segments, or legacy 15 segments, séparés par //)"
                                 onFocus={() => setExternalIdEditing(true)}
                                 onBlur={() => {
                                     setExternalIdEditing(false);

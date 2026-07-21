@@ -58,6 +58,7 @@ import { formatTokenPreviewHTML } from "../utils/richTextTokens.js";
 import { canonicalizeInputTokenValue } from "../utils/tokenCanonicalization.js";
 import {
     EXTERNAL_FIELD_ORDER,
+    EXTERNAL_GENERATED_FIELD_ORDER,
     getImportedExternalIdFromClientPayload,
     getValidExternalId,
     parseExternalId
@@ -390,7 +391,8 @@ function buildExternalIdSegments(externalId) {
     const parsed = parseExternalId(externalId);
     if (!parsed.ok) return [];
 
-    return EXTERNAL_FIELD_ORDER.map((field) => ({
+    const fieldOrder = parsed.fields.flagging ? EXTERNAL_FIELD_ORDER : EXTERNAL_GENERATED_FIELD_ORDER;
+    return fieldOrder.map((field) => ({
         field,
         label: EXTERNAL_ID_FIELD_LABELS[field] || field,
         value: formatExternalIdSegmentValue(field, parsed.fields[field])
