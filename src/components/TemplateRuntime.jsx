@@ -905,6 +905,14 @@ export const TemplateResultModal = memo(function TemplateResultModal({
         onCopy?.(allowImages ? draftHtml : stripImagesFromHtml(draftHtml));
     };
 
+    const copyRecipient = async () => {
+        if (!recipientInfo?.value) return;
+        await copyText(recipientInfo.value, {
+            message: `${recipientInfo.label} copied`,
+            variant: "success"
+        });
+    };
+
     return (
         <>
             <Modal
@@ -939,6 +947,16 @@ export const TemplateResultModal = memo(function TemplateResultModal({
                     <div className="template-result-recipient" aria-label={recipientInfo.label}>
                         <span className="template-result-recipient-label">{recipientInfo.label}</span>
                         <span className="template-result-recipient-value">{recipientInfo.value}</span>
+                        <button
+                            type="button"
+                            className="template-result-recipient-copy"
+                            onClick={copyRecipient}
+                            aria-label={`Copy ${recipientInfo.label}`}
+                            title={`Copy ${recipientInfo.value}`}
+                        >
+                            <Copy size={13} aria-hidden="true" />
+                            Copy
+                        </button>
                     </div>
                 )}
                 {showChannelControls && (
