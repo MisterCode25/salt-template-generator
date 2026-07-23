@@ -3,8 +3,11 @@ import { IMPORTED_EXTERNAL_ID_KEY, MANUAL_CLIENT_INPUTS_KEY, saveActiveClientPay
 import {
   consumePendingSuperOfficeTicketPayload,
   getSuperOfficeClientSignature,
+  isSameSuperOfficeClient,
   loadDisplaySuperOfficeTicketPayload,
+  loadPreviousSuperOfficeTicketPayload,
   loadSuperOfficeTicketPayload,
+  rebindSuperOfficeTicketsToActiveClient,
   saveDisplaySuperOfficeExternalId,
   saveSuperOfficeTicketPayload
 } from "../src/services/superOfficeTicketService.js";
@@ -76,6 +79,11 @@ assert.notEqual(
   getSuperOfficeClientSignature(clientA),
   getSuperOfficeClientSignature(clientB)
 );
+assert.equal(
+  isSameSuperOfficeClient(clientA, { ...clientA, healthcheck: { lineState: "changed" } }),
+  true
+);
+assert.equal(isSameSuperOfficeClient(clientA, clientB), false);
 
 globalThis.localStorage.clear();
 await clearAppIndexedDB();
@@ -136,7 +144,33 @@ assert.equal((await loadSuperOfficeTicketPayload()).externalTicketId, storedExte
 assert.equal((await loadSuperOfficeTicketPayload()).tokenValues["{external_customer}"], "456");
 assert.equal((await loadSuperOfficeTicketPayload()).tokenValues["{external_bok_bof}"], "BOK2|BOF2");
 
+await saveSuperOfficeTicketPayload({
+  ticketId: "31436099",
+  tokenValues: {
+    "{so_ticket_num}": "31436099"
+  },
+  attachments: [
+    { name: "other-ticket-photo.jpg", url: "https://example.test/other-ticket-photo.jpg", type: "image" }
+  ]
+});
+assert.equal((await loadSuperOfficeTicketPayload()).ticketId, "31436099");
+assert.equal((await loadPreviousSuperOfficeTicketPayload()).ticketId, "31436062");
+
+const refreshedClientA = {
+  ...clientA,
+  healthcheck: {
+    lineState: "Online",
+    routerSerialNumber: "NEW-SERIAL"
+  }
+};
+assert.equal(isSameSuperOfficeClient(clientA, refreshedClientA), true);
+await saveActiveClientPayload(refreshedClientA);
+await rebindSuperOfficeTicketsToActiveClient();
+assert.equal((await loadSuperOfficeTicketPayload()).ticketId, "31436099");
+assert.equal((await loadPreviousSuperOfficeTicketPayload()).ticketId, "31436062");
+
 await saveActiveClientPayload(clientB);
 assert.equal(await loadSuperOfficeTicketPayload(), null);
+assert.equal(await loadPreviousSuperOfficeTicketPayload(), null);
 
 console.log("superOfficeTicketService tests passed");

@@ -406,6 +406,150 @@
     cursor: not-allowed;
 }
 
+.client-import-update-menu {
+    position: relative;
+}
+
+.client-import-update-menu > summary {
+    list-style: none;
+}
+
+.client-import-update-menu > summary::-webkit-details-marker {
+    display: none;
+}
+
+.client-import-update-btn {
+    min-height: 28px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 9px;
+    border: 1px solid rgba(167, 139, 250, 0.34);
+    border-radius: 999px;
+    background: rgba(109, 40, 217, 0.14);
+    color: var(--text-primary);
+    font-size: 12px;
+    font-weight: 760;
+    cursor: pointer;
+    user-select: none;
+}
+
+.client-import-update-btn:hover,
+.client-import-update-menu[open] .client-import-update-btn {
+    border-color: rgba(196, 181, 253, 0.58);
+    background: rgba(109, 40, 217, 0.24);
+}
+
+.client-import-update-popover {
+    position: absolute;
+    z-index: var(--z-dropdown);
+    top: calc(100% + 6px);
+    left: 0;
+    width: min(310px, calc(100vw - 24px));
+    display: grid;
+    gap: 4px;
+    padding: 6px;
+    border: 1px solid var(--border-default);
+    border-radius: 10px;
+    background: var(--bg-surface-elevated);
+    box-shadow: var(--shadow-lg);
+}
+
+.client-import-update-popover button {
+    width: 100%;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: 18px minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+    padding: 8px 9px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--text-primary);
+    text-align: left;
+    cursor: pointer;
+}
+
+.client-import-update-popover button:hover:not(:disabled),
+.client-import-update-popover button:focus-visible {
+    background: var(--button-secondary-bg-hover);
+    outline: none;
+}
+
+.client-import-update-popover button:disabled {
+    opacity: 0.42;
+    cursor: not-allowed;
+}
+
+.client-import-update-popover button span {
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+}
+
+.client-import-update-popover strong,
+.client-import-update-popover small {
+    overflow-wrap: anywhere;
+}
+
+.client-import-update-popover strong {
+    font-size: 12px;
+}
+
+.client-import-update-popover small {
+    color: var(--text-muted);
+    font-size: 10px;
+}
+
+.super-office-replacement-summary {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+}
+
+.super-office-replacement-summary > span {
+    min-width: 0;
+    display: grid;
+    gap: 4px;
+    padding: 12px;
+    border: 1px solid var(--read-border);
+    border-radius: 8px;
+    background: var(--read-bg);
+}
+
+.super-office-replacement-summary small {
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.super-office-replacement-summary strong {
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 520px) {
+    .client-import-update-popover {
+        position: fixed;
+        top: auto;
+        right: 10px;
+        bottom: 10px;
+        left: 10px;
+        width: auto;
+    }
+
+    .super-office-replacement-summary {
+        grid-template-columns: 1fr;
+    }
+
+    .super-office-replacement-summary > svg {
+        transform: rotate(90deg);
+        justify-self: center;
+    }
+}
+
 .client-info-import-btn {
     display: inline-flex;
     align-items: center;

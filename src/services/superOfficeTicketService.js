@@ -17,6 +17,7 @@ import { deleteJSON, loadJSON, saveJSON } from "./storageService.js";
 
 const SUPER_OFFICE_TICKET_KEY = "super_office_ticket_payload";
 const PENDING_SUPER_OFFICE_TICKET_KEY = "pending_super_office_ticket_payload";
+const PREVIOUS_SUPER_OFFICE_TICKET_KEY = "previous_super_office_ticket_payload";
 
 export const SUPER_OFFICE_TICKET_UPDATED_EVENT = "super-office-ticket-updated";
 
@@ -51,6 +52,40 @@ export function getSuperOfficeClientSignature(payload = null) {
     } catch {
         return "";
     }
+}
+
+const CLIENT_IDENTITY_KEYS = new Set([
+    "billingaccount",
+    "contractornumber",
+    "customerid",
+    "publicid",
+    "contactrecordid"
+]);
+
+function collectClientIdentityValues(value, result = new Map()) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return result;
+    Object.entries(value).forEach(([key, nestedValue]) => {
+        if (key.startsWith("__")) return;
+        const normalizedKey = key.replace(/[^a-z0-9]/gi, "").toLowerCase();
+        if (CLIENT_IDENTITY_KEYS.has(normalizedKey)) {
+            const normalizedValue = String(nestedValue ?? "").trim().toLowerCase();
+            if (normalizedValue) result.set(normalizedKey, normalizedValue);
+            return;
+        }
+        if (nestedValue && typeof nestedValue === "object") {
+            collectClientIdentityValues(nestedValue, result);
+        }
+    });
+    return result;
+}
+
+export function isSameSuperOfficeClient(currentPayload, nextPayload) {
+    const currentIdentity = collectClientIdentityValues(currentPayload);
+    const nextIdentity = collectClientIdentityValues(nextPayload);
+    for (const [key, value] of currentIdentity) {
+        if (nextIdentity.get(key) === value) return true;
+    }
+    return getSuperOfficeClientSignature(currentPayload) === getSuperOfficeClientSignature(nextPayload);
 }
 
 function dispatchSuperOfficeTicketUpdated(payload) {
@@ -102,6 +137,11 @@ async function saveStoredPayload(payload) {
     await saveJSON(SUPER_OFFICE_TICKET_KEY, payload);
 }
 
+async function savePreviousPayload(payload) {
+    if (!payload) return;
+    await saveJSON(PREVIOUS_SUPER_OFFICE_TICKET_KEY, payload);
+}
+
 async function savePendingPayload(payload) {
     if (!payload) return;
     await saveJSON(PENDING_SUPER_OFFICE_TICKET_KEY, payload);
@@ -132,6 +172,10 @@ function removePendingPayload() {
     return deleteJSON(PENDING_SUPER_OFFICE_TICKET_KEY);
 }
 
+function removePreviousPayload() {
+    return deleteJSON(PREVIOUS_SUPER_OFFICE_TICKET_KEY);
+}
+
 export async function saveSuperOfficeTicketPayload(importResult) {
     const activeClientPayload = await loadActiveClientPayload();
     const payload = buildSuperOfficeTicketPayload(
@@ -148,6 +192,17 @@ export async function saveSuperOfficeTicketPayload(importResult) {
         return payload;
     }
 
+    const currentPayload = normalizeStoredTicketPayload(await loadJSON(SUPER_OFFICE_TICKET_KEY, null));
+    const currentTicketId = currentPayload?.ticketId || currentPayload?.sourceTicketId || "";
+    const nextTicketId = payload.ticketId || payload.sourceTicketId || "";
+    if (
+        currentPayload?.clientSignature === payload.clientSignature
+        && currentTicketId
+        && nextTicketId
+        && currentTicketId !== nextTicketId
+    ) {
+        await savePreviousPayload(currentPayload);
+    }
     await saveStoredPayload(payload);
     await removePendingPayload();
     dispatchSuperOfficeTicketUpdated(payload);
@@ -213,11 +268,13 @@ export async function loadSuperOfficeTicketPayload() {
         const activeClientSignature = getSuperOfficeClientSignature(await loadActiveClientPayload());
         if (!activeClientSignature) {
             await removeStoredSuperOfficeTicketPayload();
+            await removePreviousPayload();
             return null;
         }
 
         if (storedPayload?.clientSignature !== activeClientSignature) {
             await removeStoredSuperOfficeTicketPayload();
+            await removePreviousPayload();
             return null;
         }
 
@@ -231,8 +288,45 @@ export async function loadSuperOfficeTicketPayload() {
     }
 }
 
+export async function loadPreviousSuperOfficeTicketPayload() {
+    try {
+        const previousPayload = normalizeStoredTicketPayload(
+            await loadJSON(PREVIOUS_SUPER_OFFICE_TICKET_KEY, null)
+        );
+        if (!previousPayload) return null;
+
+        const activeClientSignature = getSuperOfficeClientSignature(await loadActiveClientPayload());
+        if (!activeClientSignature || previousPayload.clientSignature !== activeClientSignature) {
+            await removePreviousPayload();
+            return null;
+        }
+        return previousPayload;
+    } catch (error) {
+        console.error("loadPreviousSuperOfficeTicketPayload error", error);
+        return null;
+    }
+}
+
+export async function rebindSuperOfficeTicketsToActiveClient() {
+    const clientSignature = getSuperOfficeClientSignature(await loadActiveClientPayload());
+    if (!clientSignature) return false;
+
+    const currentPayload = normalizeStoredTicketPayload(await loadJSON(SUPER_OFFICE_TICKET_KEY, null));
+    const previousPayload = normalizeStoredTicketPayload(await loadJSON(PREVIOUS_SUPER_OFFICE_TICKET_KEY, null));
+    await Promise.all([
+        currentPayload
+            ? saveStoredPayload({ ...currentPayload, clientSignature })
+            : Promise.resolve(),
+        previousPayload
+            ? savePreviousPayload({ ...previousPayload, clientSignature })
+            : Promise.resolve()
+    ]);
+    return Boolean(currentPayload || previousPayload);
+}
+
 export async function clearSuperOfficeTicketPayload() {
     await removeStoredSuperOfficeTicketPayload();
     await removePendingPayload();
+    await removePreviousPayload();
     dispatchSuperOfficeTicketUpdated(null);
 }

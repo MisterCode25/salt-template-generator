@@ -30,6 +30,7 @@ import {
     ClientPasteModal,
     CaptureDataModal,
     ExternalIdConflictModal,
+    SuperOfficeReplacementModal,
     TemplateResultModal,
     TokenPromptModal,
     useTemplateRuntime,
@@ -67,6 +68,7 @@ import {
     SUPER_OFFICE_TICKET_UPDATED_EVENT,
     hasSuperOfficeTicketPayload,
     loadDisplaySuperOfficeTicketPayload,
+    loadPreviousSuperOfficeTicketPayload,
     loadSuperOfficeTicketPayload,
     saveDisplaySuperOfficeExternalId
 } from "../services/superOfficeTicketService.js";
@@ -1077,6 +1079,7 @@ export default function Templates() {
     const [externalGeneratorStartField, setExternalGeneratorStartField] = useState(null);
     const [superOfficeTicket, setSuperOfficeTicket] = useState(null);
     const [superOfficeDataPresent, setSuperOfficeDataPresent] = useState(false);
+    const [previousSuperOfficeTicket, setPreviousSuperOfficeTicket] = useState(null);
     const [superOfficeGalleryOpen, setSuperOfficeGalleryOpen] = useState(false);
     const [aloPreparation, setAloPreparation] = useState(null);
     const [aloTemplateOptions, setAloTemplateOptions] = useState([]);
@@ -1158,8 +1161,12 @@ export default function Templates() {
     }, []);
 
     const refreshSuperOfficeState = useCallback(async (payload = undefined) => {
-        const nextTicket = payload === undefined ? await loadDisplaySuperOfficeTicketPayload() : payload;
+        const [nextTicket, previousTicket] = await Promise.all([
+            payload === undefined ? loadDisplaySuperOfficeTicketPayload() : Promise.resolve(payload),
+            loadPreviousSuperOfficeTicketPayload()
+        ]);
         setSuperOfficeTicket(nextTicket || null);
+        setPreviousSuperOfficeTicket(previousTicket || null);
         setSuperOfficeDataPresent(await hasSuperOfficeTicketPayload());
         return nextTicket;
     }, []);
@@ -1374,6 +1381,26 @@ export default function Templates() {
     const closeSuperOfficeGallery = useCallback(() => {
         setSuperOfficeGalleryOpen(false);
     }, []);
+
+    const refreshVtiData = useCallback(async (event) => {
+        const imported = await runtimeRef.current.readClientClipboard(event);
+        if (imported) {
+            await refreshSuperOfficeState();
+            resetCaseNavigation();
+        }
+    }, [refreshSuperOfficeState, resetCaseNavigation]);
+
+    const replaceSuperOfficeData = useCallback((event) => {
+        runtimeRef.current.prepareSuperOfficeReplacement(event);
+    }, []);
+
+    const restorePreviousSuperOfficeData = useCallback(async () => {
+        const restored = await runtimeRef.current.restorePreviousSuperOfficeTicket();
+        if (restored) {
+            await refreshSuperOfficeState();
+            resetCaseNavigation();
+        }
+    }, [refreshSuperOfficeState, resetCaseNavigation]);
 
     const copyAloAutofillData = useCallback(async () => {
         const runtimeApi = runtimeRef.current;
@@ -1762,6 +1789,10 @@ export default function Templates() {
                 hasSuperOfficeData={superOfficeDataPresent}
                 onChangeLang={changeLanguage}
                 onOpenCaptureData={openCaptureDataFlow}
+                onRefreshVti={refreshVtiData}
+                onReplaceSuperOffice={replaceSuperOfficeData}
+                onRestorePreviousSuperOffice={restorePreviousSuperOfficeData}
+                previousSuperOfficeTicketId={previousSuperOfficeTicket?.ticketId || previousSuperOfficeTicket?.sourceTicketId || ""}
                 onOpenPaste={openClientPasteModal}
                 onClearClient={clearClientAndResetCase}
                 onCustomizeBar={canCustomizeClientBar ? () => runtimeRef.current.setClientBarCustomizeOpen(true) : null}
@@ -1948,6 +1979,21 @@ export default function Templates() {
                 <ClientImportErrorModal
                     message={runtime.clientImportErrorModal}
                     onClose={() => runtime.setClientImportErrorModal(null)}
+                />
+            )}
+
+            {runtime.superOfficeReplacementPrompt && (
+                <SuperOfficeReplacementModal
+                    currentTicket={runtime.superOfficeReplacementPrompt.currentTicket}
+                    nextTicket={runtime.superOfficeReplacementPrompt.nextTicket}
+                    onCancel={runtime.cancelSuperOfficeReplacement}
+                    onConfirm={async () => {
+                        const imported = await runtime.confirmSuperOfficeReplacement();
+                        if (imported) {
+                            await refreshSuperOfficeState();
+                            resetCaseNavigation();
+                        }
+                    }}
                 />
             )}
 

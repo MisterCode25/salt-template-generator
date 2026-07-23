@@ -9,7 +9,9 @@ import {
     Database,
     Edit3,
     ExternalLink,
+    History,
     Loader2,
+    RefreshCw,
     RotateCcw,
     Sparkles,
     Star
@@ -75,8 +77,11 @@ import {
     clearSuperOfficeTicketPayload,
     consumePendingSuperOfficeTicketPayload,
     getSuperOfficeClientSignature,
+    isSameSuperOfficeClient,
     loadPendingSuperOfficeTicketPayload,
+    loadPreviousSuperOfficeTicketPayload,
     loadSuperOfficeTicketPayload,
+    rebindSuperOfficeTicketsToActiveClient,
     saveSuperOfficeTicketPayload
 } from "../services/superOfficeTicketService.js";
 import {
@@ -1203,12 +1208,17 @@ export const ClientInfoPanel = memo(function ClientInfoPanel({
     hasSuperOfficeData = false,
     onChangeLang,
     onOpenCaptureData,
+    onRefreshVti,
+    onReplaceSuperOffice,
+    onRestorePreviousSuperOffice,
+    previousSuperOfficeTicketId = "",
     onOpenPaste,
     onClearClient,
     onCustomizeBar,
     onExternalIdFieldClick,
     onToggleDetails
 }) {
+    const updateMenuRef = useRef(null);
     const hasInfo = sections.length > 0;
     const isError = status.type === "error";
     const hasAnyImportedData = hasVtiData || hasSuperOfficeData;
@@ -1228,6 +1238,10 @@ export const ClientInfoPanel = memo(function ClientInfoPanel({
             showToast("Unable to copy External ID", "error");
         }
     };
+    const runUpdateAction = (action) => {
+        updateMenuRef.current?.removeAttribute("open");
+        action?.();
+    };
 
     return (
         <section className="client-info-panel" aria-label="Client information">
@@ -1243,6 +1257,54 @@ export const ClientInfoPanel = memo(function ClientInfoPanel({
                     <span>{loading ? "Capturing..." : "Capture data"}</span>
                     <small>{missingCaptureLabel}</small>
                 </button>
+                {hasAnyImportedData && (
+                    <details className="client-import-update-menu" ref={updateMenuRef}>
+                        <summary className="client-import-update-btn">
+                            <RefreshCw size={13} aria-hidden="true" />
+                            Mettre à jour
+                        </summary>
+                        <div className="client-import-update-popover" role="menu">
+                            <button
+                                type="button"
+                                role="menuitem"
+                                onClick={() => runUpdateAction(onRefreshVti)}
+                                disabled={loading || !hasVtiData}
+                            >
+                                <RefreshCw size={14} aria-hidden="true" />
+                                <span>
+                                    <strong>Actualiser VTI</strong>
+                                    <small>Conserver le ticket SO</small>
+                                </span>
+                            </button>
+                            <button
+                                type="button"
+                                role="menuitem"
+                                onClick={() => runUpdateAction(onReplaceSuperOffice)}
+                                disabled={loading || !hasVtiData}
+                            >
+                                <ClipboardList size={14} aria-hidden="true" />
+                                <span>
+                                    <strong>Remplacer le ticket SO</strong>
+                                    <small>Conserver les données VTI</small>
+                                </span>
+                            </button>
+                            {previousSuperOfficeTicketId && (
+                                <button
+                                    type="button"
+                                    role="menuitem"
+                                    onClick={() => runUpdateAction(onRestorePreviousSuperOffice)}
+                                    disabled={loading}
+                                >
+                                    <History size={14} aria-hidden="true" />
+                                    <span>
+                                        <strong>Revenir au ticket précédent</strong>
+                                        <small>Ticket {previousSuperOfficeTicketId}</small>
+                                    </span>
+                                </button>
+                            )}
+                        </div>
+                    </details>
+                )}
                 <button
                     type="button"
                     className="client-import-clear-btn"
@@ -1397,6 +1459,48 @@ export function ClientImportErrorModal({ message, onClose }) {
             <p className="client-import-error-message">{message}</p>
             <div className="popup-actions">
                 <button type="button" className="primary-btn" onClick={onClose}>OK</button>
+            </div>
+        </Modal>
+    );
+}
+
+export function SuperOfficeReplacementModal({ currentTicket, nextTicket, onCancel, onConfirm }) {
+    const currentId = currentTicket?.ticketId || currentTicket?.sourceTicketId || "actuel";
+    const nextId = nextTicket?.ticketId || nextTicket?.sourceTicketId || "copié";
+    const isSameTicket = currentId === nextId;
+
+    return (
+        <Modal
+            onClose={onCancel}
+            dialogClassName="popup-box super-office-replacement-modal"
+            ariaLabel="Replace SuperOffice ticket"
+        >
+            <div className="popup-header">
+                <div>
+                    <p className="eyebrow">SuperOffice</p>
+                    <h2>{isSameTicket ? "Actualiser le ticket SO ?" : "Remplacer le ticket SO ?"}</h2>
+                </div>
+            </div>
+            <div className="super-office-replacement-summary">
+                <span>
+                    <small>Ticket actuel</small>
+                    <strong>{currentId}</strong>
+                </span>
+                <ArrowRight size={18} aria-hidden="true" />
+                <span>
+                    <small>Nouveau ticket</small>
+                    <strong>{nextId}</strong>
+                </span>
+            </div>
+            <p className="hint">
+                Les données VTI et le profil agent seront conservés. Les photos, pièces jointes et données SO
+                seront remplacées.
+            </p>
+            <div className="popup-actions">
+                <button type="button" className="secondary-btn" onClick={onCancel}>Annuler</button>
+                <button type="button" className="primary-btn" onClick={onConfirm}>
+                    {isSameTicket ? "Actualiser" : "Remplacer"}
+                </button>
             </div>
         </Modal>
     );
@@ -1635,6 +1739,7 @@ export function useTemplateRuntime() {
     const [clientBarFieldKeys, setClientBarFieldKeys] = useState(null);
     const [clientBarCustomizeOpen, setClientBarCustomizeOpen] = useState(false);
     const [externalIdConflictPrompt, setExternalIdConflictPrompt] = useState(null);
+    const [superOfficeReplacementPrompt, setSuperOfficeReplacementPrompt] = useState(null);
     const [captureDataOpen, setCaptureDataOpen] = useState(false);
     const [captureDataState, setCaptureDataState] = useState(() => createCaptureDataState());
     const captureCompletedTypes = useRef(new Set());
@@ -1837,6 +1942,7 @@ export function useTemplateRuntime() {
             { corrected: true }
         );
         setExternalIdConflictPrompt(null);
+        setSuperOfficeReplacementPrompt(null);
         await resolveCaptureConflict();
     };
 
@@ -1956,7 +2062,8 @@ export function useTemplateRuntime() {
         const currentClientPayload = await loadActiveClientPayload();
         const currentClientSignature = getSuperOfficeClientSignature(currentClientPayload);
         const nextClientSignature = getSuperOfficeClientSignature(payload);
-        if (currentClientSignature && currentClientSignature !== nextClientSignature) {
+        const isSameClient = isSameSuperOfficeClient(currentClientPayload, payload);
+        if (currentClientSignature && currentClientSignature !== nextClientSignature && !isSameClient) {
             await clearSuperOfficeTicketPayload();
         }
         const {
@@ -1989,6 +2096,9 @@ export function useTemplateRuntime() {
         await setTokenInputValues(valuesToPersist);
 
         await saveActiveClientPayload(payload);
+        if (isSameClient && currentClientSignature !== nextClientSignature) {
+            await rebindSuperOfficeTicketsToActiveClient();
+        }
         const pendingSuperOfficeTicket = await loadPendingSuperOfficeTicketPayload();
         const storedSuperOfficeTicket = currentClientSignature === nextClientSignature
             ? await loadSuperOfficeTicketPayload()
@@ -2083,6 +2193,59 @@ export function useTemplateRuntime() {
         } finally {
             setClientImportLoading(false);
         }
+    };
+
+    const prepareSuperOfficeReplacement = async (event) => {
+        setClientImportLoading(true);
+        try {
+            window.focus();
+            event?.currentTarget?.focus?.();
+            const clipboardText = await readClipboardText();
+            const result = parseSuperOfficeInfoPayload(clipboardText);
+            if (!result.ok) throw new Error("Clipboard does not contain SuperOffice data.");
+
+            setSuperOfficeReplacementPrompt({
+                currentTicket: await loadSuperOfficeTicketPayload(),
+                nextTicket: result
+            });
+            return true;
+        } catch (error) {
+            const message = error?.message || "Unable to import SuperOffice data.";
+            setClientImportStatus({ type: "error", message });
+            setClientImportErrorModal(message);
+            showToast(message, "error");
+            return false;
+        } finally {
+            setClientImportLoading(false);
+        }
+    };
+
+    const cancelSuperOfficeReplacement = () => {
+        setSuperOfficeReplacementPrompt(null);
+    };
+
+    const confirmSuperOfficeReplacement = async () => {
+        const nextTicket = superOfficeReplacementPrompt?.nextTicket;
+        if (!nextTicket) return false;
+        setSuperOfficeReplacementPrompt(null);
+        clearSuperOfficeMediaCache();
+
+        if (openExternalIdConflictPrompt(nextTicket, await loadActiveClientPayload())) {
+            return false;
+        }
+        return completeSuperOfficeImport(nextTicket);
+    };
+
+    const restorePreviousSuperOfficeTicket = async () => {
+        const previousTicket = await loadPreviousSuperOfficeTicketPayload();
+        if (!previousTicket) {
+            showToast("No previous SuperOffice ticket is available.", "warning");
+            return false;
+        }
+        clearSuperOfficeMediaCache();
+        await completeSuperOfficeImport(previousTicket, previousTicket.tokenValues || {}, { restored: true });
+        showToast(`SuperOffice ticket ${previousTicket.ticketId || previousTicket.sourceTicketId} restored.`, "success");
+        return true;
     };
 
     const notifyCaptureImport = async (type) => {
@@ -2677,6 +2840,11 @@ export function useTemplateRuntime() {
         saveClientBarSelection,
         resetClientBarSelection,
         externalIdConflictPrompt,
+        superOfficeReplacementPrompt,
+        prepareSuperOfficeReplacement,
+        cancelSuperOfficeReplacement,
+        confirmSuperOfficeReplacement,
+        restorePreviousSuperOfficeTicket,
         keepExternalIdSourceValues,
         keepExternalIdValues,
         applyExternalIdConflictSelections,
