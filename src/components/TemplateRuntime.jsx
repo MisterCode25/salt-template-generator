@@ -29,7 +29,7 @@ import {
 } from "../services/activeClientService.js";
 import { copyHtml, copyText, formatClipboardHtmlBody, showToast } from "../services/clipboardService.js";
 import { resolveTemplateImagesInHtml } from "../services/templateImageService.js";
-import { clearSuperOfficeMediaCache } from "./SuperOfficePhotoGallery.jsx";
+import { clearSuperOfficeMediaCache } from "../services/superOfficeMediaCache.js";
 import { stripImagesFromHtml } from "../utils/templateImages.js";
 import { loadTokens } from "../services/tokenService.js";
 import { deleteJSON, loadJSON, saveJSON } from "../services/storageService.js";

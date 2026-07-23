@@ -58,10 +58,9 @@ import {
     stripImagesFromHtml,
     TEMPLATE_IMAGES_UPDATED_EVENT
 } from "../utils/templateImages.js";
-import { loadTemplateImageMap } from "../services/templateImageService.js";
+import { loadTemplateImageMapForHtml } from "../services/templateImageService.js";
 import { CONFIG_LOCK_UPDATED_EVENT, loadConfigLocked, loadConfigName } from "../services/appConfigService.js";
 import ToolsBar from "../components/ToolsBar.jsx";
-import SuperOfficePhotoGallery from "../components/SuperOfficePhotoGallery.jsx";
 import { copyText, showToast } from "../services/clipboardService.js";
 import { loadAgentProfile } from "../services/agentProfileService.js";
 import {
@@ -93,6 +92,7 @@ const ExternalGenerator = lazy(() => import("./ExternalGenerator.jsx"));
 const ManageNodes = lazy(() => import("./ManageNodes.jsx"));
 const ManageTools = lazy(() => import("./ManageTools.jsx"));
 const SettingsPage = lazy(() => import("./Settings.jsx"));
+const SuperOfficePhotoGallery = lazy(() => import("../components/SuperOfficePhotoGallery.jsx"));
 
 const CHANNEL_LABELS = {
     [Channel.EMAIL]: "Email",
@@ -161,6 +161,24 @@ function plainTextFromTemplate(value) {
         .replace(/&gt;/g, ">")
         .replace(/\n{3,}/g, "\n\n")
         .trim();
+}
+
+function buildAloTemplateOptions(templates, lang, values) {
+    const options = [];
+    templates.forEach((template) => {
+        getAvailableTemplateChannels(template).forEach((channel) => {
+            const model = resolveChannelModel(template, channel);
+            if (!model) return;
+            const text = plainTextFromTemplate(generateFinalText(model, lang, values));
+            if (!text) return;
+            options.push({
+                id: `${template.id}:${channel}`,
+                label: `${template.title || "Untitled"} - ${CHANNEL_LABELS[channel]}`,
+                text
+            });
+        });
+    });
+    return options.sort((a, b) => a.label.localeCompare(b.label));
 }
 
 function normalizeDisplayFieldKey(label = "", value = "") {
@@ -1061,6 +1079,7 @@ export default function Templates() {
     const [superOfficeDataPresent, setSuperOfficeDataPresent] = useState(false);
     const [superOfficeGalleryOpen, setSuperOfficeGalleryOpen] = useState(false);
     const [aloPreparation, setAloPreparation] = useState(null);
+    const [aloTemplateOptions, setAloTemplateOptions] = useState([]);
     const [templateImageMap, setTemplateImageMap] = useState(() => new Map());
     const [configName, setConfigName] = useState("No configuration");
     const [configLocked, setConfigLocked] = useState(false);
@@ -1150,21 +1169,6 @@ export default function Templates() {
     }, [refreshSuperOfficeState]);
 
     useEffect(() => {
-        let cancelled = false;
-        const refreshTemplateImages = () => {
-            loadTemplateImageMap().then((imageMap) => {
-                if (!cancelled) setTemplateImageMap(imageMap);
-            });
-        };
-        refreshTemplateImages();
-        window.addEventListener(TEMPLATE_IMAGES_UPDATED_EVENT, refreshTemplateImages);
-        return () => {
-            cancelled = true;
-            window.removeEventListener(TEMPLATE_IMAGES_UPDATED_EVENT, refreshTemplateImages);
-        };
-    }, []);
-
-    useEffect(() => {
         const handler = (event) => {
             refreshSuperOfficeState(event.detail?.payload ?? undefined);
         };
@@ -1187,23 +1191,6 @@ export default function Templates() {
         () => new Map(treeTemplates.map((template) => [template.id, template])),
         [treeTemplates]
     );
-    const aloTemplateOptions = useMemo(() => {
-        const options = [];
-        treeTemplates.forEach((template) => {
-            getAvailableTemplateChannels(template).forEach((channel) => {
-                const model = resolveChannelModel(template, channel);
-                if (!model) return;
-                const text = plainTextFromTemplate(generateFinalText(model, runtime.lang, runtime.values));
-                if (!text) return;
-                options.push({
-                    id: `${template.id}:${channel}`,
-                    label: `${template.title || "Untitled"} - ${CHANNEL_LABELS[channel]}`,
-                    text
-                });
-            });
-        });
-        return options.sort((a, b) => a.label.localeCompare(b.label));
-    }, [runtime.lang, runtime.values, treeTemplates]);
     const templateChannelsById = useMemo(
         () => buildTemplateDisplayChannelIndex(treeTemplates),
         [treeTemplates]
@@ -1280,6 +1267,35 @@ export default function Templates() {
         () => templateLookup.get(activeTemplateId) || null,
         [activeTemplateId, templateLookup]
     );
+
+    useEffect(() => {
+        let cancelled = false;
+        const refreshTemplateImages = () => {
+            const htmlValues = activeTemplate
+                ? Object.values(activeTemplate.contentByChannel || {}).flatMap((content) => [
+                    content?.text_fr,
+                    content?.text_en,
+                    content?.text_de,
+                    content?.text_it,
+                    ...(content?.variants || []).flatMap((variant) => [
+                        variant?.text_fr,
+                        variant?.text_en,
+                        variant?.text_de,
+                        variant?.text_it
+                    ])
+                ])
+                : [];
+            loadTemplateImageMapForHtml(htmlValues).then((imageMap) => {
+                if (!cancelled) setTemplateImageMap(imageMap);
+            });
+        };
+        refreshTemplateImages();
+        window.addEventListener(TEMPLATE_IMAGES_UPDATED_EVENT, refreshTemplateImages);
+        return () => {
+            cancelled = true;
+            window.removeEventListener(TEMPLATE_IMAGES_UPDATED_EVENT, refreshTemplateImages);
+        };
+    }, [activeTemplate]);
     const rootNodes = useMemo(() => getIndexedChildNodes(childrenByParent, null), [childrenByParent]);
     const searchResults = useMemo(
         () => searchTemplateTreeIndex(searchIndex, query),
@@ -1360,14 +1376,17 @@ export default function Templates() {
     }, []);
 
     const copyAloAutofillData = useCallback(async () => {
-        const clientPayload = runtimeRef.current.clientPayload;
+        const runtimeApi = runtimeRef.current;
+        const clientPayload = runtimeApi.clientPayload;
         if (!clientPayload) return;
 
+        setAloTemplateOptions(buildAloTemplateOptions(treeTemplates, runtimeApi.lang, runtimeApi.values));
         setAloPreparation(buildAloPreparationDefaults(clientPayload, await loadSuperOfficeTicketPayload()));
-    }, []);
+    }, [treeTemplates]);
 
     const closeAloPreparation = useCallback(() => {
         setAloPreparation(null);
+        setAloTemplateOptions([]);
     }, []);
 
     const submitAloPreparation = useCallback(async (options) => {
@@ -1384,6 +1403,7 @@ export default function Templates() {
             { message: "ALO fill data copied", variant: "success" }
         );
         setAloPreparation(null);
+        setAloTemplateOptions([]);
     }, []);
 
     const importClientFromPasteAndResetCase = useCallback(async (text) => {
@@ -1974,11 +1994,13 @@ export default function Templates() {
             )}
 
             {superOfficeGalleryOpen && (
-                <SuperOfficePhotoGallery
-                    ticket={superOfficeTicket}
-                    profile={caseProfile}
-                    onClose={closeSuperOfficeGallery}
-                />
+                <Suspense fallback={null}>
+                    <SuperOfficePhotoGallery
+                        ticket={superOfficeTicket}
+                        profile={caseProfile}
+                        onClose={closeSuperOfficeGallery}
+                    />
+                </Suspense>
             )}
         </main>
     );

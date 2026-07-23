@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     ChevronLeft,
     ChevronRight,
@@ -13,30 +13,36 @@ import {
     ZoomOut
 } from "lucide-react";
 import Modal from "./Modal.jsx";
-import SuperOfficeImageAnnotator from "./SuperOfficeImageAnnotator.jsx";
 import {
     getSuperOfficeMediaAttachments,
     groupSuperOfficeMediaAttachmentsByPost
 } from "../utils/superOfficeImport.js";
+import {
+    convertImageBlobForPreview,
+    isDirectlyPreviewableImage,
+    requiresImageConversion
+} from "../utils/imagePreview.js";
+import { createAsyncTaskQueue } from "../utils/asyncTaskQueue.js";
+import {
+    deleteCachedSuperOfficeMedia,
+    getCachedSuperOfficeMedia,
+    getSuperOfficeMediaKey,
+    isSuperOfficeMediaDecoded,
+    markSuperOfficeMediaDecoded,
+    setCachedSuperOfficeMedia
+} from "../services/superOfficeMediaCache.js";
+import "../../css/super-office-media.css";
+
+const SuperOfficeImageAnnotator = lazy(() => import("./SuperOfficeImageAnnotator.jsx"));
 
 const VIEWER_MIN_ZOOM = 1;
 const VIEWER_MAX_ZOOM = 5;
 const VIEWER_ZOOM_STEP = 0.35;
-const BROWSER_PREVIEWABLE_IMAGE_PATTERN = /\.(jpe?g|png|webp|gif|bmp|avif|ico|svg)(?:$|[?#])/i;
-const CONVERTIBLE_IMAGE_PATTERN = /\.(heic|heif|tiff?|tif)(?:$|[?#])/i;
 const INITIAL_VISIBLE_MEDIA_COUNT = 72;
 const VISIBLE_MEDIA_BATCH_SIZE = 72;
 
-const mediaObjectUrlCache = new Map();
-
-function revokeCachedMediaEntry(entry) {
-    if (entry?.objectUrl && typeof URL !== "undefined" && typeof URL.revokeObjectURL === "function") URL.revokeObjectURL(entry.objectUrl);
-}
-
-export function clearSuperOfficeMediaCache() {
-    mediaObjectUrlCache.forEach(revokeCachedMediaEntry);
-    mediaObjectUrlCache.clear();
-}
+const enqueueMediaFetch = createAsyncTaskQueue(6);
+const enqueueMediaConversion = createAsyncTaskQueue(2);
 
 function displayValue(value) {
     if (value === null || value === undefined) return "";
@@ -52,7 +58,15 @@ function firstValue(...values) {
 }
 
 function attachmentKey(attachment) {
-    return `${attachment?.type || ""}|${attachment?.name || ""}|${attachment?.url || ""}`;
+    return getSuperOfficeMediaKey(attachment);
+}
+
+function isMediaDecoded(attachment) {
+    return isSuperOfficeMediaDecoded(attachmentKey(attachment));
+}
+
+function markMediaDecoded(attachment) {
+    markSuperOfficeMediaDecoded(attachmentKey(attachment));
 }
 
 function clamp(value, min, max) {
@@ -91,122 +105,117 @@ function getVideoContentType(attachment = {}) {
     return undefined;
 }
 
-function isBrowserPreviewableImage(attachment = {}) {
-    const contentType = displayValue(attachment.contentType).toLowerCase();
-    if (contentType === "image/svg+xml") return true;
-    if (/^image\/(jpeg|jpg|png|webp|gif|bmp|avif|x-icon|vnd\.microsoft\.icon)$/.test(contentType)) return true;
-
-    const source = `${attachment.name || ""} ${attachment.url || ""}`;
-    return BROWSER_PREVIEWABLE_IMAGE_PATTERN.test(source);
-}
-
-function isConvertibleImage(attachment = {}) {
-    const contentType = displayValue(attachment.contentType).toLowerCase();
-    if (["image/heic", "image/heif", "image/tiff", "image/tif"].includes(contentType)) return true;
-
-    const source = `${attachment.name || ""} ${attachment.url || ""}`;
-    return CONVERTIBLE_IMAGE_PATTERN.test(source);
-}
-
 async function fetchMediaBlob(attachment = {}) {
-    if (!attachment.url || typeof fetch !== "function") {
+    const sourceUrl = attachment.dataUrl || attachment.url;
+    if (!sourceUrl || typeof fetch !== "function") {
         throw new Error("MEDIA_FETCH_UNAVAILABLE");
     }
 
-    const response = await fetch(attachment.url, { credentials: "include" });
-    if (!response.ok) throw new Error("MEDIA_FETCH_FAILED");
-    return response.blob();
-}
-
-async function convertImageBlobToPng(blob) {
-    if (typeof createImageBitmap !== "function") {
-        throw new Error("IMAGE_CONVERSION_UNAVAILABLE");
-    }
-
-    const bitmap = await createImageBitmap(blob);
-    const canvas = document.createElement("canvas");
-    canvas.width = bitmap.width;
-    canvas.height = bitmap.height;
-    const context = canvas.getContext("2d");
-    if (!context) throw new Error("IMAGE_CANVAS_UNAVAILABLE");
-    context.drawImage(bitmap, 0, 0);
-    bitmap.close?.();
-
-    return new Promise((resolve, reject) => {
-        canvas.toBlob((nextBlob) => {
-            if (nextBlob) resolve(nextBlob);
-            else reject(new Error("IMAGE_EXPORT_FAILED"));
-        }, "image/png");
+    return enqueueMediaFetch(async () => {
+        const response = await fetch(sourceUrl, { credentials: "include" });
+        if (!response.ok) throw new Error("MEDIA_FETCH_FAILED");
+        return response.blob();
     });
 }
 
 function getCachedMediaObjectUrl(attachment = {}) {
-    return mediaObjectUrlCache.get(attachmentKey(attachment))?.objectUrl || "";
+    return getCachedSuperOfficeMedia(attachmentKey(attachment))?.objectUrl || "";
 }
 
 function getImmediateDisplayImageUrl(attachment = {}) {
-    if (!attachment?.url) return "";
+    const sourceUrl = attachment?.dataUrl || attachment?.url;
+    if (!sourceUrl) return "";
     const cachedUrl = getCachedMediaObjectUrl(attachment);
     if (cachedUrl) return cachedUrl;
-    return isBrowserPreviewableImage(attachment) && !isConvertibleImage(attachment) ? attachment.url : "";
+    return isDirectlyPreviewableImage(attachment) && !requiresImageConversion(attachment) ? sourceUrl : "";
 }
 
 async function buildCachedImageUrl(attachment = {}) {
-    if (!attachment.url || typeof URL === "undefined" || typeof URL.createObjectURL !== "function") {
+    if ((!attachment.url && !attachment.dataUrl) || typeof URL === "undefined" || typeof URL.createObjectURL !== "function") {
         throw new Error("MEDIA_CACHE_UNAVAILABLE");
     }
 
     const cacheKey = attachmentKey(attachment);
-    const cached = mediaObjectUrlCache.get(cacheKey);
+    const cached = getCachedSuperOfficeMedia(cacheKey);
     if (cached?.objectUrl) return cached.objectUrl;
     if (cached?.promise) return cached.promise;
 
     const promise = fetchMediaBlob(attachment)
-        .then((blob) => (isConvertibleImage(attachment) ? convertImageBlobToPng(blob) : blob))
+        .then((blob) => (requiresImageConversion(attachment)
+            ? enqueueMediaConversion(() => convertImageBlobForPreview(blob, attachment))
+            : blob))
         .then((blob) => {
             const objectUrl = URL.createObjectURL(blob);
-            mediaObjectUrlCache.set(cacheKey, { objectUrl });
+            setCachedSuperOfficeMedia(cacheKey, { objectUrl });
             return objectUrl;
         })
         .catch((error) => {
-            mediaObjectUrlCache.delete(cacheKey);
+            deleteCachedSuperOfficeMedia(cacheKey);
             throw error;
         });
 
-    mediaObjectUrlCache.set(cacheKey, { promise });
+    setCachedSuperOfficeMedia(cacheKey, { promise });
     return promise;
 }
 
-function useDisplayImageUrl(attachment) {
+function useNearViewport(rootMargin = "600px") {
+    const elementRef = useRef(null);
+    const [isNearViewport, setIsNearViewport] = useState(
+        () => typeof IntersectionObserver === "undefined"
+    );
+
+    useEffect(() => {
+        const element = elementRef.current;
+        if (!element || typeof IntersectionObserver === "undefined") {
+            setIsNearViewport(true);
+            return undefined;
+        }
+
+        const observer = new IntersectionObserver(([entry]) => {
+            if (!entry.isIntersecting) return;
+            setIsNearViewport(true);
+            observer.disconnect();
+        }, { rootMargin });
+        observer.observe(element);
+        return () => observer.disconnect();
+    }, [rootMargin]);
+
+    return [elementRef, isNearViewport];
+}
+
+function useDisplayImageUrl(attachment, enabled = true) {
     const cacheKey = attachmentKey(attachment);
     const [displayUrl, setDisplayUrl] = useState(() => getImmediateDisplayImageUrl(attachment));
 
     useEffect(() => {
         let cancelled = false;
 
-        if (!attachment?.url) {
+        if (!attachment?.url && !attachment?.dataUrl) {
             setDisplayUrl("");
             return undefined;
         }
 
         const immediateUrl = getImmediateDisplayImageUrl(attachment);
         setDisplayUrl(immediateUrl);
+        if (!enabled) return undefined;
 
         buildCachedImageUrl(attachment)
             .then((nextUrl) => {
                 if (cancelled) return;
 
-                const canKeepOriginalVisible = isBrowserPreviewableImage(attachment) && !isConvertibleImage(attachment);
+                const canKeepOriginalVisible = isDirectlyPreviewableImage(attachment) && !requiresImageConversion(attachment);
                 if (!canKeepOriginalVisible || !immediateUrl) setDisplayUrl(nextUrl);
             })
             .catch(() => {
-                if (!cancelled) setDisplayUrl(attachment.url);
+                if (!cancelled && isDirectlyPreviewableImage(attachment)) {
+                    setDisplayUrl(attachment.dataUrl || attachment.url);
+                }
             });
 
         return () => {
             cancelled = true;
         };
-    }, [attachment, cacheKey]);
+    }, [attachment, cacheKey, enabled]);
 
     return displayUrl;
 }
@@ -328,6 +337,7 @@ function limitMediaGroups(groups = [], visibleCount = INITIAL_VISIBLE_MEDIA_COUN
 
 function SuperOfficePhotoThumb({ attachment, onOpen, hasFailed, onMediaError }) {
     const [isImageLoading, setIsImageLoading] = useState(false);
+    const [thumbRef, isNearViewport] = useNearViewport();
 
     const handleClick = useCallback(() => {
         onOpen(attachment.galleryIndex);
@@ -336,15 +346,16 @@ function SuperOfficePhotoThumb({ attachment, onOpen, hasFailed, onMediaError }) 
     const mediaTypeLabel = getMediaTypeLabel(attachment);
     const MediaIcon = getMediaIcon(attachment);
     const isImage = attachment.type === "image";
-    const displayUrl = useDisplayImageUrl(attachment);
+    const displayUrl = useDisplayImageUrl(attachment, isNearViewport);
     const shouldRenderImage = isImage && !hasFailed && displayUrl;
 
     useEffect(() => {
-        setIsImageLoading(Boolean(shouldRenderImage));
-    }, [shouldRenderImage, displayUrl]);
+        setIsImageLoading(Boolean(shouldRenderImage) && !isMediaDecoded(attachment));
+    }, [attachment, shouldRenderImage, displayUrl]);
 
     return (
         <button
+            ref={thumbRef}
             type="button"
             className="so-photo-thumb"
             onClick={handleClick}
@@ -363,7 +374,10 @@ function SuperOfficePhotoThumb({ attachment, onOpen, hasFailed, onMediaError }) 
                         aria-hidden="true"
                         loading="lazy"
                         decoding="async"
-                        onLoad={() => setIsImageLoading(false)}
+                        onLoad={() => {
+                            markMediaDecoded(attachment);
+                            setIsImageLoading(false);
+                        }}
                         onError={() => {
                             setIsImageLoading(false);
                             onMediaError(attachment);
@@ -398,11 +412,11 @@ function SuperOfficeViewerFallback({ attachment, message = "Aperçu indisponible
 
 function SuperOfficeImagePreview({ attachment, viewerTransform, rotation, onMediaError }) {
     const [isLoading, setIsLoading] = useState(false);
-    const displayUrl = useDisplayImageUrl(attachment);
+    const displayUrl = useDisplayImageUrl(attachment, true);
 
     useEffect(() => {
-        setIsLoading(Boolean(displayUrl));
-    }, [displayUrl]);
+        setIsLoading(Boolean(displayUrl) && !isMediaDecoded(attachment));
+    }, [attachment, displayUrl]);
 
     if (!displayUrl) {
         return (
@@ -428,7 +442,10 @@ function SuperOfficeImagePreview({ attachment, viewerTransform, rotation, onMedi
                 style={{
                     transform: `translate3d(${viewerTransform.x}px, ${viewerTransform.y}px, 0) rotate(${rotation}deg) scale(${viewerTransform.scale})`
                 }}
-                onLoad={() => setIsLoading(false)}
+                onLoad={() => {
+                    markMediaDecoded(attachment);
+                    setIsLoading(false);
+                }}
                 onError={() => {
                     setIsLoading(false);
                     onMediaError(attachment);
@@ -881,14 +898,16 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
                         </div>
                     </div>
                     {annotatorOpen && activeIsImage && (
-                        <SuperOfficeImageAnnotator
-                            image={activeAttachment}
-                            annotations={activeAnnotations}
-                            crop={activeCrop}
-                            onChangeAnnotations={updateActiveAnnotations}
-                            onChangeCrop={updateActiveCrop}
-                            onClose={() => setAnnotatorOpen(false)}
-                        />
+                        <Suspense fallback={null}>
+                            <SuperOfficeImageAnnotator
+                                image={activeAttachment}
+                                annotations={activeAnnotations}
+                                crop={activeCrop}
+                                onChangeAnnotations={updateActiveAnnotations}
+                                onChangeCrop={updateActiveCrop}
+                                onClose={() => setAnnotatorOpen(false)}
+                            />
+                        </Suspense>
                     )}
                 </div>
             )}

@@ -1,14 +1,16 @@
-import { loadIndexedJSON, saveIndexedJSON } from "./indexedDbService.js";
+import { deleteIndexedJSON, loadIndexedJSON, saveIndexedJSON } from "./indexedDbService.js";
 import {
     buildTemplateImageMap,
     hydrateTemplateImageElements,
     hydrateTemplateImageHtml,
+    extractTemplateImageIdsFromHtml,
     normalizeTemplateImageRecord,
     normalizeTemplateImages,
     TEMPLATE_IMAGES_UPDATED_EVENT
 } from "../utils/templateImages.js";
 
 const TEMPLATE_IMAGES_KEY = "template_images";
+const TEMPLATE_IMAGE_DATA_KEY_PREFIX = "template_image_data:";
 const MAX_TEMPLATE_IMAGE_DIMENSION = 1600;
 const JPEG_QUALITY = 0.86;
 const SUPPORTED_FILE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
@@ -85,17 +87,64 @@ async function normalizeImageDataUrl(dataUrl, fileType) {
     };
 }
 
-export async function loadTemplateImages() {
-    return normalizeTemplateImages(await loadIndexedJSON(TEMPLATE_IMAGES_KEY, []));
+function getTemplateImageDataKey(id) {
+    return `${TEMPLATE_IMAGE_DATA_KEY_PREFIX}${id}`;
 }
 
-export async function loadTemplateImageMap() {
-    return buildTemplateImageMap(await loadTemplateImages());
+function withoutImageData(record) {
+    const { dataUrl: _dataUrl, ...metadata } = record;
+    return metadata;
+}
+
+async function loadTemplateImageMetadata() {
+    const stored = normalizeTemplateImages(await loadIndexedJSON(TEMPLATE_IMAGES_KEY, []));
+    if (!stored.some((image) => image.dataUrl)) return stored;
+
+    await Promise.all(stored.map((image) => (
+        image.dataUrl ? saveIndexedJSON(getTemplateImageDataKey(image.id), image.dataUrl) : Promise.resolve()
+    )));
+    const metadata = stored.map(withoutImageData);
+    await saveIndexedJSON(TEMPLATE_IMAGES_KEY, metadata);
+    return normalizeTemplateImages(metadata);
+}
+
+async function loadTemplateImageByMetadata(metadata) {
+    const dataUrl = await loadIndexedJSON(getTemplateImageDataKey(metadata.id), "");
+    return normalizeTemplateImageRecord({ ...metadata, dataUrl });
+}
+
+export async function loadTemplateImages() {
+    const metadata = await loadTemplateImageMetadata();
+    return Promise.all(metadata.map(loadTemplateImageByMetadata));
+}
+
+export async function loadTemplateImageMap(ids = null) {
+    const metadata = await loadTemplateImageMetadata();
+    const requestedIds = ids ? new Set(ids) : null;
+    const selected = requestedIds ? metadata.filter((image) => requestedIds.has(image.id)) : metadata;
+    return buildTemplateImageMap(await Promise.all(selected.map(loadTemplateImageByMetadata)));
+}
+
+export async function loadTemplateImageMapForHtml(...htmlValues) {
+    const ids = new Set();
+    htmlValues.flat(Infinity).forEach((html) => {
+        extractTemplateImageIdsFromHtml(String(html || "")).forEach((id) => ids.add(id));
+    });
+    if (ids.size === 0) return new Map();
+    return loadTemplateImageMap(ids);
 }
 
 export async function saveTemplateImages(images = []) {
     const normalized = normalizeTemplateImages(images);
-    await saveIndexedJSON(TEMPLATE_IMAGES_KEY, normalized);
+    const previous = await loadTemplateImageMetadata();
+    const nextIds = new Set(normalized.map((image) => image.id));
+    await Promise.all([
+        ...normalized.map((image) => saveIndexedJSON(getTemplateImageDataKey(image.id), image.dataUrl || "")),
+        ...previous
+            .filter((image) => !nextIds.has(image.id))
+            .map((image) => deleteIndexedJSON(getTemplateImageDataKey(image.id)))
+    ]);
+    await saveIndexedJSON(TEMPLATE_IMAGES_KEY, normalized.map(withoutImageData));
     emitTemplateImagesUpdated();
     return normalized;
 }
@@ -104,10 +153,12 @@ export async function upsertTemplateImage(record) {
     const normalized = normalizeTemplateImageRecord(record);
     if (!normalized) throw new Error("Invalid template image.");
 
-    const images = await loadTemplateImages();
-    const byId = new Map(images.map((image) => [image.id, image]));
-    byId.set(normalized.id, normalized);
-    await saveTemplateImages(Array.from(byId.values()));
+    const metadata = await loadTemplateImageMetadata();
+    await saveIndexedJSON(getTemplateImageDataKey(normalized.id), normalized.dataUrl || "");
+    const byId = new Map(metadata.map((image) => [image.id, image]));
+    byId.set(normalized.id, withoutImageData(normalized));
+    await saveIndexedJSON(TEMPLATE_IMAGES_KEY, Array.from(byId.values()));
+    emitTemplateImagesUpdated();
     return normalized;
 }
 
@@ -139,9 +190,13 @@ export async function saveTemplateImageFile(file) {
 
 export async function resolveTemplateImagesInHtml(html = "") {
     if (!String(html || "").includes("data-template-image-id")) return html || "";
-    return hydrateTemplateImageHtml(html, await loadTemplateImageMap());
+    return hydrateTemplateImageHtml(html, await loadTemplateImageMapForHtml(html));
 }
 
 export async function hydrateStoredTemplateImageElements(root) {
-    return hydrateTemplateImageElements(root, await loadTemplateImageMap());
+    if (!root?.querySelectorAll) return 0;
+    const html = Array.from(root.querySelectorAll("[data-template-image-id]"))
+        .map((image) => image.outerHTML)
+        .join("");
+    return hydrateTemplateImageElements(root, await loadTemplateImageMapForHtml(html));
 }

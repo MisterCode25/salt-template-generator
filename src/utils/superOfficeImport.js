@@ -1,7 +1,7 @@
 import { canonicalizeInputTokenValue, SO_TICKET_NUM_TOKEN } from "./tokenCanonicalization.js";
 import { buildExternalTokenValues, parseExternalId } from "./externalGenerator.js";
 
-const IMAGE_ATTACHMENT_PATTERN = /\.(jpe?g|png|webp|gif|bmp|avif|heic|heif|tiff?|ico|svg)(?:$|[?#])/i;
+const IMAGE_ATTACHMENT_PATTERN = /\.(jpe?g|jfif|png|webp|gif|bmp|avif|heic|heif|tiff?|ico|svg)(?:$|[?#])/i;
 const VIDEO_ATTACHMENT_PATTERN = /\.(mp4|mov)(?:$|[?#])/i;
 const PDF_ATTACHMENT_PATTERN = /\.pdf(?:$|[?#])/i;
 const CONTRACTOR_TOKENS = ["{contractor}", "{contractor_number}", "{client_contractor_number}"];
@@ -125,6 +125,7 @@ function normalizeAttachment(attachment, index) {
         id: valueOf(attachment.id, attachment.attachmentId, attachment.documentId) || `${index}-${name}-${url}`,
         name,
         url,
+        dataUrl: valueOf(attachment.dataUrl) || null,
         type,
         contentType: contentType || declaredType || null,
         size: valueOf(attachment.size, attachment.sizeText, attachment.fileSize) || null,

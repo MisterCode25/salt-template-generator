@@ -2775,7 +2775,9 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
                 return treeData.templates.some((template) => template.id === current) ? current : null;
             });
             setExpandedNodeIds((current) => {
-                if (resetSelection) return new Set(treeData.nodes.map((node) => node.id));
+                if (resetSelection) {
+                    return new Set(treeData.nodes.filter((node) => !node.parentId).map((node) => node.id));
+                }
                 const validIds = new Set(treeData.nodes.map((node) => node.id));
                 return new Set([...current].filter((nodeId) => validIds.has(nodeId)));
             });
