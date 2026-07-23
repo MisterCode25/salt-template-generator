@@ -17,6 +17,7 @@ import {
     ArrowUpRight,
     ClipboardCopy,
     Crop,
+    Download,
     Maximize2,
     MessageSquareText,
     RotateCcw,
@@ -695,6 +696,8 @@ export default function SuperOfficeImageAnnotator({
     const annotationNodeRefs = useRef(new Map());
     const transformerRef = useRef(null);
     const [copyState, setCopyState] = useState({ status: "idle", message: "" });
+    const [exportResult, setExportResult] = useState(null);
+    const exportObjectUrlRef = useRef("");
 
     const activeCrop = useMemo(() => normalizeCropRect(
         crop,
@@ -996,31 +999,71 @@ export default function SuperOfficeImageAnnotator({
         setCopyState({ status: "idle", message: "" });
     }, [annotations, selectedId, setAnnotations]);
 
-    const handleCopyImage = useCallback(async () => {
+    const buildFinalImage = useCallback(async () => {
+        if (loadedImage.status !== "ready" || !loadedImage.image) {
+            throw new Error("L'image n'est pas encore prête.");
+        }
+        if (!loadedImage.canExport) {
+            throw new Error(loadedImage.exportBlockedReason || "Cette image ne peut pas être exportée en PNG depuis le navigateur.");
+        }
+        return buildAnnotatedImageBlob(loadedImage.image, annotations, activeCrop);
+    }, [activeCrop, annotations, loadedImage]);
+
+    const handlePrepareImage = useCallback(async () => {
+        setCopyState({ status: "working", message: "Création de l’image finale..." });
+        try {
+            const blob = await buildFinalImage();
+            if (exportObjectUrlRef.current) URL.revokeObjectURL(exportObjectUrlRef.current);
+            const objectUrl = URL.createObjectURL(blob);
+            exportObjectUrlRef.current = objectUrl;
+            const baseName = String(image?.name || "image-annotee")
+                .replace(/\.[^.]+$/, "")
+                .replace(/[^\p{L}\p{N}._-]+/gu, "-");
+            setExportResult({
+                blob,
+                objectUrl,
+                fileName: `${baseName || "image-annotee"}-annotee.png`
+            });
+            setCopyState({ status: "idle", message: "" });
+        } catch (error) {
+            setCopyState({
+                status: "error",
+                message: error?.message || "Impossible de créer l'image annotée."
+            });
+        }
+    }, [buildFinalImage, image?.name]);
+
+    const handleCopyPreparedImage = useCallback(async () => {
+        if (!exportResult?.blob) return;
         setCopyState({ status: "working", message: "Copie en cours..." });
         try {
             if (!navigator.clipboard?.write || typeof ClipboardItem === "undefined") {
-                throw new Error("La copie PNG n'est pas disponible dans ce navigateur.");
+                throw new Error("Copie automatique bloquée. Fais un clic droit sur l’image puis « Copier l’image ».");
             }
-            if (loadedImage.status !== "ready" || !loadedImage.image) {
-                throw new Error("L'image n'est pas encore prête.");
-            }
-            if (!loadedImage.canExport) {
-                throw new Error(loadedImage.exportBlockedReason || "Cette image ne peut pas être exportée en PNG depuis le navigateur.");
-            }
-
-            const blob = await buildAnnotatedImageBlob(loadedImage.image, annotations, activeCrop);
             await navigator.clipboard.write([
-                new ClipboardItem({ "image/png": blob })
+                new ClipboardItem({ "image/png": exportResult.blob })
             ]);
             setCopyState({ status: "success", message: "Image copiée." });
         } catch (error) {
             setCopyState({
                 status: "error",
-                message: error?.message || "Impossible de copier l'image annotée."
+                message: error?.message || "Copie automatique bloquée. Fais un clic droit sur l’image puis « Copier l’image »."
             });
         }
-    }, [activeCrop, annotations, loadedImage]);
+    }, [exportResult]);
+
+    const closeExportResult = useCallback(() => {
+        if (exportObjectUrlRef.current) {
+            URL.revokeObjectURL(exportObjectUrlRef.current);
+            exportObjectUrlRef.current = "";
+        }
+        setExportResult(null);
+        setCopyState({ status: "idle", message: "" });
+    }, []);
+
+    useEffect(() => () => {
+        if (exportObjectUrlRef.current) URL.revokeObjectURL(exportObjectUrlRef.current);
+    }, []);
 
     useEffect(() => {
         if (selectedId && !selectedAnnotation) {
@@ -1122,9 +1165,9 @@ export default function SuperOfficeImageAnnotator({
                         <button type="button" className="so-annotator__text-action" onClick={handleClear} disabled={annotations.length === 0 && !draft} title="Tout effacer" aria-label="Tout effacer">
                             <span>Clear</span>
                         </button>
-                        <button type="button" className="so-annotator__copy" onClick={handleCopyImage} disabled={copyState.status === "working" || loadedImage.status !== "ready"} title="Copy image">
+                        <button type="button" className="so-annotator__copy" onClick={handlePrepareImage} disabled={copyState.status === "working" || loadedImage.status !== "ready"} title="Créer l’image finale">
                             <ClipboardCopy size={17} aria-hidden="true" />
-                            <span>Copy image</span>
+                            <span>Image finale</span>
                         </button>
                         <button type="button" onClick={onClose} title="Fermer" aria-label="Fermer">
                             <X size={19} aria-hidden="true" />
@@ -1214,6 +1257,41 @@ export default function SuperOfficeImageAnnotator({
             {(copyState.message || loadedImage.exportBlockedReason) && (
                 <div className={`so-annotator__status ${copyState.status === "error" || loadedImage.exportBlockedReason ? "is-error" : ""}`}>
                     {copyState.message || loadedImage.exportBlockedReason}
+                </div>
+            )}
+
+            {exportResult && (
+                <div className="so-annotator-result" role="dialog" aria-modal="true" aria-label="Image annotée prête">
+                    <div className="so-annotator-result__bar">
+                        <div>
+                            <strong>Image annotée prête</strong>
+                            <span>Clic droit sur l’image → Copier l’image si la copie automatique est bloquée.</span>
+                        </div>
+                        <div className="so-annotator-result__actions">
+                            <button type="button" className="secondary-btn" onClick={closeExportResult}>
+                                Retour à l’éditeur
+                            </button>
+                            <button type="button" className="primary-btn" onClick={handleCopyPreparedImage} disabled={copyState.status === "working"}>
+                                <ClipboardCopy size={16} aria-hidden="true" />
+                                Copier l’image
+                            </button>
+                            <a className="secondary-btn" href={exportResult.objectUrl} download={exportResult.fileName}>
+                                <Download size={16} aria-hidden="true" />
+                                Télécharger PNG
+                            </a>
+                            <button type="button" className="so-annotator-result__close" onClick={onClose} title="Fermer" aria-label="Fermer le résultat">
+                                <X size={19} aria-hidden="true" />
+                            </button>
+                        </div>
+                    </div>
+                    <div className="so-annotator-result__preview">
+                        <img src={exportResult.objectUrl} alt="Image annotée finale à copier" draggable="true" />
+                    </div>
+                    {copyState.message && (
+                        <div className={`so-annotator__status ${copyState.status === "error" ? "is-error" : ""}`}>
+                            {copyState.message}
+                        </div>
+                    )}
                 </div>
             )}
         </div>

@@ -490,6 +490,15 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
     const activeCrop = activeImageKey ? cropsByImage[activeImageKey] || null : null;
     const activeAttachmentFailed = activeAttachmentKey ? failedAttachments.has(activeAttachmentKey) : false;
     const activeImageFailed = activeIsImage && activeAttachmentFailed;
+    const annotatorImage = useMemo(() => {
+        if (!activeAttachment) return null;
+        return {
+            ...activeAttachment,
+            url: getCachedMediaObjectUrl(activeAttachment)
+                || activeAttachment.dataUrl
+                || activeAttachment.url
+        };
+    }, [activeAttachment, activeAttachmentKey]);
     const viewerZoomPercent = Math.round(viewerTransform.scale * 100);
     const canGoToPrevious = activeIndex !== null && activeIndex > 0;
     const canGoToNext = activeIndex !== null && activeIndex < mediaItems.length - 1;
@@ -913,7 +922,7 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
                     {annotatorOpen && activeIsImage && (
                         <Suspense fallback={null}>
                             <SuperOfficeImageAnnotator
-                                image={activeAttachment}
+                                image={annotatorImage}
                                 annotations={activeAnnotations}
                                 crop={activeCrop}
                                 onChangeAnnotations={updateActiveAnnotations}
