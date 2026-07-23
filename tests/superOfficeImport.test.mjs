@@ -404,13 +404,18 @@ import { parseExternalId } from "../src/utils/externalGenerator.js";
   const dateGroups = groupSuperOfficeImageAttachmentsByDate(result.attachments);
   assert.equal(dateGroups[0].dateKey, "2026-06-18");
   assert.equal(dateGroups[0].label, "18.06.2026");
+  assert.equal(dateGroups[0].postLabel, "Post non identifié");
+  assert.equal(dateGroups[0].dateLabel, "18.06.2026");
 
   const postGroups = groupSuperOfficeImageAttachmentsByPost(result.attachments);
   assert.equal(postGroups.length, 2);
   assert.equal(postGroups[0].label, "Post 1");
+  assert.equal(postGroups[0].postLabel, "Post 1");
+  assert.equal(postGroups[0].dateLabel, "17.06.2026");
   assert.deepEqual(postGroups[0].attachments.map((attachment) => attachment.name), ["photo-post-1.jpg"]);
   assert.equal(postGroups[1].label, "Post 2");
   assert.equal(postGroups[1].metaLabel, "18.06.2026 · Client");
+  assert.equal(postGroups[1].author, "Client");
   assert.deepEqual(postGroups[1].attachments.map((attachment) => attachment.name), [
     "photo-post-2-a.jpg",
     "photo-post-2-b.jpg"

@@ -477,6 +477,12 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
     const viewerImageWrapRef = useRef(null);
     const viewerPanRef = useRef(null);
     const activeAttachment = activeIndex === null ? null : mediaItems[activeIndex] || null;
+    const activeGroup = useMemo(() => {
+        if (activeIndex === null) return null;
+        return groups.find((group) => (
+            group.attachments.some((attachment) => attachment.galleryIndex === activeIndex)
+        )) || null;
+    }, [activeIndex, groups]);
     const activeAttachmentKey = activeAttachment ? attachmentKey(activeAttachment) : "";
     const activeIsImage = activeAttachment?.type === "image";
     const activeImageKey = activeIsImage ? activeAttachmentKey : "";
@@ -485,6 +491,8 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
     const activeAttachmentFailed = activeAttachmentKey ? failedAttachments.has(activeAttachmentKey) : false;
     const activeImageFailed = activeIsImage && activeAttachmentFailed;
     const viewerZoomPercent = Math.round(viewerTransform.scale * 100);
+    const canGoToPrevious = activeIndex !== null && activeIndex > 0;
+    const canGoToNext = activeIndex !== null && activeIndex < mediaItems.length - 1;
     const ticketSignature = `${ticket?.clientSignature || ""}|${ticket?.ticketId || ""}|${ticket?.importedAt || ""}`;
 
     const openAttachment = useCallback((index) => {
@@ -501,20 +509,16 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
     }, []);
 
     const goToPrevious = useCallback(() => {
+        if (!canGoToPrevious) return;
         setAnnotatorOpen(false);
-        setActiveIndex((current) => {
-            if (current === null || mediaItems.length === 0) return current;
-            return (current - 1 + mediaItems.length) % mediaItems.length;
-        });
-    }, [mediaItems.length]);
+        setActiveIndex((current) => current === null ? current : Math.max(0, current - 1));
+    }, [canGoToPrevious]);
 
     const goToNext = useCallback(() => {
+        if (!canGoToNext) return;
         setAnnotatorOpen(false);
-        setActiveIndex((current) => {
-            if (current === null || mediaItems.length === 0) return current;
-            return (current + 1) % mediaItems.length;
-        });
-    }, [mediaItems.length]);
+        setActiveIndex((current) => current === null ? current : Math.min(mediaItems.length - 1, current + 1));
+    }, [canGoToNext, mediaItems.length]);
 
     const handleMediaError = useCallback((attachment) => {
         setFailedAttachments((current) => {
@@ -752,7 +756,14 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
                     <div className="so-photo-viewer__stage" onMouseDown={(event) => event.stopPropagation()}>
                         <div className="so-photo-viewer__meta">
                             <div className="so-photo-viewer__meta-main">
-                                <strong>{activeAttachment.name}</strong>
+                                <div className="so-photo-viewer__origin">
+                                    <strong>{activeAttachment.name}</strong>
+                                    <span>
+                                        <b>{activeGroup?.postLabel || "Post non identifié"}</b>
+                                        <small>{activeGroup?.dateLabel || "Date inconnue"}</small>
+                                        {activeGroup?.author && <small>{activeGroup.author}</small>}
+                                    </span>
+                                </div>
                                 <div className="so-photo-viewer__meta-actions">
                                     {activeIsImage && (
                                         <div className="so-photo-viewer__zoom-controls" role="group" aria-label="Zoom et rotation image">
@@ -834,8 +845,9 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
                                 type="button"
                                 className="so-photo-viewer__nav so-photo-viewer__nav--prev"
                                 onClick={goToPrevious}
+                                disabled={!canGoToPrevious}
                                 aria-label="Média précédent"
-                                title="Média précédent"
+                                title={canGoToPrevious ? "Média précédent" : "Premier média"}
                             >
                                 <ChevronLeft size={26} aria-hidden="true" />
                             </button>
@@ -890,8 +902,9 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
                                 type="button"
                                 className="so-photo-viewer__nav so-photo-viewer__nav--next"
                                 onClick={goToNext}
+                                disabled={!canGoToNext}
                                 aria-label="Média suivant"
-                                title="Média suivant"
+                                title={canGoToNext ? "Média suivant" : "Dernier média"}
                             >
                                 <ChevronRight size={26} aria-hidden="true" />
                             </button>

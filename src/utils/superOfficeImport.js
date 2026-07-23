@@ -307,6 +307,9 @@ function groupAttachmentsByDate(attachments = []) {
         if (!groups.has(meta.dateKey)) {
             groups.set(meta.dateKey, {
                 ...meta,
+                postLabel: "Post non identifié",
+                dateLabel: meta.label,
+                author: valueOf(attachment.messageAuthor),
                 attachments: []
             });
         }
@@ -360,6 +363,9 @@ export function groupSuperOfficeImageAttachmentsByPost(attachments = []) {
                 dateKey: groupKey,
                 label: postKey ? buildPostGroupLabel(attachment, fallbackIndex) : dateMeta.label,
                 metaLabel: postKey ? buildPostGroupMetaLabel(attachment) : "",
+                postLabel: postKey ? buildPostGroupLabel(attachment, fallbackIndex) : "Post non identifié",
+                dateLabel: dateMeta.label,
+                author: valueOf(attachment.messageAuthor),
                 sortValue: normalizeOptionalInteger(attachment.messageIndex) ?? index,
                 attachments: []
             });
@@ -388,6 +394,9 @@ export function groupSuperOfficeMediaAttachmentsByPost(attachments = []) {
                 dateKey: groupKey,
                 label: postKey ? buildPostGroupLabel(attachment, fallbackIndex) : dateMeta.label,
                 metaLabel: postKey ? buildPostGroupMetaLabel(attachment) : "",
+                postLabel: postKey ? buildPostGroupLabel(attachment, fallbackIndex) : "Post non identifié",
+                dateLabel: dateMeta.label,
+                author: valueOf(attachment.messageAuthor),
                 sortValue: normalizeOptionalInteger(attachment.messageIndex) ?? index,
                 attachments: []
             });
