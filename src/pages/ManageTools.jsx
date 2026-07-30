@@ -63,7 +63,8 @@ const KEYBOARD_SHORTCUT_DESCRIPTIONS = Object.freeze({
 const DATA_SHORTCUT_MINI_DESCRIPTIONS = Object.freeze({
     vti: "Copies clean customer JSON from VTI for the main import.",
     so: "Copies SO ticket data, External ID and media when available.",
-    alo: "Fills the ALO ticket form from the app's prepared data."
+    alo: "Fills the ALO ticket form from the app's prepared data.",
+    "alo-beta": "Fetches the Fulfillment Ext Ref, then fills the ALO form without submitting it."
 });
 
 const MODULE_WIZARD_STEPS = Object.freeze([

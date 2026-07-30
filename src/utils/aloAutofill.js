@@ -3,6 +3,7 @@ import { SO_TICKET_NUM_TOKEN } from "./tokenCanonicalization.js";
 
 export const ALO_AUTOFILL_CLIPBOARD_SOURCE = "salt-templater-alo-autofill";
 export const ALO_AUTOFILL_VERSION = 1;
+export const ALO_FULFILLMENT_DETAIL_URL = "https://wholesale.swisscom.com/wsg/prod/alo/fuf/web/alo-web/fulfillment/detail.do";
 
 const ALO_DEFAULT_PROBLEM = Object.freeze({
     problemDescription: "No signal",
@@ -63,6 +64,19 @@ function getOfferActivationDate(clientPayload = {}) {
         clientPayload?.client?.dateActivation,
         clientPayload?.contact?.activationDate,
         clientPayload?.healthcheck?.activationDate
+    ]);
+}
+
+function getAloOrderId(clientPayload = {}) {
+    return firstValue([
+        clientPayload?.contact?.providerOrderRef,
+        clientPayload?.contact?.provider_order_ref,
+        clientPayload?.client?.providerOrderRef,
+        clientPayload?.client?.provider_order_ref,
+        clientPayload?.healthcheck?.orderId,
+        clientPayload?.healthcheck?.order_id,
+        clientPayload?.orderId,
+        clientPayload?.order_id
     ]);
 }
 
@@ -211,6 +225,7 @@ export function buildAloAutofillPayload(clientPayload = {}, agentProfile = {}, s
         version: ALO_AUTOFILL_VERSION,
         fields,
         alo: {
+            orderId: getAloOrderId(clientPayload),
             type: options.aloType || "noSignal",
             signalState: options.signalState || "",
             disconnectionDate: options.disconnectionDate || "",
@@ -240,7 +255,20 @@ export function formatAloAutofillPayload(clientPayload = {}, agentProfile = {}, 
     return JSON.stringify(buildAloAutofillPayload(clientPayload, agentProfile, superOfficePayload, options), null, 2);
 }
 
-function aloAutofillBookmarkletRunner(expectedSource) {
+export function extractAloExternalReference(documentRoot) {
+    if (!documentRoot || typeof documentRoot.querySelectorAll !== "function") return "";
+
+    const normalize = (value) => String(value === null || value === undefined ? "" : value)
+        .replace(/\s+/g, " ")
+        .trim();
+    const label = Array.from(documentRoot.querySelectorAll(".tooltipCode")).find(
+        (element) => normalize(element?.textContent) === "translationId=global.extRef"
+    );
+    const value = normalize(label?.closest?.("td")?.nextElementSibling?.textContent);
+    return value && value !== "-" ? value : "";
+}
+
+function aloAutofillBookmarkletRunner(expectedSource, preparedPayload) {
     function text(value) {
         if (value === null || value === undefined) return "";
         return String(value).trim();
@@ -387,6 +415,11 @@ function aloAutofillBookmarkletRunner(expectedSource) {
         show("ALO fill", "Fields populated: " + count, "success");
     }
 
+    if (preparedPayload) {
+        run(preparedPayload);
+        return;
+    }
+
     show("ALO fill", "Reading copied ALO data...", "info");
     if (!navigator.clipboard || !navigator.clipboard.readText) {
         show("ALO fill", "Clipboard API not available on this page.", "error");
@@ -412,7 +445,150 @@ function aloAutofillBookmarkletRunner(expectedSource) {
     });
 }
 
+function aloAutofillBetaBookmarkletRunner(expectedSource, fulfillmentDetailUrl, fillForm, extractExternalReference) {
+    function text(value) {
+        if (value === null || value === undefined) return "";
+        return String(value).trim();
+    }
+
+    function first(values) {
+        for (var i = 0; i < values.length; i += 1) {
+            var value = text(values[i]);
+            if (value) return value;
+        }
+        return "";
+    }
+
+    function show(title, detail, progress, kind) {
+        var overlay = document.getElementById("saltAloBetaOverlay");
+        if (!overlay) {
+            overlay = document.createElement("div");
+            overlay.id = "saltAloBetaOverlay";
+            overlay.style.cssText = "position:fixed;z-index:2147483647;inset:0;background:rgba(0,0,0,.72);backdrop-filter:blur(3px);color:#fff;font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;text-align:left";
+            overlay.innerHTML = "<div id='saltAloBetaCard' style='position:relative;width:420px;max-width:calc(100vw - 40px);background:rgba(24,24,28,.97);border:1px solid rgba(255,255,255,.12);border-radius:18px;box-shadow:0 22px 60px rgba(0,0,0,.45);padding:24px 26px'>"
+                + "<button id='saltAloBetaClose' type='button' aria-label='Close' style='display:none;position:absolute;right:14px;top:12px;border:0;background:transparent;color:#fff;font-size:24px;line-height:1;cursor:pointer'>&times;</button>"
+                + "<div style='display:flex;align-items:center;gap:12px;margin-bottom:16px'><div id='saltAloBetaDot' style='width:14px;height:14px;border-radius:50%;background:#21a36a;box-shadow:0 0 18px #21a36a'></div><div id='saltAloBetaTitle' style='font-size:18px;font-weight:700'></div></div>"
+                + "<div id='saltAloBetaDetail' style='font-size:14px;line-height:1.5;color:#d8d8df;white-space:pre-line'></div>"
+                + "<div style='margin-top:20px;height:5px;background:rgba(255,255,255,.14);border-radius:999px;overflow:hidden'><div id='saltAloBetaBar' style='width:8%;height:100%;background:linear-gradient(90deg,#21a36a,#65d6a0);border-radius:999px;transition:width .25s ease'></div></div>"
+                + "</div>";
+            (document.body || document.documentElement).appendChild(overlay);
+            overlay.querySelector("#saltAloBetaClose").onclick = function closeOverlay() {
+                overlay.remove();
+            };
+        }
+
+        var isError = kind === "error";
+        var card = overlay.querySelector("#saltAloBetaCard");
+        var dot = overlay.querySelector("#saltAloBetaDot");
+        var bar = overlay.querySelector("#saltAloBetaBar");
+        overlay.querySelector("#saltAloBetaTitle").textContent = title || "ALO beta";
+        overlay.querySelector("#saltAloBetaDetail").textContent = detail || "";
+        overlay.querySelector("#saltAloBetaClose").style.display = isError ? "block" : "none";
+        card.style.borderColor = isError ? "rgba(248,113,113,.55)" : "rgba(255,255,255,.12)";
+        dot.style.background = isError ? "#ef4444" : "#21a36a";
+        dot.style.boxShadow = isError ? "0 0 18px #ef4444" : "0 0 18px #21a36a";
+        bar.style.width = Math.max(4, Math.min(100, progress || 0)) + "%";
+        bar.style.background = isError
+            ? "linear-gradient(90deg,#ef4444,#fb7185)"
+            : "linear-gradient(90deg,#21a36a,#65d6a0)";
+    }
+
+    function hide() {
+        var overlay = document.getElementById("saltAloBetaOverlay");
+        if (overlay) overlay.remove();
+    }
+
+    function fail(detail) {
+        show("ALO beta — impossible de continuer", detail, 100, "error");
+    }
+
+    show("ALO beta", "Lecture des données préparées…", 8, "info");
+
+    var targetUrl;
+    try {
+        targetUrl = new URL(fulfillmentDetailUrl);
+    } catch {
+        fail("L’adresse Fulfillment configurée est invalide.");
+        return;
+    }
+
+    if (location.origin !== targetUrl.origin) {
+        fail("Lance ce bookmarklet depuis le site ALO Wholesale.");
+        return;
+    }
+
+    if (!navigator.clipboard || !navigator.clipboard.readText) {
+        fail("Le presse-papiers n’est pas accessible sur cette page.");
+        return;
+    }
+
+    navigator.clipboard.readText().then(function handleClipboard(raw) {
+        if (!text(raw)) throw new Error("Le presse-papiers est vide. Prépare d’abord le ticket depuis Salt BO tools.");
+
+        var payload;
+        try {
+            payload = JSON.parse(raw);
+        } catch {
+            throw new Error("Le presse-papiers ne contient pas de données ALO valides.");
+        }
+
+        if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+            throw new Error("Les données ALO préparées sont invalides.");
+        }
+        if (payload.source && payload.source !== expectedSource) {
+            throw new Error("Le presse-papiers ne contient pas les données ALO préparées par Salt BO tools.");
+        }
+
+        var orderId = first([
+            payload.alo && payload.alo.orderId,
+            payload.orderId,
+            payload.contact && payload.contact.providerOrderRef,
+            payload.client && payload.client.providerOrderRef,
+            payload.fields && payload.fields.providerOrderRef
+        ]);
+        if (!orderId) {
+            throw new Error("Order ID introuvable dans les données VTI. Recapture le client avec le bookmarklet VTI.");
+        }
+
+        show("ALO beta", "Order ID détecté : " + orderId + "\nChargement de la commande Fulfillment…", 38, "info");
+        targetUrl.searchParams.set("orderId", orderId);
+
+        return fetch(targetUrl.href, {
+            credentials: "include",
+            cache: "no-store",
+            redirect: "follow"
+        }).then(function handleResponse(response) {
+            if (!response.ok) {
+                throw new Error("La page Fulfillment a répondu avec l’erreur HTTP " + response.status + ".");
+            }
+            return response.text();
+        }).then(function handleFulfillmentHtml(html) {
+            show("ALO beta", "Commande chargée.\nRecherche de l’External Ref…", 70, "info");
+            var fulfillmentDocument = new DOMParser().parseFromString(html, "text/html");
+            var externalReference = extractExternalReference(fulfillmentDocument);
+            if (!externalReference) {
+                throw new Error("External Ref introuvable. Vérifie la session ALO et l’Order ID " + orderId + ".");
+            }
+
+            payload.fields = Object.assign({}, payload.fields || {}, {
+                externalReference: externalReference
+            });
+            show("ALO beta", "External Ref trouvée : " + externalReference + "\nRemplissage du ticket…", 92, "info");
+            hide();
+            fillForm(expectedSource, payload);
+        });
+    }).catch(function handleError(error) {
+        fail(error && error.message ? error.message : String(error));
+    });
+}
+
 export function buildAloAutofillBookmarklet() {
     const sourceLiteral = JSON.stringify(ALO_AUTOFILL_CLIPBOARD_SOURCE);
     return `javascript:(${aloAutofillBookmarkletRunner.toString()})(${sourceLiteral});`;
+}
+
+export function buildAloAutofillBetaBookmarklet() {
+    const sourceLiteral = JSON.stringify(ALO_AUTOFILL_CLIPBOARD_SOURCE);
+    const detailUrlLiteral = JSON.stringify(ALO_FULFILLMENT_DETAIL_URL);
+    return `javascript:(${aloAutofillBetaBookmarkletRunner.toString()})(${sourceLiteral},${detailUrlLiteral},(${aloAutofillBookmarkletRunner.toString()}),(${extractAloExternalReference.toString()}));`;
 }

@@ -52,7 +52,8 @@ export default function VtiBookmarklet({ embedded = false }) {
                     <p className="vti-bookmarklet-lead">
                         Drag the buttons into the bookmarks bar. VTI imports full customer data;
                         SuperOffice imports the SO ticket number, a valid External ID and ticket media with their message dates when present.
-                        The ALO shortcut fills the ticket form from the structured data prepared by the app.
+                        The ALO shortcuts fill the ticket form from the structured data prepared by the app;
+                        the beta version also retrieves the Fulfillment Ext Ref in the background.
                     </p>
                 </div>
             </section>

@@ -79,6 +79,11 @@ import { CAPTURE_DATA_TYPE, classifyCaptureClipboardText } from "../utils/captur
 import { parseSuperOfficeInfoPayload } from "../utils/superOfficeImport.js";
 import { getRouterElectricalImpact } from "../utils/routerElectricalImpact.js";
 import {
+    formatDateInputValueForToken,
+    formatDateTokenValueForInput,
+    getTokenPromptInputType
+} from "../utils/tokenPromptInput.js";
+import {
     clearSuperOfficeTicketPayload,
     consumePendingSuperOfficeTicketPayload,
     getSuperOfficeClientSignature,
@@ -422,11 +427,8 @@ const TokenPromptField = memo(function TokenPromptField({
     autoFocus,
     onChange
 }) {
-    const type = tokenDef.input_type === "number"
-        ? "number"
-        : tokenDef.input_type === "date"
-            ? "date"
-            : "text";
+    const type = getTokenPromptInputType(tokenDef);
+    const inputValue = type === "date" ? formatDateTokenValueForInput(value) : value;
 
     return (
         <div className={`token-prompt-field${hasError ? " token-prompt-field--error" : ""}`}>
@@ -435,10 +437,15 @@ const TokenPromptField = memo(function TokenPromptField({
                 id={`tp-${tokenDef.token}`}
                 type={type}
                 autoFocus={autoFocus}
-                value={value}
+                value={inputValue}
                 className={hasError ? "input-error" : ""}
                 placeholder={tokenDef.token}
-                onChange={(event) => onChange(tokenDef.token, event.target.value)}
+                onChange={(event) => onChange(
+                    tokenDef.token,
+                    type === "date"
+                        ? formatDateInputValueForToken(event.target.value)
+                        : event.target.value
+                )}
             />
             {hasError && <span className="token-prompt-field-error">This field is required</span>}
         </div>

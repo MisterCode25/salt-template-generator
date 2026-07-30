@@ -1,6 +1,9 @@
 import superOfficeBookmarklet from "../data/superOfficeBookmarklet.txt?raw";
 import vtiHealthcheckBookmarklet from "../data/vtiHealthcheckBookmarklet.txt?raw";
-import { buildAloAutofillBookmarklet } from "../utils/aloAutofill.js";
+import {
+    buildAloAutofillBetaBookmarklet,
+    buildAloAutofillBookmarklet
+} from "../utils/aloAutofill.js";
 
 export const DATA_SHORTCUTS = Object.freeze([
     {
@@ -42,6 +45,21 @@ export const DATA_SHORTCUTS = Object.freeze([
             "Capture SO data if you want the SO ticket copied into Ext. reference.",
             "Click ALO fill in the tools bar to copy the structured data.",
             "Open the ALO ticket form, then click this bookmarklet from the bookmarks bar."
+        ]
+    },
+    {
+        id: "alo-beta",
+        eyebrow: "ALO ticket form · Beta",
+        title: "Fill ALO site + Ext Ref",
+        buttonLabel: "Fill ALO site Beta",
+        bookmarklet: buildAloAutofillBetaBookmarklet(),
+        description: "Loads the matching Fulfillment order in the background, extracts its Ext Ref and fills the ALO ticket form without submitting it.",
+        steps: [
+            "Capture current VTI data so the Provider Order Ref is available.",
+            "Click ALO fill in the tools bar and prepare the structured ticket data.",
+            "Open the ALO ticket creation form.",
+            "Click this beta bookmarklet and wait for the progress overlay to finish.",
+            "Review every populated field, then validate the ticket manually."
         ]
     }
 ]);

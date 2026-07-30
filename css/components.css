@@ -12173,6 +12173,10 @@ a.tools-bar-btn {
     --shortcut-accent: #21a36a;
 }
 
+.tools-shortcut-card--alo-beta {
+    --shortcut-accent: #8b5cf6;
+}
+
 .tools-shortcut-card__body {
     min-width: 0;
     display: grid;
