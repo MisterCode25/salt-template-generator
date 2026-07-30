@@ -667,6 +667,38 @@
     white-space: nowrap;
 }
 
+.client-info-bar-field-value-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+}
+
+.router-impact-status {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    min-height: 20px;
+    padding: 2px 7px;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 900;
+    line-height: 1;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+}
+
+.router-impact-status--impacted {
+    background: rgba(220, 38, 38, 0.16);
+    color: #dc2626;
+}
+
+.router-impact-status--safe {
+    background: rgba(22, 163, 74, 0.16);
+    color: #16a34a;
+}
+
 .client-info-bar-controls {
     display: flex;
     align-items: center;

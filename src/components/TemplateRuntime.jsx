@@ -1339,7 +1339,16 @@ export const ClientInfoPanel = memo(function ClientInfoPanel({
                                         title={`${field.label}: ${field.value}`}
                                     >
                                         <span className="client-info-bar-field-key">{field.label}</span>
-                                        <span className="client-info-bar-field-val">{field.value}</span>
+                                        <span className="client-info-bar-field-value-row">
+                                            <span className="client-info-bar-field-val">{field.value}</span>
+                                            {field.routerElectricalImpact && (
+                                                <span
+                                                    className={`router-impact-status router-impact-status--${field.routerElectricalImpact.isImpacted ? "impacted" : "safe"}`}
+                                                >
+                                                    {field.routerElectricalImpact.label}
+                                                </span>
+                                            )}
+                                        </span>
                                     </div>
                                 ))}
                             </div>

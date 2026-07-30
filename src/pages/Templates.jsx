@@ -89,6 +89,7 @@ import {
     saveTemplateQuickSectionsState
 } from "../services/templateUsageService.js";
 import { getTopicColorStyle } from "../utils/topicAppearance.js";
+import { getRouterElectricalImpact } from "../utils/routerElectricalImpact.js";
 
 const ExternalGenerator = lazy(() => import("./ExternalGenerator.jsx"));
 const ManageNodes = lazy(() => import("./ManageNodes.jsx"));
@@ -1098,9 +1099,17 @@ export default function Templates() {
         () => mergeDisplayInfoSections(runtime.clientInfoSections, caseProfileInfoSections),
         [caseProfileInfoSections, runtime.clientInfoSections]
     );
-    const displayClientSummaryFields = runtime.clientPayload
+    const baseClientSummaryFields = runtime.clientPayload
         ? runtime.clientSummaryFields
         : caseProfileSummaryFields;
+    const displayClientSummaryFields = useMemo(
+        () => baseClientSummaryFields.map((field) => (
+            String(field.label || "").trim().toLowerCase() === "router serial"
+                ? { ...field, routerElectricalImpact: getRouterElectricalImpact(field.value) }
+                : field
+        )),
+        [baseClientSummaryFields]
+    );
     const displayClientExternalId = runtime.clientExternalId || caseProfile.externalId || "";
     const canCustomizeClientBar = runtime.clientBarFieldGroups.length > 0;
 

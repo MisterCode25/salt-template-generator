@@ -23,6 +23,7 @@ import {
     requiresImageConversion
 } from "../utils/imagePreview.js";
 import { createAsyncTaskQueue } from "../utils/asyncTaskQueue.js";
+import { getRouterElectricalImpact } from "../utils/routerElectricalImpact.js";
 import {
     deleteCachedSuperOfficeMedia,
     getCachedSuperOfficeMedia,
@@ -269,7 +270,8 @@ function buildPhotoContextBadges(profile = null) {
         {
             key: "routerSerial",
             label: "N° série routeur",
-            value: routerSerial
+            value: routerSerial,
+            routerElectricalImpact: getRouterElectricalImpact(routerSerial)
         },
         {
             key: "routerModel",
@@ -843,7 +845,16 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
                                     {contextBadges.map((badge) => (
                                         <span key={badge.key} className="so-photo-viewer__context-badge" title={`${badge.label}: ${badge.value}`}>
                                             <small>{badge.label}</small>
-                                            <strong>{badge.value}</strong>
+                                            <span className="so-photo-viewer__context-value">
+                                                <strong>{badge.value}</strong>
+                                                {badge.routerElectricalImpact && (
+                                                    <span
+                                                        className={`router-impact-status router-impact-status--${badge.routerElectricalImpact.isImpacted ? "impacted" : "safe"}`}
+                                                    >
+                                                        {badge.routerElectricalImpact.label}
+                                                    </span>
+                                                )}
+                                            </span>
                                         </span>
                                     ))}
                                 </div>
