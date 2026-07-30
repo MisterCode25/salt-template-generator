@@ -73,6 +73,7 @@ import {
 } from "../utils/externalIdConflicts.js";
 import { CAPTURE_DATA_TYPE, classifyCaptureClipboardText } from "../utils/captureDataDetection.js";
 import { parseSuperOfficeInfoPayload } from "../utils/superOfficeImport.js";
+import { getRouterElectricalImpact } from "../utils/routerElectricalImpact.js";
 import {
     clearSuperOfficeTicketPayload,
     consumePendingSuperOfficeTicketPayload,
@@ -186,6 +187,12 @@ function sanitizeGeneratedTemplateHtml(model, html = "") {
 
 function clientBarFieldKey(scope, label) {
     return `${scope}:${String(label || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "_")}`;
+}
+
+function getRouterImpactForClientField(field = {}) {
+    const label = String(field.label || "").trim().toLowerCase();
+    if (label !== "router serial" && label !== "n° série routeur") return null;
+    return field.routerElectricalImpact || getRouterElectricalImpact(field.value);
 }
 
 async function loadClientBarFieldKeys() {
@@ -1441,12 +1448,24 @@ export const ClientInfoPanel = memo(function ClientInfoPanel({
                         <div key={section.id} className="client-info-section">
                             <h3>{section.title}</h3>
                             <div className="client-info-fields">
-                                {section.fields.map((field) => (
-                                    <div key={`${section.id}-${field.label}`} className="client-info-field">
-                                        <span className="client-info-label">{field.label}</span>
-                                        <span className="client-info-value">{field.value}</span>
-                                    </div>
-                                ))}
+                                {section.fields.map((field) => {
+                                    const routerElectricalImpact = getRouterImpactForClientField(field);
+                                    return (
+                                        <div key={`${section.id}-${field.label}`} className="client-info-field">
+                                            <span className="client-info-label">{field.label}</span>
+                                            <span className="client-info-value-row">
+                                                <span className="client-info-value">{field.value}</span>
+                                                {routerElectricalImpact && (
+                                                    <span
+                                                        className={`router-impact-status router-impact-status--${routerElectricalImpact.isImpacted ? "impacted" : "safe"}`}
+                                                    >
+                                                        {routerElectricalImpact.label}
+                                                    </span>
+                                                )}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     ))}

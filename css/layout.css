@@ -674,6 +674,17 @@
     min-width: 0;
 }
 
+.client-info-value-row {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.client-info-value-row .client-info-value {
+    min-width: 0;
+}
+
 .router-impact-status {
     flex: 0 0 auto;
     display: inline-flex;
