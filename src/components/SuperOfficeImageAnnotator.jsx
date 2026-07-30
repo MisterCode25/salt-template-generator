@@ -634,6 +634,29 @@ async function dataUrlToBlob(dataUrl) {
     return response.blob();
 }
 
+function createExportBaseCanvas(image, sourceRect, exportSize) {
+    const canvas = document.createElement("canvas");
+    canvas.width = exportSize.width;
+    canvas.height = exportSize.height;
+    const context = canvas.getContext("2d", { alpha: false });
+    if (!context) throw new Error("Impossible de préparer le canevas d’export.");
+
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = "high";
+    context.drawImage(
+        image,
+        sourceRect.x,
+        sourceRect.y,
+        sourceRect.width,
+        sourceRect.height,
+        0,
+        0,
+        exportSize.width,
+        exportSize.height
+    );
+    return canvas;
+}
+
 async function buildAnnotatedImageBlob(image, annotations, crop, maxWidth = DEFAULT_ANNOTATION_EXPORT_MAX_WIDTH) {
     const naturalWidth = image.naturalWidth || image.width;
     const naturalHeight = image.naturalHeight || image.height;
@@ -656,9 +679,9 @@ async function buildAnnotatedImageBlob(image, annotations, crop, maxWidth = DEFA
     });
     const layer = new Konva.Layer();
     stage.add(layer);
+    const baseCanvas = createExportBaseCanvas(image, sourceRect, exportSize);
     layer.add(new Konva.Image({
-        image,
-        crop: makeKonvaCrop(sourceRect),
+        image: baseCanvas,
         x: 0,
         y: 0,
         width: exportSize.width,
