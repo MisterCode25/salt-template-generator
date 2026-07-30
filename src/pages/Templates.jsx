@@ -166,18 +166,20 @@ function plainTextFromTemplate(value) {
         .trim();
 }
 
-function buildAloTemplateOptions(templates, lang, values) {
+function buildAloTemplateOptions(templates, resolveTemplateText) {
     const options = [];
     templates.forEach((template) => {
         getAvailableTemplateChannels(template).forEach((channel) => {
             const model = resolveChannelModel(template, channel);
             if (!model) return;
-            const text = plainTextFromTemplate(generateFinalText(model, lang, values));
+            const resolvedTemplate = resolveTemplateText(model);
+            const text = plainTextFromTemplate(resolvedTemplate.text);
             if (!text) return;
             options.push({
                 id: `${template.id}:${channel}`,
                 label: `${template.title || "Untitled"} - ${CHANNEL_LABELS[channel]}`,
-                text
+                text,
+                missingTokens: resolvedTemplate.missingTokens
             });
         });
     });
@@ -1416,7 +1418,10 @@ export default function Templates() {
         const clientPayload = runtimeApi.clientPayload;
         if (!clientPayload) return;
 
-        setAloTemplateOptions(buildAloTemplateOptions(treeTemplates, runtimeApi.lang, runtimeApi.values));
+        setAloTemplateOptions(buildAloTemplateOptions(
+            treeTemplates,
+            runtimeApi.generateResolvedTemplateText
+        ));
         setAloPreparation(buildAloPreparationDefaults(clientPayload, await loadSuperOfficeTicketPayload()));
     }, [treeTemplates]);
 

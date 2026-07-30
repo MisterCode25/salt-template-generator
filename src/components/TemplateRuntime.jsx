@@ -16,7 +16,11 @@ import {
     Sparkles,
     Star
 } from "lucide-react";
-import { generateFinalText, getTemplateTextByLang } from "../core/tokenEngine.js";
+import {
+    generateFinalText,
+    generateFinalTextWithTokenResolver,
+    getTemplateTextByLang
+} from "../core/tokenEngine.js";
 import {
     ACTIVE_CLIENT_PAYLOAD_UPDATED_EVENT,
     CLIENT_INPUT_VALUES_UPDATED_EVENT,
@@ -2615,6 +2619,20 @@ export function useTemplateRuntime() {
         return { values: vals, missing };
     };
 
+    const generateResolvedTemplateText = (model) => {
+        const tokenDefinitions = new Map();
+        templateTokens.forEach((tokenDef) => {
+            tokenDefinitions.set(tokenDef.token, tokenDef);
+            tokenDefinitions.set(canonicalizeInputTokenValue(tokenDef.token), tokenDef);
+        });
+
+        return generateFinalTextWithTokenResolver(model, lang, (tokenName) => {
+            const tokenDef = tokenDefinitions.get(tokenName)
+                || tokenDefinitions.get(canonicalizeInputTokenValue(tokenName));
+            return getTokenValue(tokenDef || tokenName);
+        });
+    };
+
     const buildTokenPrompt = (effectiveModel, sectionKey, mode = "copy") => {
         const text = getTemplateTextByLang(effectiveModel, lang) || "";
         const tokensNeeded = Array.from(new Set(text.match(/\{[^{}]+\}/g) || []));
@@ -2899,6 +2917,7 @@ export function useTemplateRuntime() {
         requestCopy,
         copyModel,
         requestTemplateResult,
+        generateResolvedTemplateText,
         requestTokenInputs,
         confirmTokenPrompt,
         clearOnDemandValues

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   applyTokens,
   generateFinalText,
+  generateFinalTextWithTokenResolver,
   getTemplateTextByLang,
   getTemplateTextResult
 } from "../src/core/tokenEngine.js";
@@ -41,6 +42,22 @@ const sampleModel = {
   assert.equal(en, "Hello Alice");
   const fr = generateFinalText(sampleModel, "fr", values);
   assert.equal(fr, "Bonjour Alice");
+}
+
+{
+  const model = {
+    text_fr: "",
+    text_en: "Ticket {so_ticket_num} for {client_first_name}",
+    text_de: "",
+    text_it: ""
+  };
+  const resolved = generateFinalTextWithTokenResolver(model, "en", (token) => ({
+    "{so_ticket_num}": "123456",
+    "{client_first_name}": "Alice"
+  })[token]);
+
+  assert.equal(resolved.text, "Ticket 123456 for Alice");
+  assert.deepEqual(resolved.missingTokens, []);
 }
 
 {

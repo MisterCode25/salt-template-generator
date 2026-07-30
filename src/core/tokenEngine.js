@@ -148,3 +148,25 @@ export function generateFinalText(model, lang, tokenValues) {
     const result = getTemplateTextResult(model, lang);
     return applyTokens(result.text, translateTitleTokens(tokenValues || {}, result.lang));
 }
+
+export function generateFinalTextWithTokenResolver(model, lang, resolveTokenValue) {
+    const result = getTemplateTextResult(model, lang);
+    const tokens = Array.from(new Set(result.text.match(TOKEN_PATTERN) || []));
+    const tokenValues = {};
+    const missingTokens = [];
+
+    tokens.forEach((token) => {
+        const value = typeof resolveTokenValue === "function" ? resolveTokenValue(token) : undefined;
+        if (value === "" || value === null || value === undefined) {
+            missingTokens.push(token);
+            return;
+        }
+        tokenValues[token] = value;
+    });
+
+    return {
+        text: applyTokens(result.text, translateTitleTokens(tokenValues, result.lang)),
+        missingTokens,
+        lang: result.lang
+    };
+}
