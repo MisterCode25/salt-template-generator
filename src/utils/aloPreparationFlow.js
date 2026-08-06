@@ -21,7 +21,9 @@ export function buildAloPreparationSteps({
         key: signalState === "never" ? "activationDate" : "disconnectionDate",
         kind: "input",
         title: signalState === "never" ? "Activation date" : "Disconnection date",
-        inputType: "date"
+        inputType: "text",
+        inputFormat: "localized-date",
+        placeholder: "DD.MM.YYYY"
     });
 
     steps.push({

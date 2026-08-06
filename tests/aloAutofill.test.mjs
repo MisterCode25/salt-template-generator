@@ -107,6 +107,10 @@ assert.equal(
   ]);
   assert.equal(steps.some((step) => step.key === "extRef"), false);
   assert.equal(steps.some((step) => step.key === "notesMode" || step.kind === "textarea"), false);
+  const lostDateStep = steps.find((step) => step.key === "disconnectionDate");
+  assert.equal(lostDateStep.inputType, "text");
+  assert.equal(lostDateStep.inputFormat, "localized-date");
+  assert.equal(lostDateStep.placeholder, "DD.MM.YYYY");
 
   const neverSteps = buildAloPreparationSteps({
     signalState: "never",
@@ -217,6 +221,8 @@ assert.equal(
   assert.equal(payload.fields.problemCode3, "Performance problem");
   assert.equal(payload.alo.type, "lowBadRxTx");
   assert.equal(payload.alo.signalState, "never");
+  assert.equal(payload.alo.activationDate, "20.06.2026");
+  assert.equal(payload.alo.disconnectionDate, "");
   assert.equal(payload.alo.problemDateTime, "20.06.2026");
   assert.equal(payload.alo.notes, "Bad signal - Never activated - 20.06.2026");
 }

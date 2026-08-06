@@ -85,6 +85,10 @@ import {
     openAlexHomePage
 } from "../utils/alexTicket.js";
 import { buildAloPreparationSteps } from "../utils/aloPreparationFlow.js";
+import {
+    formatDateInputValueForToken,
+    formatDateTokenValueForInput
+} from "../utils/tokenPromptInput.js";
 import { getKeyboardShortcutForEvent } from "../utils/keyboardShortcuts.js";
 import {
     buildCaseProfile,
@@ -548,6 +552,11 @@ function AloPreparationModal({ defaults, templateOptions = [], resolveTemplateTe
         activationDate: defaults.activationDate || "",
         selectedTemplateId: ""
     }));
+    const [dateDrafts, setDateDrafts] = useState(() => ({
+        disconnectionDate: formatDateInputValueForToken(defaults.disconnectionDate),
+        activationDate: formatDateInputValueForToken(defaults.activationDate)
+    }));
+    const [dateErrors, setDateErrors] = useState({});
     const [stepIndex, setStepIndex] = useState(0);
 
     const steps = useMemo(() => buildAloPreparationSteps({
@@ -586,8 +595,26 @@ function AloPreparationModal({ defaults, templateOptions = [], resolveTemplateTe
     });
 
     const continueInput = () => {
-        const value = String(form[step.key] || "").trim();
+        const isLocalizedDate = step.inputFormat === "localized-date";
+        const normalizedDate = isLocalizedDate
+            ? formatDateTokenValueForInput(dateDrafts[step.key])
+            : "";
+        const value = isLocalizedDate
+            ? normalizedDate
+            : String(form[step.key] || "").trim();
+        if (isLocalizedDate && !normalizedDate) {
+            setDateErrors((current) => ({ ...current, [step.key]: true }));
+            return;
+        }
         if (!value && !step.optional) return;
+        if (isLocalizedDate) {
+            updateForm({ [step.key]: normalizedDate });
+            setDateDrafts((current) => ({
+                ...current,
+                [step.key]: formatDateInputValueForToken(normalizedDate)
+            }));
+            setDateErrors((current) => ({ ...current, [step.key]: false }));
+        }
         if (stepIndex === steps.length - 1) {
             finish();
             return;
@@ -639,10 +666,27 @@ function AloPreparationModal({ defaults, templateOptions = [], resolveTemplateTe
                         <input
                             autoFocus
                             type={step.inputType || "text"}
-                            className="prompt-dialog__input"
-                            value={form[step.key] || ""}
+                            className={`prompt-dialog__input${dateErrors[step.key] ? " input-error" : ""}`}
+                            value={step.inputFormat === "localized-date"
+                                ? dateDrafts[step.key] || ""
+                                : form[step.key] || ""}
                             placeholder={step.placeholder || ""}
-                            onChange={(event) => updateForm({ [step.key]: event.target.value })}
+                            inputMode={step.inputFormat === "localized-date" ? "numeric" : undefined}
+                            maxLength={step.inputFormat === "localized-date" ? 10 : undefined}
+                            aria-invalid={dateErrors[step.key] || undefined}
+                            onChange={(event) => {
+                                const nextValue = event.target.value;
+                                if (step.inputFormat !== "localized-date") {
+                                    updateForm({ [step.key]: nextValue });
+                                    return;
+                                }
+                                const normalizedDate = formatDateTokenValueForInput(nextValue);
+                                setDateDrafts((current) => ({ ...current, [step.key]: nextValue }));
+                                updateForm({ [step.key]: normalizedDate });
+                                if (normalizedDate) {
+                                    setDateErrors((current) => ({ ...current, [step.key]: false }));
+                                }
+                            }}
                             onKeyDown={(event) => {
                                 if (event.key === "Enter") {
                                     event.preventDefault();
@@ -650,6 +694,11 @@ function AloPreparationModal({ defaults, templateOptions = [], resolveTemplateTe
                                 }
                             }}
                         />
+                        {step.inputFormat === "localized-date" && (
+                            <p className="hint">
+                                {dateErrors[step.key] ? "Enter a valid date in DD.MM.YYYY format." : "Format: DD.MM.YYYY"}
+                            </p>
+                        )}
                     </div>
                 )}
 

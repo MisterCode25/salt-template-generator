@@ -276,8 +276,8 @@ export function buildAloAutofillPayload(clientPayload = {}, agentProfile = {}, s
             orderId: getAloOrderId(clientPayload),
             type: options.aloType || "noSignal",
             signalState: options.signalState || "",
-            disconnectionDate: options.disconnectionDate || "",
-            activationDate: options.activationDate || "",
+            disconnectionDate: formatDisplayDate(options.disconnectionDate),
+            activationDate: formatDisplayDate(options.activationDate),
             problemDateTime: fields.problemDateTime,
             notes: options.notes || ""
         },
