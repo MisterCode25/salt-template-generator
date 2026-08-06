@@ -10,7 +10,8 @@ import {
   buildAloTemplateTokenValues,
   extractAloExternalReference,
   formatAloAutofillPayload,
-  openAloTicketCreationPage
+  openAloTicketCreationPage,
+  resolveAloTemplateWithProblemDate
 } from "../src/utils/aloAutofill.js";
 import { buildAloPreparationSteps } from "../src/utils/aloPreparationFlow.js";
 import { CASE_PROBLEM_DATE_TOKEN } from "../src/utils/caseDateTokens.js";
@@ -142,6 +143,25 @@ assert.equal(
     activationDate: "2026-06-20"
   });
   assert.equal(neverValues[CASE_PROBLEM_DATE_TOKEN], "20.06.2026");
+}
+
+{
+  const model = { text_fr: "Date du problème : {case_problem_date}" };
+  let receivedOverrides = null;
+  const resolved = resolveAloTemplateWithProblemDate(
+    model,
+    { signalState: "lost", disconnectionDate: "2026-06-03" },
+    (selectedModel, overrides) => {
+      receivedOverrides = overrides;
+      return {
+        text: applyTokens(selectedModel.text_fr, overrides),
+        missingTokens: []
+      };
+    }
+  );
+
+  assert.equal(receivedOverrides[CASE_PROBLEM_DATE_TOKEN], "03.06.2026");
+  assert.equal(resolved.text, "Date du problème : 03.06.2026");
 }
 
 {

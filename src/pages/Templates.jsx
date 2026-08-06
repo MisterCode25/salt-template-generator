@@ -74,9 +74,9 @@ import {
 } from "../services/superOfficeTicketService.js";
 import {
     buildAloPreparationDefaults,
-    buildAloTemplateTokenValues,
     formatAloAutofillPayload,
-    openAloTicketCreationPage
+    openAloTicketCreationPage,
+    resolveAloTemplateWithProblemDate
 } from "../utils/aloAutofill.js";
 import {
     buildAlexTicketPayload,
@@ -550,7 +550,8 @@ function AloPreparationModal({ defaults, templateOptions = [], resolveTemplateTe
         signalState: defaults.signalState || "",
         disconnectionDate: defaults.disconnectionDate || "",
         activationDate: defaults.activationDate || "",
-        selectedTemplateId: ""
+        selectedTemplateId: "",
+        notes: ""
     }));
     const [dateDrafts, setDateDrafts] = useState(() => ({
         disconnectionDate: formatDateInputValueForToken(defaults.disconnectionDate),
@@ -572,15 +573,21 @@ function AloPreparationModal({ defaults, templateOptions = [], resolveTemplateTe
             ? "No signal"
             : "Choose type";
 
-    const selectedTemplate = templateOptions.find((option) => option.id === form.selectedTemplateId);
-    const resolvedSelectedTemplate = selectedTemplate && resolveTemplateText
-        ? resolveTemplateText(selectedTemplate.model, buildAloTemplateTokenValues(form))
-        : null;
-    const selectedTemplateNotes = resolvedSelectedTemplate
-        ? plainTextFromTemplate(resolvedSelectedTemplate.text)
-        : selectedTemplate?.text || "";
+    const selectedTemplateNotes = form.notes;
 
-    const updateForm = (patch) => setForm((current) => ({ ...current, ...patch }));
+    const updateForm = (patch) => setForm((current) => {
+        const next = { ...current, ...patch };
+        const changesProblemDate = [
+            "signalState",
+            "disconnectionDate",
+            "activationDate"
+        ].some((key) => Object.prototype.hasOwnProperty.call(patch, key));
+        if (changesProblemDate && current.selectedTemplateId) {
+            next.selectedTemplateId = "";
+            next.notes = "";
+        }
+        return next;
+    });
 
     const advance = () => setStepIndex((current) => Math.min(current + 1, steps.length - 1));
     const back = () => setStepIndex((current) => Math.max(current - 1, 0));
@@ -591,7 +598,7 @@ function AloPreparationModal({ defaults, templateOptions = [], resolveTemplateTe
         disconnectionDate: form.disconnectionDate,
         activationDate: form.activationDate,
         description: form.aloType === "lowBadRxTx" ? "Bad signal" : "No signal",
-        notes: selectedTemplateNotes.trim()
+        notes: form.notes.trim()
     });
 
     const continueInput = () => {
@@ -627,7 +634,17 @@ function AloPreparationModal({ defaults, templateOptions = [], resolveTemplateTe
         if (step.key === "selectedTemplateId") {
             const option = templateOptions.find((candidate) => candidate.id === value);
             if (!option) return;
-            updateForm({ selectedTemplateId: value });
+            const resolvedTemplate = resolveAloTemplateWithProblemDate(
+                option.model,
+                form,
+                resolveTemplateText
+            );
+            updateForm({
+                selectedTemplateId: value,
+                notes: resolvedTemplate
+                    ? plainTextFromTemplate(resolvedTemplate.text)
+                    : option.text
+            });
             return;
         }
         updateForm({ [step.key]: value });

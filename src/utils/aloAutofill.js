@@ -153,6 +153,11 @@ export function buildAloTemplateTokenValues(options = {}) {
     };
 }
 
+export function resolveAloTemplateWithProblemDate(model, options, resolveTemplateText) {
+    if (!model || typeof resolveTemplateText !== "function") return null;
+    return resolveTemplateText(model, buildAloTemplateTokenValues(options));
+}
+
 export function buildAloPreparationDefaults(clientPayload = {}, superOfficePayload = {}) {
     const externalId = firstValue([
         superOfficePayload?.externalTicketId,
