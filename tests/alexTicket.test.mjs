@@ -27,6 +27,15 @@ import {
 }
 
 {
+    const result = buildAlexTicketPayload({
+        contact: { eligibilityOrdering: "45" }
+    }, "Ticket #98-61 / A");
+
+    assert.equal(result.ok, true);
+    assert.equal(result.payload.ticket, "9861");
+}
+
+{
     const aloResult = buildAlexTicketPayload({
         contact: { eligibilityOrdering: "0" }
     }, "1234");
@@ -39,7 +48,7 @@ import {
 
     const missingTicket = buildAlexTicketPayload({
         contact: { eligibilityOrdering: "35" }
-    }, "");
+    }, "###");
     assert.deepEqual(missingTicket, { ok: false, error: "MISSING_TICKET" });
 }
 

@@ -9,6 +9,10 @@ function normalizeText(value) {
     return String(value ?? "").trim();
 }
 
+function normalizeTicketNumber(value) {
+    return String(value ?? "").replace(/\D+/g, "");
+}
+
 function getEligibilityOrdering(clientPayload) {
     return normalizeText(
         clientPayload?.contact?.eligibilityOrdering
@@ -19,7 +23,7 @@ function getEligibilityOrdering(clientPayload) {
 
 export function buildAlexTicketPayload(clientPayload, partnerTicketNumber) {
     const alap = getEligibilityOrdering(clientPayload);
-    const ticket = normalizeText(partnerTicketNumber);
+    const ticket = normalizeTicketNumber(partnerTicketNumber);
 
     if (!/^\d+$/.test(alap)) return { ok: false, error: "MISSING_PARTNER_ID" };
     if (alap === "0") return { ok: false, error: "ALO_PARTNER" };
@@ -82,7 +86,7 @@ function alexTicketBookmarkletRunner(expectedSource) {
         }
 
         var alap = String(payload.alap || "").trim();
-        var ticket = String(payload.ticket || "").trim();
+        var ticket = String(payload.ticket || "").replace(/\D+/g, "");
         var serviceDomain = Number(payload.serviceDomain);
         var businessDomain = String(payload.businessDomain || "").trim();
 
