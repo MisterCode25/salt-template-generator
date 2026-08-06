@@ -75,8 +75,10 @@ import {
 import {
     buildAloPreparationDefaults,
     buildAloProblemDescription,
+    buildAloTemplateTokenValues,
     formatAloAutofillPayload
 } from "../utils/aloAutofill.js";
+import { buildAloPreparationSteps } from "../utils/aloPreparationFlow.js";
 import { getKeyboardShortcutForEvent } from "../utils/keyboardShortcuts.js";
 import {
     buildCaseProfile,
@@ -121,11 +123,6 @@ const DEFAULT_QUICK_SECTION_STATE = Object.freeze({
     favorites: false
 });
 
-const ALO_TYPE_OPTIONS = [
-    { value: "noSignal", label: "No signal" },
-    { value: "lowBadRxTx", label: "Low / bad RX TX" }
-];
-
 function WorkspaceErrorFallback({ workspace, error, onClose, onRetry }) {
     const workspaceLabel = {
         nodes: "Manage playbook",
@@ -147,11 +144,6 @@ function WorkspaceErrorFallback({ workspace, error, onClose, onRetry }) {
         </div>
     );
 }
-
-const ALO_SIGNAL_OPTIONS = [
-    { value: "lost", label: "Lost" },
-    { value: "never", label: "Never" }
-];
 
 function plainTextFromTemplate(value) {
     return String(value || "")
@@ -179,7 +171,8 @@ function buildAloTemplateOptions(templates, resolveTemplateText) {
                 id: `${template.id}:${channel}`,
                 label: `${template.title || "Untitled"} - ${CHANNEL_LABELS[channel]}`,
                 text,
-                missingTokens: resolvedTemplate.missingTokens
+                missingTokens: resolvedTemplate.missingTokens,
+                model
             });
         });
     });
@@ -541,52 +534,23 @@ const PlaybookSearchBox = memo(function PlaybookSearchBox({
     );
 });
 
-function AloPreparationModal({ defaults, templateOptions = [], onCancel, onSubmit }) {
+function AloPreparationModal({ defaults, templateOptions = [], resolveTemplateText, onCancel, onSubmit }) {
     const [form, setForm] = useState(() => ({
         aloType: defaults.aloType || "",
-        extRef: defaults.extRef || "",
         signalState: defaults.signalState || "",
         disconnectionDate: defaults.disconnectionDate || "",
         activationDate: defaults.activationDate || "",
-        notesMode: "",
         selectedTemplateId: "",
         notes: defaults.description || ""
     }));
     const [stepIndex, setStepIndex] = useState(0);
     const inferredSignalState = Boolean(defaults.signalState);
 
-    const steps = useMemo(() => {
-        const next = [];
-        next.push({ key: "aloType", kind: "choice", title: "Type", options: ALO_TYPE_OPTIONS });
-        next.push({
-            key: "extRef",
-            kind: "input",
-            title: "External ref",
-            inputType: "text",
-            placeholder: "Optional external reference",
-            optional: true
-        });
-        if (!inferredSignalState) next.push({ key: "signalState", kind: "choice", title: "Signal state", options: ALO_SIGNAL_OPTIONS });
-        next.push({
-            key: form.signalState === "never" ? "activationDate" : "disconnectionDate",
-            kind: "input",
-            title: form.signalState === "never" ? "Activation date" : "Disconnection date",
-            inputType: "date"
-        });
-        next.push({
-            key: "notesMode",
-            kind: "choice",
-            title: "Problem notes",
-            options: [
-                { value: "free", label: "Free text" },
-                { value: "template", label: "Import template", disabled: templateOptions.length === 0 }
-            ]
-        });
-        next.push(form.notesMode === "template"
-            ? { key: "selectedTemplateId", kind: "template", title: "Import template" }
-            : { key: "notes", kind: "textarea", title: "Free text" });
-        return next;
-    }, [form.notesMode, form.signalState, inferredSignalState, templateOptions.length]);
+    const steps = useMemo(() => buildAloPreparationSteps({
+        signalState: form.signalState,
+        hasInferredSignalState: inferredSignalState,
+        hasTemplates: templateOptions.length > 0
+    }), [form.signalState, inferredSignalState, templateOptions.length]);
 
     const step = steps[Math.min(stepIndex, steps.length - 1)];
     const showBack = stepIndex > 0;
@@ -599,7 +563,14 @@ function AloPreparationModal({ defaults, templateOptions = [], onCancel, onSubmi
     const updateForm = (patch) => {
         setForm((current) => {
             const next = { ...current, ...patch };
-            if (Object.prototype.hasOwnProperty.call(patch, "signalState") || Object.prototype.hasOwnProperty.call(patch, "aloType")) {
+            const affectsTemplateResolution = [
+                "aloType",
+                "signalState",
+                "disconnectionDate",
+                "activationDate"
+            ].some((key) => Object.prototype.hasOwnProperty.call(patch, key));
+            if (affectsTemplateResolution) {
+                next.selectedTemplateId = "";
                 next.notes = next.aloType ? buildAloProblemDescription(next) : "";
             }
             return next;
@@ -611,7 +582,6 @@ function AloPreparationModal({ defaults, templateOptions = [], onCancel, onSubmi
 
     const finish = () => onSubmit({
         aloType: form.aloType,
-        extRef: form.extRef.trim(),
         signalState: form.signalState,
         disconnectionDate: form.disconnectionDate,
         activationDate: form.activationDate,
@@ -634,7 +604,14 @@ function AloPreparationModal({ defaults, templateOptions = [], onCancel, onSubmi
         if (step.key === "selectedTemplateId") {
             const option = templateOptions.find((candidate) => candidate.id === value);
             if (!option) return;
-            updateForm({ selectedTemplateId: value, notes: option.text });
+            const resolvedTemplate = resolveTemplateText?.(
+                option.model,
+                buildAloTemplateTokenValues(form)
+            );
+            updateForm({
+                selectedTemplateId: value,
+                notes: resolvedTemplate ? plainTextFromTemplate(resolvedTemplate.text) : option.text
+            });
             return;
         }
         updateForm({ [step.key]: value });
@@ -687,18 +664,6 @@ function AloPreparationModal({ defaults, templateOptions = [], onCancel, onSubmi
                     </div>
                 )}
 
-                {step.kind === "textarea" && (
-                    <div className="prompt-dialog__body">
-                        <textarea
-                            autoFocus
-                            className="prompt-dialog__input alo-step-textarea"
-                            rows={6}
-                            value={form.notes}
-                            onChange={(event) => updateForm({ notes: event.target.value })}
-                        />
-                    </div>
-                )}
-
                 {step.kind === "template" && (
                     <div className="prompt-dialog__body">
                         <select
@@ -712,6 +677,7 @@ function AloPreparationModal({ defaults, templateOptions = [], onCancel, onSubmi
                                 <option key={option.id} value={option.id}>{option.label}</option>
                             ))}
                         </select>
+                        {!step.hasTemplates && <p className="hint">No template is available.</p>}
                         {form.notes && <p className="alo-step-preview">{form.notes}</p>}
                     </div>
                 )}
@@ -2034,6 +2000,7 @@ export default function Templates() {
                 <AloPreparationModal
                     defaults={aloPreparation}
                     templateOptions={aloTemplateOptions}
+                    resolveTemplateText={runtime.generateResolvedTemplateText}
                     onCancel={closeAloPreparation}
                     onSubmit={submitAloPreparation}
                 />

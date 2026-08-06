@@ -7,6 +7,7 @@ import {
 } from "../utils/tokenCanonicalization.js";
 import { AGENT_PROFILE_TOKENS } from "./agentProfileService.js";
 import { EXTERNAL_SYSTEM_TOKENS } from "../utils/externalGenerator.js";
+import { CASE_DATE_SYSTEM_TOKENS } from "../utils/caseDateTokens.js";
 import { loadActiveClientPayload } from "./activeClientService.js";
 import {
     loadTokenInputValues,
@@ -17,7 +18,7 @@ import { getClientInternalTokenData } from "../utils/clientClipboard.js";
 const TOKEN_PATH = "tokens";
 const TOKEN_PATTERN = /\{[^{}]+\}/g;
 const INTERNAL_TOKEN_PREFIX_PATTERN = /^\{(?:client|contact|healthcheck|offer)_/i;
-const SYSTEM_TOKENS = [...AGENT_PROFILE_TOKENS, ...EXTERNAL_SYSTEM_TOKENS];
+const SYSTEM_TOKENS = [...AGENT_PROFILE_TOKENS, ...EXTERNAL_SYSTEM_TOKENS, ...CASE_DATE_SYSTEM_TOKENS];
 const SYSTEM_TOKEN_SET = new Set(SYSTEM_TOKENS.map((tokenDef) => tokenDef.token));
 export const LEGACY_BUILT_IN_TOKENS = Object.freeze([
     "{agent_name}",

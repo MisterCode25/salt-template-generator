@@ -2066,11 +2066,6 @@ textarea:focus {
     width: min(520px, calc(100vw - 32px));
 }
 
-.alo-step-textarea {
-    min-height: 130px;
-    resize: vertical;
-}
-
 .alo-step-preview {
     max-height: 150px;
     overflow: auto;

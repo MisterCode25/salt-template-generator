@@ -427,6 +427,16 @@ export function parseSuperOfficeInfoPayload(input) {
         payload.ticketCreatedAt,
         payload.ticketCreatedDate
     );
+    const firstPostAt = valueOf(
+        payload.firstPostAt,
+        payload.firstPostDate,
+        payload.firstMessageAt,
+        payload.firstMessageDate,
+        payload.posts?.[0]?.createdAt,
+        payload.posts?.[0]?.date,
+        payload.messages?.[0]?.createdAt,
+        payload.messages?.[0]?.date
+    );
     const externalTicketId = valueOf(
         payload.externalTicketId,
         payload.externalId,
@@ -484,6 +494,7 @@ export function parseSuperOfficeInfoPayload(input) {
         ticketId: soTicket,
         sourceTicketId,
         createdAt,
+        firstPostAt,
         externalTicketId,
         contractorNumber,
         externalIdValid,

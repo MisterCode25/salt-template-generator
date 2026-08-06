@@ -2626,7 +2626,7 @@ export function useTemplateRuntime() {
         return { values: vals, missing };
     };
 
-    const generateResolvedTemplateText = (model) => {
+    const generateResolvedTemplateText = (model, tokenOverrides = {}) => {
         const tokenDefinitions = new Map();
         templateTokens.forEach((tokenDef) => {
             tokenDefinitions.set(tokenDef.token, tokenDef);
@@ -2634,8 +2634,15 @@ export function useTemplateRuntime() {
         });
 
         return generateFinalTextWithTokenResolver(model, lang, (tokenName) => {
+            const canonicalTokenName = canonicalizeInputTokenValue(tokenName);
+            if (Object.prototype.hasOwnProperty.call(tokenOverrides, tokenName)) {
+                return tokenOverrides[tokenName];
+            }
+            if (Object.prototype.hasOwnProperty.call(tokenOverrides, canonicalTokenName)) {
+                return tokenOverrides[canonicalTokenName];
+            }
             const tokenDef = tokenDefinitions.get(tokenName)
-                || tokenDefinitions.get(canonicalizeInputTokenValue(tokenName));
+                || tokenDefinitions.get(canonicalTokenName);
             return getTokenValue(tokenDef || tokenName);
         });
     };

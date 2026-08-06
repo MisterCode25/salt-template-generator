@@ -6,9 +6,13 @@ import {
   buildAloAutofillBetaBookmarklet,
   buildAloAutofillPayload,
   buildAloPreparationDefaults,
+  buildAloTemplateTokenValues,
   extractAloExternalReference,
   formatAloAutofillPayload
 } from "../src/utils/aloAutofill.js";
+import { buildAloPreparationSteps } from "../src/utils/aloPreparationFlow.js";
+import { CASE_PROBLEM_DATE_TOKEN } from "../src/utils/caseDateTokens.js";
+import { applyTokens } from "../src/core/tokenEngine.js";
 import {
   TEST_SO_IMPORT_PAYLOAD,
   TEST_VTI_IMPORT_PAYLOAD
@@ -72,9 +76,45 @@ const agentProfile = {
   const defaults = buildAloPreparationDefaults(TEST_VTI_IMPORT_PAYLOAD, TEST_SO_IMPORT_PAYLOAD);
   assert.equal(defaults.aloType, "");
   assert.equal(defaults.signalState, "lost");
-  assert.equal(defaults.extRef, "");
+  assert.equal(defaults.extRef, undefined);
   assert.equal(defaults.activationDate, "2026-06-20");
   assert.equal(defaults.description, "");
+}
+
+{
+  const steps = buildAloPreparationSteps({
+    signalState: "lost",
+    hasInferredSignalState: false,
+    hasTemplates: true
+  });
+  assert.deepEqual(steps.map((step) => step.key), [
+    "aloType",
+    "signalState",
+    "disconnectionDate",
+    "selectedTemplateId"
+  ]);
+  assert.equal(steps.some((step) => step.key === "extRef"), false);
+  assert.equal(steps.some((step) => step.key === "notesMode" || step.kind === "textarea"), false);
+}
+
+{
+  const lostValues = buildAloTemplateTokenValues({
+    signalState: "lost",
+    disconnectionDate: "2026-06-04",
+    activationDate: "2026-06-20"
+  });
+  assert.equal(lostValues[CASE_PROBLEM_DATE_TOKEN], "04.06.2026");
+  assert.equal(
+    applyTokens("Signal lost on {case_problem_date}", lostValues),
+    "Signal lost on 04.06.2026"
+  );
+
+  const neverValues = buildAloTemplateTokenValues({
+    signalState: "never",
+    disconnectionDate: "2026-06-04",
+    activationDate: "2026-06-20"
+  });
+  assert.equal(neverValues[CASE_PROBLEM_DATE_TOKEN], "20.06.2026");
 }
 
 {
@@ -99,10 +139,42 @@ const agentProfile = {
 {
   const defaults = buildAloPreparationDefaults(TEST_VTI_IMPORT_PAYLOAD, {
     ...TEST_SO_IMPORT_PAYLOAD,
-    createdAt: "6/4/2026 12:07 PM"
+    createdAt: "6/4/2026 12:07 PM",
+    firstPostAt: "03.06.2026 09:15"
   });
 
   assert.equal(defaults.disconnectionDate, "2026-06-04");
+}
+
+{
+  const defaults = buildAloPreparationDefaults(TEST_VTI_IMPORT_PAYLOAD, {
+    ...TEST_SO_IMPORT_PAYLOAD,
+    firstPostAt: "03.06.2026 09:15"
+  });
+
+  assert.equal(defaults.disconnectionDate, "2026-06-03");
+}
+
+{
+  const defaults = buildAloPreparationDefaults(TEST_VTI_IMPORT_PAYLOAD, {
+    ticketId: "31436062",
+    createdAt: "6/4/2026 12:07 PM"
+  });
+
+  assert.equal(defaults.signalState, "");
+  assert.equal(defaults.disconnectionDate, "2026-06-04");
+}
+
+{
+  const defaults = buildAloPreparationDefaults(TEST_VTI_IMPORT_PAYLOAD, {
+    ...TEST_SO_IMPORT_PAYLOAD,
+    attachments: [
+      { messageIndex: 1, date: "04.06.2026 11:00" },
+      { messageIndex: 0, date: "02.06.2026 08:30" }
+    ]
+  });
+
+  assert.equal(defaults.disconnectionDate, "2026-06-02");
 }
 
 {

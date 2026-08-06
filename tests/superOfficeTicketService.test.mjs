@@ -120,6 +120,7 @@ await saveActiveClientPayload(clientA);
 const saved = await saveSuperOfficeTicketPayload({
   ticketId: "31436062",
   createdAt: "6/4/2026 12:07 PM",
+  firstPostAt: "6/3/2026 9:15 AM",
   tokenValues: {
     "{so_ticket_num}": "31436062"
   },
@@ -133,6 +134,7 @@ const saved = await saveSuperOfficeTicketPayload({
 assert.equal(saved.imageAttachments.length, 1);
 assert.equal(saved.mediaAttachments.length, 3);
 assert.equal(saved.createdAt, "6/4/2026 12:07 PM");
+assert.equal(saved.firstPostAt, "6/3/2026 9:15 AM");
 assert.equal(saved.tokenValues["{so_ticket_num}"], "31436062");
 assert.equal((await loadSuperOfficeTicketPayload()).imageAttachments.length, 1);
 assert.equal((await loadSuperOfficeTicketPayload()).mediaAttachments.length, 3);

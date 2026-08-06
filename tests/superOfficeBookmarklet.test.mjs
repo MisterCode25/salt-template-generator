@@ -119,6 +119,7 @@ async function flushBookmarkletAsyncWork() {
 
     const payload = JSON.parse(copiedText);
     assert.equal(payload.ticketId, "31436062");
+    assert.equal(payload.firstPostAt, "13.06.2026 14:45");
     assert.equal(payload.attachments.length, 2);
 
     const inlineImage = payload.attachments.find((attachment) => attachment.name === "Inline OTO photo");
@@ -139,6 +140,7 @@ async function flushBookmarkletAsyncWork() {
 
     const parsed = parseSuperOfficeInfoPayload(payload);
     assert.equal(parsed.ok, true);
+    assert.equal(parsed.firstPostAt, "13.06.2026 14:45");
     assert.equal(parsed.imageAttachments.length, 2);
   } finally {
     restoreGlobals.reverse().forEach((restore) => restore());

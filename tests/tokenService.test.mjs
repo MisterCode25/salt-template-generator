@@ -47,6 +47,7 @@ const agentFirstNameToken = tokens.find((tokenDef) => tokenDef.token === "{agent
 const agentEmailToken = tokens.find((tokenDef) => tokenDef.token === "{agent_email}");
 const externalPartnerTicketToken = tokens.find((tokenDef) => tokenDef.token === "{external_partner_ticket_number}");
 const externalCommentToken = tokens.find((tokenDef) => tokenDef.token === "{external_comment}");
+const caseProblemDateToken = tokens.find((tokenDef) => tokenDef.token === "{case_problem_date}");
 
 assert.ok(customerToken);
 assert.ok(soTicketToken);
@@ -62,6 +63,8 @@ assert.equal(agentEmailToken.label, "Agent email");
 assert.equal(externalPartnerTicketToken.system, true);
 assert.equal(externalPartnerTicketToken.key, "partnerTicketNumber");
 assert.equal(externalCommentToken, undefined);
+assert.equal(caseProblemDateToken?.system, true);
+assert.equal(caseProblemDateToken?.input_type, "date");
 assert.equal(tokens.some((tokenDef) => tokenDef.token === "{client_first_name}"), false);
 assert.equal(tokens.some((tokenDef) => tokenDef.token === "{contact_error}"), false);
 assert.equal(tokens.some((tokenDef) => tokenDef.token === "{healthcheck_oto_id}"), false);
@@ -73,6 +76,7 @@ const persistedTokens = await loadJSON("tokens", []);
 assert.equal(persistedTokens.some((tokenDef) => tokenDef.token === "{agent_firstName}"), false);
 assert.equal(persistedTokens.some((tokenDef) => tokenDef.token === "{external_partner_ticket_number}"), false);
 assert.equal(persistedTokens.some((tokenDef) => tokenDef.token === "{so_ticket_num}"), false);
+assert.equal(persistedTokens.some((tokenDef) => tokenDef.token === "{case_problem_date}"), false);
 assert.equal(persistedTokens.some((tokenDef) => tokenDef.token === "{customer_name}"), true);
 
 await clearAppIndexedDB();

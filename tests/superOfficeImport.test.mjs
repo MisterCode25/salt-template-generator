@@ -18,6 +18,7 @@ import { parseExternalId } from "../src/utils/externalGenerator.js";
   const result = parseSuperOfficeInfoPayload(JSON.stringify({
     ticketId: "232",
     createdAt: "6/4/2026 12:07 PM",
+    firstPostAt: "6/3/2026 9:15 AM",
     externalTicketId: "VALID//26.02.2026//123//SO1//Lost//Fiber Off//Other//X6//EWB//ABC//L1//OLT//1//BOK|BOF//Comment"
   }));
 
@@ -25,6 +26,7 @@ import { parseExternalId } from "../src/utils/externalGenerator.js";
   assert.equal(result.ticketId, "232");
   assert.equal(result.sourceTicketId, "232");
   assert.equal(result.createdAt, "6/4/2026 12:07 PM");
+  assert.equal(result.firstPostAt, "6/3/2026 9:15 AM");
   assert.equal(result.externalIdValid, true);
   assert.equal(result.ignoredExternalId, false);
   assert.equal(result.contractorNumber, "123");

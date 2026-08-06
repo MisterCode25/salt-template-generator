@@ -1,10 +1,10 @@
 import { parseExternalId } from "./externalGenerator.js";
 import { SO_TICKET_NUM_TOKEN } from "./tokenCanonicalization.js";
+import { CASE_PROBLEM_DATE_TOKEN } from "./caseDateTokens.js";
 
 export const ALO_AUTOFILL_CLIPBOARD_SOURCE = "salt-templater-alo-autofill";
 export const ALO_AUTOFILL_VERSION = 1;
 export const ALO_FULFILLMENT_DETAIL_URL = "https://wholesale.swisscom.com/wsg/prod/alo/fuf/web/alo-web/fulfillment/detail.do";
-
 const ALO_DEFAULT_PROBLEM = Object.freeze({
     problemDescription: "No signal",
     problemNotes: "",
@@ -80,6 +80,44 @@ function getAloOrderId(clientPayload = {}) {
     ]);
 }
 
+function getFirstSuperOfficePostDate(superOfficePayload = {}) {
+    const explicitDate = firstValue([
+        superOfficePayload?.firstPostAt,
+        superOfficePayload?.firstPostDate,
+        superOfficePayload?.firstMessageAt,
+        superOfficePayload?.firstMessageDate
+    ]);
+    if (explicitDate) return explicitDate;
+
+    const datedAttachments = (Array.isArray(superOfficePayload?.attachments) ? superOfficePayload.attachments : [])
+        .map((attachment) => {
+            const rawMessageIndex = attachment?.messageIndex;
+            return {
+                date: firstValue([
+                    attachment?.date,
+                    attachment?.messageDate,
+                    attachment?.messageDateTime,
+                    attachment?.createdAt,
+                    attachment?.message?.date,
+                    attachment?.message?.createdAt
+                ]),
+                messageIndex: rawMessageIndex === null || rawMessageIndex === undefined || rawMessageIndex === ""
+                    ? null
+                    : Number(rawMessageIndex)
+            };
+        })
+        .filter((attachment) => attachment.date && formatIsoDate(attachment.date));
+    const indexedAttachments = datedAttachments.filter((attachment) => Number.isInteger(attachment.messageIndex));
+    const candidates = indexedAttachments.length > 0 ? indexedAttachments : datedAttachments;
+    candidates.sort((left, right) => {
+        if (indexedAttachments.length > 0 && left.messageIndex !== right.messageIndex) {
+            return left.messageIndex - right.messageIndex;
+        }
+        return formatIsoDate(left.date).localeCompare(formatIsoDate(right.date));
+    });
+    return candidates[0]?.date || "";
+}
+
 function resolveAloSignalState(externalFields = {}) {
     const signal = textValue(externalFields.SignalStatus).toLowerCase();
     if (signal === "lost") return "lost";
@@ -96,6 +134,16 @@ export function buildAloProblemDescription(options = {}) {
         : formatDisplayDate(options.disconnectionDate);
     const label = signalState === "never" ? "Never activated" : "Signal lost";
     return [base, label, date].filter(Boolean).join(" - ");
+}
+
+export function buildAloTemplateTokenValues(options = {}) {
+    const disconnectionDate = formatDisplayDate(options.disconnectionDate);
+    const activationDate = formatDisplayDate(options.activationDate);
+    const problemDate = options.signalState === "never" ? activationDate : disconnectionDate;
+
+    return {
+        [CASE_PROBLEM_DATE_TOKEN]: problemDate
+    };
 }
 
 export function buildAloPreparationDefaults(clientPayload = {}, superOfficePayload = {}) {
@@ -115,17 +163,16 @@ export function buildAloPreparationDefaults(clientPayload = {}, superOfficePaylo
         superOfficePayload?.createdAt,
         superOfficePayload?.created,
         superOfficePayload?.ticketDate,
-        superOfficePayload?.messageDate,
-        superOfficePayload?.importedAt
+        superOfficePayload?.createdDate
     ]));
+    const firstPostDate = formatIsoDate(getFirstSuperOfficePostDate(superOfficePayload));
 
     return {
         externalId,
         externalFields,
         aloType: "",
         signalState,
-        extRef: "",
-        disconnectionDate: signalState === "lost" ? ticketCreatedDate : "",
+        disconnectionDate: ticketCreatedDate || firstPostDate,
         activationDate,
         description: ""
     };

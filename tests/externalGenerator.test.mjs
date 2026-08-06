@@ -107,6 +107,10 @@ import { setTokenInputValues } from "../src/services/tokenInputValueService.js";
         client: {
             contractorNumber: "31447756"
         },
+        contact: {
+            eligibilityOrdering: "35",
+            providerOrderRef: "10031420260327025732000000"
+        },
         healthcheck: {
             routerSerialNumber: "GFAB11004892",
             lexId: "69VEV",
@@ -123,6 +127,18 @@ import { setTokenInputValues } from "../src/services/tokenInputValueService.js";
     assert.equal(parsed.fields.oltName, "1");
     assert.equal(parsed.fields.oltBoard, "2");
     assert.equal(parsed.fields.bokBof, "KP100314-C0036|8");
+    assert.equal(parsed.fields.partner, "SIG");
+    assert.equal(parsed.fields.partnerTicketNumber, undefined);
+}
+
+{
+    const parsed = buildExternalFieldsFromClientPayload({
+        contact: {
+            eligibilityOrdering: "19"
+        }
+    });
+    assert.equal(parsed.ok, true);
+    assert.equal(parsed.fields.partner, "SGSW");
 }
 
 {

@@ -1,6 +1,7 @@
 import { SO_TICKET_NUM_TOKEN, SO_TICKET_TOKEN_KEY } from "./tokenCanonicalization.js";
 import { loadTokenInputValues } from "../services/tokenInputValueService.js";
 import { IMPORTED_EXTERNAL_ID_KEY } from "../services/activeClientService.js";
+import { getEligibilityPartnerName } from "./eligibilityPartner.js";
 
 export const EXTERNAL_GENERATOR_PARTNERS = [
     "ALO", "AMB", "ANI", "COMNET", "DANET", "DEK", "DWW", "EBS", "ENERCOM", "ENIWA", "ESAG", "ESI", "EVAL", "EVB", "EVK",
@@ -264,6 +265,23 @@ function valueOf(...values) {
     return "";
 }
 
+function normalizeGeneratorPartner(partnerName) {
+    const value = String(partnerName ?? "").trim();
+    if (!value) return "";
+
+    const normalizedValue = value.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const aliases = {
+        com: "COMNET",
+        enerc: "ENERCOM",
+        swiss4: "SWISS4NET"
+    };
+    if (aliases[normalizedValue]) return aliases[normalizedValue];
+
+    return EXTERNAL_GENERATOR_PARTNERS.find((partner) => (
+        partner.toLowerCase().replace(/[^a-z0-9]/g, "") === normalizedValue
+    )) || value;
+}
+
 function boxTypeFromRouterSerial(serial = "") {
     if (serial.startsWith("GFAB")) return "X6";
     if (serial.startsWith("GFAC")) return "W7";
@@ -295,11 +313,22 @@ export function buildExternalFieldsFromClientPayload(payload) {
     }
 
     const client = payload.client || {};
+    const contact = payload.contact || {};
     const healthcheck = payload.healthcheck || {};
     const routerSerial = valueOf(healthcheck.routerSerialNumber, healthcheck.oldRouterSerialNumber);
+    const partner = normalizeGeneratorPartner(valueOf(
+        getEligibilityPartnerName(contact.eligibilityOrdering),
+        contact.partnerName,
+        contact.partner,
+        client.partnerName,
+        client.partner,
+        contact.eligibilitySource,
+        client.eligibilitySource
+    ));
     const fields = {
         customer: valueOf(client.contractorNumber, client.contractor, healthcheck.customerId),
         boxType: boxTypeFromRouterSerial(routerSerial),
+        ...(partner ? { partner } : {}),
         lexId: valueOf(healthcheck.lexId),
         oltName: valueOf(healthcheck.oltName),
         oltBoard: valueOf(healthcheck.oltBoard),
@@ -309,6 +338,7 @@ export function buildExternalFieldsFromClientPayload(payload) {
     const hasUsefulData = Boolean(
         fields.customer
         || fields.boxType
+        || fields.partner
         || fields.lexId
         || fields.oltName
         || fields.oltBoard
