@@ -164,6 +164,8 @@ ${JSON.stringify(sampleClientJSON, null, 2)}`);
   assert.equal(summary.find((field) => field.label === "OTO ID").value, "B.111.783.391.7");
   assert.equal(summary.find((field) => field.label === "Port").value, "3");
   assert.equal(getClientLanguageCode(sampleClientJSON), "fr");
+  assert.equal(getClientLanguageCode({ contact: { communicationLanguage: "DE" } }), "de");
+  assert.equal(getClientLanguageCode({ client: { language: "Italian" } }), "it");
 }
 
 {

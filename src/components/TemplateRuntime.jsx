@@ -1820,6 +1820,8 @@ export function useTemplateRuntime() {
             await applyAgentProfile();
             if (cancelled) return;
             if (storedClient) {
+                const storedClientLanguage = getClientLanguageCode(storedClient);
+                if (storedClientLanguage) setLang(storedClientLanguage);
                 setClientPayload(storedClient);
                 setClientImportStatus({ type: "success", message: "" });
             }
