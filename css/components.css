@@ -11095,6 +11095,10 @@ a.tools-bar-btn {
     --tool-accent: #18a07a;
 }
 
+.tools-bar-btn--alex {
+    --tool-accent: #3478d4;
+}
+
 .tools-bar-btn--so {
     --tool-accent: #d99a2b;
 }
@@ -12166,6 +12170,10 @@ a.tools-bar-btn {
 
 .tools-shortcut-card--alo {
     --shortcut-accent: #21a36a;
+}
+
+.tools-shortcut-card--alex-ticket {
+    --shortcut-accent: #3478d4;
 }
 
 .tools-shortcut-card--alo-beta {

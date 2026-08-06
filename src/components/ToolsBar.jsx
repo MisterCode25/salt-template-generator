@@ -267,6 +267,9 @@ function ToolsBar({
     runtimeContextRef: externalRuntimeContextRef = null,
     onOpenExternalGenerator,
     hasExternalId = false,
+    onOpenAlexTicket,
+    hasAlexTicketData = false,
+    alexTicketUnavailableMessage = "ALEX ticket data is unavailable",
     onCopyAloAutofillData,
     hasAloAutofillData = false,
     onOpenSuperOfficePhotos,
@@ -365,6 +368,19 @@ function ToolsBar({
                                     ALO fill
                                 </button>
                             )}
+                            {onOpenAlexTicket && (
+                                <button
+                                    type="button"
+                                    className={`tools-bar-btn tools-bar-btn--system tools-bar-btn--alex${hasAlexTicketData ? "" : " is-disabled"}`}
+                                    onClick={onOpenAlexTicket}
+                                    disabled={!hasAlexTicketData}
+                                    aria-disabled={!hasAlexTicketData}
+                                    title={hasAlexTicketData ? "Copy the payload and open the existing ALEX ticket" : alexTicketUnavailableMessage}
+                                >
+                                    <ExternalLink size={14} strokeWidth={2} aria-hidden="true" />
+                                    Ticket ALEX
+                                </button>
+                            )}
                             {onOpenSuperOfficePhotos && superOfficeAttachmentCount > 0 && (
                                 <button
                                     type="button"
@@ -431,6 +447,9 @@ export default memo(ToolsBar, (prevProps, nextProps) => {
         && prevProps.runtimeContextRef === nextProps.runtimeContextRef
         && prevProps.onOpenExternalGenerator === nextProps.onOpenExternalGenerator
         && prevProps.hasExternalId === nextProps.hasExternalId
+        && prevProps.onOpenAlexTicket === nextProps.onOpenAlexTicket
+        && prevProps.hasAlexTicketData === nextProps.hasAlexTicketData
+        && prevProps.alexTicketUnavailableMessage === nextProps.alexTicketUnavailableMessage
         && prevProps.onCopyAloAutofillData === nextProps.onCopyAloAutofillData
         && prevProps.hasAloAutofillData === nextProps.hasAloAutofillData
         && prevProps.onOpenSuperOfficePhotos === nextProps.onOpenSuperOfficePhotos

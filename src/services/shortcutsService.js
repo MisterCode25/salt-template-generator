@@ -4,6 +4,7 @@ import {
     buildAloAutofillBetaBookmarklet,
     buildAloAutofillBookmarklet
 } from "../utils/aloAutofill.js";
+import { buildAlexTicketBookmarklet } from "../utils/alexTicket.js";
 
 export const DATA_SHORTCUTS = Object.freeze([
     {
@@ -31,6 +32,20 @@ export const DATA_SHORTCUTS = Object.freeze([
             "Click the saved bookmarklet in the bookmarks bar.",
             "Come back to Salt BO tools with the Capture data popup open.",
             "Ticket photos, videos and PDFs will appear in the Médias SO tool when compatible attachments are present."
+        ]
+    },
+    {
+        id: "alex-ticket",
+        eyebrow: "ALEX ticket consultation",
+        title: "Open ALEX ticket",
+        buttonLabel: "Open ALEX ticket",
+        bookmarklet: buildAlexTicketBookmarklet(),
+        description: "Reads the ALEX ticket payload, selects the matching partner in local storage and opens the existing partner ticket.",
+        steps: [
+            "Capture the current VTI customer and generate or import its External ID.",
+            "Click Ticket ALEX in the tools bar to copy the partner context and ticket number.",
+            "On the newly opened ftthproxy.ch tab, sign in if necessary.",
+            "Click this bookmarklet to select the partner and display the existing ticket."
         ]
     },
     {

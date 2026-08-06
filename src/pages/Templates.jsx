@@ -78,6 +78,12 @@ import {
     formatAloAutofillPayload,
     openAloTicketCreationPage
 } from "../utils/aloAutofill.js";
+import {
+    buildAlexTicketPayload,
+    formatAlexTicketPayload,
+    getAlexTicketUnavailableMessage,
+    openAlexHomePage
+} from "../utils/alexTicket.js";
 import { buildAloPreparationSteps } from "../utils/aloPreparationFlow.js";
 import { getKeyboardShortcutForEvent } from "../utils/keyboardShortcuts.js";
 import {
@@ -1063,6 +1069,11 @@ export default function Templates() {
         [baseClientSummaryFields]
     );
     const displayClientExternalId = runtime.clientExternalId || caseProfile.externalId || "";
+    const alexPartnerTicketNumber = caseProfile.externalPartnerTicketNumber || "";
+    const alexTicketPreparation = useMemo(
+        () => buildAlexTicketPayload(runtime.clientPayload, alexPartnerTicketNumber),
+        [alexPartnerTicketNumber, runtime.clientPayload]
+    );
     const canCustomizeClientBar = runtime.clientBarFieldGroups.length > 0;
 
     toolRuntimeContextRef.current = {
@@ -1380,6 +1391,24 @@ export default function Templates() {
         ));
         setAloPreparation(buildAloPreparationDefaults(clientPayload, superOfficePayload));
     }, [treeTemplates]);
+
+    const openAlexTicket = useCallback(async () => {
+        const preparation = buildAlexTicketPayload(
+            runtimeRef.current.clientPayload,
+            alexPartnerTicketNumber
+        );
+        if (!preparation.ok) {
+            showToast(getAlexTicketUnavailableMessage(preparation.error), "error");
+            return;
+        }
+
+        const copyPromise = copyText(
+            formatAlexTicketPayload(preparation.payload),
+            { message: "ALEX ticket payload copied", variant: "success" }
+        );
+        openAlexHomePage();
+        await copyPromise;
+    }, [alexPartnerTicketNumber]);
 
     const closeAloPreparation = useCallback(() => {
         setAloPreparation(null);
@@ -1784,6 +1813,11 @@ export default function Templates() {
                 runtimeContextRef={toolRuntimeContextRef}
                 onOpenExternalGenerator={openExternalGenerator}
                 hasExternalId={Boolean(displayClientExternalId)}
+                onOpenAlexTicket={openAlexTicket}
+                hasAlexTicketData={alexTicketPreparation.ok}
+                alexTicketUnavailableMessage={alexTicketPreparation.ok
+                    ? ""
+                    : getAlexTicketUnavailableMessage(alexTicketPreparation.error)}
                 onCopyAloAutofillData={copyAloAutofillData}
                 hasAloAutofillData={Boolean(runtime.clientPayload)}
                 onOpenSuperOfficePhotos={openSuperOfficeGallery}
