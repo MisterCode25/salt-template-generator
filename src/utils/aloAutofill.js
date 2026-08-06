@@ -6,6 +6,12 @@ export const ALO_AUTOFILL_CLIPBOARD_SOURCE = "salt-templater-alo-autofill";
 export const ALO_AUTOFILL_VERSION = 1;
 export const ALO_FULFILLMENT_DETAIL_URL = "https://wholesale.swisscom.com/wsg/prod/alo/fuf/web/alo-web/fulfillment/detail.do";
 export const ALO_TICKET_CREATION_URL = "https://wholesale.swisscom.com/wsg/prod/alo/ass/web/alo-web/assurance/create.do?clearModel=true";
+
+export function openAloTicketCreationPage(openWindow = globalThis.window?.open?.bind(globalThis.window)) {
+    if (typeof openWindow !== "function") return null;
+    return openWindow(ALO_TICKET_CREATION_URL, "_blank", "noopener,noreferrer");
+}
+
 const ALO_DEFAULT_PROBLEM = Object.freeze({
     problemDescription: "No signal",
     problemNotes: "",

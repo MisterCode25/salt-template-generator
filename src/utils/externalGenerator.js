@@ -357,6 +357,34 @@ export function buildExternalFieldsFromClientPayload(payload) {
     return { ok: true, fields };
 }
 
+export const EXTERNAL_TREATMENT_STEP_DOWNSTREAM_FIELDS = Object.freeze([
+    "SignalStatus",
+    "LedStatus",
+    "partner",
+    "partnerTicketNumber",
+    "comment"
+]);
+
+export function buildTreatmentStepChangeFields(currentFields, treatmentStep, clientPayload) {
+    const resetFields = Object.fromEntries(
+        EXTERNAL_TREATMENT_STEP_DOWNSTREAM_FIELDS.map((field) => [field, ""])
+    );
+    const nextFields = {
+        ...currentFields,
+        treatmentStep,
+        ...resetFields
+    };
+
+    if (treatmentStep !== "FLL Ticket") return nextFields;
+
+    const clientFields = buildExternalFieldsFromClientPayload(clientPayload);
+    if (clientFields.ok && clientFields.fields.partner) {
+        nextFields.partner = clientFields.fields.partner;
+    }
+
+    return nextFields;
+}
+
 export function mergeExternalFields(current, patch) {
     return { ...current, ...patch };
 }

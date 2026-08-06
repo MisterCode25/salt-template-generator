@@ -9,9 +9,11 @@ import { SO_TICKET_NUM_TOKEN, SO_TICKET_TOKEN_KEY } from "../utils/tokenCanonica
 import {
     EXTERNAL_DEFAULT_FIELDS,
     EXTERNAL_GENERATOR_PARTNERS,
+    EXTERNAL_TREATMENT_STEP_DOWNSTREAM_FIELDS,
     buildExternalFieldsFromClientPayload,
     buildExternalCode,
     buildPartnerTicketPromptTitle,
+    buildTreatmentStepChangeFields,
     buildExternalTokenValues,
     formatDateForInput,
     mergeExternalFields,
@@ -862,12 +864,6 @@ export default function ExternalGenerator({
         await runPostVtiCompletionFlow(fieldsRef.current, inferMetaFromFields(fieldsRef.current));
     };
 
-    // When the user modifies a branching field via field click, clear the fields that
-    // logically come after it in the wizard so the flow re-asks for them.
-    const WIZARD_DOWNSTREAM_FIELDS = {
-        treatmentStep: ["SignalStatus", "LedStatus", "partner", "partnerTicketNumber", "comment"],
-    };
-
     const FIELD_POPUP_CONFIG = {
         data: { type: "input", inputType: "date", title: "Date", placeholder: "YYYY-MM-DD" },
         SignalStatus: { type: "choice", options: SIGNAL_OPTIONS_ESCALATION, title: "Signal Status" },
@@ -923,10 +919,16 @@ export default function ExternalGenerator({
 
         // When modifying a branching field, clear its downstream fields so the wizard
         // re-asks for them in the correct context rather than skipping them.
-        const downstreamFields = WIZARD_DOWNSTREAM_FIELDS[fieldId] || [];
-        const clearPatch = downstreamFields.reduce((acc, f) => ({ ...acc, [f]: "" }), {});
-
-        const updatedFields = { ...currentFields, [fieldId]: cleaned, ...clearPatch };
+        const isTreatmentStepChange = fieldId === "treatmentStep";
+        const downstreamFields = isTreatmentStepChange
+            ? EXTERNAL_TREATMENT_STEP_DOWNSTREAM_FIELDS
+            : [];
+        const activeClientPayload = isTreatmentStepChange
+            ? clientPayload || storedClientPayload || await loadActiveClientPayload()
+            : null;
+        const updatedFields = isTreatmentStepChange
+            ? buildTreatmentStepChangeFields(currentFields, cleaned, activeClientPayload)
+            : { ...currentFields, [fieldId]: cleaned };
         setFields(updatedFields);
         setVtiEmptyFieldErrors((prev) => {
             const next = { ...prev };

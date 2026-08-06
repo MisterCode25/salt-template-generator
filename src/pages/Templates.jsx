@@ -73,10 +73,10 @@ import {
     saveDisplaySuperOfficeExternalId
 } from "../services/superOfficeTicketService.js";
 import {
-    ALO_TICKET_CREATION_URL,
     buildAloPreparationDefaults,
     buildAloTemplateTokenValues,
-    formatAloAutofillPayload
+    formatAloAutofillPayload,
+    openAloTicketCreationPage
 } from "../utils/aloAutofill.js";
 import { buildAloPreparationSteps } from "../utils/aloPreparationFlow.js";
 import { getKeyboardShortcutForEvent } from "../utils/keyboardShortcuts.js";
@@ -595,7 +595,6 @@ function AloPreparationModal({ defaults, templateOptions = [], resolveTemplateTe
             const option = templateOptions.find((candidate) => candidate.id === value);
             if (!option) return;
             updateForm({ selectedTemplateId: value });
-            setTimeout(advance, 0);
             return;
         }
         updateForm({ [step.key]: value });
@@ -1036,6 +1035,7 @@ export default function Templates() {
     const [superOfficeGalleryOpen, setSuperOfficeGalleryOpen] = useState(false);
     const [aloPreparation, setAloPreparation] = useState(null);
     const [aloTemplateOptions, setAloTemplateOptions] = useState([]);
+    const aloPreparationContextRef = useRef(null);
     const [templateImageMap, setTemplateImageMap] = useState(() => new Map());
     const [configName, setConfigName] = useState("No configuration");
     const [configLocked, setConfigLocked] = useState(false);
@@ -1368,34 +1368,47 @@ export default function Templates() {
         const clientPayload = runtimeApi.clientPayload;
         if (!clientPayload) return;
 
+        const [agentProfile, superOfficePayload] = await Promise.all([
+            loadAgentProfile(),
+            loadSuperOfficeTicketPayload()
+        ]);
+        aloPreparationContextRef.current = { agentProfile, superOfficePayload };
+
         setAloTemplateOptions(buildAloTemplateOptions(
             treeTemplates,
             runtimeApi.generateResolvedTemplateText
         ));
-        setAloPreparation(buildAloPreparationDefaults(clientPayload, await loadSuperOfficeTicketPayload()));
+        setAloPreparation(buildAloPreparationDefaults(clientPayload, superOfficePayload));
     }, [treeTemplates]);
 
     const closeAloPreparation = useCallback(() => {
         setAloPreparation(null);
         setAloTemplateOptions([]);
+        aloPreparationContextRef.current = null;
     }, []);
 
     const submitAloPreparation = useCallback(async (options) => {
         const clientPayload = runtimeRef.current.clientPayload;
         if (!clientPayload) return;
 
-        await copyText(
+        const preparationContext = aloPreparationContextRef.current;
+        const agentProfile = preparationContext?.agentProfile || await loadAgentProfile();
+        const superOfficePayload = preparationContext?.superOfficePayload || await loadSuperOfficeTicketPayload();
+
+        const copyPromise = copyText(
             formatAloAutofillPayload(
                 clientPayload,
-                await loadAgentProfile(),
-                await loadSuperOfficeTicketPayload(),
+                agentProfile,
+                superOfficePayload,
                 options
             ),
             { message: "ALO fill data copied", variant: "success" }
         );
+        openAloTicketCreationPage();
+        await copyPromise;
         setAloPreparation(null);
         setAloTemplateOptions([]);
-        window.location.assign(ALO_TICKET_CREATION_URL);
+        aloPreparationContextRef.current = null;
     }, []);
 
     const importClientFromPasteAndResetCase = useCallback(async (text) => {

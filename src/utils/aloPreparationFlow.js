@@ -14,12 +14,6 @@ export function buildAloPreparationSteps({
 } = {}) {
     const steps = [
         { key: "aloType", kind: "choice", title: "Type", options: ALO_TYPE_OPTIONS },
-        {
-            key: "selectedTemplateId",
-            kind: "template",
-            title: "Import template",
-            hasTemplates
-        },
         { key: "signalState", kind: "choice", title: "Signal state", options: ALO_SIGNAL_OPTIONS }
     ];
 
@@ -28,6 +22,13 @@ export function buildAloPreparationSteps({
         kind: "input",
         title: signalState === "never" ? "Activation date" : "Disconnection date",
         inputType: "date"
+    });
+
+    steps.push({
+        key: "selectedTemplateId",
+        kind: "template",
+        title: "Import template",
+        hasTemplates
     });
 
     return steps;

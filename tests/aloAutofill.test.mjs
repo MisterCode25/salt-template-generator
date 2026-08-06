@@ -9,7 +9,8 @@ import {
   buildAloPreparationDefaults,
   buildAloTemplateTokenValues,
   extractAloExternalReference,
-  formatAloAutofillPayload
+  formatAloAutofillPayload,
+  openAloTicketCreationPage
 } from "../src/utils/aloAutofill.js";
 import { buildAloPreparationSteps } from "../src/utils/aloPreparationFlow.js";
 import { CASE_PROBLEM_DATE_TOKEN } from "../src/utils/caseDateTokens.js";
@@ -31,6 +32,12 @@ assert.equal(
   ALO_TICKET_CREATION_URL,
   "https://wholesale.swisscom.com/wsg/prod/alo/ass/web/alo-web/assurance/create.do?clearModel=true"
 );
+
+{
+  const calls = [];
+  openAloTicketCreationPage((...args) => calls.push(args));
+  assert.deepEqual(calls, [[ALO_TICKET_CREATION_URL, "_blank", "noopener,noreferrer"]]);
+}
 
 {
   const payload = buildAloAutofillPayload(TEST_VTI_IMPORT_PAYLOAD, agentProfile, TEST_SO_IMPORT_PAYLOAD);
@@ -94,9 +101,9 @@ assert.equal(
   });
   assert.deepEqual(steps.map((step) => step.key), [
     "aloType",
-    "selectedTemplateId",
     "signalState",
-    "disconnectionDate"
+    "disconnectionDate",
+    "selectedTemplateId"
   ]);
   assert.equal(steps.some((step) => step.key === "extRef"), false);
   assert.equal(steps.some((step) => step.key === "notesMode" || step.kind === "textarea"), false);
@@ -107,9 +114,9 @@ assert.equal(
   });
   assert.deepEqual(neverSteps.map((step) => step.key), [
     "aloType",
-    "selectedTemplateId",
     "signalState",
-    "activationDate"
+    "activationDate",
+    "selectedTemplateId"
   ]);
 }
 

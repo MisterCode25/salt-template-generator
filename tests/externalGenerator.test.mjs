@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
     EXTERNAL_SYSTEM_TOKENS,
     buildExternalFieldsFromClientPayload,
+    buildTreatmentStepChangeFields,
     buildExternalCode,
     buildPartnerTicketPromptTitle,
     readExternalFieldsFromStoredTokens,
@@ -136,6 +137,28 @@ import { setTokenInputValues } from "../src/services/tokenInputValueService.js";
     assert.equal(parsed.fields.bokBof, "KP100314-C0036|8");
     assert.equal(parsed.fields.partner, "SIG");
     assert.equal(parsed.fields.partnerTicketNumber, undefined);
+}
+
+{
+    const updated = buildTreatmentStepChangeFields({
+        treatmentStep: "Other",
+        SignalStatus: "Lost",
+        LedStatus: "Fiber Red",
+        partner: "EWB",
+        partnerTicketNumber: "OLD-123",
+        comment: "Old comment"
+    }, "FLL Ticket", {
+        contact: {
+            eligibilityOrdering: "35"
+        }
+    });
+
+    assert.equal(updated.treatmentStep, "FLL Ticket");
+    assert.equal(updated.SignalStatus, "");
+    assert.equal(updated.LedStatus, "");
+    assert.equal(updated.partner, "SIG");
+    assert.equal(updated.partnerTicketNumber, "");
+    assert.equal(updated.comment, "");
 }
 
 {
