@@ -65,6 +65,7 @@ import {
     assert.match(bookmarklet, /localStorage\.setItem\("focus"/);
     assert.match(bookmarklet, /view-ticket/);
     assert.match(bookmarklet, /assurance\/ticket/);
+    assert.doesNotMatch(bookmarklet, /encodeURIComponent/);
     assert.doesNotMatch(bookmarklet, /auth/i);
 }
 

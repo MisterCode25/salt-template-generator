@@ -10,7 +10,7 @@ function normalizeText(value) {
 }
 
 function normalizeTicketNumber(value) {
-    return String(value ?? "").replace(/\D+/g, "");
+    return String(value ?? "").replace(/[^0-9]+/g, "");
 }
 
 function getEligibilityOrdering(clientPayload) {
@@ -86,7 +86,7 @@ function alexTicketBookmarkletRunner(expectedSource) {
         }
 
         var alap = String(payload.alap || "").trim();
-        var ticket = String(payload.ticket || "").replace(/\D+/g, "");
+        var ticket = String(payload.ticket || "").replace(/[^0-9]+/g, "");
         var serviceDomain = Number(payload.serviceDomain);
         var businessDomain = String(payload.businessDomain || "").trim();
 
@@ -106,7 +106,7 @@ function alexTicketBookmarkletRunner(expectedSource) {
             businessDomain: businessDomain
         }));
 
-        var targetHash = "/assurance/ticket/" + encodeURIComponent(ticket);
+        var targetHash = "/assurance/ticket/" + ticket;
         if (location.hash === "#" + targetHash) {
             location.reload();
             return;
