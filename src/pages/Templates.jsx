@@ -73,8 +73,8 @@ import {
     saveDisplaySuperOfficeExternalId
 } from "../services/superOfficeTicketService.js";
 import {
+    ALO_TICKET_CREATION_URL,
     buildAloPreparationDefaults,
-    buildAloProblemDescription,
     buildAloTemplateTokenValues,
     formatAloAutofillPayload
 } from "../utils/aloAutofill.js";
@@ -540,17 +540,14 @@ function AloPreparationModal({ defaults, templateOptions = [], resolveTemplateTe
         signalState: defaults.signalState || "",
         disconnectionDate: defaults.disconnectionDate || "",
         activationDate: defaults.activationDate || "",
-        selectedTemplateId: "",
-        notes: defaults.description || ""
+        selectedTemplateId: ""
     }));
     const [stepIndex, setStepIndex] = useState(0);
-    const inferredSignalState = Boolean(defaults.signalState);
 
     const steps = useMemo(() => buildAloPreparationSteps({
         signalState: form.signalState,
-        hasInferredSignalState: inferredSignalState,
         hasTemplates: templateOptions.length > 0
-    }), [form.signalState, inferredSignalState, templateOptions.length]);
+    }), [form.signalState, templateOptions.length]);
 
     const step = steps[Math.min(stepIndex, steps.length - 1)];
     const showBack = stepIndex > 0;
@@ -560,22 +557,15 @@ function AloPreparationModal({ defaults, templateOptions = [], resolveTemplateTe
             ? "No signal"
             : "Choose type";
 
-    const updateForm = (patch) => {
-        setForm((current) => {
-            const next = { ...current, ...patch };
-            const affectsTemplateResolution = [
-                "aloType",
-                "signalState",
-                "disconnectionDate",
-                "activationDate"
-            ].some((key) => Object.prototype.hasOwnProperty.call(patch, key));
-            if (affectsTemplateResolution) {
-                next.selectedTemplateId = "";
-                next.notes = next.aloType ? buildAloProblemDescription(next) : "";
-            }
-            return next;
-        });
-    };
+    const selectedTemplate = templateOptions.find((option) => option.id === form.selectedTemplateId);
+    const resolvedSelectedTemplate = selectedTemplate && resolveTemplateText
+        ? resolveTemplateText(selectedTemplate.model, buildAloTemplateTokenValues(form))
+        : null;
+    const selectedTemplateNotes = resolvedSelectedTemplate
+        ? plainTextFromTemplate(resolvedSelectedTemplate.text)
+        : selectedTemplate?.text || "";
+
+    const updateForm = (patch) => setForm((current) => ({ ...current, ...patch }));
 
     const advance = () => setStepIndex((current) => Math.min(current + 1, steps.length - 1));
     const back = () => setStepIndex((current) => Math.max(current - 1, 0));
@@ -586,7 +576,7 @@ function AloPreparationModal({ defaults, templateOptions = [], resolveTemplateTe
         disconnectionDate: form.disconnectionDate,
         activationDate: form.activationDate,
         description: form.aloType === "lowBadRxTx" ? "Bad signal" : "No signal",
-        notes: form.notes.trim()
+        notes: selectedTemplateNotes.trim()
     });
 
     const continueInput = () => {
@@ -604,14 +594,8 @@ function AloPreparationModal({ defaults, templateOptions = [], resolveTemplateTe
         if (step.key === "selectedTemplateId") {
             const option = templateOptions.find((candidate) => candidate.id === value);
             if (!option) return;
-            const resolvedTemplate = resolveTemplateText?.(
-                option.model,
-                buildAloTemplateTokenValues(form)
-            );
-            updateForm({
-                selectedTemplateId: value,
-                notes: resolvedTemplate ? plainTextFromTemplate(resolvedTemplate.text) : option.text
-            });
+            updateForm({ selectedTemplateId: value });
+            setTimeout(advance, 0);
             return;
         }
         updateForm({ [step.key]: value });
@@ -678,7 +662,7 @@ function AloPreparationModal({ defaults, templateOptions = [], resolveTemplateTe
                             ))}
                         </select>
                         {!step.hasTemplates && <p className="hint">No template is available.</p>}
-                        {form.notes && <p className="alo-step-preview">{form.notes}</p>}
+                        {selectedTemplateNotes && <p className="alo-step-preview">{selectedTemplateNotes}</p>}
                     </div>
                 )}
 
@@ -689,7 +673,7 @@ function AloPreparationModal({ defaults, templateOptions = [], resolveTemplateTe
                     <div className="prompt-dialog__actions-end">
                         {step.kind !== "choice" && (
                             <button type="button" className="prompt-dialog__btn prompt-dialog__btn--continue" onClick={continueInput}>
-                                {stepIndex === steps.length - 1 ? "Copy ALO data" : "Continue →"}
+                                {stepIndex === steps.length - 1 ? "Copy & open ALO" : "Continue →"}
                             </button>
                         )}
                     </div>
@@ -1411,6 +1395,7 @@ export default function Templates() {
         );
         setAloPreparation(null);
         setAloTemplateOptions([]);
+        window.location.assign(ALO_TICKET_CREATION_URL);
     }, []);
 
     const importClientFromPasteAndResetCase = useCallback(async (text) => {

@@ -5,6 +5,7 @@ import { CASE_PROBLEM_DATE_TOKEN } from "./caseDateTokens.js";
 export const ALO_AUTOFILL_CLIPBOARD_SOURCE = "salt-templater-alo-autofill";
 export const ALO_AUTOFILL_VERSION = 1;
 export const ALO_FULFILLMENT_DETAIL_URL = "https://wholesale.swisscom.com/wsg/prod/alo/fuf/web/alo-web/fulfillment/detail.do";
+export const ALO_TICKET_CREATION_URL = "https://wholesale.swisscom.com/wsg/prod/alo/ass/web/alo-web/assurance/create.do?clearModel=true";
 const ALO_DEFAULT_PROBLEM = Object.freeze({
     problemDescription: "No signal",
     problemNotes: "",
@@ -159,12 +160,6 @@ export function buildAloPreparationDefaults(clientPayload = {}, superOfficePaylo
     const externalFields = parsedExternalId.ok ? parsedExternalId.fields : {};
     const signalState = resolveAloSignalState(externalFields);
     const activationDate = formatIsoDate(getOfferActivationDate(clientPayload));
-    const ticketCreatedDate = formatIsoDate(firstValue([
-        superOfficePayload?.createdAt,
-        superOfficePayload?.created,
-        superOfficePayload?.ticketDate,
-        superOfficePayload?.createdDate
-    ]));
     const firstPostDate = formatIsoDate(getFirstSuperOfficePostDate(superOfficePayload));
 
     return {
@@ -172,7 +167,7 @@ export function buildAloPreparationDefaults(clientPayload = {}, superOfficePaylo
         externalFields,
         aloType: "",
         signalState,
-        disconnectionDate: ticketCreatedDate || firstPostDate,
+        disconnectionDate: firstPostDate,
         activationDate,
         description: ""
     };

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   ALO_AUTOFILL_CLIPBOARD_SOURCE,
   ALO_FULFILLMENT_DETAIL_URL,
+  ALO_TICKET_CREATION_URL,
   buildAloAutofillBookmarklet,
   buildAloAutofillBetaBookmarklet,
   buildAloAutofillPayload,
@@ -25,6 +26,11 @@ const agentProfile = {
   email: "samir@example.test",
   phoneNumber: "+41 79 000 00 00"
 };
+
+assert.equal(
+  ALO_TICKET_CREATION_URL,
+  "https://wholesale.swisscom.com/wsg/prod/alo/ass/web/alo-web/assurance/create.do?clearModel=true"
+);
 
 {
   const payload = buildAloAutofillPayload(TEST_VTI_IMPORT_PAYLOAD, agentProfile, TEST_SO_IMPORT_PAYLOAD);
@@ -84,17 +90,27 @@ const agentProfile = {
 {
   const steps = buildAloPreparationSteps({
     signalState: "lost",
-    hasInferredSignalState: false,
     hasTemplates: true
   });
   assert.deepEqual(steps.map((step) => step.key), [
     "aloType",
+    "selectedTemplateId",
     "signalState",
-    "disconnectionDate",
-    "selectedTemplateId"
+    "disconnectionDate"
   ]);
   assert.equal(steps.some((step) => step.key === "extRef"), false);
   assert.equal(steps.some((step) => step.key === "notesMode" || step.kind === "textarea"), false);
+
+  const neverSteps = buildAloPreparationSteps({
+    signalState: "never",
+    hasTemplates: true
+  });
+  assert.deepEqual(neverSteps.map((step) => step.key), [
+    "aloType",
+    "selectedTemplateId",
+    "signalState",
+    "activationDate"
+  ]);
 }
 
 {
@@ -143,7 +159,7 @@ const agentProfile = {
     firstPostAt: "03.06.2026 09:15"
   });
 
-  assert.equal(defaults.disconnectionDate, "2026-06-04");
+  assert.equal(defaults.disconnectionDate, "2026-06-03");
 }
 
 {
@@ -162,7 +178,7 @@ const agentProfile = {
   });
 
   assert.equal(defaults.signalState, "");
-  assert.equal(defaults.disconnectionDate, "2026-06-04");
+  assert.equal(defaults.disconnectionDate, "");
 }
 
 {
