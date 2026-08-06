@@ -49,6 +49,11 @@ export const EXTERNAL_DEFAULT_FIELDS = {
     comment: ""
 };
 
+export function buildPartnerTicketPromptTitle(partnerName) {
+    const partner = String(partnerName ?? "").trim();
+    return partner ? `Partner Ticket Number — ${partner}` : "Partner Ticket Number";
+}
+
 export const EXTERNAL_SYSTEM_TOKEN_FIELDS = Object.freeze([
     { field: "flagging", token: "{external_flagging}", label: "External ID flagging" },
     { field: "data", token: "{external_date}", label: "External ID date", input_type: "date" },

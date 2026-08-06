@@ -11,6 +11,7 @@ import {
     EXTERNAL_GENERATOR_PARTNERS,
     buildExternalFieldsFromClientPayload,
     buildExternalCode,
+    buildPartnerTicketPromptTitle,
     buildExternalTokenValues,
     formatDateForInput,
     mergeExternalFields,
@@ -505,7 +506,12 @@ export default function ExternalGenerator({
                     return { kind: "partner-mode" };
                 }
                 if (!isBlank(draft.partner) && isBlank(draft.partnerTicketNumber)) {
-                    return { kind: "input", key: "partnerTicketNumber", title: "Partner Ticket Number", placeholder: "e.g. 12345678" };
+                    return {
+                        kind: "input",
+                        key: "partnerTicketNumber",
+                        title: buildPartnerTicketPromptTitle(draft.partner),
+                        placeholder: "e.g. 12345678"
+                    };
                 }
             }
 
@@ -886,24 +892,27 @@ export default function ExternalGenerator({
         if (!config) return false;
 
         const currentFields = sourceFields || fieldsRef.current;
+        const popupTitle = fieldId === "partnerTicketNumber"
+            ? buildPartnerTicketPromptTitle(currentFields.partner)
+            : config.title;
 
         let value;
         if (config.type === "choice") {
-            value = await askChoice(config.title, optionsOf(config.options), { currentValue: currentFields[fieldId] });
+            value = await askChoice(popupTitle, optionsOf(config.options), { currentValue: currentFields[fieldId] });
         } else if (config.type === "search") {
             value = await askChoice(
-                config.title,
+                popupTitle,
                 config.options.map((v) => ({ label: v, value: v })),
                 { searchable: true, searchPlaceholder: config.searchPlaceholder || "Search...", currentValue: currentFields[fieldId] }
             );
         } else if (config.type === "custom-note") {
             value = await askChoice(
-                config.title,
+                popupTitle,
                 config.options.map((v) => ({ label: v, value: v })),
                 { customNote: true, currentValue: currentFields[fieldId] }
             );
         } else {
-            value = await askInput(config.title, config.placeholder || "", currentFields[fieldId] || "", {
+            value = await askInput(popupTitle, config.placeholder || "", currentFields[fieldId] || "", {
                 inputType: config.inputType || "text"
             });
         }

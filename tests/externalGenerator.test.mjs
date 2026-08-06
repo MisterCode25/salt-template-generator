@@ -3,6 +3,7 @@ import {
     EXTERNAL_SYSTEM_TOKENS,
     buildExternalFieldsFromClientPayload,
     buildExternalCode,
+    buildPartnerTicketPromptTitle,
     readExternalFieldsFromStoredTokens,
     buildExternalTokenValues,
     getImportedExternalIdFromClientPayload,
@@ -13,6 +14,12 @@ import {
 import { clearAppIndexedDB } from "../src/services/indexedDbService.js";
 import { IMPORTED_EXTERNAL_ID_KEY } from "../src/services/activeClientService.js";
 import { setTokenInputValues } from "../src/services/tokenInputValueService.js";
+
+{
+    assert.equal(buildPartnerTicketPromptTitle("SIG"), "Partner Ticket Number — SIG");
+    assert.equal(buildPartnerTicketPromptTitle("  SGSW  "), "Partner Ticket Number — SGSW");
+    assert.equal(buildPartnerTicketPromptTitle(""), "Partner Ticket Number");
+}
 
 {
     const partnerTicketToken = EXTERNAL_SYSTEM_TOKENS.find((tokenDef) => tokenDef.token === "{external_partner_ticket_number}");
