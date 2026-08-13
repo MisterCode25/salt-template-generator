@@ -11,9 +11,11 @@ import {
     Lock,
     MoreVertical,
     Plus,
+    Search,
     Sparkles,
     Star,
-    Trash2
+    Trash2,
+    X
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
@@ -61,6 +63,8 @@ import {
     getTopicColorValue,
     normalizeTopicColor
 } from "../utils/topicAppearance.js";
+import { filterTemplateEditorTree } from "../utils/templateEditorSearch.js";
+import "../../css/node-editor-search.css";
 
 const TREE_DRAG_MIME = "application/x-template-tree-item";
 const CHATGPT_CLIPBOARD_READ_TIMEOUT_MS = 3500;
@@ -2759,6 +2763,8 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
     const [dropTarget, setDropTarget] = useState(null);
     const dropTargetRef = useRef(null);
     const [configLocked, setConfigLocked] = useState(false);
+    const [templateSearchQuery, setTemplateSearchQuery] = useState("");
+    const deferredTemplateSearchQuery = useDeferredValue(templateSearchQuery);
 
     useEffect(() => {
         let active = true;
@@ -2849,6 +2855,29 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
     const nodeLookup = useMemo(() => buildNodeLookup(nodes), [nodes]);
     const childrenByParent = useMemo(() => buildNodeChildrenIndex(nodes), [nodes]);
     const templatesByNode = useMemo(() => buildTemplateNodeIndex(templates), [templates]);
+    const templateSearchResults = useMemo(
+        () => filterTemplateEditorTree(nodes, templates, deferredTemplateSearchQuery),
+        [deferredTemplateSearchQuery, nodes, templates]
+    );
+    const isTemplateSearchActive = deferredTemplateSearchQuery.trim().length > 0;
+    const visibleChildrenByParent = useMemo(
+        () => isTemplateSearchActive
+            ? buildNodeChildrenIndex(templateSearchResults.nodes)
+            : childrenByParent,
+        [childrenByParent, isTemplateSearchActive, templateSearchResults.nodes]
+    );
+    const visibleTemplatesByNode = useMemo(
+        () => isTemplateSearchActive
+            ? buildTemplateNodeIndex(templateSearchResults.templates)
+            : templatesByNode,
+        [isTemplateSearchActive, templateSearchResults.templates, templatesByNode]
+    );
+    const visibleExpandedNodeIds = useMemo(
+        () => isTemplateSearchActive
+            ? new Set(templateSearchResults.nodes.map((node) => node.id))
+            : expandedNodeIds,
+        [expandedNodeIds, isTemplateSearchActive, templateSearchResults.nodes]
+    );
     const nodeSummaryById = useMemo(() => {
         const summaries = new Map();
         nodes.forEach((node) => {
@@ -3363,22 +3392,50 @@ export default function ManageNodes({ embedded = false, onClose = null }) {
                                 </button>
                             )}
                         </div>
+                        <div className="node-editor-search">
+                            <Search size={16} aria-hidden="true" />
+                            <input
+                                type="search"
+                                value={templateSearchQuery}
+                                onChange={(event) => setTemplateSearchQuery(event.target.value)}
+                                placeholder="Search templates..."
+                                aria-label="Search templates"
+                            />
+                            {templateSearchQuery && (
+                                <button
+                                    type="button"
+                                    className="node-editor-search__clear"
+                                    onClick={() => setTemplateSearchQuery("")}
+                                    aria-label="Clear template search"
+                                    title="Clear search"
+                                >
+                                    <X size={15} aria-hidden="true" />
+                                </button>
+                            )}
+                        </div>
+                        {isTemplateSearchActive && (
+                            <p className="node-editor-search__count" aria-live="polite">
+                                {formatUnitCount(templateSearchResults.matchCount, "template")} found
+                            </p>
+                        )}
                         <div className="node-tree-list node-tree-list--primary">
                             {nodes.length === 0 ? (
                                 <EmptyState
                                     message="No topics yet."
                                     action={configLocked ? null : <button type="button" className="secondary-btn" onClick={openRootNodeModal}>Create topic</button>}
                                 />
+                            ) : isTemplateSearchActive && templateSearchResults.matchCount === 0 ? (
+                                <EmptyState message="No matching templates." />
                             ) : (
                                 <NodeTreeRows
-                                    childrenByParent={childrenByParent}
+                                    childrenByParent={visibleChildrenByParent}
                                     nodeSummaryById={nodeSummaryById}
-                                    templatesByNode={templatesByNode}
+                                    templatesByNode={visibleTemplatesByNode}
                                     parentId={null}
                                     selectedNodeId={selectedNodeId}
                                     selectedTemplateId={selectedTemplateId}
                                     selectedItemType={selectedItemType}
-                                    expandedNodeIds={expandedNodeIds}
+                                    expandedNodeIds={visibleExpandedNodeIds}
                                     locked={configLocked}
                                     dragItem={dragItem}
                                     dropTarget={dropTarget}

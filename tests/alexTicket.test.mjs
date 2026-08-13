@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import vm from "node:vm";
 import {
     ALEX_CLIPBOARD_SOURCE,
     ALEX_HOME_URL,
@@ -67,6 +68,58 @@ import {
     assert.match(bookmarklet, /assurance\/ticket/);
     assert.doesNotMatch(bookmarklet, /encodeURIComponent/);
     assert.doesNotMatch(bookmarklet, /auth/i);
+}
+
+{
+    const bookmarklet = buildAlexTicketBookmarklet().replace(/^javascript:/, "");
+    const storedValues = new Map();
+    const scheduledCallbacks = [];
+    const replacedUrls = [];
+    const location = {
+        hostname: "www.ftthproxy.ch",
+        origin: "https://www.ftthproxy.ch",
+        pathname: "/",
+        hash: "",
+        replace: (url) => replacedUrls.push(url)
+    };
+    const context = vm.createContext({
+        alert: () => {},
+        Date: { now: () => 1234567890 },
+        JSON,
+        location,
+        localStorage: {
+            setItem: (key, value) => storedValues.set(key, value)
+        },
+        navigator: {
+            clipboard: {
+                readText: async () => JSON.stringify({
+                    source: ALEX_CLIPBOARD_SOURCE,
+                    action: "view-ticket",
+                    alap: "45",
+                    serviceDomain: 1,
+                    businessDomain: "L1",
+                    ticket: "#223323"
+                })
+            }
+        },
+        Number,
+        Promise,
+        setTimeout: (callback, delay) => scheduledCallbacks.push({ callback, delay }),
+        String
+    });
+
+    vm.runInContext(bookmarklet, context);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    assert.equal(location.hash, "");
+    assert.equal(storedValues.has("focus"), true);
+    assert.equal(scheduledCallbacks.length, 1);
+    assert.equal(scheduledCallbacks[0].delay, 300);
+
+    scheduledCallbacks[0].callback();
+    assert.deepEqual(replacedUrls, [
+        "https://www.ftthproxy.ch/?saltAlexRefresh=1234567890#/assurance/ticket/223323"
+    ]);
 }
 
 console.log("alexTicket tests passed");

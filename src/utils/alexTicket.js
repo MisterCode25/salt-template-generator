@@ -107,11 +107,12 @@ function alexTicketBookmarkletRunner(expectedSource) {
         }));
 
         var targetHash = "/assurance/ticket/" + ticket;
-        if (location.hash === "#" + targetHash) {
-            location.reload();
-            return;
-        }
-        location.hash = targetHash;
+        var reloadUrl = location.origin
+            + "/?saltAlexRefresh=" + Date.now()
+            + "#" + targetHash;
+        setTimeout(function reloadAlexWithPartnerContext() {
+            location.replace(reloadUrl);
+        }, 300);
     }).catch(function handleError(error) {
         fail(error && error.message ? error.message : String(error));
     });
