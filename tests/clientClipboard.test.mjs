@@ -117,6 +117,15 @@ ${JSON.stringify(sampleClientJSON, null, 2)}`);
   assert.ok(client.fields.some((field) => field.label === "Full name" && field.value === "Peter manuel BILLIG"));
   assert.ok(client.fields.some((field) => field.label === "Activation date" && field.value === "2026-06-20"));
   assert.ok(contact.fields.some((field) => field.label === "Contact eligibility" && field.value === "ALO (SIG)"));
+
+  const mixedCasePartnerDisplay = getClientInfoSections({
+    contact: {
+      eligibilitySource: "ALO",
+      eligibilityOrdering: "19"
+    }
+  });
+  const mixedCasePartnerContact = mixedCasePartnerDisplay.find((section) => section.id === "contact");
+  assert.ok(mixedCasePartnerContact.fields.some((field) => field.label === "Contact eligibility" && field.value === "ALO (SGSW)"));
   assert.ok(contact.fields.some((field) => field.label === "Eligibility ordering" && field.value === "35"));
   assert.ok(contact.fields.some((field) => field.label === "Public ID" && field.value === "28453061"));
   assert.ok(contact.fields.some((field) => field.label === "Fixed number" && field.value === "41788451664"));

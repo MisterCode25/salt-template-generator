@@ -462,9 +462,14 @@ function formatContactEligibilityWithPartner(payload) {
     if (!eligibilitySource) return "";
 
     const partnerName = getEligibilityPartnerName(readPath(payload, "contact.eligibilityOrdering"));
+    const displayPartnerName = partnerName.toLocaleUpperCase();
 
-    if (!partnerName || eligibilitySource.includes(`(${partnerName})`)) return eligibilitySource;
-    return `${eligibilitySource} (${partnerName})`;
+    if (!displayPartnerName) return eligibilitySource;
+    if (eligibilitySource.includes(`(${partnerName})`)) {
+        return eligibilitySource.replace(`(${partnerName})`, `(${displayPartnerName})`);
+    }
+    if (eligibilitySource.includes(`(${displayPartnerName})`)) return eligibilitySource;
+    return `${eligibilitySource} (${displayPartnerName})`;
 }
 
 function knownClientFieldPaths() {
