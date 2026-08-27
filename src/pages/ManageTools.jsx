@@ -45,6 +45,7 @@ import { buildCaseProfile } from "../utils/caseProfile.js";
 import Modal from "../components/Modal.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import EmptyState from "../components/EmptyState.jsx";
+import BrowserExtensionInstallPanel from "../components/BrowserExtensionInstallPanel.jsx";
 import { copyHtml, copyText, showToast } from "../services/clipboardService.js";
 import { CONFIG_LOCK_UPDATED_EVENT, loadConfigLocked } from "../services/appConfigService.js";
 
@@ -975,6 +976,8 @@ function DataShortcutsPanel() {
                     <p>Bookmarklets used for VTI, SuperOffice, ALEX and ALO handoffs.</p>
                 </div>
             </section>
+
+            <BrowserExtensionInstallPanel />
 
             <section className="tools-shortcut-guide" aria-label="Shortcut install instructions">
                 <strong>Install once</strong>
