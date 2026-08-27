@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import {
     AlertTriangle,
     CheckCircle2,
@@ -8,6 +9,8 @@ import {
 } from "lucide-react";
 import { BROWSER_EXTENSION_PHASE } from "../../shared/browserExtensionProtocol.js";
 import Modal from "./Modal.jsx";
+
+const COMPLETED_AUTO_CLOSE_DELAY_MS = 1000;
 
 function getVisual(state) {
     if (state.error) {
@@ -27,6 +30,18 @@ function getVisual(state) {
 }
 
 export default function BrowserExtensionCaptureModal({ state, onRetry, onClose }) {
+    const onCloseRef = useRef(onClose);
+    onCloseRef.current = onClose;
+
+    useEffect(() => {
+        if (state.phase !== BROWSER_EXTENSION_PHASE.COMPLETED) {
+            return undefined;
+        }
+
+        const timeoutId = window.setTimeout(() => onCloseRef.current(), COMPLETED_AUTO_CLOSE_DELAY_MS);
+        return () => window.clearTimeout(timeoutId);
+    }, [state.phase]);
+
     const visual = getVisual(state);
     const VisualIcon = visual.Icon;
     const isBusy = state.isRunning || state.isChecking;

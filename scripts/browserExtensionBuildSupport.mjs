@@ -28,12 +28,19 @@ function wrapBookmarkletExpression(functionName, source) {
 }
 
 export function buildSuperOfficeCaptureModule(bookmarkletSource) {
-    const source = assertBookmarkletSource(bookmarkletSource, "SuperOffice");
+    let source = assertBookmarkletSource(bookmarkletSource, "SuperOffice");
+    source = replaceSection(
+        source,
+        "const showToast=",
+        "const all=",
+        "const showToast=()=>{};",
+        "SuperOffice visual feedback"
+    );
     const clipboardTail = "navigator.clipboard.writeText(JSON.stringify(data,null,2)).then(()=>showToast(\"JSON copié dans le presse-papiers\")).catch(()=>showToast(\"Erreur copie clipboard\"));";
     const transformed = replaceRequired(
         source,
         clipboardTail,
-        "showToast(\"Données SuperOffice capturées\");return data;",
+        "return data;",
         "SuperOffice clipboard output"
     );
     return wrapBookmarkletExpression("captureSuperOfficePage", transformed);
@@ -49,6 +56,13 @@ export function buildVtiCaptureModule(bookmarkletSource) {
         "function setBar",
         "function openPopupNow(){}",
         "VTI popup"
+    );
+    source = replaceSection(
+        source,
+        "function setBar",
+        "function fail",
+        "function setBar(){}function show(){}function hide(){}function toast(){}",
+        "VTI visual feedback"
     );
     source = replaceSection(
         source,

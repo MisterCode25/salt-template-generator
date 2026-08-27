@@ -24,6 +24,7 @@ const manifest = JSON.parse(readFileSync(
   assert.match(moduleSource, /export async function captureSuperOfficePage/);
   assert.match(moduleSource, /return data/);
   assert.doesNotMatch(moduleSource, /navigator\.clipboard/);
+  assert.doesNotMatch(moduleSource, /position:fixed/);
   assert.doesNotMatch(moduleSource, /\beval\s*\(/);
 }
 
@@ -35,6 +36,8 @@ const manifest = JSON.parse(readFileSync(
   assert.match(moduleSource, /return payload/);
   assert.doesNotMatch(moduleSource, /navigator\.clipboard/);
   assert.doesNotMatch(moduleSource, /window\.open/);
+  assert.doesNotMatch(moduleSource, /saltOverlay/);
+  assert.doesNotMatch(moduleSource, /position:fixed/);
   assert.doesNotMatch(moduleSource, /\beval\s*\(/);
 }
 
