@@ -88,6 +88,97 @@ async function withGlobalOverrides(overrides, callback) {
 }
 
 {
+  const moduleSource = buildSuperOfficeCaptureModule(superOfficeBookmarklet);
+  const captureSuperOfficePage = Function(
+    `${moduleSource.replace(/^export /, "")}; return captureSuperOfficePage;`
+  )();
+  let postDataReads = 0;
+  const delayedSuperOfficeWindow = {};
+  Object.defineProperty(delayedSuperOfficeWindow, "HtmlMessages2_data", {
+    configurable: true,
+    get() {
+      postDataReads += 1;
+      if (postDataReads < 6) return { ticket: { messages: [] } };
+      return {
+        ticket: {
+          messages: [
+            { bodyHtml: "<p>MSISDN: <strong>32323232</strong></p>" }
+          ]
+        }
+      };
+    }
+  });
+
+  const captureResult = await withGlobalOverrides({
+    document: {
+      body: { innerText: "REQUEST 31436062\nExternal ticket ID:\n" },
+      querySelectorAll: () => []
+    },
+    DOMParser: class DOMParser {
+      parseFromString(html) {
+        return {
+          body: { textContent: String(html).replace(/<[^>]+>/g, " ") },
+          querySelectorAll: () => []
+        };
+      }
+    },
+    location: { origin: "https://cs.salt.ch" },
+    window: delayedSuperOfficeWindow,
+    setTimeout(callback) {
+      callback();
+      return 1;
+    }
+  }, () => captureSuperOfficePage());
+
+  assert.ok(postDataReads >= 6);
+  assert.equal(captureResult.contractorNumber, "32323232");
+}
+
+{
+  const moduleSource = buildSuperOfficeCaptureModule(superOfficeBookmarklet);
+  const captureSuperOfficePage = Function(
+    `${moduleSource.replace(/^export /, "")}; return captureSuperOfficePage;`
+  )();
+  const firstPostFrame = {
+    contentDocument: {
+      body: { innerText: "MSISDN: 44556677" }
+    }
+  };
+  const firstPostRoot = {
+    innerText: "",
+    closest: () => null,
+    querySelectorAll(selector) {
+      return selector === "iframe" ? [firstPostFrame] : [];
+    }
+  };
+  const messageScopeSelector = ".HtmlMessages2,[id*='HtmlMessages2'],.HtmlMessages2_mainDiv,.HtmlMessages2_message,.HtmlMessage";
+  const messageRootSelector = ".HtmlMessages2_message,.HtmlMessage,[id*='HtmlMessages2_message'],article";
+
+  const captureResult = await withGlobalOverrides({
+    document: {
+      body: { innerText: "REQUEST 31436062\nExternal ticket ID:\n" },
+      querySelectorAll(selector) {
+        return [messageScopeSelector, messageRootSelector].includes(selector)
+          ? [firstPostRoot]
+          : [];
+      }
+    },
+    DOMParser: class DOMParser {
+      parseFromString(html) {
+        return {
+          body: { textContent: String(html).replace(/<[^>]+>/g, " ") },
+          querySelectorAll: () => []
+        };
+      }
+    },
+    location: { origin: "https://cs.salt.ch" },
+    window: { HtmlMessages2_data: {} }
+  }, () => captureSuperOfficePage());
+
+  assert.equal(captureResult.contractorNumber, "44556677");
+}
+
+{
   const moduleSource = buildVtiCaptureModule(vtiBookmarklet);
 
   assert.match(moduleSource, /export async function captureVtiPage/);
@@ -104,7 +195,7 @@ assert.ok(vtiBookmarklet.startsWith("javascript:"));
 assert.ok(superOfficeBookmarklet.startsWith("javascript:"));
 
 assert.equal(manifest.manifest_version, 3);
-assert.equal(manifest.version, "0.1.8");
+assert.equal(manifest.version, "0.1.9");
 assert.equal(CURRENT_BROWSER_EXTENSION_VERSION, manifest.version);
 assert.deepEqual(manifest.permissions.sort(), ["scripting", "tabs"]);
 assert.equal(manifest.host_permissions.includes("<all_urls>"), false);

@@ -27,6 +27,13 @@ function wrapBookmarkletExpression(functionName, source) {
     return `export async function ${functionName}() {\n    return await ${expression};\n}\n`;
 }
 
+const superOfficeFirstPostExtraction = String.raw`
+const readablePostText=value=>{let readable=String(value??"");try{readable=new DOMParser().parseFromString(readable,"text/html").body?.textContent||readable}catch{}return readable.replace(/\u00a0/g," ").trim()};
+const firstPostSnapshot=()=>{const message=messageDataList()[0];const messageRoot=all(".HtmlMessages2_message,.HtmlMessage,[id*='HtmlMessages2_message'],article").filter(el=>!isNoiseControl(el))[0];const messageValues=[message?.text,message?.plainText,message?.bodyText,message?.body,message?.message,message?.content,message?.html,message?.bodyHtml,message?.messageHtml,message?.htmlBody].filter(value=>typeof value==="string"&&value.trim());const frames=messageRoot?all("iframe",messageRoot):[];const frameValues=frames.map(frame=>{try{return frame.contentDocument?.body?.innerText||frame.contentDocument?.body?.textContent||frame.contentWindow?.document?.body?.innerText||frame.contentWindow?.document?.body?.textContent||""}catch{return""}}).filter(value=>String(value).trim());const rootValue=messageRoot?.innerText||messageRoot?.textContent||"";const readableMessageValues=messageValues.map(readablePostText).filter(Boolean);const readableFrameValues=frameValues.map(readablePostText).filter(Boolean);const readableRootValue=readablePostText(rootValue);const values=[...readableMessageValues,...readableFrameValues,readableRootValue].filter(Boolean);return{text:values.join("\n"),isLoaded:readableMessageValues.length>0||readableFrameValues.length>0||(frames.length===0&&Boolean(readableRootValue))}};
+const contractorFromFirstPostText=text=>readablePostText(text).match(/\bMSISDN\s*:\s*([0-9]+)\b/i)?.[1]||null;
+const waitForFirstPostContractor=async()=>{let previousText="";let stableReadCount=0;for(let attempt=0;attempt<24;attempt+=1){await flipHtmlMessagesPosts();const snapshot=firstPostSnapshot();const contractorNumber=contractorFromFirstPostText(snapshot.text);if(contractorNumber)return contractorNumber;if(snapshot.isLoaded){if(snapshot.text===previousText){stableReadCount+=1}else{previousText=snapshot.text;stableReadCount=1}if(stableReadCount>=4)return null}else{previousText="";stableReadCount=0}if(attempt<23)await sleep(250)}return null};
+`;
+
 export function buildSuperOfficeCaptureModule(bookmarkletSource) {
     let source = assertBookmarkletSource(bookmarkletSource, "SuperOffice");
     source = replaceSection(
@@ -39,13 +46,13 @@ export function buildSuperOfficeCaptureModule(bookmarkletSource) {
     source = replaceRequired(
         source,
         "const firstPostAt=",
-        "const contractorFromFirstPost=()=>{const message=messageDataList()[0];const messageRoot=all(\".HtmlMessages2_message,.HtmlMessage,[id*='HtmlMessages2_message'],article\").filter(el=>!isNoiseControl(el))[0];const raw=message?.text||message?.plainText||message?.bodyText||message?.body||message?.message||message?.content||message?.html||message?.bodyHtml||message?.messageHtml||message?.htmlBody||messageRoot?.innerText||\"\";let readable=String(raw);try{readable=new DOMParser().parseFromString(readable,\"text/html\").body?.textContent||readable}catch{}return readable.match(/\\bMSISDN\\s*:\\s*([0-9]+)\\b/i)?.[1]||null};const firstPostAt=",
+        `${superOfficeFirstPostExtraction}const firstPostAt=`,
         "SuperOffice first-post contractor extraction"
     );
     source = replaceRequired(
         source,
         "const data={ticketId,createdAt,firstPostAt:firstPostAt(),externalTicketId,attachments};",
-        "const data={ticketId,createdAt,firstPostAt:firstPostAt(),externalTicketId,contractorNumber:contractorFromFirstPost(),attachments};",
+        "const contractorNumber=await waitForFirstPostContractor();const data={ticketId,createdAt,firstPostAt:firstPostAt(),externalTicketId,contractorNumber,attachments};",
         "SuperOffice contractor output"
     );
     const clipboardTail = "navigator.clipboard.writeText(JSON.stringify(data,null,2)).then(()=>showToast(\"JSON copié dans le presse-papiers\")).catch(()=>showToast(\"Erreur copie clipboard\"));";
