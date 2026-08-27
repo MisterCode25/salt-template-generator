@@ -11,6 +11,7 @@ import {
     ExternalLink,
     History,
     Loader2,
+    Puzzle,
     RefreshCw,
     RotateCcw,
     Sparkles,
@@ -77,6 +78,20 @@ import {
 } from "../utils/externalIdConflicts.js";
 import { CAPTURE_DATA_TYPE, classifyCaptureClipboardText } from "../utils/captureDataDetection.js";
 import { parseSuperOfficeInfoPayload } from "../utils/superOfficeImport.js";
+import {
+    BROWSER_EXTENSION_MESSAGE
+} from "../../shared/browserExtensionProtocol.js";
+import {
+    createBrowserExtensionRequestId,
+    requestBrowserExtensionStatus,
+    startBrowserExtensionCapture,
+    subscribeToBrowserExtensionEvents
+} from "../services/browserExtensionCaptureService.js";
+import {
+    BROWSER_EXTENSION_CAPTURE_ACTION,
+    createBrowserExtensionCaptureState,
+    reduceBrowserExtensionCaptureState
+} from "../utils/browserExtensionCaptureState.js";
 import { getRouterElectricalImpact } from "../utils/routerElectricalImpact.js";
 import {
     formatDateInputValueForToken,
@@ -1226,6 +1241,7 @@ export const ClientInfoPanel = memo(function ClientInfoPanel({
     hasSuperOfficeData = false,
     onChangeLang,
     onOpenCaptureData,
+    onOpenBrowserExtensionCapture,
     onRefreshVti,
     onReplaceSuperOffice,
     onRestorePreviousSuperOffice,
@@ -1274,6 +1290,17 @@ export const ClientInfoPanel = memo(function ClientInfoPanel({
                     <ClipboardList size={14} aria-hidden="true" />
                     <span>{loading ? "Capturing..." : "Capture data"}</span>
                     <small>{missingCaptureLabel}</small>
+                </button>
+                <button
+                    type="button"
+                    className="client-import-status-btn client-import-status-btn--extension"
+                    onClick={onOpenBrowserExtensionCapture}
+                    disabled={loading}
+                    title="Capturer les onglets SuperOffice et VTI avec l’extension bêta"
+                >
+                    <Puzzle size={14} aria-hidden="true" />
+                    <span>Capture bêta</span>
+                    <small>Extension</small>
                 </button>
                 {hasAnyImportedData && (
                     <details className="client-import-update-menu" ref={updateMenuRef}>
@@ -1781,6 +1808,10 @@ export function useTemplateRuntime() {
     const [superOfficeReplacementPrompt, setSuperOfficeReplacementPrompt] = useState(null);
     const [captureDataOpen, setCaptureDataOpen] = useState(false);
     const [captureDataState, setCaptureDataState] = useState(() => createCaptureDataState());
+    const [browserExtensionCaptureOpen, setBrowserExtensionCaptureOpen] = useState(false);
+    const [browserExtensionCaptureState, setBrowserExtensionCaptureState] = useState(
+        () => createBrowserExtensionCaptureState()
+    );
     const captureCompletedTypes = useRef(new Set());
     const captureLastClipboardText = useRef("");
     const captureImportCallback = useRef(null);
@@ -1788,6 +1819,12 @@ export function useTemplateRuntime() {
     const captureStepAdvanceTimer = useRef(null);
     const captureReadInFlight = useRef(false);
     const captureConflictType = useRef(null);
+    const browserExtensionImportInFlight = useRef(false);
+    const browserExtensionImportCallback = useRef(null);
+    const browserExtensionEventHandler = useRef(null);
+    const dispatchBrowserExtensionCapture = useCallback((event) => {
+        setBrowserExtensionCaptureState((current) => reduceBrowserExtensionCaptureState(current, event));
+    }, []);
 
     useEffect(() => {
         let cancelled = false;
@@ -1974,6 +2011,16 @@ export function useTemplateRuntime() {
         return true;
     };
 
+    const finishBrowserExtensionImport = async () => {
+        const callback = browserExtensionImportCallback.current;
+        browserExtensionImportCallback.current = null;
+        try {
+            if (callback) await callback();
+        } catch (error) {
+            console.error("browser extension import callback error", error);
+        }
+    };
+
     const keepExternalIdSourceValues = async () => {
         if (!externalIdConflictPrompt) return;
         const correctedImportResult = externalIdConflictPrompt.correctedImportResult;
@@ -1985,6 +2032,7 @@ export function useTemplateRuntime() {
         setExternalIdConflictPrompt(null);
         setSuperOfficeReplacementPrompt(null);
         await resolveCaptureConflict();
+        await finishBrowserExtensionImport();
     };
 
     const keepExternalIdValues = async () => {
@@ -1997,6 +2045,7 @@ export function useTemplateRuntime() {
         );
         setExternalIdConflictPrompt(null);
         await resolveCaptureConflict();
+        await finishBrowserExtensionImport();
     };
 
     const applyExternalIdConflictSelections = async (selections = {}) => {
@@ -2020,6 +2069,7 @@ export function useTemplateRuntime() {
         );
         setExternalIdConflictPrompt(null);
         await resolveCaptureConflict();
+        await finishBrowserExtensionImport();
     };
 
 
@@ -2027,6 +2077,7 @@ export function useTemplateRuntime() {
         const wasCaptureConflict = Boolean(captureConflictType.current);
         setExternalIdConflictPrompt(null);
         captureConflictType.current = null;
+        browserExtensionImportCallback.current = null;
         if (wasCaptureConflict) {
             captureCompletedTypes.current.delete(CAPTURE_DATA_TYPE.SUPER_OFFICE);
             setCaptureDataState((current) => ({
@@ -2187,6 +2238,113 @@ export function useTemplateRuntime() {
         inputChangeVersion.current++;
         setClientImportStatus({ type: "success", message: "" });
         return { pendingSuperOfficeConflict };
+    };
+
+    const importBrowserExtensionCapture = async (message) => {
+        if (browserExtensionImportInFlight.current) return;
+        browserExtensionImportInFlight.current = true;
+
+        try {
+            const vtiText = JSON.stringify(message.payload?.vti ?? null);
+            parseClientClipboardJSON(vtiText);
+            const superOfficeResult = parseSuperOfficeInfoPayload(message.payload?.superOffice);
+            if (!superOfficeResult.ok) {
+                throw new Error("L’extension n’a pas retourné de données SuperOffice valides.");
+            }
+
+            dispatchBrowserExtensionCapture({
+                type: BROWSER_EXTENSION_CAPTURE_ACTION.IMPORTING,
+                requestId: message.requestId
+            });
+
+            clearSuperOfficeMediaCache();
+            await clearSuperOfficeTicketPayload();
+            await loadClientFromText(vtiText);
+
+            if (openExternalIdConflictPrompt(superOfficeResult, await loadActiveClientPayload())) {
+                setBrowserExtensionCaptureOpen(false);
+                return;
+            }
+
+            await completeSuperOfficeImport(superOfficeResult);
+            dispatchBrowserExtensionCapture({
+                type: BROWSER_EXTENSION_CAPTURE_ACTION.SUCCEEDED,
+                requestId: message.requestId
+            });
+            await finishBrowserExtensionImport();
+        } catch (error) {
+            dispatchBrowserExtensionCapture({
+                type: BROWSER_EXTENSION_CAPTURE_ACTION.LOCAL_FAILURE,
+                requestId: message.requestId,
+                installed: true,
+                error: error?.message || "Les données capturées n’ont pas pu être importées."
+            });
+        } finally {
+            browserExtensionImportInFlight.current = false;
+        }
+    };
+
+    browserExtensionEventHandler.current = (message) => {
+        dispatchBrowserExtensionCapture(message);
+        if (message.type === BROWSER_EXTENSION_MESSAGE.COMPLETED) {
+            importBrowserExtensionCapture(message);
+        }
+    };
+
+    useEffect(() => subscribeToBrowserExtensionEvents((message) => {
+        browserExtensionEventHandler.current?.(message);
+    }), []);
+
+    const openBrowserExtensionCaptureFlow = async (options = {}) => {
+        browserExtensionImportCallback.current = typeof options.onImported === "function"
+            ? options.onImported
+            : null;
+        setBrowserExtensionCaptureOpen(true);
+        dispatchBrowserExtensionCapture({ type: BROWSER_EXTENSION_CAPTURE_ACTION.CHECKING });
+
+        const status = await requestBrowserExtensionStatus();
+        if (!status || status.type === BROWSER_EXTENSION_MESSAGE.FAILED) {
+            dispatchBrowserExtensionCapture({
+                type: BROWSER_EXTENSION_CAPTURE_ACTION.LOCAL_FAILURE,
+                installed: false,
+                error: "Extension non détectée. Installe-la, recharge l’application puis réessaie."
+            });
+            return false;
+        }
+        if (status.busy) {
+            dispatchBrowserExtensionCapture({
+                type: BROWSER_EXTENSION_CAPTURE_ACTION.LOCAL_FAILURE,
+                installed: true,
+                error: "Une autre capture est déjà en cours dans l’extension."
+            });
+            return false;
+        }
+
+        const requestId = createBrowserExtensionRequestId();
+        dispatchBrowserExtensionCapture({
+            type: BROWSER_EXTENSION_CAPTURE_ACTION.STARTING,
+            requestId
+        });
+        const response = await startBrowserExtensionCapture(requestId);
+        if (!response) {
+            dispatchBrowserExtensionCapture({
+                type: BROWSER_EXTENSION_CAPTURE_ACTION.LOCAL_FAILURE,
+                requestId,
+                installed: false,
+                error: "L’extension ne répond pas. Recharge l’application puis réessaie."
+            });
+            return false;
+        }
+
+        dispatchBrowserExtensionCapture(response);
+        return response.type === BROWSER_EXTENSION_MESSAGE.ACCEPTED;
+    };
+
+    const closeBrowserExtensionCaptureFlow = () => {
+        if (browserExtensionCaptureState.isRunning || browserExtensionCaptureState.isChecking) return;
+        browserExtensionImportCallback.current = null;
+        setBrowserExtensionCaptureOpen(false);
+        dispatchBrowserExtensionCapture({ type: BROWSER_EXTENSION_CAPTURE_ACTION.RESET });
     };
 
     const readClientClipboard = async (event) => {
@@ -2892,6 +3050,10 @@ export function useTemplateRuntime() {
         openCaptureDataFlow,
         closeCaptureDataFlow,
         readCaptureDataClipboard,
+        browserExtensionCaptureOpen,
+        browserExtensionCaptureState,
+        openBrowserExtensionCaptureFlow,
+        closeBrowserExtensionCaptureFlow,
         clientDetailsExpanded,
         setClientDetailsExpanded,
         clientBarFieldGroups,

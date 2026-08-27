@@ -27,7 +27,8 @@ export default function Modal({
     ariaLabel,
     ariaLabelledBy,
     closeOnOverlay = true,
-    disableEscapeClose = false
+    disableEscapeClose = false,
+    showCloseButton = true
 }) {
     const dialogRef = useRef(null);
     const onCloseRef = useRef(onClose);
@@ -108,15 +109,17 @@ export default function Modal({
                 onMouseDown={(event) => event.stopPropagation()}
             >
                 {children}
-                <button
-                    type="button"
-                    className="modal-close-btn"
-                    onClick={requestClose}
-                    aria-label="Close dialog"
-                    title="Close"
-                >
-                    ×
-                </button>
+                {showCloseButton && (
+                    <button
+                        type="button"
+                        className="modal-close-btn"
+                        onClick={requestClose}
+                        aria-label="Close dialog"
+                        title="Close"
+                    >
+                        ×
+                    </button>
+                )}
             </div>
         </div>
     );

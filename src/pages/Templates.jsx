@@ -23,6 +23,7 @@ import {
 import EmptyState from "../components/EmptyState.jsx";
 import ErrorBoundary from "../components/ErrorBoundary.jsx";
 import Modal from "../components/Modal.jsx";
+import BrowserExtensionCaptureModal from "../components/BrowserExtensionCaptureModal.jsx";
 import {
     ClientBarCustomizeModal,
     ClientInfoPanel,
@@ -1411,6 +1412,15 @@ export default function Templates() {
         });
     }, [refreshSuperOfficeState, resetCaseNavigation]);
 
+    const openBrowserExtensionCaptureFlow = useCallback(async () => {
+        await runtimeRef.current.openBrowserExtensionCaptureFlow({
+            onImported: async () => {
+                await refreshSuperOfficeState();
+                resetCaseNavigation();
+            }
+        });
+    }, [refreshSuperOfficeState, resetCaseNavigation]);
+
     const openSuperOfficeGallery = useCallback(async () => {
         await refreshSuperOfficeState();
         setSuperOfficeGalleryOpen(true);
@@ -1783,6 +1793,7 @@ export default function Templates() {
         || runtime.clientPasteOpen
         || runtime.clientImportErrorModal
         || runtime.captureDataOpen
+        || runtime.browserExtensionCaptureOpen
         || runtime.clientBarCustomizeOpen
         || runtime.externalIdConflictPrompt
         || externalGeneratorOpen
@@ -1862,6 +1873,7 @@ export default function Templates() {
                 hasSuperOfficeData={superOfficeDataPresent}
                 onChangeLang={changeLanguage}
                 onOpenCaptureData={openCaptureDataFlow}
+                onOpenBrowserExtensionCapture={openBrowserExtensionCaptureFlow}
                 onRefreshVti={refreshVtiData}
                 onReplaceSuperOffice={replaceSuperOfficeData}
                 onRestorePreviousSuperOffice={restorePreviousSuperOfficeData}
@@ -2053,6 +2065,14 @@ export default function Templates() {
                 />
             )}
 
+            {runtime.browserExtensionCaptureOpen && (
+                <BrowserExtensionCaptureModal
+                    state={runtime.browserExtensionCaptureState}
+                    onRetry={openBrowserExtensionCaptureFlow}
+                    onClose={runtime.closeBrowserExtensionCaptureFlow}
+                />
+            )}
+
             {runtime.clientImportErrorModal && (
                 <ClientImportErrorModal
                     message={runtime.clientImportErrorModal}
@@ -2086,7 +2106,7 @@ export default function Templates() {
                 />
             )}
 
-            {runtime.externalIdConflictPrompt && !runtime.captureDataOpen && (
+            {runtime.externalIdConflictPrompt && !runtime.captureDataOpen && !runtime.browserExtensionCaptureOpen && (
                 <ExternalIdConflictModal
                     conflicts={runtime.externalIdConflictPrompt.conflicts}
                     onApplySelections={runtime.applyExternalIdConflictSelections}

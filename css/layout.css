@@ -319,6 +319,24 @@
     flex: 0 0 auto;
 }
 
+.client-import-status-btn--extension {
+    min-height: 30px;
+    padding-inline: 10px;
+    border-color: rgba(167, 139, 250, 0.44);
+    background: rgba(109, 40, 217, 0.16);
+    color: #ede9fe;
+}
+
+.client-import-status-btn--extension:hover:not(:disabled) {
+    border-color: rgba(196, 181, 253, 0.66);
+    background: rgba(109, 40, 217, 0.26);
+}
+
+.client-import-status-btn--extension small {
+    background: rgba(167, 139, 250, 0.18);
+    color: #ddd6fe;
+}
+
 .client-import-status-btn small {
     display: inline-flex;
     align-items: center;
@@ -1145,6 +1163,72 @@
     margin-top: 14px;
 }
 
+.browser-extension-capture-orb {
+    border-color: rgba(167, 139, 250, 0.34);
+    background: rgba(76, 29, 149, 0.28);
+    color: #ddd6fe;
+}
+
+.browser-extension-capture-focus {
+    min-height: 88px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 18px 0 12px;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid rgba(167, 139, 250, 0.24);
+    background: rgba(76, 29, 149, 0.13);
+    color: #ddd6fe;
+}
+
+.browser-extension-capture-focus.is-done {
+    border-color: rgba(34, 197, 94, 0.3);
+    background: rgba(20, 83, 45, 0.16);
+    color: #bbf7d0;
+}
+
+.browser-extension-capture-focus.is-error {
+    border-color: rgba(248, 113, 113, 0.32);
+    background: rgba(127, 29, 29, 0.16);
+    color: #fecaca;
+}
+
+.browser-extension-capture-focus > div {
+    display: grid;
+    gap: 5px;
+}
+
+.browser-extension-capture-focus strong {
+    color: var(--text-primary);
+    font-size: 15px;
+}
+
+.browser-extension-capture-focus span {
+    color: var(--text-secondary);
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.browser-extension-capture-note {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: rgba(148, 163, 184, 0.08);
+    color: var(--text-muted);
+    font-size: 11px;
+    line-height: 1.45;
+}
+
+.browser-extension-download-btn,
+.browser-extension-install-download {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    text-decoration: none;
+}
+
 @keyframes captureDataSpin {
     to {
         transform: rotate(360deg);
@@ -1237,6 +1321,77 @@
 .vti-bookmarklet-shortcut-card .hint {
     margin-top: 6px;
     line-height: 1.55;
+}
+
+.browser-extension-install-panel {
+    display: grid;
+    gap: 18px;
+    border-color: rgba(167, 139, 250, 0.32);
+    background: linear-gradient(135deg, rgba(76, 29, 149, 0.17), rgba(18, 24, 38, 0.86));
+}
+
+.browser-extension-install-heading {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 14px;
+}
+
+.browser-extension-install-heading h2 {
+    margin: 3px 0 5px;
+}
+
+.browser-extension-install-heading .hint {
+    max-width: 720px;
+    line-height: 1.5;
+}
+
+.browser-extension-install-icon {
+    width: 42px;
+    height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9px;
+    background: rgba(124, 58, 237, 0.18);
+    color: #ddd6fe;
+}
+
+.browser-extension-install-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 8px;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, 0.1);
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 750;
+    white-space: nowrap;
+}
+
+.browser-extension-install-status.is-installed {
+    background: rgba(34, 197, 94, 0.14);
+    color: #bbf7d0;
+}
+
+.browser-extension-install-content {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    gap: 22px;
+}
+
+.browser-extension-install-content code {
+    color: var(--text-primary);
+}
+
+.browser-extension-install-fallback {
+    margin: 0;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-default);
+    color: var(--text-muted);
+    font-size: 12px;
 }
 
 .vti-bookmarklet-panel h2 {
@@ -1358,6 +1513,19 @@
     .vti-bookmarklet-support {
         flex-direction: column;
         align-items: stretch;
+    }
+
+    .browser-extension-install-heading,
+    .browser-extension-install-content {
+        grid-template-columns: 1fr;
+    }
+
+    .browser-extension-install-status {
+        justify-self: start;
+    }
+
+    .browser-extension-install-download {
+        justify-self: start;
     }
 
     .client-info-panel {
@@ -1698,6 +1866,17 @@
     color: #0369a1;
 }
 
+.light-theme .client-import-status-btn--extension {
+    border-color: rgba(109, 40, 217, 0.28);
+    background: rgba(124, 58, 237, 0.09);
+    color: #5b21b6;
+}
+
+.light-theme .client-import-status-btn--extension small {
+    background: rgba(124, 58, 237, 0.1);
+    color: #6d28d9;
+}
+
 .light-theme .client-import-status-btn.is-loaded {
     border-color: rgba(80, 88, 110, 0.18);
     background: rgba(80, 88, 110, 0.06);
@@ -1938,6 +2117,17 @@
     background: linear-gradient(135deg, rgba(0, 232, 120, 0.19), rgba(14, 165, 233, 0.17));
 }
 
+.salt-theme .client-import-status-btn--extension {
+    border-color: rgba(167, 139, 250, 0.42);
+    background: rgba(109, 40, 217, 0.16);
+    color: #ede9fe;
+}
+
+.salt-theme .client-import-status-btn--extension:hover:not(:disabled) {
+    border-color: rgba(196, 181, 253, 0.62);
+    background: rgba(109, 40, 217, 0.24);
+}
+
 .salt-theme .client-import-status-btn small {
     background: rgba(0, 232, 120, 0.14);
     color: #8bf4ba;
@@ -1956,6 +2146,11 @@
 .salt-theme .client-import-status-btn--capture small {
     background: rgba(0, 232, 120, 0.14);
     color: #8bf4ba;
+}
+
+.salt-theme .client-import-status-btn--extension small {
+    background: rgba(167, 139, 250, 0.18);
+    color: #ddd6fe;
 }
 
 .salt-theme .client-import-status-btn.is-loaded {
