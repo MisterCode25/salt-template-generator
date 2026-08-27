@@ -104,7 +104,7 @@ assert.ok(vtiBookmarklet.startsWith("javascript:"));
 assert.ok(superOfficeBookmarklet.startsWith("javascript:"));
 
 assert.equal(manifest.manifest_version, 3);
-assert.equal(manifest.version, "0.1.7");
+assert.equal(manifest.version, "0.1.8");
 assert.equal(CURRENT_BROWSER_EXTENSION_VERSION, manifest.version);
 assert.deepEqual(manifest.permissions.sort(), ["scripting", "tabs"]);
 assert.equal(manifest.host_permissions.includes("<all_urls>"), false);
@@ -116,7 +116,8 @@ assert.ok(manifest.content_scripts[0].matches.includes(
   "https://mistercode25.github.io/salt-template-generator/*"
 ));
 assert.match(serviceWorkerSource, /runAloAutofill/);
-assert.match(serviceWorkerSource, /runAlexTicketOpen/);
+assert.match(serviceWorkerSource, /runAlexOpen/);
+assert.match(serviceWorkerSource, /open-provider/);
 assert.match(serviceWorkerSource, /buildSuperOfficeTicketUrl/);
 assert.match(serviceWorkerSource, /chrome\.tabs\.update/);
 assert.match(serviceWorkerSource, /getCapturedSuperOfficeTicketNumber/);

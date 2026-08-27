@@ -28,7 +28,7 @@ import {
 import {
     ALEX_HOME_URL,
     ALEX_STORAGE_NAVIGATION_DELAY_MS,
-    openAlexTicketPage
+    openAlexPage
 } from "./alexAutomation.js";
 import { captureSuperOfficePage } from "./generated/superOfficeCapture.js";
 import { captureVtiPage } from "./generated/vtiCapture.js";
@@ -343,26 +343,32 @@ async function runAloAutofill(requestId, appTabId, payload) {
     }
 }
 
-async function runAlexTicketOpen(requestId, appTabId, payload) {
+async function runAlexOpen(requestId, appTabId, payload) {
     try {
-        if (!payload || payload.source !== "salt-templater-alex-ticket" || payload.action !== "view-ticket") {
+        const supportedAction = payload
+            && ["view-ticket", "open-provider"].includes(payload.action);
+        if (!payload || payload.source !== "salt-templater-alex-ticket" || !supportedAction) {
             throw new Error("Les données ALEX reçues sont invalides.");
         }
         const alexTab = await openOrReuseWorkflowTab("alex", ALEX_HOME_URL);
         const executionResults = await chrome.scripting.executeScript({
             target: { tabId: alexTab.id },
             world: "MAIN",
-            func: openAlexTicketPage,
+            func: openAlexPage,
             args: [payload, ALEX_STORAGE_NAVIGATION_DELAY_MS]
         });
         const result = readExecutionResult(executionResults, "ALEX");
-        if (!result.ok) throw new Error(result.error || "Le ticket ALEX n’a pas pu être ouvert.");
+        if (!result.ok) throw new Error(result.error || "ALEX n’a pas pu être ouvert.");
+
+        const message = payload.action === "view-ticket"
+            ? "Contexte partenaire appliqué. Ouverture du ticket ALEX…"
+            : "Provider sélectionné. Ouverture d’ALEX…";
 
         await sendActionCompleted(
             appTabId,
             requestId,
             "alex",
-            "Contexte partenaire appliqué. Ouverture du ticket ALEX…",
+            message,
             { result }
         );
     } catch (error) {
@@ -415,7 +421,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     if (message.type === BROWSER_EXTENSION_MESSAGE.START_ALEX) {
-        startWorkflow(message, sender.tab.id, sendResponse, runAlexTicketOpen);
+        startWorkflow(message, sender.tab.id, sendResponse, runAlexOpen);
         return false;
     }
 

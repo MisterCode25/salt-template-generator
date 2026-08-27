@@ -40,10 +40,10 @@ export const DATA_SHORTCUTS = Object.freeze([
         title: "Open ALEX ticket",
         buttonLabel: "Open ALEX ticket",
         bookmarklet: buildAlexTicketBookmarklet(),
-        description: "Reads the ALEX ticket payload, selects the matching partner in local storage and opens the existing partner ticket.",
+        description: "Reads the ALEX payload, selects the matching partner in local storage and opens either its workspace or an existing ticket.",
         steps: [
             "Capture the current VTI customer and generate or import its External ID.",
-            "Click Ticket ALEX in the tools bar to copy the partner context and ticket number.",
+            "Click Create ALEX ticket or Ticket ALEX in the tools bar to copy the matching context.",
             "On the newly opened ftthproxy.ch tab, sign in if necessary.",
             "Click this bookmarklet to select the partner and display the existing ticket."
         ]

@@ -80,6 +80,7 @@ import {
     resolveAloTemplateWithProblemDate
 } from "../utils/aloAutofill.js";
 import {
+    buildAlexProviderPayload,
     buildAlexTicketPayload,
     formatAlexTicketPayload,
     getAlexTicketUnavailableMessage,
@@ -87,7 +88,7 @@ import {
 } from "../utils/alexTicket.js";
 import { BROWSER_EXTENSION_MESSAGE } from "../../shared/browserExtensionProtocol.js";
 import {
-    startBrowserExtensionAlexTicket,
+    startBrowserExtensionAlexAction,
     startBrowserExtensionAloAutofill
 } from "../services/browserExtensionCaptureService.js";
 import { buildAloPreparationSteps } from "../utils/aloPreparationFlow.js";
@@ -1142,6 +1143,10 @@ export default function Templates() {
     );
     const displayClientExternalId = runtime.clientExternalId || caseProfile.externalId || "";
     const alexPartnerTicketNumber = caseProfile.externalPartnerTicketNumber || "";
+    const alexProviderPreparation = useMemo(
+        () => buildAlexProviderPayload(runtime.clientPayload),
+        [runtime.clientPayload]
+    );
     const alexTicketPreparation = useMemo(
         () => buildAlexTicketPayload(runtime.clientPayload, alexPartnerTicketNumber),
         [alexPartnerTicketNumber, runtime.clientPayload]
@@ -1473,6 +1478,40 @@ export default function Templates() {
         setAloPreparation(buildAloPreparationDefaults(clientPayload, superOfficePayload));
     }, [treeTemplates]);
 
+    const handoffAlexPayload = useCallback(async (payload, messages) => {
+        const extensionResult = await startBrowserExtensionAlexAction(payload);
+        if (extensionResult?.type === BROWSER_EXTENSION_MESSAGE.ACTION_COMPLETED) {
+            showToast(extensionResult.message || messages.success, "success");
+            return;
+        }
+
+        const copyPromise = copyText(
+            formatAlexTicketPayload(payload),
+            {
+                message: extensionResult
+                    ? "Données ALEX copiées : utilise le bookmarklet de secours"
+                    : messages.copied,
+                variant: extensionResult ? "warning" : "success"
+            }
+        );
+        if (!extensionResult) openAlexHomePage();
+        await copyPromise;
+        if (extensionResult?.error) showToast(extensionResult.error, "warning");
+    }, []);
+
+    const openAlexProvider = useCallback(async () => {
+        const preparation = buildAlexProviderPayload(runtimeRef.current.clientPayload);
+        if (!preparation.ok) {
+            showToast(getAlexTicketUnavailableMessage(preparation.error), "error");
+            return;
+        }
+
+        await handoffAlexPayload(preparation.payload, {
+            success: "ALEX ouvert sur le bon provider",
+            copied: "Données du provider ALEX copiées"
+        });
+    }, [handoffAlexPayload]);
+
     const openAlexTicket = useCallback(async () => {
         const preparation = buildAlexTicketPayload(
             runtimeRef.current.clientPayload,
@@ -1483,25 +1522,11 @@ export default function Templates() {
             return;
         }
 
-        const extensionResult = await startBrowserExtensionAlexTicket(preparation.payload);
-        if (extensionResult?.type === BROWSER_EXTENSION_MESSAGE.ACTION_COMPLETED) {
-            showToast(extensionResult.message || "Ticket ALEX ouvert", "success");
-            return;
-        }
-
-        const copyPromise = copyText(
-            formatAlexTicketPayload(preparation.payload),
-            {
-                message: extensionResult
-                    ? "Données ALEX copiées : utilise le bookmarklet de secours"
-                    : "ALEX ticket payload copied",
-                variant: extensionResult ? "warning" : "success"
-            }
-        );
-        if (!extensionResult) openAlexHomePage();
-        await copyPromise;
-        if (extensionResult?.error) showToast(extensionResult.error, "warning");
-    }, [alexPartnerTicketNumber]);
+        await handoffAlexPayload(preparation.payload, {
+            success: "Ticket ALEX ouvert",
+            copied: "ALEX ticket payload copied"
+        });
+    }, [alexPartnerTicketNumber, handoffAlexPayload]);
 
     const closeAloPreparation = useCallback(() => {
         setAloPreparation(null);
@@ -1926,6 +1951,11 @@ export default function Templates() {
                 runtimeContextRef={toolRuntimeContextRef}
                 onOpenExternalGenerator={openExternalGenerator}
                 hasExternalId={Boolean(displayClientExternalId)}
+                onOpenAlexProvider={openAlexProvider}
+                hasAlexProviderData={alexProviderPreparation.ok}
+                alexProviderUnavailableMessage={alexProviderPreparation.ok
+                    ? ""
+                    : getAlexTicketUnavailableMessage(alexProviderPreparation.error)}
                 onOpenAlexTicket={openAlexTicket}
                 hasAlexTicketData={alexTicketPreparation.ok}
                 alexTicketUnavailableMessage={alexTicketPreparation.ok

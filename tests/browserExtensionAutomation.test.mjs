@@ -6,7 +6,7 @@ import {
 import {
   ALEX_HOME_URL,
   ALEX_STORAGE_NAVIGATION_DELAY_MS,
-  openAlexTicketPage
+  openAlexPage
 } from "../browser-extension/alexAutomation.js";
 import {
   BROWSER_EXTENSION_MESSAGE,
@@ -27,7 +27,7 @@ assert.equal(isBrowserExtensionVersionAtLeast("0.1.3", "0.1.3"), true);
 assert.equal(isBrowserExtensionVersionAtLeast("0.2.0", "0.1.3"), true);
 assert.equal(isBrowserExtensionVersionAtLeast("0.1.2", "0.1.3"), false);
 assert.equal(isBrowserExtensionVersionAtLeast("", "0.1.3"), false);
-assert.equal(CURRENT_BROWSER_EXTENSION_VERSION, "0.1.7");
+assert.equal(CURRENT_BROWSER_EXTENSION_VERSION, "0.1.8");
 
 async function withGlobalOverrides(overrides, callback) {
   const previousDescriptors = new Map();
@@ -49,6 +49,41 @@ async function withGlobalOverrides(overrides, callback) {
       else delete globalThis[name];
     }
   }
+}
+
+{
+  const storedValues = new Map();
+  const scheduledCallbacks = [];
+  const replacedUrls = [];
+
+  const result = await withGlobalOverrides({
+    localStorage: {
+      setItem: (key, value) => storedValues.set(key, value)
+    },
+    location: {
+      hostname: "www.ftthproxy.ch",
+      origin: "https://www.ftthproxy.ch",
+      replace: (url) => replacedUrls.push(url)
+    },
+    setTimeout: (callback, delay) => scheduledCallbacks.push({ callback, delay })
+  }, () => openAlexPage({
+    source: "salt-templater-alex-ticket",
+    action: "open-provider",
+    alap: "45",
+    serviceDomain: 1,
+    businessDomain: "L1"
+  }, ALEX_STORAGE_NAVIGATION_DELAY_MS));
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(JSON.parse(storedValues.get("focus")), {
+    alap: "45",
+    serviceDomain: 1,
+    businessDomain: "L1"
+  });
+  assert.equal(scheduledCallbacks.length, 1);
+
+  scheduledCallbacks[0].callback();
+  assert.match(replacedUrls[0], /^https:\/\/www\.ftthproxy\.ch\/\?saltAlexRefresh=\d+#\/$/);
 }
 
 function createInput(value = "") {
@@ -120,7 +155,7 @@ function createInput(value = "") {
       replace: (url) => replacedUrls.push(url)
     },
     setTimeout: (callback, delay) => scheduledCallbacks.push({ callback, delay })
-  }, () => openAlexTicketPage({
+  }, () => openAlexPage({
     source: "salt-templater-alex-ticket",
     action: "view-ticket",
     alap: "45",

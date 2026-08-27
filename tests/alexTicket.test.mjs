@@ -3,11 +3,28 @@ import vm from "node:vm";
 import {
     ALEX_CLIPBOARD_SOURCE,
     ALEX_HOME_URL,
+    buildAlexProviderPayload,
     buildAlexTicketBookmarklet,
     buildAlexTicketPayload,
     formatAlexTicketPayload,
     openAlexHomePage
 } from "../src/utils/alexTicket.js";
+
+{
+    const result = buildAlexProviderPayload({
+        contact: { eligibilityOrdering: "45" }
+    });
+
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.payload, {
+        source: ALEX_CLIPBOARD_SOURCE,
+        version: 1,
+        action: "open-provider",
+        alap: "45",
+        serviceDomain: 1,
+        businessDomain: "L1"
+    });
+}
 
 {
     const result = buildAlexTicketPayload({
@@ -65,6 +82,7 @@ import {
     Function(bookmarklet.replace(/^javascript:/, ""));
     assert.match(bookmarklet, /localStorage\.setItem\("focus"/);
     assert.match(bookmarklet, /view-ticket/);
+    assert.match(bookmarklet, /open-provider/);
     assert.match(bookmarklet, /assurance\/ticket/);
     assert.doesNotMatch(bookmarklet, /encodeURIComponent/);
     assert.doesNotMatch(bookmarklet, /auth/i);
@@ -119,6 +137,60 @@ import {
     scheduledCallbacks[0].callback();
     assert.deepEqual(replacedUrls, [
         "https://www.ftthproxy.ch/?saltAlexRefresh=1234567890#/assurance/ticket/223323"
+    ]);
+}
+
+{
+    const bookmarklet = buildAlexTicketBookmarklet().replace(/^javascript:/, "");
+    const storedValues = new Map();
+    const scheduledCallbacks = [];
+    const replacedUrls = [];
+    const location = {
+        hostname: "www.ftthproxy.ch",
+        origin: "https://www.ftthproxy.ch",
+        pathname: "/",
+        hash: "",
+        replace: (url) => replacedUrls.push(url)
+    };
+    const context = vm.createContext({
+        alert: () => {},
+        Date: { now: () => 1234567890 },
+        JSON,
+        location,
+        localStorage: {
+            setItem: (key, value) => storedValues.set(key, value)
+        },
+        navigator: {
+            clipboard: {
+                readText: async () => JSON.stringify({
+                    source: ALEX_CLIPBOARD_SOURCE,
+                    action: "open-provider",
+                    alap: "45",
+                    serviceDomain: 1,
+                    businessDomain: "L1"
+                })
+            }
+        },
+        Number,
+        Promise,
+        setTimeout: (callback, delay) => scheduledCallbacks.push({ callback, delay }),
+        String
+    });
+
+    vm.runInContext(bookmarklet, context);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    assert.deepEqual(JSON.parse(storedValues.get("focus")), {
+        alap: "45",
+        serviceDomain: 1,
+        businessDomain: "L1"
+    });
+    assert.equal(scheduledCallbacks.length, 1);
+    assert.equal(scheduledCallbacks[0].delay, 300);
+
+    scheduledCallbacks[0].callback();
+    assert.deepEqual(replacedUrls, [
+        "https://www.ftthproxy.ch/?saltAlexRefresh=1234567890#/"
     ]);
 }
 

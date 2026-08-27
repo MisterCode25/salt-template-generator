@@ -1,7 +1,7 @@
 export const ALEX_HOME_URL = "https://www.ftthproxy.ch/";
 export const ALEX_STORAGE_NAVIGATION_DELAY_MS = 500;
 
-export function openAlexTicketPage(payload, requestedDelayMs) {
+export function openAlexPage(payload, requestedDelayMs) {
     function text(value) {
         if (value === null || value === undefined) return "";
         return String(value).trim();
@@ -11,7 +11,8 @@ export function openAlexTicketPage(payload, requestedDelayMs) {
     if (!/(^|\.)ftthproxy\.ch$/i.test(pageLocation.hostname)) {
         throw new Error("L’onglet ALEX n’est pas sur ftthproxy.ch.");
     }
-    if (!payload || payload.source !== "salt-templater-alex-ticket" || payload.action !== "view-ticket") {
+    var supportedAction = payload && (payload.action === "view-ticket" || payload.action === "open-provider");
+    if (!payload || payload.source !== "salt-templater-alex-ticket" || !supportedAction) {
         throw new Error("Les données ALEX sont invalides.");
     }
 
@@ -22,7 +23,7 @@ export function openAlexTicketPage(payload, requestedDelayMs) {
     if (!/^\d+$/.test(alap) || alap === "0") {
         throw new Error("L’identifiant partenaire ALEX est invalide.");
     }
-    if (!ticket) {
+    if (payload.action === "view-ticket" && !ticket) {
         throw new Error("Le numéro du ticket ALEX est absent.");
     }
     if (!Number.isFinite(serviceDomain) || !businessDomain) {
@@ -37,12 +38,15 @@ export function openAlexTicketPage(payload, requestedDelayMs) {
 
     var delayMs = Number(requestedDelayMs);
     if (!Number.isFinite(delayMs) || delayMs < 300) delayMs = 500;
+    var targetHash = payload.action === "view-ticket"
+        ? "/assurance/ticket/" + ticket
+        : "/";
     var targetUrl = pageLocation.origin
         + "/?saltAlexRefresh=" + Date.now()
-        + "#/assurance/ticket/" + ticket;
-    setTimeout(function openTicketAfterPartnerContext() {
+        + "#" + targetHash;
+    setTimeout(function openAlexAfterPartnerContext() {
         pageLocation.replace(targetUrl);
     }, delayMs);
 
-    return { ok: true, delayMs, targetUrl };
+    return { ok: true, action: payload.action, delayMs, targetUrl };
 }

@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ClipboardPaste, ExternalLink, Files, Puzzle, Settings2, Users } from "lucide-react";
+import { ClipboardPaste, ExternalLink, FilePlus2, Files, Puzzle, Settings2, Users } from "lucide-react";
 import Modal from "./Modal.jsx";
 import PartnersModal from "./PartnersModal.jsx";
 import { copyHtml, copyText, showToast } from "../services/clipboardService.js";
@@ -267,6 +267,9 @@ function ToolsBar({
     runtimeContextRef: externalRuntimeContextRef = null,
     onOpenExternalGenerator,
     hasExternalId = false,
+    onOpenAlexProvider,
+    hasAlexProviderData = false,
+    alexProviderUnavailableMessage = "ALEX provider data is unavailable",
     onOpenAlexTicket,
     hasAlexTicketData = false,
     alexTicketUnavailableMessage = "ALEX ticket data is unavailable",
@@ -368,6 +371,21 @@ function ToolsBar({
                                     ALO fill
                                 </button>
                             )}
+                            {onOpenAlexProvider && (
+                                <button
+                                    type="button"
+                                    className={`tools-bar-btn tools-bar-btn--system tools-bar-btn--alex${hasAlexProviderData ? "" : " is-disabled"}`}
+                                    onClick={onOpenAlexProvider}
+                                    disabled={!hasAlexProviderData}
+                                    aria-disabled={!hasAlexProviderData}
+                                    title={hasAlexProviderData
+                                        ? "Ouvrir ALEX sur le bon provider pour préparer un nouveau ticket"
+                                        : alexProviderUnavailableMessage}
+                                >
+                                    <FilePlus2 size={14} strokeWidth={2} aria-hidden="true" />
+                                    Créer ticket ALEX
+                                </button>
+                            )}
                             {onOpenAlexTicket && (
                                 <button
                                     type="button"
@@ -447,6 +465,9 @@ export default memo(ToolsBar, (prevProps, nextProps) => {
         && prevProps.runtimeContextRef === nextProps.runtimeContextRef
         && prevProps.onOpenExternalGenerator === nextProps.onOpenExternalGenerator
         && prevProps.hasExternalId === nextProps.hasExternalId
+        && prevProps.onOpenAlexProvider === nextProps.onOpenAlexProvider
+        && prevProps.hasAlexProviderData === nextProps.hasAlexProviderData
+        && prevProps.alexProviderUnavailableMessage === nextProps.alexProviderUnavailableMessage
         && prevProps.onOpenAlexTicket === nextProps.onOpenAlexTicket
         && prevProps.hasAlexTicketData === nextProps.hasAlexTicketData
         && prevProps.alexTicketUnavailableMessage === nextProps.alexTicketUnavailableMessage

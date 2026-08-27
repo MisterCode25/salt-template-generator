@@ -21,25 +21,39 @@ function getEligibilityOrdering(clientPayload) {
     );
 }
 
-export function buildAlexTicketPayload(clientPayload, partnerTicketNumber) {
+function buildAlexProviderContext(clientPayload, action) {
     const alap = getEligibilityOrdering(clientPayload);
-    const ticket = normalizeTicketNumber(partnerTicketNumber);
 
     if (!/^\d+$/.test(alap)) return { ok: false, error: "MISSING_PARTNER_ID" };
     if (alap === "0") return { ok: false, error: "ALO_PARTNER" };
-    if (!ticket) return { ok: false, error: "MISSING_TICKET" };
 
     return {
         ok: true,
         payload: {
             source: ALEX_CLIPBOARD_SOURCE,
             version: ALEX_CLIPBOARD_VERSION,
-            action: "view-ticket",
+            action,
             alap,
             serviceDomain: ALEX_SERVICE_DOMAIN,
-            businessDomain: ALEX_BUSINESS_DOMAIN,
-            ticket
+            businessDomain: ALEX_BUSINESS_DOMAIN
         }
+    };
+}
+
+export function buildAlexProviderPayload(clientPayload) {
+    return buildAlexProviderContext(clientPayload, "open-provider");
+}
+
+export function buildAlexTicketPayload(clientPayload, partnerTicketNumber) {
+    const context = buildAlexProviderContext(clientPayload, "view-ticket");
+    if (!context.ok) return context;
+
+    const ticket = normalizeTicketNumber(partnerTicketNumber);
+    if (!ticket) return { ok: false, error: "MISSING_TICKET" };
+
+    return {
+        ok: true,
+        payload: { ...context.payload, ticket }
     };
 }
 
@@ -81,8 +95,9 @@ function alexTicketBookmarkletRunner(expectedSource) {
             throw new Error("the clipboard does not contain valid JSON.");
         }
 
-        if (!payload || payload.source !== expectedSource || payload.action !== "view-ticket") {
-            throw new Error("the clipboard does not contain Ticket ALEX data from Salt BO tools.");
+        var supportedAction = payload && (payload.action === "view-ticket" || payload.action === "open-provider");
+        if (!payload || payload.source !== expectedSource || !supportedAction) {
+            throw new Error("the clipboard does not contain ALEX data from Salt BO tools.");
         }
 
         var alap = String(payload.alap || "").trim();
@@ -93,7 +108,7 @@ function alexTicketBookmarkletRunner(expectedSource) {
         if (!/^\d+$/.test(alap) || alap === "0") {
             throw new Error("the ALEX partner identifier is invalid.");
         }
-        if (!ticket) {
+        if (payload.action === "view-ticket" && !ticket) {
             throw new Error("the ALEX ticket number is missing.");
         }
         if (!Number.isFinite(serviceDomain) || !businessDomain) {
@@ -106,7 +121,9 @@ function alexTicketBookmarkletRunner(expectedSource) {
             businessDomain: businessDomain
         }));
 
-        var targetHash = "/assurance/ticket/" + ticket;
+        var targetHash = payload.action === "view-ticket"
+            ? "/assurance/ticket/" + ticket
+            : "/";
         var reloadUrl = location.origin
             + "/?saltAlexRefresh=" + Date.now()
             + "#" + targetHash;
