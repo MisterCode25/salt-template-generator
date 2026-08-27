@@ -6,6 +6,11 @@ import {
   selectReusableWorkflowTab,
   selectUniqueCaptureTabs
 } from "../browser-extension/tabDiscovery.js";
+import {
+  buildSuperOfficeTicketUrl,
+  getCapturedSuperOfficeTicketNumber,
+  normalizeSuperOfficeTicketNumber
+} from "../shared/superOfficeTicketNavigation.js";
 
 const vtiTab = {
   id: 11,
@@ -22,6 +27,27 @@ const saltSuperOfficeTab = {
   url: "https://cs.salt.ch/scripts/ticket.fcgi?_sf=0&action=doScreenDefinition&idString=viewEmail&entryId=28958607",
   title: "REQUEST 28958607"
 };
+
+{
+  assert.equal(normalizeSuperOfficeTicketNumber("28958607"), "28958607");
+  assert.equal(normalizeSuperOfficeTicketNumber("# 28958607"), "28958607");
+  assert.equal(normalizeSuperOfficeTicketNumber("REQUEST 28958607"), "");
+  assert.equal(normalizeSuperOfficeTicketNumber(""), "");
+
+  const url = new URL(buildSuperOfficeTicketUrl("#28958607"));
+  assert.equal(url.origin, "https://cs.salt.ch");
+  assert.equal(url.pathname, "/scripts/ticket.fcgi");
+  assert.equal(url.searchParams.get("_sf"), "0");
+  assert.equal(url.searchParams.get("action"), "doScreenDefinition");
+  assert.equal(url.searchParams.get("idString"), "viewEmail");
+  assert.equal(url.searchParams.get("entryId"), "28958607");
+  assert.equal(url.searchParams.has("entryID"), false);
+  assert.throws(() => buildSuperOfficeTicketUrl("ticket inconnu"), /numéro de ticket/i);
+
+  assert.equal(getCapturedSuperOfficeTicketNumber({ ticketId: "28958607" }), "28958607");
+  assert.equal(getCapturedSuperOfficeTicketNumber({ sourceTicketId: "#28958607" }), "28958607");
+  assert.equal(getCapturedSuperOfficeTicketNumber({}), "");
+}
 
 {
   assert.equal(classifyCaptureTab(vtiTab), "vti");

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
     AlertTriangle,
     CheckCircle2,
@@ -8,6 +8,7 @@ import {
     RefreshCw
 } from "lucide-react";
 import { BROWSER_EXTENSION_PHASE } from "../../shared/browserExtensionProtocol.js";
+import { normalizeSuperOfficeTicketNumber } from "../../shared/superOfficeTicketNavigation.js";
 import Modal from "./Modal.jsx";
 
 const COMPLETED_AUTO_CLOSE_DELAY_MS = 1000;
@@ -29,7 +30,9 @@ function getVisual(state) {
     return { mode: "ready", Icon: Puzzle, title: "Extension de capture" };
 }
 
-export default function BrowserExtensionCaptureModal({ state, onRetry, onClose }) {
+export default function BrowserExtensionCaptureModal({ state, onStart, onClose }) {
+    const [ticketNumber, setTicketNumber] = useState("");
+    const [ticketInputError, setTicketInputError] = useState("");
     const onCloseRef = useRef(onClose);
     onCloseRef.current = onClose;
 
@@ -45,12 +48,27 @@ export default function BrowserExtensionCaptureModal({ state, onRetry, onClose }
     const visual = getVisual(state);
     const VisualIcon = visual.Icon;
     const isBusy = state.isRunning || state.isChecking;
+    const isCompleted = state.phase === BROWSER_EXTENSION_PHASE.COMPLETED;
     const timelineProgressClass = state.vtiStatus === "done"
         ? "is-complete"
         : state.superOfficeStatus === "done"
             ? "is-half"
             : "is-start";
     const downloadUrl = `${import.meta.env.BASE_URL}downloads/salt-bo-capture-beta.zip`;
+    const submitTicket = (event) => {
+        event.preventDefault();
+        if (isBusy) return;
+
+        const normalizedTicketNumber = normalizeSuperOfficeTicketNumber(ticketNumber);
+        if (!normalizedTicketNumber) {
+            setTicketInputError("Saisis uniquement le numéro du ticket SuperOffice.");
+            return;
+        }
+
+        setTicketNumber(normalizedTicketNumber);
+        setTicketInputError("");
+        onStart(normalizedTicketNumber);
+    };
 
     return (
         <Modal
@@ -68,9 +86,42 @@ export default function BrowserExtensionCaptureModal({ state, onRetry, onClose }
                 <div>
                     <p className="eyebrow">Bêta</p>
                     <h2>Capture par extension</h2>
-                    <p>Utilise les onglets SuperOffice et VTI déjà ouverts, sans navigation automatique.</p>
+                    <p>Charge le ticket demandé dans l’onglet SuperOffice ouvert, puis capture SO et VTI.</p>
                 </div>
             </div>
+
+            {!isCompleted && (
+                <form className="browser-extension-ticket-form" onSubmit={submitTicket}>
+                    <label htmlFor="browser-extension-ticket-number">Numéro du ticket SuperOffice</label>
+                    <div className="browser-extension-ticket-row">
+                        <input
+                            id="browser-extension-ticket-number"
+                            type="text"
+                            inputMode="numeric"
+                            autoComplete="off"
+                            autoFocus
+                            value={ticketNumber}
+                            onChange={(event) => {
+                                setTicketNumber(event.target.value);
+                                if (ticketInputError) setTicketInputError("");
+                            }}
+                            placeholder="28958607"
+                            disabled={isBusy}
+                            aria-invalid={Boolean(ticketInputError)}
+                            aria-describedby={ticketInputError ? "browser-extension-ticket-error" : undefined}
+                        />
+                        <button type="submit" className="primary-btn" disabled={isBusy}>
+                            {state.error && <RefreshCw size={15} aria-hidden="true" />}
+                            {state.error ? "Réessayer" : "Charger et capturer"}
+                        </button>
+                    </div>
+                    {ticketInputError && (
+                        <small id="browser-extension-ticket-error" className="browser-extension-ticket-error">
+                            {ticketInputError}
+                        </small>
+                    )}
+                </form>
+            )}
 
             <div className={`browser-extension-capture-focus is-${visual.mode}`} aria-live="polite">
                 <VisualIcon
@@ -89,7 +140,7 @@ export default function BrowserExtensionCaptureModal({ state, onRetry, onClose }
                 <div className={`capture-data-timeline-step is-${state.superOfficeStatus}`}>
                     <span className="capture-data-timeline-dot" aria-hidden="true" />
                     <strong>SuperOffice</strong>
-                    <small>Ticket déjà ouvert</small>
+                    <small>Ticket demandé</small>
                 </div>
                 <div className={`capture-data-timeline-step is-${state.vtiStatus}`}>
                     <span className="capture-data-timeline-dot" aria-hidden="true" />
@@ -99,8 +150,8 @@ export default function BrowserExtensionCaptureModal({ state, onRetry, onClose }
             </div>
 
             <div className="browser-extension-capture-note">
-                Exactement un onglet SuperOffice et un onglet VTI doivent être ouverts. En cas de doute,
-                l’extension s’arrête sans choisir un onglet au hasard.
+                Exactement un onglet SuperOffice et un onglet VTI doivent être ouverts. L’onglet SuperOffice
+                est réutilisé en arrière-plan ; l’onglet VTI doit déjà afficher le bon client.
             </div>
 
             <div className="popup-actions capture-data-actions">
@@ -108,12 +159,6 @@ export default function BrowserExtensionCaptureModal({ state, onRetry, onClose }
                     <Download size={15} aria-hidden="true" />
                     Télécharger l’extension
                 </a>
-                {state.error && (
-                    <button type="button" className="primary-btn" onClick={onRetry}>
-                        <RefreshCw size={15} aria-hidden="true" />
-                        Réessayer
-                    </button>
-                )}
                 {!isBusy && (
                     <button type="button" className="secondary-btn" onClick={onClose}>Fermer</button>
                 )}

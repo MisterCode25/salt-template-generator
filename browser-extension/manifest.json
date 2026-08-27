@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Salt BO Capture Beta",
-  "description": "Captures SO/VTI data, extracts first-post MSISDN contractors, and opens ALO or ALEX workflows.",
-  "version": "0.1.4",
+  "description": "Loads and captures SO tickets, captures VTI data, and opens ALO or ALEX workflows.",
+  "version": "0.1.5",
   "permissions": [
     "scripting",
     "tabs"

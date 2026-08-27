@@ -22,7 +22,7 @@ export function createBrowserExtensionCaptureState() {
         phase: null,
         superOfficeStatus: "waiting",
         vtiStatus: "waiting",
-        message: "Prêt à lancer la capture automatique.",
+        message: "Saisis le numéro du ticket SuperOffice à charger.",
         error: ""
     };
 }

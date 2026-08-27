@@ -1169,6 +1169,56 @@
     color: #ddd6fe;
 }
 
+.browser-extension-ticket-form {
+    display: grid;
+    gap: 7px;
+    margin-top: 18px;
+}
+
+.browser-extension-ticket-form label {
+    color: var(--text-primary);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.browser-extension-ticket-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 9px;
+}
+
+.browser-extension-ticket-row input {
+    min-width: 0;
+    height: 38px;
+    padding: 0 11px;
+    border: 1px solid var(--border-default);
+    border-radius: 7px;
+    background: rgba(10, 14, 24, 0.86);
+    color: var(--text-primary);
+    font: inherit;
+}
+
+.browser-extension-ticket-row input:focus {
+    border-color: #a78bfa;
+    outline: 2px solid rgba(167, 139, 250, 0.2);
+    outline-offset: 1px;
+}
+
+.browser-extension-ticket-row input[aria-invalid="true"] {
+    border-color: rgba(248, 113, 113, 0.72);
+}
+
+.browser-extension-ticket-error {
+    color: #fca5a5;
+    font-size: 11px;
+}
+
+@media (max-width: 560px) {
+    .browser-extension-ticket-row {
+        grid-template-columns: 1fr;
+    }
+}
+
 .browser-extension-capture-focus {
     min-height: 88px;
     display: flex;

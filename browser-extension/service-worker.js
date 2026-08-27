@@ -5,6 +5,11 @@ import {
     isAppCommand
 } from "./shared/browserExtensionProtocol.js";
 import {
+    buildSuperOfficeTicketUrl,
+    getCapturedSuperOfficeTicketNumber,
+    normalizeSuperOfficeTicketNumber
+} from "./shared/superOfficeTicketNavigation.js";
+import {
     CAPTURE_TAB_ERROR_MESSAGE,
     selectReusableWorkflowTab,
     selectUniqueCaptureTabs
@@ -57,8 +62,13 @@ function readExecutionResult(results, label) {
     return result;
 }
 
-async function runCapture(requestId, appTabId) {
+async function runCapture(requestId, appTabId, payload) {
     try {
+        const requestedTicketNumber = normalizeSuperOfficeTicketNumber(payload?.ticketNumber);
+        if (!requestedTicketNumber) {
+            throw new Error("Le numéro de ticket SuperOffice est invalide.");
+        }
+
         await reportProgress(
             appTabId,
             requestId,
@@ -75,8 +85,20 @@ async function runCapture(requestId, appTabId) {
         await reportProgress(
             appTabId,
             requestId,
+            BROWSER_EXTENSION_PHASE.LOCATING_TABS,
+            `Chargement du ticket SuperOffice ${requestedTicketNumber}…`,
+            { superOfficeStatus: "active", vtiStatus: "waiting" }
+        );
+        await chrome.tabs.update(selection.superOfficeTab.id, {
+            url: buildSuperOfficeTicketUrl(requestedTicketNumber)
+        });
+        await waitForTabLoad(selection.superOfficeTab.id, 30000, "du ticket SuperOffice");
+
+        await reportProgress(
+            appTabId,
+            requestId,
             BROWSER_EXTENSION_PHASE.SUPER_OFFICE_CAPTURE,
-            "Capture du ticket SuperOffice…",
+            `Capture du ticket SuperOffice ${requestedTicketNumber}…`,
             { superOfficeStatus: "active", vtiStatus: "waiting" }
         );
         const superOfficeResults = await chrome.scripting.executeScript({
@@ -85,6 +107,15 @@ async function runCapture(requestId, appTabId) {
             func: captureSuperOfficePage
         });
         const superOfficePayload = readExecutionResult(superOfficeResults, "SuperOffice");
+        const capturedTicketNumber = getCapturedSuperOfficeTicketNumber(superOfficePayload);
+        if (!capturedTicketNumber) {
+            throw new Error("Le numéro du ticket chargé n’a pas pu être confirmé dans SuperOffice.");
+        }
+        if (capturedTicketNumber !== requestedTicketNumber) {
+            throw new Error(
+                `Le ticket SuperOffice capturé (${capturedTicketNumber}) ne correspond pas au ticket demandé (${requestedTicketNumber}).`
+            );
+        }
 
         await reportProgress(
             appTabId,

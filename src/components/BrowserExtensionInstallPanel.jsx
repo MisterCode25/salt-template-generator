@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2, Download, Puzzle } from "lucide-react";
 import {
+    CURRENT_BROWSER_EXTENSION_VERSION,
     isBrowserExtensionVersionAtLeast,
     requestBrowserExtensionStatus
 } from "../services/browserExtensionCaptureService.js";
-
-const CURRENT_EXTENSION_VERSION = "0.1.4";
 
 export default function BrowserExtensionInstallPanel() {
     const [extensionStatus, setExtensionStatus] = useState({
@@ -15,7 +14,7 @@ export default function BrowserExtensionInstallPanel() {
     });
     const extensionDownloadUrl = `${import.meta.env.BASE_URL}downloads/salt-bo-capture-beta.zip`;
     const needsUpdate = extensionStatus.installed
-        && !isBrowserExtensionVersionAtLeast(extensionStatus.version, CURRENT_EXTENSION_VERSION);
+        && !isBrowserExtensionVersionAtLeast(extensionStatus.version, CURRENT_BROWSER_EXTENSION_VERSION);
 
     useEffect(() => {
         let cancelled = false;

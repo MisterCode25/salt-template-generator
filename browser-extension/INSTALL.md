@@ -7,7 +7,7 @@
 5. Sélectionne ce dossier, celui qui contient `manifest.json`.
 6. Recharge Salt BO tools une fois l’extension installée.
 
-La capture bêta n’effectue encore aucune recherche de client VTI à partir du contractor : elle exige exactement un onglet SuperOffice et un onglet VTI déjà ouverts sur les bonnes données.
+La capture bêta demande le numéro du ticket SuperOffice, charge ce ticket dans l’unique onglet SuperOffice déjà ouvert, puis capture ses données. Elle n’effectue encore aucune recherche de client VTI à partir du contractor : elle exige aussi exactement un onglet VTI déjà ouvert sur le bon client.
 
 La capture SuperOffice récupère le contractor depuis l’External ID lorsqu’il est valide. Sinon, elle cherche `MSISDN: <numéro>` dans le premier post du ticket.
 

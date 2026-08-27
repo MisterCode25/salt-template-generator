@@ -132,6 +132,10 @@ async function buildExtensionDirectory() {
         join(projectRoot, "shared/browserExtensionProtocol.js"),
         join(extensionDist, "shared/browserExtensionProtocol.js")
     );
+    await copyFile(
+        join(projectRoot, "shared/superOfficeTicketNavigation.js"),
+        join(extensionDist, "shared/superOfficeTicketNavigation.js")
+    );
 
     const [superOfficeBookmarklet, vtiBookmarklet] = await Promise.all([
         readFile(join(projectRoot, "src/data/superOfficeBookmarklet.txt"), "utf8"),

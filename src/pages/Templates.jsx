@@ -1417,8 +1417,8 @@ export default function Templates() {
         });
     }, [refreshSuperOfficeState, resetCaseNavigation]);
 
-    const openBrowserExtensionCaptureFlow = useCallback(async () => {
-        await runtimeRef.current.openBrowserExtensionCaptureFlow({
+    const openBrowserExtensionCaptureFlow = useCallback(() => {
+        runtimeRef.current.openBrowserExtensionCaptureFlow({
             onImported: async () => {
                 await refreshSuperOfficeState();
                 resetCaseNavigation();
@@ -2103,7 +2103,7 @@ export default function Templates() {
             {runtime.browserExtensionCaptureOpen && (
                 <BrowserExtensionCaptureModal
                     state={runtime.browserExtensionCaptureState}
-                    onRetry={openBrowserExtensionCaptureFlow}
+                    onStart={runtime.startBrowserExtensionCaptureFlow}
                     onClose={runtime.closeBrowserExtensionCaptureFlow}
                 />
             )}

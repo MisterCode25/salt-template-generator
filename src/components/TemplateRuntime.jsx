@@ -82,7 +82,9 @@ import {
     BROWSER_EXTENSION_MESSAGE
 } from "../../shared/browserExtensionProtocol.js";
 import {
+    CURRENT_BROWSER_EXTENSION_VERSION,
     createBrowserExtensionRequestId,
+    isBrowserExtensionVersionAtLeast,
     requestBrowserExtensionStatus,
     startBrowserExtensionCapture,
     subscribeToBrowserExtensionEvents
@@ -2295,11 +2297,19 @@ export function useTemplateRuntime() {
         browserExtensionEventHandler.current?.(message);
     }), []);
 
-    const openBrowserExtensionCaptureFlow = async (options = {}) => {
+    const openBrowserExtensionCaptureFlow = (options = {}) => {
         browserExtensionImportCallback.current = typeof options.onImported === "function"
             ? options.onImported
             : null;
         setBrowserExtensionCaptureOpen(true);
+        dispatchBrowserExtensionCapture({ type: BROWSER_EXTENSION_CAPTURE_ACTION.RESET });
+    };
+
+    const startBrowserExtensionCaptureFlow = async (ticketNumber) => {
+        if (browserExtensionCaptureState.isRunning || browserExtensionCaptureState.isChecking) {
+            return false;
+        }
+
         dispatchBrowserExtensionCapture({ type: BROWSER_EXTENSION_CAPTURE_ACTION.CHECKING });
 
         const status = await requestBrowserExtensionStatus();
@@ -2308,6 +2318,14 @@ export function useTemplateRuntime() {
                 type: BROWSER_EXTENSION_CAPTURE_ACTION.LOCAL_FAILURE,
                 installed: false,
                 error: "Extension non détectée. Installe-la, recharge l’application puis réessaie."
+            });
+            return false;
+        }
+        if (!isBrowserExtensionVersionAtLeast(status.version, CURRENT_BROWSER_EXTENSION_VERSION)) {
+            dispatchBrowserExtensionCapture({
+                type: BROWSER_EXTENSION_CAPTURE_ACTION.LOCAL_FAILURE,
+                installed: true,
+                error: `Mets l’extension à jour vers la version ${CURRENT_BROWSER_EXTENSION_VERSION}, puis recharge-la.`
             });
             return false;
         }
@@ -2325,7 +2343,7 @@ export function useTemplateRuntime() {
             type: BROWSER_EXTENSION_CAPTURE_ACTION.STARTING,
             requestId
         });
-        const response = await startBrowserExtensionCapture(requestId);
+        const response = await startBrowserExtensionCapture(requestId, ticketNumber);
         if (!response) {
             dispatchBrowserExtensionCapture({
                 type: BROWSER_EXTENSION_CAPTURE_ACTION.LOCAL_FAILURE,
@@ -3053,6 +3071,7 @@ export function useTemplateRuntime() {
         browserExtensionCaptureOpen,
         browserExtensionCaptureState,
         openBrowserExtensionCaptureFlow,
+        startBrowserExtensionCaptureFlow,
         closeBrowserExtensionCaptureFlow,
         clientDetailsExpanded,
         setClientDetailsExpanded,

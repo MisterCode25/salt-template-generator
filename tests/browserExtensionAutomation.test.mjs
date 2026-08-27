@@ -13,7 +13,9 @@ import {
   createExtensionEvent
 } from "../shared/browserExtensionProtocol.js";
 import {
+  CURRENT_BROWSER_EXTENSION_VERSION,
   isBrowserExtensionVersionAtLeast,
+  startBrowserExtensionCapture,
   startBrowserExtensionAloAutofill
 } from "../src/services/browserExtensionCaptureService.js";
 import { ALO_FULFILLMENT_DETAIL_URL as APP_ALO_FULFILLMENT_DETAIL_URL } from "../src/utils/aloAutofill.js";
@@ -25,6 +27,7 @@ assert.equal(isBrowserExtensionVersionAtLeast("0.1.3", "0.1.3"), true);
 assert.equal(isBrowserExtensionVersionAtLeast("0.2.0", "0.1.3"), true);
 assert.equal(isBrowserExtensionVersionAtLeast("0.1.2", "0.1.3"), false);
 assert.equal(isBrowserExtensionVersionAtLeast("", "0.1.3"), false);
+assert.equal(CURRENT_BROWSER_EXTENSION_VERSION, "0.1.5");
 
 async function withGlobalOverrides(overrides, callback) {
   const previousDescriptors = new Map();
@@ -138,6 +141,41 @@ function createInput(value = "") {
 
   scheduledCallbacks[0].callback();
   assert.match(replacedUrls[0], /^https:\/\/www\.ftthproxy\.ch\/\?saltAlexRefresh=\d+#\/assurance\/ticket\/223323$/);
+}
+
+{
+  const commands = [];
+  const listeners = new Set();
+  const fakeWindow = {
+    location: { origin: "https://mistercode25.github.io" },
+    addEventListener(type, listener) {
+      if (type === "message") listeners.add(listener);
+    },
+    removeEventListener(type, listener) {
+      if (type === "message") listeners.delete(listener);
+    },
+    clearTimeout() {},
+    setTimeout() {
+      return 1;
+    },
+    postMessage(command) {
+      commands.push(command);
+      for (const listener of [...listeners]) {
+        listener({
+          data: createExtensionEvent(BROWSER_EXTENSION_MESSAGE.ACCEPTED, command.requestId),
+          origin: fakeWindow.location.origin,
+          source: fakeWindow
+        });
+      }
+    }
+  };
+
+  const result = await withGlobalOverrides({ window: fakeWindow }, () => (
+    startBrowserExtensionCapture("capture-ticket-1", "28958607")
+  ));
+
+  assert.equal(result.type, BROWSER_EXTENSION_MESSAGE.ACCEPTED);
+  assert.deepEqual(commands[0].payload, { ticketNumber: "28958607" });
 }
 
 {
