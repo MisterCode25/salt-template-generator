@@ -75,3 +75,13 @@ export function buildVtiContractorDetailUrl(recordId) {
     url.searchParams.set("record", normalizedRecordId);
     return url.href;
 }
+
+export function getVtiContractorRecordIdFromUrl(value) {
+    try {
+        const url = new URL(value);
+        const recordId = String(url.searchParams.get("record") || "").trim();
+        return /^\d+$/.test(recordId) ? recordId : "";
+    } catch {
+        return "";
+    }
+}

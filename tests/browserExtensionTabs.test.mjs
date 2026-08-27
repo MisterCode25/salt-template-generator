@@ -9,6 +9,7 @@ import {
 import {
   buildSuperOfficeTicketUrl,
   getCapturedSuperOfficeTicketNumber,
+  getSuperOfficeTicketNumberFromUrl,
   normalizeSuperOfficeTicketNumber
 } from "../shared/superOfficeTicketNavigation.js";
 
@@ -47,6 +48,9 @@ const saltSuperOfficeTab = {
   assert.equal(getCapturedSuperOfficeTicketNumber({ ticketId: "28958607" }), "28958607");
   assert.equal(getCapturedSuperOfficeTicketNumber({ sourceTicketId: "#28958607" }), "28958607");
   assert.equal(getCapturedSuperOfficeTicketNumber({}), "");
+  assert.equal(getSuperOfficeTicketNumberFromUrl(saltSuperOfficeTab.url), "28958607");
+  assert.equal(getSuperOfficeTicketNumberFromUrl("https://cs.salt.ch/"), "");
+  assert.equal(getSuperOfficeTicketNumberFromUrl("invalid"), "");
 }
 
 {

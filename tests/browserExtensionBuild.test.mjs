@@ -4,6 +4,11 @@ import {
   buildSuperOfficeCaptureModule,
   buildVtiCaptureModule
 } from "../scripts/browserExtensionBuildSupport.mjs";
+import {
+  extractUsableVtiHealthcheckText,
+  fetchVtiHealthcheckSource,
+  normalizeVtiHealthcheckResponseText
+} from "../browser-extension/healthcheckCapture.js";
 import { CURRENT_BROWSER_EXTENSION_VERSION } from "../src/services/browserExtensionCaptureService.js";
 
 const vtiBookmarklet = readFileSync(
@@ -52,6 +57,8 @@ async function withGlobalOverrides(overrides, callback) {
   assert.match(moduleSource, /MSISDN/);
   assert.match(moduleSource, /contractorNumber/);
   assert.match(moduleSource, /orderedSuperOfficePostEntries/);
+  assert.match(moduleSource, /prepareSuperOfficePosts/);
+  assert.match(moduleSource, /await prepareSuperOfficePosts\(\)/);
   assert.doesNotMatch(moduleSource, /const message=messageDataList\(\)\[0\]/);
   assert.doesNotMatch(moduleSource, /navigator\.clipboard/);
   assert.doesNotMatch(moduleSource, /position:fixed/);
@@ -86,6 +93,50 @@ async function withGlobalOverrides(overrides, callback) {
   }, () => captureSuperOfficePage());
 
   assert.equal(captureResult.contractorNumber, "32323232");
+}
+
+{
+  const html = `
+    <html>
+      <head><style>.hidden { display: none; }</style></head>
+      <body>
+        <section>
+          <div>routerSerialNumber</div><div>SAGEM-123</div>
+          <div>otoId</div><div>OTO-456</div>
+          <div>lineState</div><div>ACTIVE</div>
+          <p>${"Healthcheck details ".repeat(40)}</p>
+        </section>
+        <script>window.hiddenHealthcheckValue = "ignored";</script>
+      </body>
+    </html>
+  `;
+  const normalizedText = normalizeVtiHealthcheckResponseText(html);
+
+  assert.match(normalizedText, /routerSerialNumber\nSAGEM-123/);
+  assert.doesNotMatch(normalizedText, /hiddenHealthcheckValue/);
+
+  let requestedOptions = null;
+  const fetchedSource = await withGlobalOverrides({
+    location: { href: "https://vti.salt.ch/index.php", origin: "https://vti.salt.ch" },
+    fetch: async (_url, options) => {
+      requestedOptions = options;
+      return { ok: true, text: async () => html };
+    }
+  }, () => fetchVtiHealthcheckSource(
+    "https://vti.salt.ch/index.php?mode=healthCheck"
+  ));
+  const fetchedText = extractUsableVtiHealthcheckText(fetchedSource);
+
+  assert.equal(fetchedText, normalizedText);
+  assert.equal(requestedOptions.credentials, "include");
+  assert.equal(requestedOptions.cache, "no-store");
+  assert.equal(requestedOptions.redirect, "follow");
+}
+
+{
+  const fetchedText = extractUsableVtiHealthcheckText("<html><body>Loading...</body></html>");
+
+  assert.equal(fetchedText, "");
 }
 
 {
@@ -294,7 +345,7 @@ assert.ok(vtiBookmarklet.startsWith("javascript:"));
 assert.ok(superOfficeBookmarklet.startsWith("javascript:"));
 
 assert.equal(manifest.manifest_version, 3);
-assert.equal(manifest.version, "0.1.11");
+assert.equal(manifest.version, "0.1.12");
 assert.equal(CURRENT_BROWSER_EXTENSION_VERSION, manifest.version);
 assert.deepEqual(manifest.permissions.sort(), ["scripting", "tabs"]);
 assert.equal(manifest.host_permissions.includes("<all_urls>"), false);
@@ -312,6 +363,8 @@ assert.match(serviceWorkerSource, /buildSuperOfficeTicketUrl/);
 assert.match(serviceWorkerSource, /chrome\.tabs\.update/);
 assert.match(serviceWorkerSource, /getCapturedSuperOfficeTicketNumber/);
 assert.match(serviceWorkerSource, /findVtiContractorRecord/);
+assert.match(serviceWorkerSource, /VTI_FAST_SEARCH_UNAVAILABLE/);
+assert.match(serviceWorkerSource, /fetchVtiHealthcheckSource/);
 assert.match(serviceWorkerSource, /CONTRACTOR_INPUT_REQUIRED/);
 assert.match(serviceWorkerSource, /ALEX_STORAGE_NAVIGATION_DELAY_MS/);
 assert.match(appBridgeSource, /salt\.capture\.alo\.start\.v1/);

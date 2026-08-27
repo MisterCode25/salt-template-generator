@@ -34,6 +34,7 @@ const orderedSuperOfficePostEntries=()=>messageDataList().map((message,index)=>{
 const firstSuperOfficePostEntry=()=>orderedSuperOfficePostEntries()[0]||{message:null,index:0,date:null,timestamp:null};
 const firstPostSnapshot=()=>{const firstPost=firstSuperOfficePostEntry();const message=firstPost.message;const messageRoots=all(".HtmlMessages2_message,.HtmlMessage,[id*='HtmlMessages2_message'],article").filter(el=>!isNoiseControl(el));const messageId=norm(message?.id||message?.messageId||message?.messageID||message?.postId);const matchingRoot=messageId?messageRoots.find(root=>{const rootId=norm(root?.getAttribute?.("data-message-id")||root?.getAttribute?.("data-post-id")||root?.id);return rootId===messageId||rootId.includes(messageId)}):null;const messageRoot=matchingRoot||messageRoots[firstPost.index]||messageRoots[0];const messageValues=[message?.text,message?.plainText,message?.bodyText,message?.body,message?.message,message?.content,message?.html,message?.bodyHtml,message?.messageHtml,message?.htmlBody].filter(value=>typeof value==="string"&&value.trim());const frames=messageRoot?all("iframe",messageRoot):[];const frameValues=frames.map(frame=>{try{return frame.contentDocument?.body?.innerText||frame.contentDocument?.body?.textContent||frame.contentWindow?.document?.body?.innerText||frame.contentWindow?.document?.body?.textContent||""}catch{return""}}).filter(value=>String(value).trim());const rootValue=messageRoot?.innerText||messageRoot?.textContent||"";const readableMessageValues=messageValues.map(readablePostText).filter(Boolean);const readableFrameValues=frameValues.map(readablePostText).filter(Boolean);const readableRootValue=readablePostText(rootValue);const values=[...readableMessageValues,...readableFrameValues,readableRootValue].filter(Boolean);return{text:values.join("\n"),isLoaded:readableMessageValues.length>0||readableFrameValues.length>0||(frames.length===0&&Boolean(readableRootValue))}};
 const contractorFromFirstPostText=text=>readablePostText(text).match(/\bMSISDN\s*:\s*([0-9]+)\b/i)?.[1]||null;
+const prepareSuperOfficePosts=async()=>{const nativeMessageFlips=all("img.HtmlMessages2_flipImage");if(nativeMessageFlips.length){await flipHtmlMessagesPosts();return}const hasLoadedMessageContent=messageDataList().some(message=>[message?.text,message?.plainText,message?.bodyText,message?.body,message?.message,message?.content,message?.html,message?.bodyHtml,message?.messageHtml,message?.htmlBody].some(value=>typeof value==="string"&&value.trim()));if(hasLoadedMessageContent)return;await expandTicketPosts()};
 const waitForFirstPostContractor=async()=>{let previousText="";let stableReadCount=0;for(let attempt=0;attempt<24;attempt+=1){const snapshot=firstPostSnapshot();const contractorNumber=contractorFromFirstPostText(snapshot.text);if(contractorNumber)return contractorNumber;if(snapshot.isLoaded){if(snapshot.text===previousText){stableReadCount+=1}else{previousText=snapshot.text;stableReadCount=1}if(stableReadCount>=4)return null}else{previousText="";stableReadCount=0}if(attempt<23)await sleep(250)}return null};
 `;
 
@@ -57,6 +58,12 @@ export function buildSuperOfficeCaptureModule(bookmarkletSource) {
         "const data={ticketId,createdAt,firstPostAt:firstPostAt(),externalTicketId,attachments};",
         "const contractorNumber=await waitForFirstPostContractor();const data={ticketId,createdAt,firstPostAt:firstPostAt(),externalTicketId,contractorNumber,attachments};",
         "SuperOffice contractor output"
+    );
+    source = replaceRequired(
+        source,
+        "await expandTicketPosts();const text=document.body.innerText;",
+        "await prepareSuperOfficePosts();const text=document.body.innerText;",
+        "SuperOffice fast post preparation"
     );
     const clipboardTail = "navigator.clipboard.writeText(JSON.stringify(data,null,2)).then(()=>showToast(\"JSON copié dans le presse-papiers\")).catch(()=>showToast(\"Erreur copie clipboard\"));";
     const transformed = replaceRequired(

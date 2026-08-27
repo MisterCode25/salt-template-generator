@@ -21,6 +21,14 @@ export function buildSuperOfficeTicketUrl(ticketNumber) {
     return url.href;
 }
 
+export function getSuperOfficeTicketNumberFromUrl(value) {
+    try {
+        return normalizeSuperOfficeTicketNumber(new URL(value).searchParams.get("entryId"));
+    } catch {
+        return "";
+    }
+}
+
 export function getCapturedSuperOfficeTicketNumber(payload) {
     return normalizeSuperOfficeTicketNumber(payload?.ticketId)
         || normalizeSuperOfficeTicketNumber(payload?.sourceTicketId);

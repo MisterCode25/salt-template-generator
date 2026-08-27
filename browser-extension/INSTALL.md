@@ -13,4 +13,6 @@ Si aucun contractor n’est trouvé dans SuperOffice, l’extension ne touche pa
 
 La capture SuperOffice récupère le contractor depuis l’External ID lorsqu’il est valide. Sinon, elle ouvre les posts une seule fois, les trie par date, attend que le plus ancien soit chargé, puis cherche `MSISDN: <numéro>` dans son contenu, y compris lorsque le message est affiché dans un iframe.
 
+La version 0.1.12 accélère ce parcours sans retirer les sécurités existantes : SuperOffice utilise directement ses contrôles de posts connus, VTI recherche le `recordId` par une requête authentifiée en arrière-plan et tente la même chose pour Healthcheck. Si une de ces lectures rapides n’est pas exploitable, l’extension reprend automatiquement le chargement par onglet utilisé jusque-là.
+
 Depuis Salt BO tools, l’extension peut aussi ouvrir et préremplir le formulaire ALO sans jamais le valider, ainsi qu’ouvrir un ticket ALEX après avoir appliqué le contexte partenaire.

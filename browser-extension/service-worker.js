@@ -7,12 +7,14 @@ import {
 import {
     buildSuperOfficeTicketUrl,
     getCapturedSuperOfficeTicketNumber,
+    getSuperOfficeTicketNumberFromUrl,
     normalizeSuperOfficeTicketNumber
 } from "./shared/superOfficeTicketNavigation.js";
 import {
     buildVtiContractorDetailUrl,
     buildVtiContractorSearchUrl,
     getCapturedVtiContractorNumber,
+    getVtiContractorRecordIdFromUrl,
     resolveVtiCaptureRoute
 } from "./shared/vtiContractorNavigation.js";
 import {
@@ -32,7 +34,11 @@ import {
 } from "./alexAutomation.js";
 import { captureSuperOfficePage } from "./generated/superOfficeCapture.js";
 import { captureVtiPage } from "./generated/vtiCapture.js";
-import { captureVtiHealthcheckPage } from "./healthcheckCapture.js";
+import {
+    captureVtiHealthcheckPage,
+    extractUsableVtiHealthcheckText,
+    fetchVtiHealthcheckSource
+} from "./healthcheckCapture.js";
 import { findVtiContractorRecord } from "./vtiContractorSearch.js";
 
 let activeWorkflow = null;
@@ -69,6 +75,38 @@ function readExecutionResult(results, label) {
     return result;
 }
 
+async function findVtiContractorInTab(tabId, contractorNumber) {
+    const searchUrl = buildVtiContractorSearchUrl(contractorNumber);
+    let fastSearchResult = {
+        ok: false,
+        code: "VTI_FAST_SEARCH_UNAVAILABLE"
+    };
+    try {
+        const fastSearchResults = await chrome.scripting.executeScript({
+            target: { tabId },
+            world: "MAIN",
+            func: findVtiContractorRecord,
+            args: [contractorNumber, searchUrl]
+        });
+        fastSearchResult = readExecutionResult(fastSearchResults, "La recherche VTI rapide");
+    } catch {
+        // The normal page-navigation path below remains the compatibility fallback.
+    }
+    if (fastSearchResult.ok || fastSearchResult.code !== "VTI_FAST_SEARCH_UNAVAILABLE") {
+        return fastSearchResult;
+    }
+
+    await chrome.tabs.update(tabId, { url: searchUrl });
+    await waitForTabLoad(tabId, 30000, "de la recherche contractor VTI");
+    const fallbackSearchResults = await chrome.scripting.executeScript({
+        target: { tabId },
+        world: "ISOLATED",
+        func: findVtiContractorRecord,
+        args: [contractorNumber]
+    });
+    return readExecutionResult(fallbackSearchResults, "La recherche VTI");
+}
+
 async function runCapture(requestId, appTabId, payload) {
     try {
         const requestedTicketNumber = normalizeSuperOfficeTicketNumber(payload?.ticketNumber);
@@ -96,10 +134,17 @@ async function runCapture(requestId, appTabId, payload) {
             `Chargement du ticket SuperOffice ${requestedTicketNumber}…`,
             { superOfficeStatus: "active", vtiStatus: "waiting" }
         );
-        await chrome.tabs.update(selection.superOfficeTab.id, {
-            url: buildSuperOfficeTicketUrl(requestedTicketNumber)
-        });
-        await waitForTabLoad(selection.superOfficeTab.id, 30000, "du ticket SuperOffice");
+        const isRequestedTicketAlreadyLoaded = getSuperOfficeTicketNumberFromUrl(
+            selection.superOfficeTab.url
+        ) === requestedTicketNumber;
+        if (!isRequestedTicketAlreadyLoaded) {
+            await chrome.tabs.update(selection.superOfficeTab.id, {
+                url: buildSuperOfficeTicketUrl(requestedTicketNumber)
+            });
+        }
+        if (!isRequestedTicketAlreadyLoaded || selection.superOfficeTab.status !== "complete") {
+            await waitForTabLoad(selection.superOfficeTab.id, 30000, "du ticket SuperOffice");
+        }
 
         await reportProgress(
             appTabId,
@@ -150,18 +195,10 @@ async function runCapture(requestId, appTabId, payload) {
                 `Recherche du contractor ${contractorNumber} dans VTI…`,
                 { superOfficeStatus: "done", vtiStatus: "active" }
             );
-            await chrome.tabs.update(selection.vtiTab.id, {
-                url: buildVtiContractorSearchUrl(contractorNumber)
-            });
-            await waitForTabLoad(selection.vtiTab.id, 30000, "de la recherche contractor VTI");
-
-            const vtiSearchResults = await chrome.scripting.executeScript({
-                target: { tabId: selection.vtiTab.id },
-                world: "ISOLATED",
-                func: findVtiContractorRecord,
-                args: [contractorNumber]
-            });
-            const vtiSearchResult = readExecutionResult(vtiSearchResults, "La recherche VTI");
+            const vtiSearchResult = await findVtiContractorInTab(
+                selection.vtiTab.id,
+                contractorNumber
+            );
             if (!vtiSearchResult.ok) {
                 throw new Error(vtiSearchResult.error || "Le contractor n’a pas été trouvé dans VTI.");
             }
@@ -173,10 +210,18 @@ async function runCapture(requestId, appTabId, payload) {
                 `Contractor trouvé. Chargement de la fiche VTI ${vtiSearchResult.recordId}…`,
                 { superOfficeStatus: "done", vtiStatus: "active" }
             );
-            await chrome.tabs.update(selection.vtiTab.id, {
-                url: buildVtiContractorDetailUrl(vtiSearchResult.recordId)
-            });
-            await waitForTabLoad(selection.vtiTab.id, 30000, "de la fiche contractor VTI");
+            const currentVtiTab = await chrome.tabs.get(selection.vtiTab.id);
+            const isRequestedRecordAlreadyLoaded = getVtiContractorRecordIdFromUrl(
+                currentVtiTab.url
+            ) === vtiSearchResult.recordId;
+            if (!isRequestedRecordAlreadyLoaded) {
+                await chrome.tabs.update(selection.vtiTab.id, {
+                    url: buildVtiContractorDetailUrl(vtiSearchResult.recordId)
+                });
+            }
+            if (!isRequestedRecordAlreadyLoaded || currentVtiTab.status !== "complete") {
+                await waitForTabLoad(selection.vtiTab.id, 30000, "de la fiche contractor VTI");
+            }
         }
 
         await reportProgress(
@@ -269,6 +314,24 @@ async function captureHealthcheck(message, sender) {
 
     let helperTabId = null;
     try {
+        let fetchedText = "";
+        try {
+            const fastFetchResults = await chrome.scripting.executeScript({
+                target: { tabId: sender.tab.id },
+                world: "MAIN",
+                func: fetchVtiHealthcheckSource,
+                args: [message.url]
+            });
+            fetchedText = extractUsableVtiHealthcheckText(
+                String(fastFetchResults?.[0]?.result || "")
+            );
+        } catch {
+            // The hidden helper tab below remains the compatibility fallback.
+        }
+        if (fetchedText) {
+            return { ok: true, text: fetchedText, transport: "fetch" };
+        }
+
         const helperTab = await chrome.tabs.create({ url: message.url, active: false });
         helperTabId = helperTab.id;
         await waitForTabLoad(helperTabId, 30000, "Healthcheck VTI");
@@ -277,7 +340,7 @@ async function captureHealthcheck(message, sender) {
             world: "ISOLATED",
             func: captureVtiHealthcheckPage
         });
-        return { ok: true, text: String(results?.[0]?.result || "") };
+        return { ok: true, text: String(results?.[0]?.result || ""), transport: "tab" };
     } catch (error) {
         return { ok: false, error: normalizeError(error) };
     } finally {
