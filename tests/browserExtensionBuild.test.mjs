@@ -139,6 +139,63 @@ async function withGlobalOverrides(overrides, callback) {
   const captureSuperOfficePage = Function(
     `${moduleSource.replace(/^export /, "")}; return captureSuperOfficePage;`
   )();
+  let isPostOpen = false;
+  let openWaitCount = 0;
+  let flipClickCount = 0;
+  const flipImage = {
+    className: "HtmlMessages2_flipImage",
+    closest: () => null,
+    getAttribute: () => "",
+    click() {
+      flipClickCount += 1;
+      isPostOpen = !isPostOpen;
+      openWaitCount = 0;
+    }
+  };
+  const superOfficeWindow = {};
+  Object.defineProperty(superOfficeWindow, "HtmlMessages2_data", {
+    configurable: true,
+    get() {
+      const bodyHtml = isPostOpen && openWaitCount >= 3
+        ? "<p>MSISDN: <strong>77889900</strong></p>"
+        : "";
+      return { ticket: { messages: [{ bodyHtml }] } };
+    }
+  });
+
+  const captureResult = await withGlobalOverrides({
+    document: {
+      body: { innerText: "REQUEST 31436062\nExternal ticket ID:\n" },
+      querySelectorAll(selector) {
+        return selector === "img.HtmlMessages2_flipImage" ? [flipImage] : [];
+      }
+    },
+    DOMParser: class DOMParser {
+      parseFromString(html) {
+        return {
+          body: { textContent: String(html).replace(/<[^>]+>/g, " ") },
+          querySelectorAll: () => []
+        };
+      }
+    },
+    location: { origin: "https://cs.salt.ch" },
+    window: superOfficeWindow,
+    setTimeout(callback) {
+      if (isPostOpen) openWaitCount += 1;
+      callback();
+      return 1;
+    }
+  }, () => captureSuperOfficePage());
+
+  assert.equal(flipClickCount, 1);
+  assert.equal(captureResult.contractorNumber, "77889900");
+}
+
+{
+  const moduleSource = buildSuperOfficeCaptureModule(superOfficeBookmarklet);
+  const captureSuperOfficePage = Function(
+    `${moduleSource.replace(/^export /, "")}; return captureSuperOfficePage;`
+  )();
   const firstPostFrame = {
     contentDocument: {
       body: { innerText: "MSISDN: 44556677" }
@@ -195,7 +252,7 @@ assert.ok(vtiBookmarklet.startsWith("javascript:"));
 assert.ok(superOfficeBookmarklet.startsWith("javascript:"));
 
 assert.equal(manifest.manifest_version, 3);
-assert.equal(manifest.version, "0.1.9");
+assert.equal(manifest.version, "0.1.10");
 assert.equal(CURRENT_BROWSER_EXTENSION_VERSION, manifest.version);
 assert.deepEqual(manifest.permissions.sort(), ["scripting", "tabs"]);
 assert.equal(manifest.host_permissions.includes("<all_urls>"), false);
