@@ -1,4 +1,4 @@
-import{c as l}from"./appConfigService-CZFmvFJk.js";import{s as f}from"./chatGptPromptSettingsService-N7GRpr1q.js";/**
+import{c as l}from"./appConfigService-CqXSQb7r.js";import{s as f}from"./chatGptPromptSettingsService-Dt2jLZ9C.js";/**
  * @license lucide-react v1.17.0 - ISC
  *
  * This source code is licensed under the ISC license.

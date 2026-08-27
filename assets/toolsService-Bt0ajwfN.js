@@ -1,4 +1,4 @@
-import{c as o}from"./appConfigService-CZFmvFJk.js";import{l as c,s as d}from"./index-CCbrcW-R.js";/**
+import{c as o}from"./appConfigService-CqXSQb7r.js";import{l as c,s as d}from"./index-bUCWIdGU.js";/**
  * @license lucide-react v1.17.0 - ISC
  *
  * This source code is licensed under the ISC license.
