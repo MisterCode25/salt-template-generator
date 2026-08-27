@@ -2965,6 +2965,11 @@ textarea:focus {
     background: var(--bg-surface);
 }
 
+.settings-detail-panel--tools {
+    gap: 0;
+    padding: 0;
+}
+
 .settings-detail-hero {
     min-width: 0;
     display: grid;
@@ -11414,6 +11419,15 @@ a.tools-bar-btn {
     min-height: 0;
     margin: 0;
     padding: 0;
+}
+
+.tools-manager-page--settings-detail {
+    height: auto;
+    min-height: 100%;
+}
+
+.tools-manager-page--settings-detail .tools-manager-detail {
+    overflow: visible;
 }
 
 .tools-manager-shell {

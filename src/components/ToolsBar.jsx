@@ -429,15 +429,15 @@ function ToolsBar({
                             <span className="tools-bar-empty-tip">
                                 {hasConfiguredTools
                                     ? "No tools available for current data."
-                                    : "No tools yet. Open Options > Tools to create one."}
+                                    : "No tools yet. Open Settings > Link tools to create one."}
                             </span>
                         )}
                         <button
                             type="button"
                             className="tools-bar-manage-btn"
                             onClick={handleManageTools}
-                            title="Manage tools"
-                            aria-label="Manage tools"
+                            title="Open link tool settings"
+                            aria-label="Open link tool settings"
                         >
                             <Settings2 size={15} strokeWidth={1.9} />
                         </button>

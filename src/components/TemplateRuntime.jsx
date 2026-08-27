@@ -94,6 +94,7 @@ import {
     createBrowserExtensionCaptureState,
     reduceBrowserExtensionCaptureState
 } from "../utils/browserExtensionCaptureState.js";
+import { shouldShowLegacyCaptureButton } from "../config/appFeatureFlags.js";
 import { getRouterElectricalImpact } from "../utils/routerElectricalImpact.js";
 import {
     formatDateInputValueForToken,
@@ -1282,26 +1283,28 @@ export const ClientInfoPanel = memo(function ClientInfoPanel({
     return (
         <section className="client-info-panel" aria-label="Client information">
             <div className="client-import-status-row" aria-label="Data imports">
-                <button
-                    type="button"
-                    className={`client-import-status-btn client-import-status-btn--capture${hasVtiData && hasSuperOfficeData ? " is-loaded" : " is-missing"}`}
-                    onClick={onOpenCaptureData}
-                    disabled={loading}
-                    title="Capture SO/BO and VTI data. Alt+Q"
-                >
-                    <ClipboardList size={14} aria-hidden="true" />
-                    <span>{loading ? "Capturing..." : "Capture data"}</span>
-                    <small>{missingCaptureLabel}</small>
-                </button>
+                {shouldShowLegacyCaptureButton() && (
+                    <button
+                        type="button"
+                        className={`client-import-status-btn client-import-status-btn--capture${hasVtiData && hasSuperOfficeData ? " is-loaded" : " is-missing"}`}
+                        onClick={onOpenCaptureData}
+                        disabled={loading}
+                        title="Capture SO/BO and VTI data. Alt+Q"
+                    >
+                        <ClipboardList size={14} aria-hidden="true" />
+                        <span>{loading ? "Capturing..." : "Capture data"}</span>
+                        <small>{missingCaptureLabel}</small>
+                    </button>
+                )}
                 <button
                     type="button"
                     className="client-import-status-btn client-import-status-btn--extension"
                     onClick={onOpenBrowserExtensionCapture}
                     disabled={loading}
-                    title="Capturer les onglets SuperOffice et VTI avec l’extension bêta"
+                    title="Capturer les onglets SuperOffice et VTI avec l’extension"
                 >
                     <Puzzle size={14} aria-hidden="true" />
-                    <span>Capture bêta</span>
+                    <span>Capture data</span>
                     <small>Extension</small>
                 </button>
                 {hasAnyImportedData && (

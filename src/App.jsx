@@ -2,12 +2,12 @@ import { lazy, Suspense, useEffect } from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import PageHeader from "./components/PageHeader.jsx";
+import { SETTINGS_SECTION } from "./config/settingsSections.js";
 import { applyTheme, loadThemePreference, watchSystemThemePreference } from "./utils/theme.js";
 
 const Templates = lazy(() => import("./pages/Templates.jsx"));
 const ManageNodes = lazy(() => import("./pages/ManageNodes.jsx"));
 const ManageTokens = lazy(() => import("./pages/ManageTokens.jsx"));
-const ManageTools = lazy(() => import("./pages/ManageTools.jsx"));
 const Settings = lazy(() => import("./pages/Settings.jsx"));
 const ExternalGenerator = lazy(() => import("./pages/ExternalGenerator.jsx"));
 
@@ -34,21 +34,11 @@ function ExternalGeneratorPage() {
 }
 
 function VtiBookmarkletPage() {
-    return (
-        <>
-            <PageHeader title="Tools + Shortcuts" />
-            <ManageTools initialSection="shortcuts" />
-        </>
-    );
+    return <Settings initialSection={SETTINGS_SECTION.DATA_SHORTCUTS} />;
 }
 
 function ManageToolsPage() {
-    return (
-        <>
-            <PageHeader title="Tools + Shortcuts" />
-            <ManageTools />
-        </>
-    );
+    return <Settings initialSection={SETTINGS_SECTION.LINK_TOOLS} />;
 }
 
 function AppLoading() {

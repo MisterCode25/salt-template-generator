@@ -1,15 +1,19 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+    BookMarked,
     Copy,
     Database,
     Download,
     FileJson,
     HardDrive,
+    Keyboard,
+    Link2,
     Lock,
     Monitor,
     Moon,
     Palette,
+    Puzzle,
     ShieldCheck,
     Sparkles,
     Sun,
@@ -45,6 +49,13 @@ import { extractTemplateImageIdsFromHtml } from "../utils/templateImages.js";
 import Modal from "../components/Modal.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import ManageTokens from "./ManageTokens.jsx";
+import ManageTools from "./ManageTools.jsx";
+import {
+    SETTINGS_SECTION,
+    SETTINGS_SECTION_DEFINITIONS,
+    isToolSettingsSection,
+    normalizeSettingsSection
+} from "../config/settingsSections.js";
 import {
     applyTheme,
     getInitialTheme,
@@ -77,50 +88,24 @@ const AgentProfileField = memo(function AgentProfileField({ field, value, onChan
     );
 });
 
-const SETTINGS_SECTIONS = [
-    {
-        id: "agent",
-        label: "Agent profile",
-        summary: "Agent tokens",
-        icon: UserRound
-    },
-    {
-        id: "tokens",
-        label: "Custom tokens",
-        summary: "User tokens",
-        icon: Tags
-    },
-    {
-        id: "aiPrompt",
-        label: "AI prompt",
-        summary: "Template guidance",
-        icon: Sparkles
-    },
-    {
-        id: "theme",
-        label: "Theme",
-        summary: "Appearance",
-        icon: Palette
-    },
-    {
-        id: "configuration",
-        label: "Configuration",
-        summary: "Import / export",
-        icon: FileJson
-    },
-    {
-        id: "testData",
-        label: "Test data",
-        summary: "VTI and SO",
-        icon: TestTube2
-    },
-    {
-        id: "storage",
-        label: "Storage",
-        summary: "Browser data",
-        icon: HardDrive
-    }
-];
+const SETTINGS_SECTION_ICONS = Object.freeze({
+    [SETTINGS_SECTION.AGENT]: UserRound,
+    [SETTINGS_SECTION.TOKENS]: Tags,
+    [SETTINGS_SECTION.AI_PROMPT]: Sparkles,
+    [SETTINGS_SECTION.LINK_TOOLS]: Link2,
+    [SETTINGS_SECTION.MODULE_TOOLS]: Puzzle,
+    [SETTINGS_SECTION.DATA_SHORTCUTS]: BookMarked,
+    [SETTINGS_SECTION.KEYBOARD_SHORTCUTS]: Keyboard,
+    [SETTINGS_SECTION.THEME]: Palette,
+    [SETTINGS_SECTION.CONFIGURATION]: FileJson,
+    [SETTINGS_SECTION.TEST_DATA]: TestTube2,
+    [SETTINGS_SECTION.STORAGE]: HardDrive
+});
+
+const SETTINGS_SECTIONS = SETTINGS_SECTION_DEFINITIONS.map((section) => ({
+    ...section,
+    icon: SETTINGS_SECTION_ICONS[section.id]
+}));
 
 const THEME_OPTIONS = [
     {
@@ -297,7 +282,7 @@ function filterTemplateImagesForExport(templateImages = [], templates = []) {
     return templateImages.filter((image) => imageIds.has(image?.id));
 }
 
-export default function Settings({ embedded = false, onClose = null }) {
+export default function Settings({ embedded = false, onClose = null, initialSection = SETTINGS_SECTION.AGENT }) {
     const navigate = useNavigate();
     const fileInputRef = useRef(null);
     const [tokens, setTokens] = useState([]);
@@ -310,7 +295,7 @@ export default function Settings({ embedded = false, onClose = null }) {
     const [storageInfo, setStorageInfo] = useState(null);
     const [agentProfile, setAgentProfile] = useState({});
     const [chatGptPromptSettings, setChatGptPromptSettings] = useState({ templateInstruction: "" });
-    const [activeSection, setActiveSection] = useState("agent");
+    const [activeSection, setActiveSection] = useState(() => normalizeSettingsSection(initialSection));
     const [themePreference, setThemePreference] = useState(() => getInitialTheme());
     const [resolvedTheme, setResolvedTheme] = useState(() => getResolvedTheme(getInitialTheme()));
     const [configLocked, setConfigLocked] = useState(false);
@@ -679,6 +664,7 @@ export default function Settings({ embedded = false, onClose = null }) {
 
     const activeSectionConfig = SETTINGS_SECTIONS.find((section) => section.id === activeSection) || SETTINGS_SECTIONS[0];
     const ActiveSectionIcon = activeSectionConfig.icon;
+    const isToolsSection = isToolSettingsSection(activeSection);
     const customTokenCount = tokens.filter((tokenDef) => !tokenDef.system && !tokenDef.internal).length;
     const exportTopicOptions = buildTopicExportOptions(treeData.nodes);
     const selectedExportTopicCount = exportTopicOptions.filter(({ node }) => exportTopicIds.has(node.id)).length;
@@ -686,6 +672,11 @@ export default function Settings({ embedded = false, onClose = null }) {
 
     const renderSettingsDetail = () => {
         switch (activeSection) {
+            case SETTINGS_SECTION.LINK_TOOLS:
+            case SETTINGS_SECTION.MODULE_TOOLS:
+            case SETTINGS_SECTION.DATA_SHORTCUTS:
+            case SETTINGS_SECTION.KEYBOARD_SHORTCUTS:
+                return <ManageTools embedded detailOnly section={activeSection} />;
             case "tokens":
                 return (
                     <div className="settings-detail-stack">
@@ -932,14 +923,20 @@ export default function Settings({ embedded = false, onClose = null }) {
                         })}
                     </aside>
 
-                    <section className="settings-detail-panel" aria-labelledby={`settings-${activeSectionConfig.id}-title`}>
-                        <div className="settings-detail-hero">
-                            <span className="settings-detail-icon"><ActiveSectionIcon size={28} aria-hidden="true" /></span>
-                            <div>
-                                <h3 id={`settings-${activeSectionConfig.id}-title`}>{activeSectionConfig.label}</h3>
-                                <p>{activeSectionConfig.summary}</p>
+                    <section
+                        className={`settings-detail-panel${isToolsSection ? " settings-detail-panel--tools" : ""}`}
+                        aria-labelledby={isToolsSection ? undefined : `settings-${activeSectionConfig.id}-title`}
+                        aria-label={isToolsSection ? activeSectionConfig.label : undefined}
+                    >
+                        {!isToolsSection && (
+                            <div className="settings-detail-hero">
+                                <span className="settings-detail-icon"><ActiveSectionIcon size={28} aria-hidden="true" /></span>
+                                <div>
+                                    <h3 id={`settings-${activeSectionConfig.id}-title`}>{activeSectionConfig.label}</h3>
+                                    <p>{activeSectionConfig.summary}</p>
+                                </div>
                             </div>
-                        </div>
+                        )}
                         {renderSettingsDetail()}
                     </section>
                 </div>

@@ -48,12 +48,16 @@ import EmptyState from "../components/EmptyState.jsx";
 import BrowserExtensionInstallPanel from "../components/BrowserExtensionInstallPanel.jsx";
 import { copyHtml, copyText, showToast } from "../services/clipboardService.js";
 import { CONFIG_LOCK_UPDATED_EVENT, loadConfigLocked } from "../services/appConfigService.js";
+import {
+    SETTINGS_SECTION,
+    isToolSettingsSection
+} from "../config/settingsSections.js";
 
 const SELECTIONS = Object.freeze({
-    LINK_TOOLS: "link-tools",
-    MODULE_TOOLS: "module-tools",
-    DATA_SHORTCUTS: "data-shortcuts",
-    KEYBOARD_SHORTCUTS: "keyboard-shortcuts"
+    LINK_TOOLS: SETTINGS_SECTION.LINK_TOOLS,
+    MODULE_TOOLS: SETTINGS_SECTION.MODULE_TOOLS,
+    DATA_SHORTCUTS: SETTINGS_SECTION.DATA_SHORTCUTS,
+    KEYBOARD_SHORTCUTS: SETTINGS_SECTION.KEYBOARD_SHORTCUTS
 });
 
 const KEYBOARD_SHORTCUT_DESCRIPTIONS = Object.freeze({
@@ -86,6 +90,11 @@ const MODULE_WIZARD_STEPS = Object.freeze([
 
 function createId() {
     return globalThis.crypto?.randomUUID?.() || `tool_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+}
+
+function normalizeToolSection(sectionId) {
+    if (sectionId === "shortcuts") return SELECTIONS.DATA_SHORTCUTS;
+    return isToolSettingsSection(sectionId) ? sectionId : SELECTIONS.LINK_TOOLS;
 }
 
 function createDraftTool(type = TOOL_TYPES.LINK, order = 1) {
@@ -1051,7 +1060,13 @@ function KeyboardShortcutsPanel() {
     );
 }
 
-export default function ManageTools({ embedded = false, onClose = null, initialSection = "tools" }) {
+export default function ManageTools({
+    embedded = false,
+    onClose = null,
+    initialSection = "tools",
+    section = null,
+    detailOnly = false
+}) {
     const [tools, setTools] = useState([]);
     const [tokens, setTokens] = useState([]);
     const [runtimePreviewContext, setRuntimePreviewContext] = useState({
@@ -1060,9 +1075,7 @@ export default function ManageTools({ embedded = false, onClose = null, initialS
         clientInfo: [],
         clientSummary: []
     });
-    const [selection, setSelection] = useState(
-        initialSection === "shortcuts" ? SELECTIONS.DATA_SHORTCUTS : SELECTIONS.LINK_TOOLS
-    );
+    const [selection, setSelection] = useState(() => normalizeToolSection(initialSection));
     const [editorDraft, setEditorDraft] = useState(null);
     const [confirmDelete, setConfirmDelete] = useState(null);
     const [configLocked, setConfigLocked] = useState(false);
@@ -1075,7 +1088,7 @@ export default function ManageTools({ embedded = false, onClose = null, initialS
             setTools(sortedTools);
             setTokens(loadedContext.tokens);
             setRuntimePreviewContext(loadedContext);
-            setSelection(initialSection === "shortcuts" ? SELECTIONS.DATA_SHORTCUTS : SELECTIONS.LINK_TOOLS);
+            setSelection(normalizeToolSection(initialSection));
             setEditorDraft(null);
         });
         return () => {
@@ -1229,10 +1242,43 @@ export default function ManageTools({ embedded = false, onClose = null, initialS
         () => tools.filter((tool) => tool.type === TOOL_TYPES.MODULE),
         [tools]
     );
+    const activeSelection = isToolSettingsSection(section) ? section : selection;
+    const selectedDetail = (
+        <>
+            {activeSelection === SELECTIONS.LINK_TOOLS && (
+                <ToolListPanel
+                    type={TOOL_TYPES.LINK}
+                    tools={linkTools}
+                    locked={configLocked}
+                    onCreate={createTool}
+                    onEdit={editTool}
+                    onDelete={requestDelete}
+                />
+            )}
+            {activeSelection === SELECTIONS.MODULE_TOOLS && (
+                <ToolListPanel
+                    type={TOOL_TYPES.MODULE}
+                    tools={moduleTools}
+                    locked={configLocked}
+                    onCreate={createTool}
+                    onEdit={editTool}
+                    onDelete={requestDelete}
+                />
+            )}
+            {activeSelection === SELECTIONS.DATA_SHORTCUTS && <DataShortcutsPanel />}
+            {activeSelection === SELECTIONS.KEYBOARD_SHORTCUTS && <KeyboardShortcutsPanel />}
+        </>
+    );
+    const RootElement = embedded || detailOnly ? "div" : "main";
 
     return (
-        <main className={`tools-manager-page${embedded ? " tools-manager-page--embedded" : ""}`}>
-            <div className="tools-manager-shell">
+        <RootElement className={`tools-manager-page${embedded ? " tools-manager-page--embedded" : ""}${detailOnly ? " tools-manager-page--settings-detail" : ""}`}>
+            {detailOnly ? (
+                <section className="tools-manager-detail" aria-label="Selected extension detail">
+                    {selectedDetail}
+                </section>
+            ) : (
+                <div className="tools-manager-shell">
                 <header className="tools-manager-header">
                     <div>
                         <p className="eyebrow">Tools + shortcuts</p>
@@ -1248,14 +1294,14 @@ export default function ManageTools({ embedded = false, onClose = null, initialS
                                 icon={<Link2 size={18} strokeWidth={2} />}
                                 title="Link tools"
                                 subtitle={`${linkToolsCount} saved links`}
-                                selected={selection === SELECTIONS.LINK_TOOLS}
+                                selected={activeSelection === SELECTIONS.LINK_TOOLS}
                                 onClick={selectLinkTools}
                             />
                             <SidebarButton
                                 icon={<Puzzle size={18} strokeWidth={2} />}
                                 title="Modules"
                                 subtitle={`${moduleToolsCount} HTML modules`}
-                                selected={selection === SELECTIONS.MODULE_TOOLS}
+                                selected={activeSelection === SELECTIONS.MODULE_TOOLS}
                                 badge="Beta"
                                 onClick={selectModuleTools}
                             />
@@ -1266,45 +1312,25 @@ export default function ManageTools({ embedded = false, onClose = null, initialS
                                 icon={<BookMarked size={18} strokeWidth={2} />}
                                 title="Data shortcuts"
                                 subtitle={`${DATA_SHORTCUTS.length} bookmarklets`}
-                                selected={selection === SELECTIONS.DATA_SHORTCUTS}
+                                selected={activeSelection === SELECTIONS.DATA_SHORTCUTS}
                                 onClick={selectDataShortcuts}
                             />
                             <SidebarButton
                                 icon={<Keyboard size={18} strokeWidth={2} />}
                                 title="Keyboard shortcuts"
                                 subtitle={`${KEYBOARD_SHORTCUTS.length} app shortcuts`}
-                                selected={selection === SELECTIONS.KEYBOARD_SHORTCUTS}
+                                selected={activeSelection === SELECTIONS.KEYBOARD_SHORTCUTS}
                                 onClick={selectKeyboardShortcuts}
                             />
                         </SidebarSection>
                     </aside>
 
                     <section className="tools-manager-detail" aria-label="Selected extension detail">
-                        {selection === SELECTIONS.LINK_TOOLS && (
-                            <ToolListPanel
-                                type={TOOL_TYPES.LINK}
-                                tools={linkTools}
-                                locked={configLocked}
-                                onCreate={createTool}
-                                onEdit={editTool}
-                                onDelete={requestDelete}
-                            />
-                        )}
-                        {selection === SELECTIONS.MODULE_TOOLS && (
-                            <ToolListPanel
-                                type={TOOL_TYPES.MODULE}
-                                tools={moduleTools}
-                                locked={configLocked}
-                                onCreate={createTool}
-                                onEdit={editTool}
-                                onDelete={requestDelete}
-                            />
-                        )}
-                        {selection === SELECTIONS.DATA_SHORTCUTS && <DataShortcutsPanel />}
-                        {selection === SELECTIONS.KEYBOARD_SHORTCUTS && <KeyboardShortcutsPanel />}
+                        {selectedDetail}
                     </section>
                 </div>
-            </div>
+                </div>
+            )}
 
             {editorDraft && !configLocked && (
                 <ToolEditorModal
@@ -1327,6 +1353,6 @@ export default function ManageTools({ embedded = false, onClose = null, initialS
                     onCancel={cancelDelete}
                 />
             )}
-        </main>
+        </RootElement>
     );
 }

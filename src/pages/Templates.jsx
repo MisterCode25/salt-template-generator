@@ -109,10 +109,11 @@ import {
 } from "../services/templateUsageService.js";
 import { getTopicColorStyle } from "../utils/topicAppearance.js";
 import { getRouterElectricalImpact } from "../utils/routerElectricalImpact.js";
+import { CAPTURE_FLOW, getPrimaryCaptureFlow } from "../config/appFeatureFlags.js";
+import { SETTINGS_SECTION } from "../config/settingsSections.js";
 
 const ExternalGenerator = lazy(() => import("./ExternalGenerator.jsx"));
 const ManageNodes = lazy(() => import("./ManageNodes.jsx"));
-const ManageTools = lazy(() => import("./ManageTools.jsx"));
 const SettingsPage = lazy(() => import("./Settings.jsx"));
 const SuperOfficePhotoGallery = lazy(() => import("../components/SuperOfficePhotoGallery.jsx"));
 
@@ -143,9 +144,7 @@ const DEFAULT_QUICK_SECTION_STATE = Object.freeze({
 function WorkspaceErrorFallback({ workspace, error, onClose, onRetry }) {
     const workspaceLabel = {
         nodes: "Manage playbook",
-        tools: "Tools + shortcuts",
-        settings: "Settings",
-        vti: "Tools + shortcuts"
+        settings: "Settings"
     }[workspace] || "Workspace";
     const message = error?.message || "This workspace could not be opened.";
 
@@ -1106,6 +1105,7 @@ export default function Templates() {
     const [searchResetSignal, setSearchResetSignal] = useState(0);
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [activeWorkspace, setActiveWorkspace] = useState(null);
+    const [settingsInitialSection, setSettingsInitialSection] = useState(SETTINGS_SECTION.AGENT);
     const [externalGeneratorOpen, setExternalGeneratorOpen] = useState(false);
     const [externalGeneratorStartField, setExternalGeneratorStartField] = useState(null);
     const [superOfficeTicket, setSuperOfficeTicket] = useState(null);
@@ -1757,10 +1757,15 @@ export default function Templates() {
         setExternalGeneratorOpen(true);
     }, []);
 
-    const openToolsWorkspace = useCallback(() => {
-        setActiveWorkspace("tools");
+    const openSettingsWorkspace = useCallback((section = SETTINGS_SECTION.AGENT) => {
+        setSettingsInitialSection(section);
+        setActiveWorkspace("settings");
         setDropdownOpen(false);
     }, []);
+
+    const openLinkToolsSettings = useCallback(() => {
+        openSettingsWorkspace(SETTINGS_SECTION.LINK_TOOLS);
+    }, [openSettingsWorkspace]);
 
     const closeExternalGenerator = () => {
         setExternalGeneratorOpen(false);
@@ -1795,12 +1800,8 @@ export default function Templates() {
         switch (activeWorkspace) {
             case "nodes":
                 return <ManageNodes embedded onClose={closeWorkspace} />;
-            case "tools":
-                return <ManageTools embedded onClose={closeWorkspace} />;
             case "settings":
-                return <SettingsPage embedded onClose={closeWorkspace} />;
-            case "vti":
-                return <ManageTools embedded onClose={closeWorkspace} initialSection="shortcuts" />;
+                return <SettingsPage embedded onClose={closeWorkspace} initialSection={settingsInitialSection} />;
             default:
                 return null;
         }
@@ -1871,7 +1872,11 @@ export default function Templates() {
             if (shortcut.id === "captureData") {
                 if (hasVtiData && hasSoData) return;
                 event.preventDefault();
-                await openCaptureDataFlow();
+                if (getPrimaryCaptureFlow() === CAPTURE_FLOW.LEGACY_CLIPBOARD) {
+                    await openCaptureDataFlow();
+                } else {
+                    await openBrowserExtensionCaptureFlow();
+                }
                 return;
             }
 
@@ -1886,6 +1891,7 @@ export default function Templates() {
         return () => document.removeEventListener("keydown", handleKeyboardShortcut);
     }, [
         clearClientAndResetCase,
+        openBrowserExtensionCaptureFlow,
         openCaptureDataFlow,
         shortcutModalOpen
     ]);
@@ -1909,11 +1915,7 @@ export default function Templates() {
                                 <div className="dropdown-section">
                                     <div className="dropdown-title">Management</div>
                                     <button type="button" role="menuitem" onClick={() => openWorkspace("nodes")} className="dropdown-reset">Manage playbook</button>
-                                    <button type="button" role="menuitem" onClick={() => openWorkspace("settings")} className="dropdown-reset">Settings</button>
-                                </div>
-                                <div className="dropdown-section">
-                                    <div className="dropdown-title">Tools</div>
-                                    <button type="button" role="menuitem" onClick={() => openWorkspace("tools")} className="dropdown-reset">Tools + shortcuts</button>
+                                    <button type="button" role="menuitem" onClick={() => openSettingsWorkspace()} className="dropdown-reset">Settings</button>
                                 </div>
                             </div>
                         )}
@@ -1966,7 +1968,7 @@ export default function Templates() {
                 onOpenSuperOfficePhotos={openSuperOfficeGallery}
                 superOfficeMediaCount={superOfficeTicket?.mediaAttachments?.length || superOfficeTicket?.imageAttachments?.length || 0}
                 superOfficePhotoCount={superOfficeTicket?.imageAttachments?.length || 0}
-                onManageTools={openToolsWorkspace}
+                onManageTools={openLinkToolsSettings}
             />
 
             <section className="templates-workbench templates-workbench--columns">
