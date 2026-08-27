@@ -4032,6 +4032,13 @@ textarea:focus {
     opacity: 0.85;
 }
 
+.light-theme .settings-version-tag {
+    border-color: #a5b4fc;
+    background: #eef2ff;
+    color: #3730a3;
+    opacity: 1;
+}
+
 .help-modal {
     position: fixed;
     inset: 0;

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CheckCircle2, Download, Puzzle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Download, Puzzle } from "lucide-react";
 import {
     CURRENT_BROWSER_EXTENSION_VERSION,
     isBrowserExtensionVersionAtLeast,
@@ -15,6 +15,12 @@ export default function BrowserExtensionInstallPanel() {
     const extensionDownloadUrl = `${import.meta.env.BASE_URL}downloads/salt-bo-capture-beta.zip`;
     const needsUpdate = extensionStatus.installed
         && !isBrowserExtensionVersionAtLeast(extensionStatus.version, CURRENT_BROWSER_EXTENSION_VERSION);
+    const ExtensionStatusIcon = needsUpdate ? AlertTriangle : CheckCircle2;
+    const statusClassName = [
+        "browser-extension-install-status",
+        extensionStatus.installed ? "is-installed" : "",
+        needsUpdate ? "is-outdated" : ""
+    ].filter(Boolean).join(" ");
 
     useEffect(() => {
         let cancelled = false;
@@ -43,13 +49,23 @@ export default function BrowserExtensionInstallPanel() {
                         reuse their tab when possible, or open one when needed.
                     </p>
                 </div>
-                <span className={`browser-extension-install-status${extensionStatus.installed ? " is-installed" : ""}`}>
-                    {extensionStatus.installed && <CheckCircle2 size={14} aria-hidden="true" />}
-                    {extensionStatus.checking
-                        ? "Checking…"
-                        : extensionStatus.installed
-                            ? `Installed${extensionStatus.version ? ` · v${extensionStatus.version}` : ""}${needsUpdate ? " · Update required" : ""}`
-                            : "Not detected"}
+                <span className={statusClassName} aria-live="polite">
+                    {extensionStatus.installed && <ExtensionStatusIcon size={14} aria-hidden="true" />}
+                    {extensionStatus.checking ? (
+                        <span>Checking…</span>
+                    ) : extensionStatus.installed ? (
+                        <>
+                            <span>Installed</span>
+                            {extensionStatus.version && (
+                                <span className="browser-extension-install-version">v{extensionStatus.version}</span>
+                            )}
+                            {needsUpdate && (
+                                <strong className="browser-extension-install-update">Update required</strong>
+                            )}
+                        </>
+                    ) : (
+                        <span>Not detected</span>
+                    )}
                 </span>
             </div>
 
@@ -62,7 +78,7 @@ export default function BrowserExtensionInstallPanel() {
                 </ol>
                 <a className="primary-btn browser-extension-install-download" href={extensionDownloadUrl} download>
                     <Download size={16} aria-hidden="true" />
-                    Download extension ZIP
+                    Download extension v{CURRENT_BROWSER_EXTENSION_VERSION}
                 </a>
             </div>
             <p className="browser-extension-install-fallback">

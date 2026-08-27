@@ -2,12 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import {
     AlertTriangle,
     CheckCircle2,
-    Database,
     Download,
-    FileText,
     Puzzle,
-    RefreshCw,
-    Search
+    RefreshCw
 } from "lucide-react";
 import { BROWSER_EXTENSION_PHASE } from "../../shared/browserExtensionProtocol.js";
 import { normalizeSuperOfficeTicketNumber } from "../../shared/superOfficeTicketNavigation.js";
@@ -17,9 +14,9 @@ import Modal from "./Modal.jsx";
 
 const COMPLETED_AUTO_CLOSE_DELAY_MS = 1000;
 const CAPTURE_JOURNEY_STEPS = Object.freeze([
-    { id: "super-office", label: "SO", detail: "Ticket", Icon: FileText },
-    { id: "vti", label: "VTI", detail: "Client", Icon: Search },
-    { id: "application", label: "App", detail: "Import", Icon: Database }
+    { id: "super-office", label: "SO" },
+    { id: "vti", label: "VTI" },
+    { id: "application", label: "APP" }
 ]);
 
 function BrowserExtensionCaptureJourney({ phase, ticketNumber }) {
@@ -27,29 +24,27 @@ function BrowserExtensionCaptureJourney({ phase, ticketNumber }) {
 
     return (
         <div className={`browser-extension-capture-journey is-stage-${activeStep}`} aria-hidden="true">
-            <div className="browser-extension-journey-track">
-                <span className="browser-extension-journey-fill" />
-                <span className="browser-extension-journey-packet is-first" />
-                <span className="browser-extension-journey-packet is-second" />
-                <span className="browser-extension-journey-packet is-third" />
+            <div className="browser-extension-ai-core">
+                <span className="browser-extension-ai-orbit is-outer" />
+                <span className="browser-extension-ai-orbit is-inner" />
+                <span className="browser-extension-ai-satellite is-first" />
+                <span className="browser-extension-ai-satellite is-second" />
+                <span className="browser-extension-ai-logo">
+                    <Puzzle size={28} strokeWidth={2.1} />
+                </span>
             </div>
-            <div className="browser-extension-journey-steps">
+            <div className="browser-extension-ai-stages">
                 {CAPTURE_JOURNEY_STEPS.map((step, index) => {
                     const status = index < activeStep ? "done" : index === activeStep ? "active" : "waiting";
-                    const StepIcon = step.Icon;
                     return (
-                        <div key={step.id} className={`browser-extension-journey-step is-${status}`}>
-                            <span className="browser-extension-journey-node">
-                                <StepIcon size={18} strokeWidth={2.2} />
-                            </span>
-                            <strong>{step.label}</strong>
-                            <small>{step.detail}</small>
-                        </div>
+                        <span key={step.id} className={`browser-extension-ai-stage is-${status}`}>
+                            {step.label}
+                        </span>
                     );
                 })}
             </div>
             {ticketNumber && (
-                <span className="browser-extension-journey-ticket">Ticket {ticketNumber}</span>
+                <span className="browser-extension-ai-ticket">Ticket {ticketNumber}</span>
             )}
         </div>
     );

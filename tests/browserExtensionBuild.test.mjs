@@ -4,6 +4,7 @@ import {
   buildSuperOfficeCaptureModule,
   buildVtiCaptureModule
 } from "../scripts/browserExtensionBuildSupport.mjs";
+import { CURRENT_BROWSER_EXTENSION_VERSION } from "../src/services/browserExtensionCaptureService.js";
 
 const vtiBookmarklet = readFileSync(
   new URL("../src/data/vtiHealthcheckBookmarklet.txt", import.meta.url),
@@ -104,6 +105,7 @@ assert.ok(superOfficeBookmarklet.startsWith("javascript:"));
 
 assert.equal(manifest.manifest_version, 3);
 assert.equal(manifest.version, "0.1.7");
+assert.equal(CURRENT_BROWSER_EXTENSION_VERSION, manifest.version);
 assert.deepEqual(manifest.permissions.sort(), ["scripting", "tabs"]);
 assert.equal(manifest.host_permissions.includes("<all_urls>"), false);
 assert.ok(manifest.host_permissions.includes("https://*.salt.ch/*"));
