@@ -1,4 +1,4 @@
-import{c as g}from"./appConfigService-CqXSQb7r.js";import{d as l,e as m,f as x,h as M}from"./templateTreeService-DSs7sgHv.js";/**
+import{c as g}from"./appConfigService-ClTti-vn.js";import{d as l,e as m,f as x,h as M}from"./templateTreeService-qnvz53dm.js";/**
  * @license lucide-react v1.17.0 - ISC
  *
  * This source code is licensed under the ISC license.
