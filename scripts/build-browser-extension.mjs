@@ -22,6 +22,8 @@ const downloadPath = join(projectRoot, "public/downloads/salt-bo-capture-beta.zi
 const zipRootName = "salt-bo-capture-beta";
 
 const staticFiles = [
+    "alexAutomation.js",
+    "aloAutomation.js",
     "INSTALL.md",
     "app-bridge.js",
     "healthcheckCapture.js",

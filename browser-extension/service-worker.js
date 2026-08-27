@@ -6,20 +6,31 @@ import {
 } from "./shared/browserExtensionProtocol.js";
 import {
     CAPTURE_TAB_ERROR_MESSAGE,
+    selectReusableWorkflowTab,
     selectUniqueCaptureTabs
 } from "./tabDiscovery.js";
+import {
+    ALO_FULFILLMENT_DETAIL_URL,
+    ALO_TICKET_CREATION_URL,
+    autofillAloTicketPage
+} from "./aloAutomation.js";
+import {
+    ALEX_HOME_URL,
+    ALEX_STORAGE_NAVIGATION_DELAY_MS,
+    openAlexTicketPage
+} from "./alexAutomation.js";
 import { captureSuperOfficePage } from "./generated/superOfficeCapture.js";
 import { captureVtiPage } from "./generated/vtiCapture.js";
 import { captureVtiHealthcheckPage } from "./healthcheckCapture.js";
 
-let activeCapture = null;
+let activeWorkflow = null;
 
 function getExtensionVersion() {
     return chrome.runtime.getManifest().version;
 }
 
 function normalizeError(error) {
-    return String(error?.message || error || "Capture impossible.").trim();
+    return String(error?.message || error || "Opération impossible.").trim();
 }
 
 async function sendToApplication(tabId, message) {
@@ -111,11 +122,11 @@ async function runCapture(requestId, appTabId) {
             }
         ));
     } finally {
-        if (activeCapture?.requestId === requestId) activeCapture = null;
+        if (activeWorkflow?.requestId === requestId) activeWorkflow = null;
     }
 }
 
-function waitForTabLoad(tabId, timeoutMs = 30000) {
+function waitForTabLoad(tabId, timeoutMs = 30000, label = "de l’onglet") {
     return new Promise((resolve, reject) => {
         let timeoutId = null;
         const finish = (callback, value) => {
@@ -131,7 +142,7 @@ function waitForTabLoad(tabId, timeoutMs = 30000) {
 
         chrome.tabs.onUpdated.addListener(handleUpdated);
         timeoutId = setTimeout(() => {
-            finish(reject, new Error("Le chargement Healthcheck VTI a dépassé le délai autorisé."));
+            finish(reject, new Error(`Le chargement ${label} a dépassé le délai autorisé.`));
         }, timeoutMs);
 
         chrome.tabs.get(tabId).then((tab) => {
@@ -161,7 +172,7 @@ async function captureHealthcheck(message, sender) {
     try {
         const helperTab = await chrome.tabs.create({ url: message.url, active: false });
         helperTabId = helperTab.id;
-        await waitForTabLoad(helperTabId);
+        await waitForTabLoad(helperTabId, 30000, "Healthcheck VTI");
         const results = await chrome.scripting.executeScript({
             target: { tabId: helperTabId },
             world: "ISOLATED",
@@ -181,6 +192,102 @@ async function captureHealthcheck(message, sender) {
     }
 }
 
+async function openOrReuseWorkflowTab(workflow, url) {
+    const tabs = await chrome.tabs.query({ windowType: "normal" });
+    const reusableTab = selectReusableWorkflowTab(tabs, workflow);
+    const tab = reusableTab
+        ? await chrome.tabs.update(reusableTab.id, { active: true, url })
+        : await chrome.tabs.create({ active: true, url });
+    await waitForTabLoad(tab.id, 30000, workflow === "alo" ? "ALO" : "ALEX");
+    return tab;
+}
+
+async function sendActionCompleted(appTabId, requestId, action, message, details = {}) {
+    await sendToApplication(appTabId, createExtensionEvent(
+        BROWSER_EXTENSION_MESSAGE.ACTION_COMPLETED,
+        requestId,
+        { action, message, ...details }
+    ));
+}
+
+async function sendActionFailed(appTabId, requestId, action, error) {
+    await sendToApplication(appTabId, createExtensionEvent(
+        BROWSER_EXTENSION_MESSAGE.FAILED,
+        requestId,
+        { action, error: normalizeError(error) }
+    ));
+}
+
+async function runAloAutofill(requestId, appTabId, payload) {
+    try {
+        if (!payload || payload.source !== "salt-templater-alo-autofill") {
+            throw new Error("Les données ALO reçues sont invalides.");
+        }
+        const aloTab = await openOrReuseWorkflowTab("alo", ALO_TICKET_CREATION_URL);
+        const executionResults = await chrome.scripting.executeScript({
+            target: { tabId: aloTab.id },
+            world: "MAIN",
+            func: autofillAloTicketPage,
+            args: [payload, ALO_FULFILLMENT_DETAIL_URL]
+        });
+        const result = readExecutionResult(executionResults, "ALO");
+        if (!result.ok) throw new Error(result.error || "Le formulaire ALO n’a pas pu être rempli.");
+
+        const message = result.externalReferenceStatus === "unavailable"
+            ? "Ticket ALO rempli. L’External Ref est restée vide."
+            : "Ticket ALO ouvert et rempli.";
+        await sendActionCompleted(appTabId, requestId, "alo", message, { result });
+    } catch (error) {
+        await sendActionFailed(appTabId, requestId, "alo", error);
+    } finally {
+        if (activeWorkflow?.requestId === requestId) activeWorkflow = null;
+    }
+}
+
+async function runAlexTicketOpen(requestId, appTabId, payload) {
+    try {
+        if (!payload || payload.source !== "salt-templater-alex-ticket" || payload.action !== "view-ticket") {
+            throw new Error("Les données ALEX reçues sont invalides.");
+        }
+        const alexTab = await openOrReuseWorkflowTab("alex", ALEX_HOME_URL);
+        const executionResults = await chrome.scripting.executeScript({
+            target: { tabId: alexTab.id },
+            world: "MAIN",
+            func: openAlexTicketPage,
+            args: [payload, ALEX_STORAGE_NAVIGATION_DELAY_MS]
+        });
+        const result = readExecutionResult(executionResults, "ALEX");
+        if (!result.ok) throw new Error(result.error || "Le ticket ALEX n’a pas pu être ouvert.");
+
+        await sendActionCompleted(
+            appTabId,
+            requestId,
+            "alex",
+            "Contexte partenaire appliqué. Ouverture du ticket ALEX…",
+            { result }
+        );
+    } catch (error) {
+        await sendActionFailed(appTabId, requestId, "alex", error);
+    } finally {
+        if (activeWorkflow?.requestId === requestId) activeWorkflow = null;
+    }
+}
+
+function startWorkflow(message, appTabId, sendResponse, runner) {
+    if (activeWorkflow) {
+        sendResponse(createExtensionEvent(BROWSER_EXTENSION_MESSAGE.FAILED, message.requestId, {
+            error: "Une opération automatique est déjà en cours."
+        }));
+        return;
+    }
+
+    activeWorkflow = { requestId: message.requestId, appTabId };
+    sendResponse(createExtensionEvent(BROWSER_EXTENSION_MESSAGE.ACCEPTED, message.requestId, {
+        version: getExtensionVersion()
+    }));
+    runner(message.requestId, appTabId, message.payload);
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message?.type === BROWSER_EXTENSION_MESSAGE.HEALTHCHECK) {
         captureHealthcheck(message, sender).then(sendResponse);
@@ -193,24 +300,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse(createExtensionEvent(BROWSER_EXTENSION_MESSAGE.STATUS, message.requestId, {
             installed: true,
             version: getExtensionVersion(),
-            busy: Boolean(activeCapture)
+            busy: Boolean(activeWorkflow)
         }));
         return false;
     }
 
     if (message.type === BROWSER_EXTENSION_MESSAGE.START_CAPTURE) {
-        if (activeCapture) {
-            sendResponse(createExtensionEvent(BROWSER_EXTENSION_MESSAGE.FAILED, message.requestId, {
-                error: "Une capture automatique est déjà en cours."
-            }));
-            return false;
-        }
+        startWorkflow(message, sender.tab.id, sendResponse, runCapture);
+        return false;
+    }
 
-        activeCapture = { requestId: message.requestId, appTabId: sender.tab.id };
-        sendResponse(createExtensionEvent(BROWSER_EXTENSION_MESSAGE.ACCEPTED, message.requestId, {
-            version: getExtensionVersion()
-        }));
-        runCapture(message.requestId, sender.tab.id);
+    if (message.type === BROWSER_EXTENSION_MESSAGE.START_ALO) {
+        startWorkflow(message, sender.tab.id, sendResponse, runAloAutofill);
+        return false;
+    }
+
+    if (message.type === BROWSER_EXTENSION_MESSAGE.START_ALEX) {
+        startWorkflow(message, sender.tab.id, sendResponse, runAlexTicketOpen);
         return false;
     }
 

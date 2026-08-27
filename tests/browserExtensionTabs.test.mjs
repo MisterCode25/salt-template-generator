@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import {
   CAPTURE_TAB_ERROR,
   classifyCaptureTab,
+  classifyWorkflowTab,
+  selectReusableWorkflowTab,
   selectUniqueCaptureTabs
 } from "../browser-extension/tabDiscovery.js";
 
@@ -40,6 +42,26 @@ const saltSuperOfficeTab = {
     url: "https://cs.salt.ch/scripts/customer.fcgi?action=doScreenDefinition",
     title: "Other CS page"
   }), null);
+}
+
+{
+  assert.equal(classifyWorkflowTab({
+    url: "https://wholesale.swisscom.com/wsg/prod/alo/ass/web/alo-web/assurance/create.do"
+  }), "alo");
+  assert.equal(classifyWorkflowTab({
+    url: "https://www.ftthproxy.ch/#/assurance/ticket/1234"
+  }), "alex");
+  assert.equal(classifyWorkflowTab({ url: "https://example.com/" }), null);
+}
+
+{
+  const selected = selectReusableWorkflowTab([
+    { id: 21, url: "https://www.ftthproxy.ch/", active: false, lastAccessed: 10 },
+    { id: 22, url: "https://www.ftthproxy.ch/help", active: true, lastAccessed: 5 },
+    { id: 23, url: "https://example.com/", active: true, lastAccessed: 20 }
+  ], "alex");
+
+  assert.equal(selected.id, 22);
 }
 
 {

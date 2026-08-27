@@ -362,7 +362,7 @@ function ToolsBar({
                                     onClick={onCopyAloAutofillData}
                                     disabled={!hasAloAutofillData}
                                     aria-disabled={!hasAloAutofillData}
-                                    title={hasAloAutofillData ? "Copy ALO fill data for the bookmarklet" : "Import VTI data before preparing ALO fill data"}
+                                    title={hasAloAutofillData ? "Préparer, ouvrir et remplir le ticket ALO" : "Import VTI data before preparing ALO fill data"}
                                 >
                                     <ClipboardPaste size={14} strokeWidth={2} aria-hidden="true" />
                                     ALO fill
@@ -375,7 +375,7 @@ function ToolsBar({
                                     onClick={onOpenAlexTicket}
                                     disabled={!hasAlexTicketData}
                                     aria-disabled={!hasAlexTicketData}
-                                    title={hasAlexTicketData ? "Copy the payload and open the existing ALEX ticket" : alexTicketUnavailableMessage}
+                                    title={hasAlexTicketData ? "Ouvrir le ticket ALEX avec le contexte partenaire" : alexTicketUnavailableMessage}
                                 >
                                     <ExternalLink size={14} strokeWidth={2} aria-hidden="true" />
                                     Ticket ALEX

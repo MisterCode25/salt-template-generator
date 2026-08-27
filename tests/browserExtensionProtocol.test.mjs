@@ -17,6 +17,22 @@ import {
 }
 
 {
+  const aloCommand = createAppCommand(BROWSER_EXTENSION_MESSAGE.START_ALO, "alo-1", {
+    payload: { source: "salt-templater-alo-autofill" }
+  });
+  const alexCommand = createAppCommand(BROWSER_EXTENSION_MESSAGE.START_ALEX, "alex-1", {
+    payload: { source: "salt-templater-alex-ticket" }
+  });
+  const completed = createExtensionEvent(BROWSER_EXTENSION_MESSAGE.ACTION_COMPLETED, "alo-1", {
+    action: "alo"
+  });
+
+  assert.equal(isAppCommand(aloCommand), true);
+  assert.equal(isAppCommand(alexCommand), true);
+  assert.equal(isExtensionEvent(completed), true);
+}
+
+{
   const event = createExtensionEvent(BROWSER_EXTENSION_MESSAGE.PROGRESS, "request-2", {
     phase: BROWSER_EXTENSION_PHASE.SUPER_OFFICE_CAPTURE
   });

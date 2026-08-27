@@ -17,6 +17,14 @@ const manifest = JSON.parse(readFileSync(
   new URL("../browser-extension/manifest.json", import.meta.url),
   "utf8"
 ));
+const serviceWorkerSource = readFileSync(
+  new URL("../browser-extension/service-worker.js", import.meta.url),
+  "utf8"
+);
+const appBridgeSource = readFileSync(
+  new URL("../browser-extension/app-bridge.js", import.meta.url),
+  "utf8"
+);
 
 {
   const moduleSource = buildSuperOfficeCaptureModule(superOfficeBookmarklet);
@@ -45,12 +53,20 @@ assert.ok(vtiBookmarklet.startsWith("javascript:"));
 assert.ok(superOfficeBookmarklet.startsWith("javascript:"));
 
 assert.equal(manifest.manifest_version, 3);
+assert.equal(manifest.version, "0.1.3");
 assert.deepEqual(manifest.permissions.sort(), ["scripting", "tabs"]);
 assert.equal(manifest.host_permissions.includes("<all_urls>"), false);
 assert.ok(manifest.host_permissions.includes("https://*.salt.ch/*"));
 assert.ok(manifest.host_permissions.some((permission) => permission.includes("superoffice")));
+assert.ok(manifest.host_permissions.includes("https://wholesale.swisscom.com/*"));
+assert.ok(manifest.host_permissions.includes("https://*.ftthproxy.ch/*"));
 assert.ok(manifest.content_scripts[0].matches.includes(
   "https://mistercode25.github.io/salt-template-generator/*"
 ));
+assert.match(serviceWorkerSource, /runAloAutofill/);
+assert.match(serviceWorkerSource, /runAlexTicketOpen/);
+assert.match(serviceWorkerSource, /ALEX_STORAGE_NAVIGATION_DELAY_MS/);
+assert.match(appBridgeSource, /salt\.capture\.alo\.start\.v1/);
+assert.match(appBridgeSource, /salt\.capture\.alex\.start\.v1/);
 
 console.log("browserExtensionBuild tests passed");

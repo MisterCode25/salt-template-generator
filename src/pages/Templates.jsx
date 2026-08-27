@@ -74,8 +74,8 @@ import {
     saveDisplaySuperOfficeExternalId
 } from "../services/superOfficeTicketService.js";
 import {
+    buildAloAutofillPayload,
     buildAloPreparationDefaults,
-    formatAloAutofillPayload,
     openAloTicketCreationPage,
     resolveAloTemplateWithProblemDate
 } from "../utils/aloAutofill.js";
@@ -85,6 +85,11 @@ import {
     getAlexTicketUnavailableMessage,
     openAlexHomePage
 } from "../utils/alexTicket.js";
+import { BROWSER_EXTENSION_MESSAGE } from "../../shared/browserExtensionProtocol.js";
+import {
+    startBrowserExtensionAlexTicket,
+    startBrowserExtensionAloAutofill
+} from "../services/browserExtensionCaptureService.js";
 import { buildAloPreparationSteps } from "../utils/aloPreparationFlow.js";
 import {
     formatDateInputValueForToken,
@@ -1478,12 +1483,24 @@ export default function Templates() {
             return;
         }
 
+        const extensionResult = await startBrowserExtensionAlexTicket(preparation.payload);
+        if (extensionResult?.type === BROWSER_EXTENSION_MESSAGE.ACTION_COMPLETED) {
+            showToast(extensionResult.message || "Ticket ALEX ouvert", "success");
+            return;
+        }
+
         const copyPromise = copyText(
             formatAlexTicketPayload(preparation.payload),
-            { message: "ALEX ticket payload copied", variant: "success" }
+            {
+                message: extensionResult
+                    ? "Données ALEX copiées : utilise le bookmarklet de secours"
+                    : "ALEX ticket payload copied",
+                variant: extensionResult ? "warning" : "success"
+            }
         );
-        openAlexHomePage();
+        if (!extensionResult) openAlexHomePage();
         await copyPromise;
+        if (extensionResult?.error) showToast(extensionResult.error, "warning");
     }, [alexPartnerTicketNumber]);
 
     const closeAloPreparation = useCallback(() => {
@@ -1500,17 +1517,35 @@ export default function Templates() {
         const agentProfile = preparationContext?.agentProfile || await loadAgentProfile();
         const superOfficePayload = preparationContext?.superOfficePayload || await loadSuperOfficeTicketPayload();
 
-        const copyPromise = copyText(
-            formatAloAutofillPayload(
-                clientPayload,
-                agentProfile,
-                superOfficePayload,
-                options
-            ),
-            { message: "ALO fill data copied", variant: "success" }
+        const payload = buildAloAutofillPayload(
+            clientPayload,
+            agentProfile,
+            superOfficePayload,
+            options
         );
-        openAloTicketCreationPage();
-        await copyPromise;
+        const extensionResult = await startBrowserExtensionAloAutofill(payload);
+
+        if (extensionResult?.type === BROWSER_EXTENSION_MESSAGE.ACTION_COMPLETED) {
+            const externalReferenceUnavailable = extensionResult.result?.externalReferenceStatus === "unavailable";
+            showToast(
+                extensionResult.message || "Ticket ALO ouvert et rempli",
+                externalReferenceUnavailable ? "warning" : "success"
+            );
+        } else {
+            const copyPromise = copyText(
+                JSON.stringify(payload, null, 2),
+                {
+                    message: extensionResult
+                        ? "Données ALO copiées : utilise le bookmarklet de secours"
+                        : "ALO fill data copied",
+                    variant: extensionResult ? "warning" : "success"
+                }
+            );
+            if (!extensionResult) openAloTicketCreationPage();
+            await copyPromise;
+            if (extensionResult?.error) showToast(extensionResult.error, "warning");
+        }
+
         setAloPreparation(null);
         setAloTemplateOptions([]);
         aloPreparationContextRef.current = null;

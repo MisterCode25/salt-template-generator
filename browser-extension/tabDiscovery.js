@@ -44,6 +44,25 @@ export function classifyCaptureTab(tab = {}) {
     return null;
 }
 
+export function classifyWorkflowTab(tab = {}) {
+    const url = parseTabUrl(tab.url);
+    const hostname = url?.hostname.toLowerCase() || "";
+
+    if (hostname === "wholesale.swisscom.com") return "alo";
+    if (hostname === "ftthproxy.ch" || hostname.endsWith(".ftthproxy.ch")) return "alex";
+    return null;
+}
+
+export function selectReusableWorkflowTab(tabs = [], workflow) {
+    const candidates = (Array.isArray(tabs) ? tabs : [])
+        .filter((tab) => classifyWorkflowTab(tab) === workflow)
+        .sort((left, right) => {
+            if (Boolean(left.active) !== Boolean(right.active)) return left.active ? -1 : 1;
+            return Number(right.lastAccessed || 0) - Number(left.lastAccessed || 0);
+        });
+    return candidates[0] || null;
+}
+
 export function selectUniqueCaptureTabs(tabs = []) {
     const candidates = Array.isArray(tabs) ? tabs : [];
     const vtiTabs = candidates.filter((tab) => classifyCaptureTab(tab) === "vti");

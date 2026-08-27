@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2, Download, Puzzle } from "lucide-react";
-import { requestBrowserExtensionStatus } from "../services/browserExtensionCaptureService.js";
+import {
+    isBrowserExtensionVersionAtLeast,
+    requestBrowserExtensionStatus
+} from "../services/browserExtensionCaptureService.js";
+
+const ALO_ALEX_MINIMUM_EXTENSION_VERSION = "0.1.3";
 
 export default function BrowserExtensionInstallPanel() {
     const [extensionStatus, setExtensionStatus] = useState({
@@ -9,6 +14,8 @@ export default function BrowserExtensionInstallPanel() {
         version: ""
     });
     const extensionDownloadUrl = `${import.meta.env.BASE_URL}downloads/salt-bo-capture-beta.zip`;
+    const needsUpdate = extensionStatus.installed
+        && !isBrowserExtensionVersionAtLeast(extensionStatus.version, ALO_ALEX_MINIMUM_EXTENSION_VERSION);
 
     useEffect(() => {
         let cancelled = false;
@@ -31,10 +38,10 @@ export default function BrowserExtensionInstallPanel() {
                 <span className="browser-extension-install-icon" aria-hidden="true"><Puzzle size={24} /></span>
                 <div>
                     <p className="eyebrow">Beta extension</p>
-                    <h2>Automatic SO + VTI capture</h2>
+                    <h2>Automatic SO, VTI, ALO and ALEX workflows</h2>
                     <p className="hint">
-                        The app pilots the extension. This first version captures exactly one already-open
-                        SuperOffice tab and one already-open VTI tab; it does not search or navigate.
+                        The app pilots the extension. SO/VTI capture uses the already-open tabs; ALO and ALEX
+                        reuse their tab when possible, or open one when needed.
                     </p>
                 </div>
                 <span className={`browser-extension-install-status${extensionStatus.installed ? " is-installed" : ""}`}>
@@ -42,7 +49,7 @@ export default function BrowserExtensionInstallPanel() {
                     {extensionStatus.checking
                         ? "Checking…"
                         : extensionStatus.installed
-                            ? `Installed${extensionStatus.version ? ` · v${extensionStatus.version}` : ""}`
+                            ? `Installed${extensionStatus.version ? ` · v${extensionStatus.version}` : ""}${needsUpdate ? " · Update required" : ""}`
                             : "Not detected"}
                 </span>
             </div>
@@ -52,7 +59,7 @@ export default function BrowserExtensionInstallPanel() {
                     <li>Download and unzip the extension.</li>
                     <li>Open <code>edge://extensions</code> or <code>chrome://extensions</code>.</li>
                     <li>Enable Developer mode, choose “Load unpacked”, then select the unzipped folder.</li>
-                    <li>Reload this app once, then use the “Capture beta” button.</li>
+                    <li>Reload this app, then use “Capture beta”, “ALO fill” or “Ticket ALEX”.</li>
                 </ol>
                 <a className="primary-btn browser-extension-install-download" href={extensionDownloadUrl} download>
                     <Download size={16} aria-hidden="true" />

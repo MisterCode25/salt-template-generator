@@ -555,6 +555,15 @@ function aloAutofillBetaBookmarkletRunner(expectedSource, fulfillmentDetailUrl, 
         show("ALO beta — impossible de continuer", detail, 100, "error");
     }
 
+    function fillWithExternalReference(payload, externalReference, detail) {
+        payload.fields = Object.assign({}, payload.fields || {}, {
+            externalReference: externalReference || ""
+        });
+        show("ALO beta", detail, 92, "info");
+        hide();
+        fillForm(expectedSource, payload);
+    }
+
     show("ALO beta", "Lecture des données préparées…", 8, "info");
 
     var targetUrl;
@@ -600,7 +609,12 @@ function aloAutofillBetaBookmarkletRunner(expectedSource, fulfillmentDetailUrl, 
             payload.fields && payload.fields.providerOrderRef
         ]);
         if (!orderId) {
-            throw new Error("Order ID introuvable dans les données VTI. Recapture le client avec le bookmarklet VTI.");
+            fillWithExternalReference(
+                payload,
+                "",
+                "Order ID indisponible. External Ref laissée vide.\nRemplissage du ticket…"
+            );
+            return;
         }
 
         show("ALO beta", "Order ID détecté : " + orderId + "\nChargement de la commande Fulfillment…", 38, "info");
@@ -611,24 +625,27 @@ function aloAutofillBetaBookmarkletRunner(expectedSource, fulfillmentDetailUrl, 
             cache: "no-store",
             redirect: "follow"
         }).then(function handleResponse(response) {
-            if (!response.ok) {
-                throw new Error("La page Fulfillment a répondu avec l’erreur HTTP " + response.status + ".");
-            }
+            if (!response.ok) return "";
             return response.text();
         }).then(function handleFulfillmentHtml(html) {
             show("ALO beta", "Commande chargée.\nRecherche de l’External Ref…", 70, "info");
-            var fulfillmentDocument = new DOMParser().parseFromString(html, "text/html");
+            var fulfillmentDocument = html
+                ? new DOMParser().parseFromString(html, "text/html")
+                : null;
             var externalReference = extractExternalReference(fulfillmentDocument);
-            if (!externalReference) {
-                throw new Error("External Ref introuvable. Vérifie la session ALO et l’Order ID " + orderId + ".");
-            }
-
-            payload.fields = Object.assign({}, payload.fields || {}, {
-                externalReference: externalReference
-            });
-            show("ALO beta", "External Ref trouvée : " + externalReference + "\nRemplissage du ticket…", 92, "info");
-            hide();
-            fillForm(expectedSource, payload);
+            fillWithExternalReference(
+                payload,
+                externalReference,
+                externalReference
+                    ? "External Ref trouvée : " + externalReference + "\nRemplissage du ticket…"
+                    : "External Ref indisponible. Champ laissé vide.\nRemplissage du ticket…"
+            );
+        }).catch(function handleExternalReferenceError() {
+            fillWithExternalReference(
+                payload,
+                "",
+                "External Ref indisponible. Champ laissé vide.\nRemplissage du ticket…"
+            );
         });
     }).catch(function handleError(error) {
         fail(error && error.message ? error.message : String(error));

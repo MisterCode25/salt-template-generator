@@ -4,7 +4,9 @@
     const extensionSource = "salt-bo-capture-extension";
     const allowedCommands = new Set([
         "salt.capture.status.request.v1",
-        "salt.capture.start.v1"
+        "salt.capture.start.v1",
+        "salt.capture.alo.start.v1",
+        "salt.capture.alex.start.v1"
     ]);
 
     function isValidAppCommand(message) {

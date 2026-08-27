@@ -7,4 +7,6 @@
 5. Sélectionne ce dossier, celui qui contient `manifest.json`.
 6. Recharge Salt BO tools une fois l’extension installée.
 
-Cette version bêta ne recherche aucun contractor et ne navigue vers aucun ticket ou client. Elle exige exactement un onglet SuperOffice et un onglet VTI déjà ouverts sur les bonnes données.
+La capture bêta ne recherche aucun contractor : elle exige exactement un onglet SuperOffice et un onglet VTI déjà ouverts sur les bonnes données.
+
+Depuis Salt BO tools, l’extension peut aussi ouvrir et préremplir le formulaire ALO sans jamais le valider, ainsi qu’ouvrir un ticket ALEX après avoir appliqué le contexte partenaire.

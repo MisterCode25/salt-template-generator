@@ -10,9 +10,12 @@ export const BROWSER_EXTENSION_MESSAGE = Object.freeze({
     STATUS_REQUEST: "salt.capture.status.request.v1",
     STATUS: "salt.capture.status.v1",
     START_CAPTURE: "salt.capture.start.v1",
+    START_ALO: "salt.capture.alo.start.v1",
+    START_ALEX: "salt.capture.alex.start.v1",
     ACCEPTED: "salt.capture.accepted.v1",
     PROGRESS: "salt.capture.progress.v1",
     COMPLETED: "salt.capture.completed.v1",
+    ACTION_COMPLETED: "salt.capture.action.completed.v1",
     FAILED: "salt.capture.failed.v1",
     HEALTHCHECK: "salt.capture.healthcheck.v1"
 });
@@ -28,7 +31,9 @@ export const BROWSER_EXTENSION_PHASE = Object.freeze({
 
 const APP_MESSAGE_TYPES = new Set([
     BROWSER_EXTENSION_MESSAGE.STATUS_REQUEST,
-    BROWSER_EXTENSION_MESSAGE.START_CAPTURE
+    BROWSER_EXTENSION_MESSAGE.START_CAPTURE,
+    BROWSER_EXTENSION_MESSAGE.START_ALO,
+    BROWSER_EXTENSION_MESSAGE.START_ALEX
 ]);
 
 const EXTENSION_MESSAGE_TYPES = new Set([
@@ -37,6 +42,7 @@ const EXTENSION_MESSAGE_TYPES = new Set([
     BROWSER_EXTENSION_MESSAGE.ACCEPTED,
     BROWSER_EXTENSION_MESSAGE.PROGRESS,
     BROWSER_EXTENSION_MESSAGE.COMPLETED,
+    BROWSER_EXTENSION_MESSAGE.ACTION_COMPLETED,
     BROWSER_EXTENSION_MESSAGE.FAILED
 ]);
 
