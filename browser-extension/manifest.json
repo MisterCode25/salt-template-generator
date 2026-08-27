@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Salt BO Capture Beta",
   "description": "Captures the already-open SuperOffice ticket and VTI client from Salt BO tools.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "permissions": [
     "scripting",
     "tabs"

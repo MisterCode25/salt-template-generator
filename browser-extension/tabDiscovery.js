@@ -12,22 +12,32 @@ export const CAPTURE_TAB_ERROR_MESSAGE = Object.freeze({
     [CAPTURE_TAB_ERROR.SUPER_OFFICE_AMBIGUOUS]: "Plusieurs onglets SuperOffice ont été trouvés. Garde uniquement l’onglet du ticket à capturer."
 });
 
-function getHostname(rawUrl) {
+function parseTabUrl(rawUrl) {
     try {
-        return new URL(String(rawUrl || "")).hostname.toLowerCase();
+        return new URL(String(rawUrl || ""));
     } catch {
-        return "";
+        return null;
     }
 }
 
 export function classifyCaptureTab(tab = {}) {
-    const hostname = getHostname(tab.url);
+    const url = parseTabUrl(tab.url);
+    const hostname = url?.hostname.toLowerCase() || "";
 
     if (hostname === "vti.salt.ch" || hostname.endsWith(".vti.salt.ch")) {
         return "vti";
     }
 
     if (hostname.includes("superoffice")) {
+        return "superOffice";
+    }
+
+    const isSaltSuperOfficeTicket = hostname === "cs.salt.ch"
+        && url.pathname.toLowerCase() === "/scripts/ticket.fcgi"
+        && url.searchParams.get("action") === "doScreenDefinition"
+        && url.searchParams.get("idString") === "viewEmail"
+        && Boolean(url.searchParams.get("entryId"));
+    if (isSaltSuperOfficeTicket) {
         return "superOffice";
     }
 

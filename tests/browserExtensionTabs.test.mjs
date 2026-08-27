@@ -15,10 +15,16 @@ const superOfficeTab = {
   url: "https://online.superoffice.com/salt/default.aspx",
   title: "REQUEST 31436062"
 };
+const saltSuperOfficeTab = {
+  id: 16,
+  url: "https://cs.salt.ch/scripts/ticket.fcgi?_sf=0&action=doScreenDefinition&idString=viewEmail&entryId=28958607",
+  title: "REQUEST 28958607"
+};
 
 {
   assert.equal(classifyCaptureTab(vtiTab), "vti");
   assert.equal(classifyCaptureTab(superOfficeTab), "superOffice");
+  assert.equal(classifyCaptureTab(saltSuperOfficeTab), "superOffice");
   assert.equal(classifyCaptureTab({
     id: 13,
     url: "https://example.com/",
@@ -28,6 +34,11 @@ const superOfficeTab = {
     id: 14,
     url: "https://example.com/",
     title: "SuperOffice documentation"
+  }), null);
+  assert.equal(classifyCaptureTab({
+    id: 15,
+    url: "https://cs.salt.ch/scripts/customer.fcgi?action=doScreenDefinition",
+    title: "Other CS page"
   }), null);
 }
 
