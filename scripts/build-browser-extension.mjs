@@ -29,7 +29,8 @@ const staticFiles = [
     "healthcheckCapture.js",
     "manifest.json",
     "service-worker.js",
-    "tabDiscovery.js"
+    "tabDiscovery.js",
+    "vtiContractorSearch.js"
 ];
 
 function createCrc32Table() {
@@ -135,6 +136,10 @@ async function buildExtensionDirectory() {
     await copyFile(
         join(projectRoot, "shared/superOfficeTicketNavigation.js"),
         join(extensionDist, "shared/superOfficeTicketNavigation.js")
+    );
+    await copyFile(
+        join(projectRoot, "shared/vtiContractorNavigation.js"),
+        join(extensionDist, "shared/vtiContractorNavigation.js")
     );
 
     const [superOfficeBookmarklet, vtiBookmarklet] = await Promise.all([

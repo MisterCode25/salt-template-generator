@@ -103,7 +103,7 @@ assert.ok(vtiBookmarklet.startsWith("javascript:"));
 assert.ok(superOfficeBookmarklet.startsWith("javascript:"));
 
 assert.equal(manifest.manifest_version, 3);
-assert.equal(manifest.version, "0.1.5");
+assert.equal(manifest.version, "0.1.6");
 assert.deepEqual(manifest.permissions.sort(), ["scripting", "tabs"]);
 assert.equal(manifest.host_permissions.includes("<all_urls>"), false);
 assert.ok(manifest.host_permissions.includes("https://*.salt.ch/*"));
@@ -118,6 +118,8 @@ assert.match(serviceWorkerSource, /runAlexTicketOpen/);
 assert.match(serviceWorkerSource, /buildSuperOfficeTicketUrl/);
 assert.match(serviceWorkerSource, /chrome\.tabs\.update/);
 assert.match(serviceWorkerSource, /getCapturedSuperOfficeTicketNumber/);
+assert.match(serviceWorkerSource, /findVtiContractorRecord/);
+assert.match(serviceWorkerSource, /CONTRACTOR_INPUT_REQUIRED/);
 assert.match(serviceWorkerSource, /ALEX_STORAGE_NAVIGATION_DELAY_MS/);
 assert.match(appBridgeSource, /salt\.capture\.alo\.start\.v1/);
 assert.match(appBridgeSource, /salt\.capture\.alex\.start\.v1/);

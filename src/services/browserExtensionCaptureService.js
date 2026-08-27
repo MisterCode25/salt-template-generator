@@ -7,7 +7,7 @@ import {
 const STATUS_TIMEOUT_MS = 1200;
 const START_TIMEOUT_MS = 2200;
 const ACTION_TIMEOUT_MS = 45000;
-export const CURRENT_BROWSER_EXTENSION_VERSION = "0.1.5";
+export const CURRENT_BROWSER_EXTENSION_VERSION = "0.1.6";
 
 export function isBrowserExtensionVersionAtLeast(version, minimumVersion) {
     const parseVersion = (value) => String(value || "")
@@ -77,14 +77,15 @@ export async function requestBrowserExtensionStatus() {
 
 export async function startBrowserExtensionCapture(
     requestId = createBrowserExtensionRequestId(),
-    ticketNumber = ""
+    ticketNumber = "",
+    manualContractorNumber = ""
 ) {
     return sendCommandAndWait(
         BROWSER_EXTENSION_MESSAGE.START_CAPTURE,
         requestId,
         [BROWSER_EXTENSION_MESSAGE.ACCEPTED, BROWSER_EXTENSION_MESSAGE.FAILED],
         START_TIMEOUT_MS,
-        { payload: { ticketNumber } }
+        { payload: { ticketNumber, manualContractorNumber } }
     );
 }
 

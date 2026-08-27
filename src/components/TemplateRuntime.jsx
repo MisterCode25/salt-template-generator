@@ -2305,7 +2305,7 @@ export function useTemplateRuntime() {
         dispatchBrowserExtensionCapture({ type: BROWSER_EXTENSION_CAPTURE_ACTION.RESET });
     };
 
-    const startBrowserExtensionCaptureFlow = async (ticketNumber) => {
+    const startBrowserExtensionCaptureFlow = async (ticketNumber, options = {}) => {
         if (browserExtensionCaptureState.isRunning || browserExtensionCaptureState.isChecking) {
             return false;
         }
@@ -2341,9 +2341,14 @@ export function useTemplateRuntime() {
         const requestId = createBrowserExtensionRequestId();
         dispatchBrowserExtensionCapture({
             type: BROWSER_EXTENSION_CAPTURE_ACTION.STARTING,
-            requestId
+            requestId,
+            ticketNumber
         });
-        const response = await startBrowserExtensionCapture(requestId, ticketNumber);
+        const response = await startBrowserExtensionCapture(
+            requestId,
+            ticketNumber,
+            options.manualContractorNumber || ""
+        );
         if (!response) {
             dispatchBrowserExtensionCapture({
                 type: BROWSER_EXTENSION_CAPTURE_ACTION.LOCAL_FAILURE,

@@ -1244,6 +1244,61 @@
     color: #fecaca;
 }
 
+.browser-extension-capture-focus.is-warning {
+    border-color: rgba(250, 204, 21, 0.34);
+    background: rgba(113, 63, 18, 0.17);
+    color: #fde68a;
+}
+
+.browser-extension-contractor-input {
+    display: grid;
+    gap: 7px;
+    margin: 0 0 12px;
+    padding: 11px 12px;
+    border: 1px solid rgba(250, 204, 21, 0.28);
+    border-radius: 8px;
+    background: rgba(113, 63, 18, 0.13);
+}
+
+.browser-extension-contractor-input strong {
+    color: #fde68a;
+    font-size: 12px;
+}
+
+.browser-extension-contractor-input span {
+    color: var(--text-secondary);
+    font-size: 11px;
+    line-height: 1.45;
+}
+
+.browser-extension-contractor-input label {
+    margin-top: 4px;
+    color: var(--text-primary);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.browser-extension-contractor-input input {
+    min-width: 0;
+    height: 38px;
+    padding: 0 11px;
+    border: 1px solid var(--border-default);
+    border-radius: 7px;
+    background: rgba(10, 14, 24, 0.86);
+    color: var(--text-primary);
+    font: inherit;
+}
+
+.browser-extension-contractor-input input:focus {
+    border-color: #facc15;
+    outline: 2px solid rgba(250, 204, 21, 0.18);
+    outline-offset: 1px;
+}
+
+.browser-extension-contractor-input input[aria-invalid="true"] {
+    border-color: rgba(248, 113, 113, 0.72);
+}
+
 .browser-extension-capture-focus > div {
     display: grid;
     gap: 5px;

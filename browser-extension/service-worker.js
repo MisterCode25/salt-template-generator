@@ -10,6 +10,12 @@ import {
     normalizeSuperOfficeTicketNumber
 } from "./shared/superOfficeTicketNavigation.js";
 import {
+    buildVtiContractorDetailUrl,
+    buildVtiContractorSearchUrl,
+    getCapturedVtiContractorNumber,
+    resolveVtiCaptureRoute
+} from "./shared/vtiContractorNavigation.js";
+import {
     CAPTURE_TAB_ERROR_MESSAGE,
     selectReusableWorkflowTab,
     selectUniqueCaptureTabs
@@ -27,6 +33,7 @@ import {
 import { captureSuperOfficePage } from "./generated/superOfficeCapture.js";
 import { captureVtiPage } from "./generated/vtiCapture.js";
 import { captureVtiHealthcheckPage } from "./healthcheckCapture.js";
+import { findVtiContractorRecord } from "./vtiContractorSearch.js";
 
 let activeWorkflow = null;
 
@@ -117,11 +124,66 @@ async function runCapture(requestId, appTabId, payload) {
             );
         }
 
+        const vtiCaptureRoute = resolveVtiCaptureRoute(
+            superOfficePayload,
+            payload?.manualContractorNumber
+        );
+        const { contractorNumber } = vtiCaptureRoute;
+        if (vtiCaptureRoute.mode === "manual-input") {
+            await sendToApplication(appTabId, createExtensionEvent(
+                BROWSER_EXTENSION_MESSAGE.CONTRACTOR_INPUT_REQUIRED,
+                requestId,
+                {
+                    phase: BROWSER_EXTENSION_PHASE.AWAITING_CONTRACTOR_INPUT,
+                    ticketNumber: requestedTicketNumber,
+                    message: "Aucun contractor n’a été trouvé dans l’External ID ni après MSISDN dans le premier post. Saisis-le manuellement pour continuer. L’onglet VTI n’a pas été modifié."
+                }
+            ));
+            return;
+        }
+
+        if (vtiCaptureRoute.mode === "search") {
+            await reportProgress(
+                appTabId,
+                requestId,
+                BROWSER_EXTENSION_PHASE.VTI_SEARCH,
+                `Recherche du contractor ${contractorNumber} dans VTI…`,
+                { superOfficeStatus: "done", vtiStatus: "active" }
+            );
+            await chrome.tabs.update(selection.vtiTab.id, {
+                url: buildVtiContractorSearchUrl(contractorNumber)
+            });
+            await waitForTabLoad(selection.vtiTab.id, 30000, "de la recherche contractor VTI");
+
+            const vtiSearchResults = await chrome.scripting.executeScript({
+                target: { tabId: selection.vtiTab.id },
+                world: "ISOLATED",
+                func: findVtiContractorRecord,
+                args: [contractorNumber]
+            });
+            const vtiSearchResult = readExecutionResult(vtiSearchResults, "La recherche VTI");
+            if (!vtiSearchResult.ok) {
+                throw new Error(vtiSearchResult.error || "Le contractor n’a pas été trouvé dans VTI.");
+            }
+
+            await reportProgress(
+                appTabId,
+                requestId,
+                BROWSER_EXTENSION_PHASE.VTI_RECORD_LOAD,
+                `Contractor trouvé. Chargement de la fiche VTI ${vtiSearchResult.recordId}…`,
+                { superOfficeStatus: "done", vtiStatus: "active" }
+            );
+            await chrome.tabs.update(selection.vtiTab.id, {
+                url: buildVtiContractorDetailUrl(vtiSearchResult.recordId)
+            });
+            await waitForTabLoad(selection.vtiTab.id, 30000, "de la fiche contractor VTI");
+        }
+
         await reportProgress(
             appTabId,
             requestId,
             BROWSER_EXTENSION_PHASE.VTI_CAPTURE,
-            "Ticket SuperOffice capturé. Capture du client VTI…",
+            `Fiche du contractor ${contractorNumber} chargée. Capture du client VTI…`,
             { superOfficeStatus: "done", vtiStatus: "active" }
         );
         const vtiResults = await chrome.scripting.executeScript({
@@ -130,6 +192,12 @@ async function runCapture(requestId, appTabId, payload) {
             func: captureVtiPage
         });
         const vtiPayload = readExecutionResult(vtiResults, "VTI");
+        const capturedVtiContractorNumber = getCapturedVtiContractorNumber(vtiPayload);
+        if (capturedVtiContractorNumber !== contractorNumber) {
+            throw new Error(
+                `Le client VTI capturé (${capturedVtiContractorNumber || "inconnu"}) ne correspond pas au contractor demandé (${contractorNumber}).`
+            );
+        }
 
         await sendToApplication(appTabId, createExtensionEvent(
             BROWSER_EXTENSION_MESSAGE.COMPLETED,

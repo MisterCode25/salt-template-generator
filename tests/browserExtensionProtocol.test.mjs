@@ -33,6 +33,16 @@ import {
 }
 
 {
+  const contractorInput = createExtensionEvent(
+    BROWSER_EXTENSION_MESSAGE.CONTRACTOR_INPUT_REQUIRED,
+    "request-contractor-input",
+    { ticketNumber: "28958607" }
+  );
+
+  assert.equal(isExtensionEvent(contractorInput), true);
+}
+
+{
   const event = createExtensionEvent(BROWSER_EXTENSION_MESSAGE.PROGRESS, "request-2", {
     phase: BROWSER_EXTENSION_PHASE.SUPER_OFFICE_CAPTURE
   });

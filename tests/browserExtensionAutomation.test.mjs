@@ -27,7 +27,7 @@ assert.equal(isBrowserExtensionVersionAtLeast("0.1.3", "0.1.3"), true);
 assert.equal(isBrowserExtensionVersionAtLeast("0.2.0", "0.1.3"), true);
 assert.equal(isBrowserExtensionVersionAtLeast("0.1.2", "0.1.3"), false);
 assert.equal(isBrowserExtensionVersionAtLeast("", "0.1.3"), false);
-assert.equal(CURRENT_BROWSER_EXTENSION_VERSION, "0.1.5");
+assert.equal(CURRENT_BROWSER_EXTENSION_VERSION, "0.1.6");
 
 async function withGlobalOverrides(overrides, callback) {
   const previousDescriptors = new Map();
@@ -171,11 +171,14 @@ function createInput(value = "") {
   };
 
   const result = await withGlobalOverrides({ window: fakeWindow }, () => (
-    startBrowserExtensionCapture("capture-ticket-1", "28958607")
+    startBrowserExtensionCapture("capture-ticket-1", "28958607", "31486331")
   ));
 
   assert.equal(result.type, BROWSER_EXTENSION_MESSAGE.ACCEPTED);
-  assert.deepEqual(commands[0].payload, { ticketNumber: "28958607" });
+  assert.deepEqual(commands[0].payload, {
+    ticketNumber: "28958607",
+    manualContractorNumber: "31486331"
+  });
 }
 
 {

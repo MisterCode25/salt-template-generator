@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { BROWSER_EXTENSION_PHASE } from "../../shared/browserExtensionProtocol.js";
 import { normalizeSuperOfficeTicketNumber } from "../../shared/superOfficeTicketNavigation.js";
+import { normalizeContractorNumber } from "../../shared/vtiContractorNavigation.js";
 import Modal from "./Modal.jsx";
 
 const COMPLETED_AUTO_CLOSE_DELAY_MS = 1000;
@@ -24,6 +25,9 @@ function getVisual(state) {
     if (state.phase === BROWSER_EXTENSION_PHASE.COMPLETED) {
         return { mode: "done", Icon: CheckCircle2, title: "Import terminé" };
     }
+    if (state.requiresContractorInput) {
+        return { mode: "warning", Icon: AlertTriangle, title: "Contractor introuvable" };
+    }
     if (state.isRunning || state.isChecking) {
         return { mode: "scanning", Icon: Loader2, title: "Capture automatique en cours" };
     }
@@ -33,6 +37,8 @@ function getVisual(state) {
 export default function BrowserExtensionCaptureModal({ state, onStart, onClose }) {
     const [ticketNumber, setTicketNumber] = useState("");
     const [ticketInputError, setTicketInputError] = useState("");
+    const [manualContractorNumber, setManualContractorNumber] = useState("");
+    const [manualContractorError, setManualContractorError] = useState("");
     const onCloseRef = useRef(onClose);
     onCloseRef.current = onClose;
 
@@ -49,6 +55,7 @@ export default function BrowserExtensionCaptureModal({ state, onStart, onClose }
     const VisualIcon = visual.Icon;
     const isBusy = state.isRunning || state.isChecking;
     const isCompleted = state.phase === BROWSER_EXTENSION_PHASE.COMPLETED;
+    const requiresContractorInput = state.requiresContractorInput;
     const timelineProgressClass = state.vtiStatus === "done"
         ? "is-complete"
         : state.superOfficeStatus === "done"
@@ -68,6 +75,22 @@ export default function BrowserExtensionCaptureModal({ state, onStart, onClose }
         setTicketNumber(normalizedTicketNumber);
         setTicketInputError("");
         onStart(normalizedTicketNumber);
+    };
+    const submitManualContractor = (event) => {
+        event.preventDefault();
+        const requestedTicketNumber = normalizeSuperOfficeTicketNumber(
+            state.ticketNumber || ticketNumber
+        );
+        const normalizedContractorNumber = normalizeContractorNumber(manualContractorNumber);
+        if (!normalizedContractorNumber) {
+            setManualContractorError("Saisis uniquement le numéro du contractor.");
+            return;
+        }
+        if (!requestedTicketNumber || isBusy) return;
+
+        setManualContractorNumber(normalizedContractorNumber);
+        setManualContractorError("");
+        onStart(requestedTicketNumber, { manualContractorNumber: normalizedContractorNumber });
     };
 
     return (
@@ -90,7 +113,7 @@ export default function BrowserExtensionCaptureModal({ state, onStart, onClose }
                 </div>
             </div>
 
-            {!isCompleted && (
+            {!isCompleted && !requiresContractorInput && (
                 <form className="browser-extension-ticket-form" onSubmit={submitTicket}>
                     <label htmlFor="browser-extension-ticket-number">Numéro du ticket SuperOffice</label>
                     <div className="browser-extension-ticket-row">
@@ -135,6 +158,42 @@ export default function BrowserExtensionCaptureModal({ state, onStart, onClose }
                 </div>
             </div>
 
+            {requiresContractorInput && (
+                <form className="browser-extension-contractor-input" onSubmit={submitManualContractor}>
+                    <strong>Aucune action n’a été effectuée dans VTI.</strong>
+                    <span>
+                        Indique le contractor à rechercher. L’extension ouvrira sa fiche VTI uniquement après
+                        ta validation.
+                    </span>
+                    <label htmlFor="browser-extension-contractor-number">Numéro du contractor</label>
+                    <div className="browser-extension-ticket-row">
+                        <input
+                            id="browser-extension-contractor-number"
+                            type="text"
+                            inputMode="numeric"
+                            autoComplete="off"
+                            autoFocus
+                            value={manualContractorNumber}
+                            onChange={(event) => {
+                                setManualContractorNumber(event.target.value);
+                                if (manualContractorError) setManualContractorError("");
+                            }}
+                            placeholder="31486331"
+                            aria-invalid={Boolean(manualContractorError)}
+                            aria-describedby={manualContractorError
+                                ? "browser-extension-contractor-error"
+                                : undefined}
+                        />
+                        <button type="submit" className="primary-btn">Rechercher dans VTI</button>
+                    </div>
+                    {manualContractorError && (
+                        <small id="browser-extension-contractor-error" className="browser-extension-ticket-error">
+                            {manualContractorError}
+                        </small>
+                    )}
+                </form>
+            )}
+
             <div className={`capture-data-timeline ${timelineProgressClass}`} aria-label="Progression de la capture">
                 <div className="capture-data-timeline-line" aria-hidden="true"><span /></div>
                 <div className={`capture-data-timeline-step is-${state.superOfficeStatus}`}>
@@ -145,13 +204,13 @@ export default function BrowserExtensionCaptureModal({ state, onStart, onClose }
                 <div className={`capture-data-timeline-step is-${state.vtiStatus}`}>
                     <span className="capture-data-timeline-dot" aria-hidden="true" />
                     <strong>VTI</strong>
-                    <small>Client déjà ouvert</small>
+                    <small>Recherche et capture</small>
                 </div>
             </div>
 
             <div className="browser-extension-capture-note">
-                Exactement un onglet SuperOffice et un onglet VTI doivent être ouverts. L’onglet SuperOffice
-                est réutilisé en arrière-plan ; l’onglet VTI doit déjà afficher le bon client.
+                Exactement un onglet SuperOffice et un onglet VTI doivent être ouverts. Les deux onglets sont
+                réutilisés en arrière-plan ; VTI recherche automatiquement le contractor trouvé dans le ticket.
             </div>
 
             <div className="popup-actions capture-data-actions">
@@ -159,7 +218,12 @@ export default function BrowserExtensionCaptureModal({ state, onStart, onClose }
                     <Download size={15} aria-hidden="true" />
                     Télécharger l’extension
                 </a>
-                {!isBusy && (
+                {requiresContractorInput && (
+                    <button type="button" className="secondary-btn" onClick={onClose}>
+                        Annuler la capture
+                    </button>
+                )}
+                {!isBusy && !requiresContractorInput && (
                     <button type="button" className="secondary-btn" onClick={onClose}>Fermer</button>
                 )}
             </div>

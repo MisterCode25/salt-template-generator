@@ -37,6 +37,27 @@ const requestId = "capture-1";
         type: BROWSER_EXTENSION_CAPTURE_ACTION.STARTING,
         requestId
     });
+    const contractorInput = reduceBrowserExtensionCaptureState(starting, createExtensionEvent(
+        BROWSER_EXTENSION_MESSAGE.CONTRACTOR_INPUT_REQUIRED,
+        requestId,
+        {
+            ticketNumber: "28958607",
+            message: "Contractor introuvable"
+        }
+    ));
+
+    assert.equal(contractorInput.isRunning, false);
+    assert.equal(contractorInput.requiresContractorInput, true);
+    assert.equal(contractorInput.superOfficeStatus, "done");
+    assert.equal(contractorInput.vtiStatus, "waiting");
+    assert.equal(contractorInput.ticketNumber, "28958607");
+}
+
+{
+    const starting = reduceBrowserExtensionCaptureState(createBrowserExtensionCaptureState(), {
+        type: BROWSER_EXTENSION_CAPTURE_ACTION.STARTING,
+        requestId
+    });
     const vtiCapture = reduceBrowserExtensionCaptureState(starting, createExtensionEvent(
         BROWSER_EXTENSION_MESSAGE.PROGRESS,
         requestId,

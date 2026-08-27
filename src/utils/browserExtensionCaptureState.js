@@ -19,6 +19,8 @@ export function createBrowserExtensionCaptureState() {
         requestId: "",
         isChecking: false,
         isRunning: false,
+        requiresContractorInput: false,
+        ticketNumber: "",
         phase: null,
         superOfficeStatus: "waiting",
         vtiStatus: "waiting",
@@ -46,15 +48,31 @@ export function reduceBrowserExtensionCaptureState(state, event) {
                 ...createBrowserExtensionCaptureState(),
                 installed: true,
                 requestId: event.requestId,
+                ticketNumber: event.ticketNumber || "",
                 isRunning: true,
                 phase: BROWSER_EXTENSION_PHASE.LOCATING_TABS,
                 message: "Connexion à l’extension…"
+            };
+        case BROWSER_EXTENSION_MESSAGE.CONTRACTOR_INPUT_REQUIRED:
+            if (!isCurrentRequest(state, event)) return state;
+            return {
+                ...state,
+                isChecking: false,
+                isRunning: false,
+                requiresContractorInput: true,
+                ticketNumber: event.ticketNumber || state.ticketNumber,
+                phase: BROWSER_EXTENSION_PHASE.AWAITING_CONTRACTOR_INPUT,
+                superOfficeStatus: "done",
+                vtiStatus: "waiting",
+                message: event.message || "Aucun contractor n’a été trouvé. Saisis-le pour continuer ; l’onglet VTI n’a pas été modifié.",
+                error: ""
             };
         case BROWSER_EXTENSION_CAPTURE_ACTION.IMPORTING:
             if (!isCurrentRequest(state, event)) return state;
             return {
                 ...state,
                 isRunning: true,
+                requiresContractorInput: false,
                 phase: BROWSER_EXTENSION_PHASE.IMPORTING,
                 superOfficeStatus: "done",
                 vtiStatus: "done",
@@ -66,6 +84,7 @@ export function reduceBrowserExtensionCaptureState(state, event) {
             return {
                 ...state,
                 isRunning: false,
+                requiresContractorInput: false,
                 phase: BROWSER_EXTENSION_PHASE.COMPLETED,
                 superOfficeStatus: "done",
                 vtiStatus: "done",
@@ -79,6 +98,7 @@ export function reduceBrowserExtensionCaptureState(state, event) {
                 installed: event.installed ?? state.installed,
                 isChecking: false,
                 isRunning: false,
+                requiresContractorInput: false,
                 phase: BROWSER_EXTENSION_PHASE.FAILED,
                 message: "Capture automatique interrompue.",
                 error: event.error || "Capture impossible."
@@ -90,7 +110,9 @@ export function reduceBrowserExtensionCaptureState(state, event) {
                 installed: true,
                 version: event.version || state.version,
                 isChecking: false,
-                message: state.isRunning ? state.message : "Extension détectée."
+                message: state.isRunning || state.requiresContractorInput
+                    ? state.message
+                    : "Extension détectée."
             };
         case BROWSER_EXTENSION_MESSAGE.ACCEPTED:
             if (!isCurrentRequest(state, event)) return state;
@@ -100,6 +122,7 @@ export function reduceBrowserExtensionCaptureState(state, event) {
                 version: event.version || state.version,
                 isChecking: false,
                 isRunning: true,
+                requiresContractorInput: false,
                 error: ""
             };
         case BROWSER_EXTENSION_MESSAGE.PROGRESS:
@@ -108,6 +131,7 @@ export function reduceBrowserExtensionCaptureState(state, event) {
                 ...state,
                 isChecking: false,
                 isRunning: true,
+                requiresContractorInput: false,
                 phase: event.phase || state.phase,
                 superOfficeStatus: event.superOfficeStatus || state.superOfficeStatus,
                 vtiStatus: event.vtiStatus || state.vtiStatus,
@@ -120,6 +144,7 @@ export function reduceBrowserExtensionCaptureState(state, event) {
                 ...state,
                 isChecking: false,
                 isRunning: true,
+                requiresContractorInput: false,
                 superOfficeStatus: "done",
                 vtiStatus: "done",
                 message: event.message || "Captures terminées."
@@ -130,6 +155,7 @@ export function reduceBrowserExtensionCaptureState(state, event) {
                 ...state,
                 isChecking: false,
                 isRunning: false,
+                requiresContractorInput: false,
                 phase: BROWSER_EXTENSION_PHASE.FAILED,
                 message: "Capture automatique interrompue.",
                 error: event.error || "Capture impossible."
