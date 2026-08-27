@@ -1,0 +1,11 @@
+import{c as o}from"./appConfigService-C808tSyu.js";import{l as c,s as d}from"./index-Csx21XHt.js";/**
+ * @license lucide-react v1.17.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const m=[["path",{d:"M12 15V3",key:"m9g1x1"}],["path",{d:"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4",key:"ih7n3h"}],["path",{d:"m7 10 5 5 5-5",key:"brsn70"}]],U=o("download",m);/**
+ * @license lucide-react v1.17.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const O=[["path",{d:"M12 3v12",key:"1x0j5s"}],["path",{d:"m17 8-5-5-5 5",key:"7q97r8"}],["path",{d:"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4",key:"ih7n3h"}]],g=o("upload",O),l="quick_tools",p="blue",a=Object.freeze({LINK:"link",MODULE:"module"}),T=a.LINK,f=[{value:"blue",label:"Blue"},{value:"cyan",label:"Cyan"},{value:"emerald",label:"Green"},{value:"amber",label:"Amber"},{value:"rose",label:"Rose"},{value:"violet",label:"Violet"},{value:"slate",label:"Slate"}],y=new Set(f.map(e=>e.value)),L=new Set(Object.values(a));function b(e){return y.has(e)?e:p}function i(e){return L.has(e)?e:T}function S(e){const r=Number(e);return Number.isFinite(r)?r:void 0}function s(e){if(!e||typeof e!="object"||Array.isArray(e))return null;const r=e.type||(e.html?a.MODULE:a.LINK),n=i(r);return{...e,type:n,title:String(e.title||"").trim(),url:n===a.LINK?String(e.url||"").trim():"",description:String(e.description||"").trim(),prompt:String(e.prompt||""),html:String(e.html||""),color:b(e.color),order:S(e.order),beta:n===a.MODULE?!0:!!e.beta}}async function A(){const e=await c(l,[]);return Array.isArray(e)?e.map(s).filter(Boolean):[]}async function E(e){const r=Array.isArray(e)?e.map(s).filter(Boolean):[];return d(l,r)}function h(e=""){return Array.from(new Set(String(e||"").match(/\{[^}]+\}/g)||[]))}function u(e){return e==null||e===""?"":String(e).replace(/<[^>]+>/g,"").trim()}function N(e,r={}){return h(e).every(n=>u(r[n])!=="")}function k(e,r={}){return(e||"").replace(/\{[^}]+\}/g,n=>{const t=u(r[n]);return t?encodeURIComponent(t):n})}function I(e){return i(e==null?void 0:e.type)===a.MODULE}export{U as D,a as T,g as U,E as a,i as b,p as c,f as d,N as h,I as i,A as l,s as n,k as r,b as s};
