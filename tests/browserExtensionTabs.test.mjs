@@ -67,6 +67,16 @@ const saltSuperOfficeTab = {
     id: 15,
     url: "https://cs.salt.ch/scripts/customer.fcgi?action=doScreenDefinition",
     title: "Other CS page"
+  }), "superOffice");
+  assert.equal(classifyCaptureTab({
+    id: 17,
+    url: "https://cs.salt.ch/",
+    title: "SuperOffice home"
+  }), "superOffice");
+  assert.equal(classifyCaptureTab({
+    id: 18,
+    url: "https://not-cs.salt.ch/scripts/ticket.fcgi",
+    title: "Another Salt tool"
   }), null);
 }
 

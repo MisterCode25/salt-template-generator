@@ -103,7 +103,7 @@ assert.ok(vtiBookmarklet.startsWith("javascript:"));
 assert.ok(superOfficeBookmarklet.startsWith("javascript:"));
 
 assert.equal(manifest.manifest_version, 3);
-assert.equal(manifest.version, "0.1.6");
+assert.equal(manifest.version, "0.1.7");
 assert.deepEqual(manifest.permissions.sort(), ["scripting", "tabs"]);
 assert.equal(manifest.host_permissions.includes("<all_urls>"), false);
 assert.ok(manifest.host_permissions.includes("https://*.salt.ch/*"));

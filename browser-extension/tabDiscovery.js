@@ -28,16 +28,7 @@ export function classifyCaptureTab(tab = {}) {
         return "vti";
     }
 
-    if (hostname.includes("superoffice")) {
-        return "superOffice";
-    }
-
-    const isSaltSuperOfficeTicket = hostname === "cs.salt.ch"
-        && url.pathname.toLowerCase() === "/scripts/ticket.fcgi"
-        && url.searchParams.get("action") === "doScreenDefinition"
-        && url.searchParams.get("idString") === "viewEmail"
-        && Boolean(url.searchParams.get("entryId"));
-    if (isSaltSuperOfficeTicket) {
+    if (hostname === "cs.salt.ch" || hostname.includes("superoffice")) {
         return "superOffice";
     }
 
