@@ -276,6 +276,47 @@ function getExplicitSuperOfficeTokenValues(payload = {}) {
     return explicitValues;
 }
 
+function normalizeSuperOfficePostText(value) {
+    return String(value ?? "")
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<\/p\s*>/gi, "\n")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/&nbsp;|&#160;/gi, " ")
+        .trim();
+}
+
+export function extractSuperOfficeContractorFromFirstPost(payload = {}) {
+    const firstPost = payload.posts?.[0] || {};
+    const firstMessage = payload.messages?.[0] || {};
+    const firstPostText = valueOf(
+        payload.firstPostText,
+        payload.firstMessageText,
+        firstPost.text,
+        firstPost.plainText,
+        firstPost.bodyText,
+        firstPost.body,
+        firstPost.message,
+        firstPost.content,
+        firstPost.html,
+        firstPost.bodyHtml,
+        firstPost.messageHtml,
+        firstPost.htmlBody,
+        firstMessage.text,
+        firstMessage.plainText,
+        firstMessage.bodyText,
+        firstMessage.body,
+        firstMessage.message,
+        firstMessage.content,
+        firstMessage.html,
+        firstMessage.bodyHtml,
+        firstMessage.messageHtml,
+        firstMessage.htmlBody
+    );
+    const match = normalizeSuperOfficePostText(firstPostText)
+        .match(/\bMSISDN\s*:\s*([0-9]+)\b/i);
+    return match?.[1] || "";
+}
+
 export function normalizeSuperOfficeAttachments(attachments = []) {
     if (!Array.isArray(attachments)) return [];
 
@@ -452,6 +493,7 @@ export function parseSuperOfficeInfoPayload(input) {
         payload.client?.contractorNumber,
         payload.client?.contractor
     );
+    const firstPostContractorNumber = extractSuperOfficeContractorFromFirstPost(payload);
     const tokenValues = {};
     let externalFields = null;
     let externalIdValid = false;
@@ -470,7 +512,9 @@ export function parseSuperOfficeInfoPayload(input) {
 
     Object.assign(tokenValues, getExplicitSuperOfficeTokenValues(payload));
 
-    const contractorNumber = externalFields?.customer || payloadContractorNumber;
+    const contractorNumber = externalFields?.customer
+        || payloadContractorNumber
+        || firstPostContractorNumber;
     if (contractorNumber && (externalIdValid || sourceTicketId || attachments.length > 0)) {
         assignContractorTokenValues(tokenValues, contractorNumber);
     }

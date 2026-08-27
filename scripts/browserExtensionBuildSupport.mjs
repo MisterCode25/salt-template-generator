@@ -36,6 +36,18 @@ export function buildSuperOfficeCaptureModule(bookmarkletSource) {
         "const showToast=()=>{};",
         "SuperOffice visual feedback"
     );
+    source = replaceRequired(
+        source,
+        "const firstPostAt=",
+        "const contractorFromFirstPost=()=>{const message=messageDataList()[0];const messageRoot=all(\".HtmlMessages2_message,.HtmlMessage,[id*='HtmlMessages2_message'],article\").filter(el=>!isNoiseControl(el))[0];const raw=message?.text||message?.plainText||message?.bodyText||message?.body||message?.message||message?.content||message?.html||message?.bodyHtml||message?.messageHtml||message?.htmlBody||messageRoot?.innerText||\"\";let readable=String(raw);try{readable=new DOMParser().parseFromString(readable,\"text/html\").body?.textContent||readable}catch{}return readable.match(/\\bMSISDN\\s*:\\s*([0-9]+)\\b/i)?.[1]||null};const firstPostAt=",
+        "SuperOffice first-post contractor extraction"
+    );
+    source = replaceRequired(
+        source,
+        "const data={ticketId,createdAt,firstPostAt:firstPostAt(),externalTicketId,attachments};",
+        "const data={ticketId,createdAt,firstPostAt:firstPostAt(),externalTicketId,contractorNumber:contractorFromFirstPost(),attachments};",
+        "SuperOffice contractor output"
+    );
     const clipboardTail = "navigator.clipboard.writeText(JSON.stringify(data,null,2)).then(()=>showToast(\"JSON copié dans le presse-papiers\")).catch(()=>showToast(\"Erreur copie clipboard\"));";
     const transformed = replaceRequired(
         source,

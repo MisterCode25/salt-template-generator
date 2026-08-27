@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {
+  extractSuperOfficeContractorFromFirstPost,
   groupSuperOfficeImageAttachmentsByDate,
   groupSuperOfficeImageAttachmentsByPost,
   groupSuperOfficeMediaAttachmentsByPost,
@@ -102,6 +103,49 @@ import { parseExternalId } from "../src/utils/externalGenerator.js";
   assert.equal(result.contractorNumber, "31447756");
   assert.equal(result.tokenValues["{contractor}"], "31447756");
   assert.equal(result.tokenValues["{contractor_number}"], "31447756");
+}
+
+{
+  const payload = {
+    ticketId: "31436062",
+    posts: [{ createdAt: "27.08.2026 08:30" }],
+    messages: [
+      { bodyHtml: "<p>Hello</p><p><strong>MSISDN:</strong> 32323232</p>" },
+      { body: "MSISDN: 99999999" }
+    ]
+  };
+  const result = parseSuperOfficeInfoPayload(payload);
+
+  assert.equal(extractSuperOfficeContractorFromFirstPost(payload), "32323232");
+  assert.equal(result.ok, true);
+  assert.equal(result.contractorNumber, "32323232");
+  assert.equal(result.tokenValues["{contractor}"], "32323232");
+  assert.equal(result.tokenValues["{contractor_number}"], "32323232");
+  assert.equal(result.tokenValues["{client_contractor_number}"], "32323232");
+}
+
+{
+  const result = parseSuperOfficeInfoPayload({
+    ticketId: "31436062",
+    messages: [
+      { body: "Premier post sans contractor" },
+      { body: "MSISDN: 99999999" }
+    ]
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.contractorNumber, "");
+  assert.equal(result.tokenValues["{contractor}"], undefined);
+}
+
+{
+  const result = parseSuperOfficeInfoPayload({
+    ticketId: "31436062",
+    externalTicketId: "VALID//26.02.2026//11112222//SO-1//Lost//Fiber Off//Other//X6//EWB//ABC//L1//OLT//1//BOK|BOF//Comment",
+    messages: [{ body: "MSISDN: 32323232" }]
+  });
+
+  assert.equal(result.contractorNumber, "11112222");
 }
 
 {

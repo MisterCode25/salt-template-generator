@@ -26,14 +26,64 @@ const appBridgeSource = readFileSync(
   "utf8"
 );
 
+async function withGlobalOverrides(overrides, callback) {
+  const previousDescriptors = new Map();
+  for (const [name, value] of Object.entries(overrides)) {
+    previousDescriptors.set(name, Object.getOwnPropertyDescriptor(globalThis, name));
+    Object.defineProperty(globalThis, name, { configurable: true, value, writable: true });
+  }
+
+  try {
+    return await callback();
+  } finally {
+    for (const [name, descriptor] of previousDescriptors) {
+      if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+      else delete globalThis[name];
+    }
+  }
+}
+
 {
   const moduleSource = buildSuperOfficeCaptureModule(superOfficeBookmarklet);
 
   assert.match(moduleSource, /export async function captureSuperOfficePage/);
   assert.match(moduleSource, /return data/);
+  assert.match(moduleSource, /MSISDN/);
+  assert.match(moduleSource, /contractorNumber/);
+  assert.match(moduleSource, /messageDataList\(\)\[0\]/);
   assert.doesNotMatch(moduleSource, /navigator\.clipboard/);
   assert.doesNotMatch(moduleSource, /position:fixed/);
   assert.doesNotMatch(moduleSource, /\beval\s*\(/);
+  const captureSuperOfficePage = Function(
+    `${moduleSource.replace(/^export /, "")}; return captureSuperOfficePage;`
+  )();
+  const captureResult = await withGlobalOverrides({
+    document: {
+      body: { innerText: "REQUEST 31436062\nExternal ticket ID:\n" },
+      querySelectorAll: () => []
+    },
+    DOMParser: class DOMParser {
+      parseFromString(html) {
+        return {
+          body: { textContent: String(html).replace(/<[^>]+>/g, " ") },
+          querySelectorAll: () => []
+        };
+      }
+    },
+    location: { origin: "https://cs.salt.ch" },
+    window: {
+      HtmlMessages2_data: {
+        ticket: {
+          messages: [
+            { bodyHtml: "<p>MSISDN: <strong>32323232</strong></p>" },
+            { body: "MSISDN: 99999999" }
+          ]
+        }
+      }
+    }
+  }, () => captureSuperOfficePage());
+
+  assert.equal(captureResult.contractorNumber, "32323232");
 }
 
 {
@@ -53,7 +103,7 @@ assert.ok(vtiBookmarklet.startsWith("javascript:"));
 assert.ok(superOfficeBookmarklet.startsWith("javascript:"));
 
 assert.equal(manifest.manifest_version, 3);
-assert.equal(manifest.version, "0.1.3");
+assert.equal(manifest.version, "0.1.4");
 assert.deepEqual(manifest.permissions.sort(), ["scripting", "tabs"]);
 assert.equal(manifest.host_permissions.includes("<all_urls>"), false);
 assert.ok(manifest.host_permissions.includes("https://*.salt.ch/*"));
