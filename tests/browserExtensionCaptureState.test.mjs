@@ -7,10 +7,19 @@ import {
 import {
     BROWSER_EXTENSION_CAPTURE_ACTION,
     createBrowserExtensionCaptureState,
+    getBrowserExtensionJourneyActiveStep,
     reduceBrowserExtensionCaptureState
 } from "../src/utils/browserExtensionCaptureState.js";
 
 const requestId = "capture-1";
+
+assert.equal(getBrowserExtensionJourneyActiveStep(null), 0);
+assert.equal(getBrowserExtensionJourneyActiveStep(BROWSER_EXTENSION_PHASE.SUPER_OFFICE_CAPTURE), 0);
+assert.equal(getBrowserExtensionJourneyActiveStep(BROWSER_EXTENSION_PHASE.VTI_SEARCH), 1);
+assert.equal(getBrowserExtensionJourneyActiveStep(BROWSER_EXTENSION_PHASE.VTI_RECORD_LOAD), 1);
+assert.equal(getBrowserExtensionJourneyActiveStep(BROWSER_EXTENSION_PHASE.VTI_CAPTURE), 1);
+assert.equal(getBrowserExtensionJourneyActiveStep(BROWSER_EXTENSION_PHASE.IMPORTING), 2);
+assert.equal(getBrowserExtensionJourneyActiveStep(BROWSER_EXTENSION_PHASE.COMPLETED), 2);
 
 {
     const initial = createBrowserExtensionCaptureState();

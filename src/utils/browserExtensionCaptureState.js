@@ -29,6 +29,20 @@ export function createBrowserExtensionCaptureState() {
     };
 }
 
+export function getBrowserExtensionJourneyActiveStep(phase) {
+    switch (phase) {
+        case BROWSER_EXTENSION_PHASE.VTI_SEARCH:
+        case BROWSER_EXTENSION_PHASE.VTI_RECORD_LOAD:
+        case BROWSER_EXTENSION_PHASE.VTI_CAPTURE:
+            return 1;
+        case BROWSER_EXTENSION_PHASE.IMPORTING:
+        case BROWSER_EXTENSION_PHASE.COMPLETED:
+            return 2;
+        default:
+            return 0;
+    }
+}
+
 function isCurrentRequest(state, event) {
     return !state.requestId || state.requestId === event.requestId;
 }
