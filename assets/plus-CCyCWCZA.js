@@ -1,4 +1,4 @@
-import{c as e}from"./appConfigService-BEAxRpG_.js";/**
+import{c as e}from"./appConfigService-3KRBihu3.js";/**
  * @license lucide-react v1.17.0 - ISC
  *
  * This source code is licensed under the ISC license.
