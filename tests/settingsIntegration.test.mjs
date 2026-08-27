@@ -3,6 +3,7 @@ import {
   APP_FEATURE_FLAGS,
   CAPTURE_FLOW,
   getPrimaryCaptureFlow,
+  shouldShowCaptureUpdateMenu,
   shouldShowLegacyCaptureButton
 } from "../src/config/appFeatureFlags.js";
 import {
@@ -14,7 +15,9 @@ import {
 
 {
   assert.equal(APP_FEATURE_FLAGS.legacyClipboardCapture, false);
+  assert.equal(APP_FEATURE_FLAGS.captureUpdateMenu, false);
   assert.equal(shouldShowLegacyCaptureButton(), false);
+  assert.equal(shouldShowCaptureUpdateMenu(), false);
   assert.equal(getPrimaryCaptureFlow(), CAPTURE_FLOW.EXTENSION);
 }
 
@@ -22,6 +25,10 @@ import {
   const legacyFlags = { legacyClipboardCapture: true };
   assert.equal(shouldShowLegacyCaptureButton(legacyFlags), true);
   assert.equal(getPrimaryCaptureFlow(legacyFlags), CAPTURE_FLOW.LEGACY_CLIPBOARD);
+}
+
+{
+  assert.equal(shouldShowCaptureUpdateMenu({ captureUpdateMenu: true }), true);
 }
 
 {

@@ -94,7 +94,10 @@ import {
     createBrowserExtensionCaptureState,
     reduceBrowserExtensionCaptureState
 } from "../utils/browserExtensionCaptureState.js";
-import { shouldShowLegacyCaptureButton } from "../config/appFeatureFlags.js";
+import {
+    shouldShowCaptureUpdateMenu,
+    shouldShowLegacyCaptureButton
+} from "../config/appFeatureFlags.js";
 import { getRouterElectricalImpact } from "../utils/routerElectricalImpact.js";
 import {
     formatDateInputValueForToken,
@@ -1307,7 +1310,7 @@ export const ClientInfoPanel = memo(function ClientInfoPanel({
                     <span>Capture data</span>
                     <small>Extension</small>
                 </button>
-                {hasAnyImportedData && (
+                {shouldShowCaptureUpdateMenu() && hasAnyImportedData && (
                     <details className="client-import-update-menu" ref={updateMenuRef}>
                         <summary className="client-import-update-btn">
                             <RefreshCw size={13} aria-hidden="true" />
