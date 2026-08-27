@@ -51,7 +51,8 @@ async function withGlobalOverrides(overrides, callback) {
   assert.match(moduleSource, /return data/);
   assert.match(moduleSource, /MSISDN/);
   assert.match(moduleSource, /contractorNumber/);
-  assert.match(moduleSource, /messageDataList\(\)\[0\]/);
+  assert.match(moduleSource, /orderedSuperOfficePostEntries/);
+  assert.doesNotMatch(moduleSource, /const message=messageDataList\(\)\[0\]/);
   assert.doesNotMatch(moduleSource, /navigator\.clipboard/);
   assert.doesNotMatch(moduleSource, /position:fixed/);
   assert.doesNotMatch(moduleSource, /\beval\s*\(/);
@@ -84,6 +85,47 @@ async function withGlobalOverrides(overrides, callback) {
     }
   }, () => captureSuperOfficePage());
 
+  assert.equal(captureResult.contractorNumber, "32323232");
+}
+
+{
+  const moduleSource = buildSuperOfficeCaptureModule(superOfficeBookmarklet);
+  const captureSuperOfficePage = Function(
+    `${moduleSource.replace(/^export /, "")}; return captureSuperOfficePage;`
+  )();
+  const captureResult = await withGlobalOverrides({
+    document: {
+      body: { innerText: "REQUEST 31436062\nExternal ticket ID:\n" },
+      querySelectorAll: () => []
+    },
+    DOMParser: class DOMParser {
+      parseFromString(html) {
+        return {
+          body: { textContent: String(html).replace(/<[^>]+>/g, " ") },
+          querySelectorAll: () => []
+        };
+      }
+    },
+    location: { origin: "https://cs.salt.ch" },
+    window: {
+      HtmlMessages2_data: {
+        ticket: {
+          messages: [
+            {
+              createdAt: "27.08.2026 10:15",
+              bodyHtml: "<p>MSISDN: <strong>99999999</strong></p>"
+            },
+            {
+              createdAt: "27.08.2026 08:30",
+              bodyHtml: "<p>MSISDN: <strong>32323232</strong></p>"
+            }
+          ]
+        }
+      }
+    }
+  }, () => captureSuperOfficePage());
+
+  assert.equal(captureResult.firstPostAt, "27.08.2026 08:30");
   assert.equal(captureResult.contractorNumber, "32323232");
 }
 
@@ -252,7 +294,7 @@ assert.ok(vtiBookmarklet.startsWith("javascript:"));
 assert.ok(superOfficeBookmarklet.startsWith("javascript:"));
 
 assert.equal(manifest.manifest_version, 3);
-assert.equal(manifest.version, "0.1.10");
+assert.equal(manifest.version, "0.1.11");
 assert.equal(CURRENT_BROWSER_EXTENSION_VERSION, manifest.version);
 assert.deepEqual(manifest.permissions.sort(), ["scripting", "tabs"]);
 assert.equal(manifest.host_permissions.includes("<all_urls>"), false);
