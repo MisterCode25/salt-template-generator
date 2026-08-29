@@ -35,12 +35,17 @@ const firstSuperOfficePostEntry=()=>orderedSuperOfficePostEntries()[0]||{message
 const superOfficeMessageValues=message=>[message?.text,message?.plainText,message?.bodyText,message?.body,message?.message,message?.content,message?.html,message?.bodyHtml,message?.messageHtml,message?.htmlBody].filter(value=>typeof value==="string"&&value.trim());
 const findSuperOfficeMsisdn=messages=>{for(const message of messages){for(const value of superOfficeMessageValues(message)){const match=readablePostText(value).match(/\bMSISDN\s*:\s*(\d{8})(?!\d)/i);if(match)return match[1]}}return null};
 const isSuperOfficeMessageDataReady=messages=>messages.length>0&&messages.every(message=>message?.bodyNotLoaded!==true&&superOfficeMessageValues(message).length>0);
-const expandFirstSuperOfficePost=()=>{const ticketBlocks=window.HtmlMessages2_data;if(!ticketBlocks||typeof window.HtmlMessages2_buildHtml!=="function")return false;for(const [blockId,ticketData]of Object.entries(ticketBlocks)){const messages=Array.isArray(ticketData?.messages)?ticketData.messages:[];if(messages.length===0)continue;try{ticketData.numExpandedMessages=1;window.HtmlMessages2_buildHtml(blockId);return true}catch{return false}}return false};
-const waitForSuperOfficeMsisdn=async()=>{let didRequestExpansion=false;for(let attempt=0;attempt<20;attempt+=1){const messages=messageDataList();const msisdn=findSuperOfficeMsisdn(messages);if(msisdn)return msisdn;if(isSuperOfficeMessageDataReady(messages))return null;if(!didRequestExpansion)didRequestExpansion=expandFirstSuperOfficePost();if(attempt<19)await sleep(100)}return null};
+const waitForSuperOfficeMsisdn=async()=>{await flipHtmlMessagesPosts();for(let attempt=0;attempt<20;attempt+=1){const messages=messageDataList();const msisdn=findSuperOfficeMsisdn(messages);if(msisdn)return msisdn;if(isSuperOfficeMessageDataReady(messages))return null;if(attempt<19)await sleep(100)}return null};
 `;
 
 export function buildSuperOfficeCaptureModule(bookmarkletSource) {
     let source = assertBookmarkletSource(bookmarkletSource, "SuperOffice");
+    source = replaceRequired(
+        source,
+        "const msg=messageDataList()[index];if(msg){if(msg.bodyNotLoaded===false||norm(msg.body))return false;return true}const raw=rawOf(img);if(/open|expanded|down/.test(raw))return false;if(/closed|collapsed|fold|right|plus|expand|leftarrow/.test(raw))return true;return true",
+        "const raw=rawOf(img);if(/open|expanded|down/.test(raw))return false;if(/closed|collapsed|fold|right|plus|expand|leftarrow/.test(raw))return true;const msg=messageDataList()[index];if(msg){if(msg.bodyNotLoaded===false||norm(msg.body))return false;return true}return true",
+        "SuperOffice closed-post detection"
+    );
     source = replaceSection(
         source,
         "const showToast=",

@@ -58,8 +58,10 @@ async function withGlobalOverrides(overrides, callback) {
   assert.match(moduleSource, /contractorNumber/);
   assert.match(moduleSource, /orderedSuperOfficePostEntries/);
   assert.match(moduleSource, /findSuperOfficeMsisdn/);
-  assert.match(moduleSource, /expandFirstSuperOfficePost/);
+  assert.match(moduleSource, /flipHtmlMessagesPosts/);
+  assert.doesNotMatch(moduleSource, /openFirstSuperOfficePost/);
   assert.doesNotMatch(moduleSource, /expandAllSuperOfficePosts/);
+  assert.doesNotMatch(moduleSource, /HtmlMessages2_buildHtml/);
   assert.match(moduleSource, /waitForSuperOfficeMsisdn/);
   assert.doesNotMatch(moduleSource, /prepareSuperOfficePosts/);
   assert.doesNotMatch(moduleSource, /await expandTicketPosts\(\);const text/);
@@ -243,16 +245,29 @@ async function withGlobalOverrides(overrides, callback) {
   )();
   let isPostExpanded = false;
   let expandedDataReadCount = 0;
-  let activeTicketData = null;
-  let requestedExpandedMessageCount = null;
-  const builtBlockIds = [];
+  let buildHtmlCallCount = 0;
   let flipClickCount = 0;
+  let secondFlipClickCount = 0;
   const flipImage = {
     className: "HtmlMessages2_flipImage",
     closest: () => null,
-    getAttribute: () => "",
+    getAttribute(name) {
+      return name === "src" ? "/graphics/Nine/leftarrow.svg" : "";
+    },
     click() {
       flipClickCount += 1;
+      isPostExpanded = true;
+      expandedDataReadCount = 0;
+    }
+  };
+  const secondFlipImage = {
+    className: "HtmlMessages2_flipImage",
+    closest: () => null,
+    getAttribute(name) {
+      return name === "src" ? "/graphics/Nine/leftarrow.svg" : "";
+    },
+    click() {
+      secondFlipClickCount += 1;
     }
   };
   const superOfficeWindow = {};
@@ -263,31 +278,29 @@ async function withGlobalOverrides(overrides, callback) {
       const bodyHtml = isBodyLoaded
         ? "<p>MSISDN: <strong>77889900</strong></p>"
         : "";
-      activeTicketData = {
-        numExpandedMessages: 0,
-        messages: [{ bodyHtml, bodyNotLoaded: !isBodyLoaded }]
-      };
       return {
-        ticket: activeTicketData,
+        ticket: {
+          numExpandedMessages: 0,
+          messages: [{ bodyHtml, bodyNotLoaded: !isBodyLoaded }]
+        },
         secondaryTicketBlock: {
           numExpandedMessages: 0,
-          messages: [{ bodyHtml: "", bodyNotLoaded: true }]
+          messages: [{ bodyHtml: "Post already loaded", bodyNotLoaded: false }]
         }
       };
     }
   });
-  superOfficeWindow.HtmlMessages2_buildHtml = (blockId) => {
-    builtBlockIds.push(blockId);
-    requestedExpandedMessageCount = activeTicketData?.numExpandedMessages;
-    isPostExpanded = true;
-    expandedDataReadCount = 0;
+  superOfficeWindow.HtmlMessages2_buildHtml = () => {
+    buildHtmlCallCount += 1;
   };
 
   const captureResult = await withGlobalOverrides({
     document: {
       body: { innerText: "REQUEST 31436062\nExternal ticket ID:\n" },
       querySelectorAll(selector) {
-        return selector === "img.HtmlMessages2_flipImage" ? [flipImage] : [];
+        return selector === "img.HtmlMessages2_flipImage"
+          ? [flipImage, secondFlipImage]
+          : [];
       }
     },
     DOMParser: class DOMParser {
@@ -307,9 +320,9 @@ async function withGlobalOverrides(overrides, callback) {
     }
   }, () => captureSuperOfficePage());
 
-  assert.deepEqual(builtBlockIds, ["ticket"]);
-  assert.equal(requestedExpandedMessageCount, 1);
-  assert.equal(flipClickCount, 0);
+  assert.equal(buildHtmlCallCount, 0);
+  assert.equal(flipClickCount, 1);
+  assert.equal(secondFlipClickCount, 1);
   assert.equal(captureResult.contractorNumber, "77889900");
 }
 
@@ -413,7 +426,7 @@ assert.ok(vtiBookmarklet.startsWith("javascript:"));
 assert.ok(superOfficeBookmarklet.startsWith("javascript:"));
 
 assert.equal(manifest.manifest_version, 3);
-assert.equal(manifest.version, "0.1.15");
+assert.equal(manifest.version, "0.1.16");
 assert.equal(CURRENT_BROWSER_EXTENSION_VERSION, manifest.version);
 assert.deepEqual(manifest.permissions.sort(), ["scripting", "tabs"]);
 assert.equal(manifest.host_permissions.includes("<all_urls>"), false);

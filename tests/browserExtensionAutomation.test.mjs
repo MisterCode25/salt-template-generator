@@ -27,7 +27,7 @@ assert.equal(isBrowserExtensionVersionAtLeast("0.1.3", "0.1.3"), true);
 assert.equal(isBrowserExtensionVersionAtLeast("0.2.0", "0.1.3"), true);
 assert.equal(isBrowserExtensionVersionAtLeast("0.1.2", "0.1.3"), false);
 assert.equal(isBrowserExtensionVersionAtLeast("", "0.1.3"), false);
-assert.equal(CURRENT_BROWSER_EXTENSION_VERSION, "0.1.15");
+assert.equal(CURRENT_BROWSER_EXTENSION_VERSION, "0.1.16");
 
 async function withGlobalOverrides(overrides, callback) {
   const previousDescriptors = new Map();

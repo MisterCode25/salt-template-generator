@@ -11,8 +11,8 @@ La capture bêta demande le numéro du ticket SuperOffice, charge ce ticket dans
 
 Si aucun contractor n’est trouvé dans SuperOffice, l’extension ne touche pas à VTI. Le popup de l’application demande obligatoirement le contractor avant de lancer la recherche et la capture VTI.
 
-La capture SuperOffice récupère le contractor depuis l’External ID lorsqu’il est valide. Sinon, elle parcourt directement tous les messages disponibles dans `HtmlMessages2_data`, puis cherche `MSISDN:` suivi d’exactement huit chiffres dans leur contenu HTML normalisé. Lorsque SuperOffice n’a pas encore chargé le corps des posts pliés, l’extension demande uniquement la reconstruction du premier post avec `HtmlMessages2_buildHtml`, sans simuler de clics, attend brièvement, puis relance la recherche.
+La capture SuperOffice récupère le contractor depuis l’External ID lorsqu’il est valide. Sinon, elle ouvre tous les posts encore pliés avec leurs contrôles natifs, attend brièvement le chargement de leurs données, puis parcourt `HtmlMessages2_data` à la recherche de `MSISDN:` suivi d’exactement huit chiffres dans le contenu HTML normalisé.
 
-La version 0.1.15 limite ce fallback natif au premier post. Si le MSISDN est déjà présent dans les données, aucun post n’est reconstruit.
+La version 0.1.16 n’appelle plus `HtmlMessages2_buildHtml` après le chargement initial de la page, car cette fonction reconstruit le bloc complet et peut dupliquer les posts. Chaque post fermé est ouvert une seule fois avec sa propre flèche.
 
 Depuis Salt BO tools, l’extension peut aussi ouvrir et préremplir le formulaire ALO sans jamais le valider, ainsi qu’ouvrir un ticket ALEX après avoir appliqué le contexte partenaire.
