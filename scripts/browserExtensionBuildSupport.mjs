@@ -40,12 +40,6 @@ const waitForSuperOfficeMsisdn=async()=>{await flipHtmlMessagesPosts();for(let a
 
 export function buildSuperOfficeCaptureModule(bookmarkletSource) {
     let source = assertBookmarkletSource(bookmarkletSource, "SuperOffice");
-    source = replaceRequired(
-        source,
-        "const msg=messageDataList()[index];if(msg){if(msg.bodyNotLoaded===false||norm(msg.body))return false;return true}const raw=rawOf(img);if(/open|expanded|down/.test(raw))return false;if(/closed|collapsed|fold|right|plus|expand|leftarrow/.test(raw))return true;return true",
-        "const raw=rawOf(img);if(/open|expanded|down/.test(raw))return false;if(/closed|collapsed|fold|right|plus|expand|leftarrow/.test(raw))return true;const msg=messageDataList()[index];if(msg){if(msg.bodyNotLoaded===false||norm(msg.body))return false;return true}return true",
-        "SuperOffice closed-post detection"
-    );
     source = replaceSection(
         source,
         "const showToast=",

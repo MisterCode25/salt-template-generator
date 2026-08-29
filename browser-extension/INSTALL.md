@@ -13,6 +13,6 @@ Si aucun contractor n’est trouvé dans SuperOffice, l’extension ne touche pa
 
 La capture SuperOffice récupère le contractor depuis l’External ID lorsqu’il est valide. Sinon, elle ouvre tous les posts encore pliés avec leurs contrôles natifs, attend brièvement le chargement de leurs données, puis parcourt `HtmlMessages2_data` à la recherche de `MSISDN:` suivi d’exactement huit chiffres dans le contenu HTML normalisé.
 
-La version 0.1.16 n’appelle plus `HtmlMessages2_buildHtml` après le chargement initial de la page, car cette fonction reconstruit le bloc complet et peut dupliquer les posts. Chaque post fermé est ouvert une seule fois avec sa propre flèche.
+La version 0.1.17 n’appelle plus `HtmlMessages2_buildHtml` après le chargement initial de la page, car cette fonction reconstruit le bloc complet et peut dupliquer les posts. Elle conserve les posts déjà ouverts et clique une seule fois sur chaque post réellement fermé, y compris lorsque toutes les flèches utilisent la même image.
 
 Depuis Salt BO tools, l’extension peut aussi ouvrir et préremplir le formulaire ALO sans jamais le valider, ainsi qu’ouvrir un ticket ALEX après avoir appliqué le contexte partenaire.

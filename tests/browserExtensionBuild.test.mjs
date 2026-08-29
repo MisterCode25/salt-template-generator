@@ -322,7 +322,7 @@ async function withGlobalOverrides(overrides, callback) {
 
   assert.equal(buildHtmlCallCount, 0);
   assert.equal(flipClickCount, 1);
-  assert.equal(secondFlipClickCount, 1);
+  assert.equal(secondFlipClickCount, 0);
   assert.equal(captureResult.contractorNumber, "77889900");
 }
 
@@ -426,7 +426,7 @@ assert.ok(vtiBookmarklet.startsWith("javascript:"));
 assert.ok(superOfficeBookmarklet.startsWith("javascript:"));
 
 assert.equal(manifest.manifest_version, 3);
-assert.equal(manifest.version, "0.1.16");
+assert.equal(manifest.version, "0.1.17");
 assert.equal(CURRENT_BROWSER_EXTENSION_VERSION, manifest.version);
 assert.deepEqual(manifest.permissions.sort(), ["scripting", "tabs"]);
 assert.equal(manifest.host_permissions.includes("<all_urls>"), false);
