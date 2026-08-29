@@ -27,15 +27,15 @@ function wrapBookmarkletExpression(functionName, source) {
     return `export async function ${functionName}() {\n    return await ${expression};\n}\n`;
 }
 
-const superOfficeFirstPostExtraction = String.raw`
+const superOfficeDataExtraction = String.raw`
 const readablePostText=value=>{let readable=String(value??"");try{readable=new DOMParser().parseFromString(readable,"text/html").body?.textContent||readable}catch{}return readable.replace(/\u00a0/g," ").trim()};
 const superOfficePostTimestamp=value=>{const raw=String(value??"").trim();if(!raw)return null;const localDate=raw.match(/^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{2,4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/);if(localDate){let year=Number(localDate[3]);if(year<100)year+=2000;const month=Number(localDate[2]);const day=Number(localDate[1]);const hour=Number(localDate[4]||0);const minute=Number(localDate[5]||0);const second=Number(localDate[6]||0);const timestamp=Date.UTC(year,month-1,day,hour,minute,second);const parsed=new Date(timestamp);if(parsed.getUTCFullYear()===year&&parsed.getUTCMonth()===month-1&&parsed.getUTCDate()===day&&parsed.getUTCHours()===hour&&parsed.getUTCMinutes()===minute&&parsed.getUTCSeconds()===second)return timestamp}const timestamp=Date.parse(raw);return Number.isFinite(timestamp)?timestamp:null};
 const orderedSuperOfficePostEntries=()=>messageDataList().map((message,index)=>{const date=msgDate(message);return{message,index,date,timestamp:superOfficePostTimestamp(date)}}).sort((left,right)=>{if(left.timestamp===null&&right.timestamp===null)return left.index-right.index;if(left.timestamp===null)return 1;if(right.timestamp===null)return-1;return left.timestamp-right.timestamp||left.index-right.index});
 const firstSuperOfficePostEntry=()=>orderedSuperOfficePostEntries()[0]||{message:null,index:0,date:null,timestamp:null};
-const firstPostSnapshot=()=>{const firstPost=firstSuperOfficePostEntry();const message=firstPost.message;const messageRoots=all(".HtmlMessages2_message,.HtmlMessage,[id*='HtmlMessages2_message'],article").filter(el=>!isNoiseControl(el));const messageId=norm(message?.id||message?.messageId||message?.messageID||message?.postId);const matchingRoot=messageId?messageRoots.find(root=>{const rootId=norm(root?.getAttribute?.("data-message-id")||root?.getAttribute?.("data-post-id")||root?.id);return rootId===messageId||rootId.includes(messageId)}):null;const messageRoot=matchingRoot||messageRoots[firstPost.index]||messageRoots[0];const messageValues=[message?.text,message?.plainText,message?.bodyText,message?.body,message?.message,message?.content,message?.html,message?.bodyHtml,message?.messageHtml,message?.htmlBody].filter(value=>typeof value==="string"&&value.trim());const frames=messageRoot?all("iframe",messageRoot):[];const frameValues=frames.map(frame=>{try{return frame.contentDocument?.body?.innerText||frame.contentDocument?.body?.textContent||frame.contentWindow?.document?.body?.innerText||frame.contentWindow?.document?.body?.textContent||""}catch{return""}}).filter(value=>String(value).trim());const rootValue=messageRoot?.innerText||messageRoot?.textContent||"";const readableMessageValues=messageValues.map(readablePostText).filter(Boolean);const readableFrameValues=frameValues.map(readablePostText).filter(Boolean);const readableRootValue=readablePostText(rootValue);const values=[...readableMessageValues,...readableFrameValues,readableRootValue].filter(Boolean);return{text:values.join("\n"),isLoaded:readableMessageValues.length>0||readableFrameValues.length>0||(frames.length===0&&Boolean(readableRootValue))}};
-const contractorFromFirstPostText=text=>readablePostText(text).match(/\bMSISDN\s*:\s*([0-9]+)\b/i)?.[1]||null;
-const prepareSuperOfficePosts=async()=>{const nativeMessageFlips=all("img.HtmlMessages2_flipImage");if(nativeMessageFlips.length){await flipHtmlMessagesPosts();return}const hasLoadedMessageContent=messageDataList().some(message=>[message?.text,message?.plainText,message?.bodyText,message?.body,message?.message,message?.content,message?.html,message?.bodyHtml,message?.messageHtml,message?.htmlBody].some(value=>typeof value==="string"&&value.trim()));if(hasLoadedMessageContent)return;await expandTicketPosts()};
-const waitForFirstPostContractor=async()=>{let previousText="";let stableReadCount=0;for(let attempt=0;attempt<24;attempt+=1){const snapshot=firstPostSnapshot();const contractorNumber=contractorFromFirstPostText(snapshot.text);if(contractorNumber)return contractorNumber;if(snapshot.isLoaded){if(snapshot.text===previousText){stableReadCount+=1}else{previousText=snapshot.text;stableReadCount=1}if(stableReadCount>=4)return null}else{previousText="";stableReadCount=0}if(attempt<23)await sleep(250)}return null};
+const superOfficeMessageValues=message=>[message?.text,message?.plainText,message?.bodyText,message?.body,message?.message,message?.content,message?.html,message?.bodyHtml,message?.messageHtml,message?.htmlBody].filter(value=>typeof value==="string"&&value.trim());
+const findSuperOfficeMsisdn=messages=>{for(const message of messages){for(const value of superOfficeMessageValues(message)){const match=readablePostText(value).match(/\bMSISDN\s*:\s*(\d{8})(?!\d)/i);if(match)return match[1]}}return null};
+const isSuperOfficeMessageDataReady=messages=>messages.length>0&&messages.every(message=>message?.bodyNotLoaded!==true&&superOfficeMessageValues(message).length>0);
+const waitForSuperOfficeMsisdn=async()=>{for(let attempt=0;attempt<20;attempt+=1){const messages=messageDataList();const msisdn=findSuperOfficeMsisdn(messages);if(msisdn)return msisdn;if(isSuperOfficeMessageDataReady(messages))return null;if(attempt<19)await sleep(100)}return null};
 `;
 
 export function buildSuperOfficeCaptureModule(bookmarkletSource) {
@@ -50,20 +50,20 @@ export function buildSuperOfficeCaptureModule(bookmarkletSource) {
     source = replaceRequired(
         source,
         "const firstPostAt=()=>messageDataList().map(msgDate).find(Boolean)||null;",
-        `${superOfficeFirstPostExtraction}const firstPostAt=()=>firstSuperOfficePostEntry().date||null;`,
-        "SuperOffice first-post contractor extraction"
+        `${superOfficeDataExtraction}const firstPostAt=()=>firstSuperOfficePostEntry().date||null;`,
+        "SuperOffice message-data extraction"
     );
     source = replaceRequired(
         source,
         "const data={ticketId,createdAt,firstPostAt:firstPostAt(),externalTicketId,attachments};",
-        "const contractorNumber=await waitForFirstPostContractor();const data={ticketId,createdAt,firstPostAt:firstPostAt(),externalTicketId,contractorNumber,attachments};",
+        "const data={ticketId,createdAt,firstPostAt:firstPostAt(),externalTicketId,contractorNumber,attachments};",
         "SuperOffice contractor output"
     );
     source = replaceRequired(
         source,
         "await expandTicketPosts();const text=document.body.innerText;",
-        "await prepareSuperOfficePosts();const text=document.body.innerText;",
-        "SuperOffice fast post preparation"
+        "const contractorNumber=await waitForSuperOfficeMsisdn();const text=document.body.innerText;",
+        "SuperOffice direct MSISDN lookup"
     );
     const clipboardTail = "navigator.clipboard.writeText(JSON.stringify(data,null,2)).then(()=>showToast(\"JSON copié dans le presse-papiers\")).catch(()=>showToast(\"Erreur copie clipboard\"));";
     const transformed = replaceRequired(

@@ -57,8 +57,10 @@ async function withGlobalOverrides(overrides, callback) {
   assert.match(moduleSource, /MSISDN/);
   assert.match(moduleSource, /contractorNumber/);
   assert.match(moduleSource, /orderedSuperOfficePostEntries/);
-  assert.match(moduleSource, /prepareSuperOfficePosts/);
-  assert.match(moduleSource, /await prepareSuperOfficePosts\(\)/);
+  assert.match(moduleSource, /findSuperOfficeMsisdn/);
+  assert.match(moduleSource, /waitForSuperOfficeMsisdn/);
+  assert.doesNotMatch(moduleSource, /prepareSuperOfficePosts/);
+  assert.doesNotMatch(moduleSource, /await expandTicketPosts\(\);const text/);
   assert.doesNotMatch(moduleSource, /const message=messageDataList\(\)\[0\]/);
   assert.doesNotMatch(moduleSource, /navigator\.clipboard/);
   assert.doesNotMatch(moduleSource, /position:fixed/);
@@ -163,11 +165,11 @@ async function withGlobalOverrides(overrides, callback) {
         ticket: {
           messages: [
             {
-              createdAt: "27.08.2026 10:15",
-              bodyHtml: "<p>MSISDN: <strong>99999999</strong></p>"
+              createdAt: "27.08.2026 08:30",
+              bodyHtml: "<p>Premier post sans MSISDN</p>"
             },
             {
-              createdAt: "27.08.2026 08:30",
+              createdAt: "27.08.2026 10:15",
               bodyHtml: "<p>MSISDN: <strong>32323232</strong></p>"
             }
           ]
@@ -280,8 +282,8 @@ async function withGlobalOverrides(overrides, callback) {
     }
   }, () => captureSuperOfficePage());
 
-  assert.equal(flipClickCount, 1);
-  assert.equal(captureResult.contractorNumber, "77889900");
+  assert.equal(flipClickCount, 0);
+  assert.equal(captureResult.contractorNumber, null);
 }
 
 {
@@ -325,7 +327,46 @@ async function withGlobalOverrides(overrides, callback) {
     window: { HtmlMessages2_data: {} }
   }, () => captureSuperOfficePage());
 
-  assert.equal(captureResult.contractorNumber, "44556677");
+  assert.equal(captureResult.contractorNumber, null);
+}
+
+{
+  const moduleSource = buildSuperOfficeCaptureModule(superOfficeBookmarklet);
+  const captureSuperOfficePage = Function(
+    `${moduleSource.replace(/^export /, "")}; return captureSuperOfficePage;`
+  )();
+  const captureResult = await withGlobalOverrides({
+    document: {
+      body: { innerText: "REQUEST 31436062\nExternal ticket ID:\n" },
+      querySelectorAll: () => []
+    },
+    DOMParser: class DOMParser {
+      parseFromString(html) {
+        return {
+          body: { textContent: String(html).replace(/<[^>]+>/g, " ") },
+          querySelectorAll: () => []
+        };
+      }
+    },
+    location: { origin: "https://cs.salt.ch" },
+    window: {
+      HtmlMessages2_data: {
+        firstBlock: {
+          messages: [
+            { body: "MSISDN: 123456789" },
+            { body: "MSISDN: 31544 600" }
+          ]
+        },
+        secondBlock: {
+          messages: [
+            { bodyHtml: "<p><strong>MSISDN:</strong> 87654321</p>" }
+          ]
+        }
+      }
+    }
+  }, () => captureSuperOfficePage());
+
+  assert.equal(captureResult.contractorNumber, "87654321");
 }
 
 {
@@ -345,7 +386,7 @@ assert.ok(vtiBookmarklet.startsWith("javascript:"));
 assert.ok(superOfficeBookmarklet.startsWith("javascript:"));
 
 assert.equal(manifest.manifest_version, 3);
-assert.equal(manifest.version, "0.1.12");
+assert.equal(manifest.version, "0.1.13");
 assert.equal(CURRENT_BROWSER_EXTENSION_VERSION, manifest.version);
 assert.deepEqual(manifest.permissions.sort(), ["scripting", "tabs"]);
 assert.equal(manifest.host_permissions.includes("<all_urls>"), false);
