@@ -12,6 +12,7 @@ import {
 } from "./shared/superOfficeTicketNavigation.js";
 import {
     buildVtiContractorDetailUrl,
+    buildVtiContractorPageUrls,
     buildVtiContractorSearchUrl,
     getCapturedVtiContractorNumber,
     getVtiContractorRecordIdFromUrl,
@@ -40,6 +41,11 @@ import {
     fetchVtiHealthcheckSource
 } from "./healthcheckCapture.js";
 import { findVtiContractorRecord } from "./vtiContractorSearch.js";
+import {
+    buildVtiCapturePayload,
+    captureVtiBackgroundPages,
+    captureVtiOfferPage
+} from "./vtiParallelCapture.js";
 
 let activeWorkflow = null;
 
@@ -105,6 +111,122 @@ async function findVtiContractorInTab(tabId, contractorNumber) {
         args: [contractorNumber]
     });
     return readExecutionResult(fallbackSearchResults, "La recherche VTI");
+}
+
+async function captureVtiOfferAndHealth(recordId, contractorNumber, pageUrls) {
+    let helperTabId = null;
+    try {
+        const helperTab = await chrome.tabs.create({ url: pageUrls.offers, active: false });
+        helperTabId = helperTab.id;
+        await waitForTabLoad(helperTabId, 30000, "d’Offer Management VTI");
+
+        const [staticResults, offerResults] = await Promise.all([
+            chrome.scripting.executeScript({
+                target: { tabId: helperTabId },
+                world: "MAIN",
+                func: captureVtiBackgroundPages,
+                args: [recordId, contractorNumber, pageUrls]
+            }),
+            chrome.scripting.executeScript({
+                target: { tabId: helperTabId },
+                world: "MAIN",
+                func: captureVtiOfferPage,
+                args: [recordId]
+            })
+        ]);
+        const staticCapture = readExecutionResult(
+            staticResults,
+            "Les pages VTI en arrière-plan"
+        );
+        if (!staticCapture.ok) {
+            throw new Error(staticCapture.error || "Les pages VTI n’ont pas pu être capturées.");
+        }
+        const offerCapture = readExecutionResult(offerResults, "Offer Management VTI");
+        if (!offerCapture.ok) {
+            throw new Error(offerCapture.error || "Offer Management VTI est inaccessible.");
+        }
+
+        let healthText = "";
+        try {
+            const healthResults = await chrome.scripting.executeScript({
+                target: { tabId: helperTabId },
+                world: "MAIN",
+                func: fetchVtiHealthcheckSource,
+                args: [offerCapture.healthUrl]
+            });
+            healthText = extractUsableVtiHealthcheckText(
+                String(healthResults?.[0]?.result || "")
+            );
+        } catch {
+            // Loading HealthCheck in the inactive tab below remains the compatibility fallback.
+        }
+
+        if (!healthText) {
+            await chrome.tabs.update(helperTabId, { url: offerCapture.healthUrl });
+            await waitForTabLoad(helperTabId, 30000, "du HealthCheck VTI");
+            const healthResults = await chrome.scripting.executeScript({
+                target: { tabId: helperTabId },
+                world: "ISOLATED",
+                func: captureVtiHealthcheckPage
+            });
+            healthText = extractUsableVtiHealthcheckText(
+                String(healthResults?.[0]?.result || "")
+            );
+        }
+
+        if (!healthText) {
+            throw new Error("Le HealthCheck VTI n’a retourné aucune donnée exploitable.");
+        }
+        return { staticCapture, offerCapture, healthText };
+    } finally {
+        if (helperTabId !== null) {
+            try {
+                await chrome.tabs.remove(helperTabId);
+            } catch {
+                // The helper tab may already have been closed by the user.
+            }
+        }
+    }
+}
+
+async function loadVtiContractorInTab(tabId, recordId) {
+    const currentVtiTab = await chrome.tabs.get(tabId);
+    const isRequestedRecordAlreadyLoaded = getVtiContractorRecordIdFromUrl(
+        currentVtiTab.url
+    ) === recordId;
+    if (!isRequestedRecordAlreadyLoaded) {
+        await chrome.tabs.update(tabId, {
+            url: buildVtiContractorDetailUrl(recordId)
+        });
+    }
+    if (!isRequestedRecordAlreadyLoaded || currentVtiTab.status !== "complete") {
+        await waitForTabLoad(tabId, 30000, "de la fiche contractor VTI");
+    }
+}
+
+async function captureVtiInParallel(tabId, recordId, contractorNumber) {
+    const pageUrls = buildVtiContractorPageUrls(recordId);
+    const [, capturedPages] = await Promise.all([
+        loadVtiContractorInTab(tabId, recordId),
+        captureVtiOfferAndHealth(recordId, contractorNumber, pageUrls)
+    ]);
+
+    return buildVtiCapturePayload({
+        staticCapture: capturedPages.staticCapture,
+        offerCapture: capturedPages.offerCapture,
+        healthText: capturedPages.healthText
+    });
+}
+
+async function captureVtiWithLegacyPage(tabId, recordId) {
+    await loadVtiContractorInTab(tabId, recordId);
+
+    const results = await chrome.scripting.executeScript({
+        target: { tabId },
+        world: "ISOLATED",
+        func: captureVtiPage
+    });
+    return readExecutionResult(results, "VTI");
 }
 
 async function runCapture(requestId, appTabId, payload) {
@@ -187,6 +309,7 @@ async function runCapture(requestId, appTabId, payload) {
             return;
         }
 
+        let vtiRecordId = "";
         if (vtiCaptureRoute.mode === "search") {
             await reportProgress(
                 appTabId,
@@ -202,41 +325,37 @@ async function runCapture(requestId, appTabId, payload) {
             if (!vtiSearchResult.ok) {
                 throw new Error(vtiSearchResult.error || "Le contractor n’a pas été trouvé dans VTI.");
             }
-
-            await reportProgress(
-                appTabId,
-                requestId,
-                BROWSER_EXTENSION_PHASE.VTI_RECORD_LOAD,
-                `Contractor trouvé. Chargement de la fiche VTI ${vtiSearchResult.recordId}…`,
-                { superOfficeStatus: "done", vtiStatus: "active" }
-            );
-            const currentVtiTab = await chrome.tabs.get(selection.vtiTab.id);
-            const isRequestedRecordAlreadyLoaded = getVtiContractorRecordIdFromUrl(
-                currentVtiTab.url
-            ) === vtiSearchResult.recordId;
-            if (!isRequestedRecordAlreadyLoaded) {
-                await chrome.tabs.update(selection.vtiTab.id, {
-                    url: buildVtiContractorDetailUrl(vtiSearchResult.recordId)
-                });
-            }
-            if (!isRequestedRecordAlreadyLoaded || currentVtiTab.status !== "complete") {
-                await waitForTabLoad(selection.vtiTab.id, 30000, "de la fiche contractor VTI");
-            }
+            vtiRecordId = String(vtiSearchResult.recordId || "");
         }
 
         await reportProgress(
             appTabId,
             requestId,
             BROWSER_EXTENSION_PHASE.VTI_CAPTURE,
-            `Fiche du contractor ${contractorNumber} chargée. Capture du client VTI…`,
-            { superOfficeStatus: "done", vtiStatus: "active" }
+            `Contractor trouvé. Capture parallèle des pages VTI…`,
+            { superOfficeStatus: "done", vtiStatus: "active", vtiCaptureMode: "parallel" }
         );
-        const vtiResults = await chrome.scripting.executeScript({
-            target: { tabId: selection.vtiTab.id },
-            world: "ISOLATED",
-            func: captureVtiPage
-        });
-        const vtiPayload = readExecutionResult(vtiResults, "VTI");
+        let vtiPayload;
+        try {
+            vtiPayload = await captureVtiInParallel(
+                selection.vtiTab.id,
+                vtiRecordId,
+                contractorNumber
+            );
+        } catch (parallelCaptureError) {
+            console.warn("Capture VTI parallèle indisponible.", parallelCaptureError);
+            await reportProgress(
+                appTabId,
+                requestId,
+                BROWSER_EXTENSION_PHASE.VTI_RECORD_LOAD,
+                "Capture parallèle indisponible. Reprise avec la méthode compatible…",
+                { superOfficeStatus: "done", vtiStatus: "active", vtiCaptureMode: "legacy" }
+            );
+            vtiPayload = await captureVtiWithLegacyPage(
+                selection.vtiTab.id,
+                vtiRecordId
+            );
+        }
         const capturedVtiContractorNumber = getCapturedVtiContractorNumber(vtiPayload);
         if (capturedVtiContractorNumber !== contractorNumber) {
             throw new Error(

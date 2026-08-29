@@ -30,7 +30,8 @@ const staticFiles = [
     "manifest.json",
     "service-worker.js",
     "tabDiscovery.js",
-    "vtiContractorSearch.js"
+    "vtiContractorSearch.js",
+    "vtiParallelCapture.js"
 ];
 
 function createCrc32Table() {

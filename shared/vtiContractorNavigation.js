@@ -76,6 +76,21 @@ export function buildVtiContractorDetailUrl(recordId) {
     return url.href;
 }
 
+export function buildVtiContractorPageUrls(recordId) {
+    const detailUrl = new URL(buildVtiContractorDetailUrl(recordId));
+    const withTabLabel = (tabLabel) => {
+        const url = new URL(detailUrl);
+        url.searchParams.set("tab_label", tabLabel);
+        return url.href;
+    };
+
+    return {
+        info: withTabLabel("LBL_CONTRACTOR_INFO"),
+        billing: withTabLabel("LBL_CONTRACTOR_BILLING"),
+        offers: withTabLabel("LBL_CONTRACTOR_OFFERS")
+    };
+}
+
 export function getVtiContractorRecordIdFromUrl(value) {
     try {
         const url = new URL(value);

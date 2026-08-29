@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   buildVtiContractorDetailUrl,
+  buildVtiContractorPageUrls,
   buildVtiContractorSearchUrl,
   getCapturedVtiContractorNumber,
   getSuperOfficeContractorNumber,
@@ -31,6 +32,18 @@ function createResultRow({ contractorNumber, recordId }) {
       ];
     }
   };
+}
+
+{
+  const urls = buildVtiContractorPageUrls("56064498");
+
+  assert.equal(new URL(urls.info).searchParams.get("tab_label"), "LBL_CONTRACTOR_INFO");
+  assert.equal(new URL(urls.billing).searchParams.get("tab_label"), "LBL_CONTRACTOR_BILLING");
+  assert.equal(new URL(urls.offers).searchParams.get("tab_label"), "LBL_CONTRACTOR_OFFERS");
+  assert.deepEqual(
+    [urls.info, urls.billing, urls.offers].map((value) => new URL(value).searchParams.get("record")),
+    ["56064498", "56064498", "56064498"]
+  );
 }
 
 async function withDocument(documentValue, callback) {
