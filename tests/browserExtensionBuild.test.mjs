@@ -58,6 +58,8 @@ async function withGlobalOverrides(overrides, callback) {
   assert.match(moduleSource, /contractorNumber/);
   assert.match(moduleSource, /orderedSuperOfficePostEntries/);
   assert.match(moduleSource, /findSuperOfficeMsisdn/);
+  assert.match(moduleSource, /expandFirstSuperOfficePost/);
+  assert.doesNotMatch(moduleSource, /expandAllSuperOfficePosts/);
   assert.match(moduleSource, /waitForSuperOfficeMsisdn/);
   assert.doesNotMatch(moduleSource, /prepareSuperOfficePosts/);
   assert.doesNotMatch(moduleSource, /await expandTicketPosts\(\);const text/);
@@ -68,6 +70,7 @@ async function withGlobalOverrides(overrides, callback) {
   const captureSuperOfficePage = Function(
     `${moduleSource.replace(/^export /, "")}; return captureSuperOfficePage;`
   )();
+  let buildHtmlCallCount = 0;
   const captureResult = await withGlobalOverrides({
     document: {
       body: { innerText: "REQUEST 31436062\nExternal ticket ID:\n" },
@@ -90,10 +93,14 @@ async function withGlobalOverrides(overrides, callback) {
             { body: "MSISDN: 99999999" }
           ]
         }
+      },
+      HtmlMessages2_buildHtml() {
+        buildHtmlCallCount += 1;
       }
     }
   }, () => captureSuperOfficePage());
 
+  assert.equal(buildHtmlCallCount, 0);
   assert.equal(captureResult.contractorNumber, "32323232");
 }
 
@@ -234,8 +241,11 @@ async function withGlobalOverrides(overrides, callback) {
   const captureSuperOfficePage = Function(
     `${moduleSource.replace(/^export /, "")}; return captureSuperOfficePage;`
   )();
-  let isPostOpen = false;
-  let openWaitCount = 0;
+  let isPostExpanded = false;
+  let expandedDataReadCount = 0;
+  let activeTicketData = null;
+  let requestedExpandedMessageCount = null;
+  const builtBlockIds = [];
   let flipClickCount = 0;
   const flipImage = {
     className: "HtmlMessages2_flipImage",
@@ -243,20 +253,35 @@ async function withGlobalOverrides(overrides, callback) {
     getAttribute: () => "",
     click() {
       flipClickCount += 1;
-      isPostOpen = !isPostOpen;
-      openWaitCount = 0;
     }
   };
   const superOfficeWindow = {};
   Object.defineProperty(superOfficeWindow, "HtmlMessages2_data", {
     configurable: true,
     get() {
-      const bodyHtml = isPostOpen && openWaitCount >= 3
+      const isBodyLoaded = isPostExpanded && expandedDataReadCount >= 3;
+      const bodyHtml = isBodyLoaded
         ? "<p>MSISDN: <strong>77889900</strong></p>"
         : "";
-      return { ticket: { messages: [{ bodyHtml }] } };
+      activeTicketData = {
+        numExpandedMessages: 0,
+        messages: [{ bodyHtml, bodyNotLoaded: !isBodyLoaded }]
+      };
+      return {
+        ticket: activeTicketData,
+        secondaryTicketBlock: {
+          numExpandedMessages: 0,
+          messages: [{ bodyHtml: "", bodyNotLoaded: true }]
+        }
+      };
     }
   });
+  superOfficeWindow.HtmlMessages2_buildHtml = (blockId) => {
+    builtBlockIds.push(blockId);
+    requestedExpandedMessageCount = activeTicketData?.numExpandedMessages;
+    isPostExpanded = true;
+    expandedDataReadCount = 0;
+  };
 
   const captureResult = await withGlobalOverrides({
     document: {
@@ -276,14 +301,16 @@ async function withGlobalOverrides(overrides, callback) {
     location: { origin: "https://cs.salt.ch" },
     window: superOfficeWindow,
     setTimeout(callback) {
-      if (isPostOpen) openWaitCount += 1;
+      if (isPostExpanded) expandedDataReadCount += 1;
       callback();
       return 1;
     }
   }, () => captureSuperOfficePage());
 
+  assert.deepEqual(builtBlockIds, ["ticket"]);
+  assert.equal(requestedExpandedMessageCount, 1);
   assert.equal(flipClickCount, 0);
-  assert.equal(captureResult.contractorNumber, null);
+  assert.equal(captureResult.contractorNumber, "77889900");
 }
 
 {
@@ -386,7 +413,7 @@ assert.ok(vtiBookmarklet.startsWith("javascript:"));
 assert.ok(superOfficeBookmarklet.startsWith("javascript:"));
 
 assert.equal(manifest.manifest_version, 3);
-assert.equal(manifest.version, "0.1.13");
+assert.equal(manifest.version, "0.1.15");
 assert.equal(CURRENT_BROWSER_EXTENSION_VERSION, manifest.version);
 assert.deepEqual(manifest.permissions.sort(), ["scripting", "tabs"]);
 assert.equal(manifest.host_permissions.includes("<all_urls>"), false);
