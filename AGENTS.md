@@ -380,6 +380,8 @@ Configuration export/import lives in `configService.js` and `Settings.jsx`.
 This is an operational app.
 
 - Prefer compact, scannable, task-focused UI.
+- Write all user-facing app, extension, and bookmarklet interface copy in English. Do not add French labels, instructions, errors, toasts, tooltips, or accessibility text. Preserve multilingual template content and external source-field aliases when compatibility requires them.
+- Keep operational status copy concise. Do not add a supporting line when the status heading already communicates the current action.
 - Avoid decorative landing-page style.
 - Keep repeated items and modals visually clear.
 - Use existing CSS conventions in `css/`.

@@ -1307,7 +1307,7 @@ export const ClientInfoPanel = memo(function ClientInfoPanel({
                     className="client-import-status-btn client-import-status-btn--extension"
                     onClick={onOpenBrowserExtensionCapture}
                     disabled={loading}
-                    title="Capturer les onglets SuperOffice et VTI avec l’extension"
+                    title="Capture SuperOffice and VTI tabs with the extension"
                 >
                     <Puzzle size={14} aria-hidden="true" />
                     <span>Capture data</span>
@@ -1317,7 +1317,7 @@ export const ClientInfoPanel = memo(function ClientInfoPanel({
                     <details className="client-import-update-menu" ref={updateMenuRef}>
                         <summary className="client-import-update-btn">
                             <RefreshCw size={13} aria-hidden="true" />
-                            Mettre à jour
+                            Update
                         </summary>
                         <div className="client-import-update-popover" role="menu">
                             <button
@@ -1328,8 +1328,8 @@ export const ClientInfoPanel = memo(function ClientInfoPanel({
                             >
                                 <RefreshCw size={14} aria-hidden="true" />
                                 <span>
-                                    <strong>Actualiser VTI</strong>
-                                    <small>Conserver le ticket SO</small>
+                                    <strong>Refresh VTI</strong>
+                                    <small>Keep the SO ticket</small>
                                 </span>
                             </button>
                             <button
@@ -1340,8 +1340,8 @@ export const ClientInfoPanel = memo(function ClientInfoPanel({
                             >
                                 <ClipboardList size={14} aria-hidden="true" />
                                 <span>
-                                    <strong>Remplacer le ticket SO</strong>
-                                    <small>Conserver les données VTI</small>
+                                    <strong>Replace the SO ticket</strong>
+                                    <small>Keep VTI data</small>
                                 </span>
                             </button>
                             {previousSuperOfficeTicketId && (
@@ -1353,7 +1353,7 @@ export const ClientInfoPanel = memo(function ClientInfoPanel({
                                 >
                                     <History size={14} aria-hidden="true" />
                                     <span>
-                                        <strong>Revenir au ticket précédent</strong>
+                                        <strong>Restore previous ticket</strong>
                                         <small>Ticket {previousSuperOfficeTicketId}</small>
                                     </span>
                                 </button>
@@ -1542,8 +1542,8 @@ export function ClientImportErrorModal({ message, onClose }) {
 }
 
 export function SuperOfficeReplacementModal({ currentTicket, nextTicket, onCancel, onConfirm }) {
-    const currentId = currentTicket?.ticketId || currentTicket?.sourceTicketId || "actuel";
-    const nextId = nextTicket?.ticketId || nextTicket?.sourceTicketId || "copié";
+    const currentId = currentTicket?.ticketId || currentTicket?.sourceTicketId || "current";
+    const nextId = nextTicket?.ticketId || nextTicket?.sourceTicketId || "copied";
     const isSameTicket = currentId === nextId;
 
     return (
@@ -1555,28 +1555,27 @@ export function SuperOfficeReplacementModal({ currentTicket, nextTicket, onCance
             <div className="popup-header">
                 <div>
                     <p className="eyebrow">SuperOffice</p>
-                    <h2>{isSameTicket ? "Actualiser le ticket SO ?" : "Remplacer le ticket SO ?"}</h2>
+                    <h2>{isSameTicket ? "Refresh the SO ticket?" : "Replace the SO ticket?"}</h2>
                 </div>
             </div>
             <div className="super-office-replacement-summary">
                 <span>
-                    <small>Ticket actuel</small>
+                    <small>Current ticket</small>
                     <strong>{currentId}</strong>
                 </span>
                 <ArrowRight size={18} aria-hidden="true" />
                 <span>
-                    <small>Nouveau ticket</small>
+                    <small>New ticket</small>
                     <strong>{nextId}</strong>
                 </span>
             </div>
             <p className="hint">
-                Les données VTI et le profil agent seront conservés. Les photos, pièces jointes et données SO
-                seront remplacées.
+                VTI data and the agent profile will be kept. Photos, attachments and SO data will be replaced.
             </p>
             <div className="popup-actions">
-                <button type="button" className="secondary-btn" onClick={onCancel}>Annuler</button>
+                <button type="button" className="secondary-btn" onClick={onCancel}>Cancel</button>
                 <button type="button" className="primary-btn" onClick={onConfirm}>
-                    {isSameTicket ? "Actualiser" : "Remplacer"}
+                    {isSameTicket ? "Refresh" : "Replace"}
                 </button>
             </div>
         </Modal>
@@ -2260,7 +2259,7 @@ export function useTemplateRuntime() {
             parseClientClipboardJSON(vtiText);
             const superOfficeResult = parseSuperOfficeInfoPayload(message.payload?.superOffice);
             if (!superOfficeResult.ok) {
-                throw new Error("L’extension n’a pas retourné de données SuperOffice valides.");
+                throw new Error("The extension did not return valid SuperOffice data.");
             }
 
             dispatchBrowserExtensionCapture({
@@ -2288,7 +2287,7 @@ export function useTemplateRuntime() {
                 type: BROWSER_EXTENSION_CAPTURE_ACTION.LOCAL_FAILURE,
                 requestId: message.requestId,
                 installed: true,
-                error: error?.message || "Les données capturées n’ont pas pu être importées."
+                error: error?.message || "The captured data could not be imported."
             });
         } finally {
             browserExtensionImportInFlight.current = false;
@@ -2326,7 +2325,7 @@ export function useTemplateRuntime() {
             dispatchBrowserExtensionCapture({
                 type: BROWSER_EXTENSION_CAPTURE_ACTION.LOCAL_FAILURE,
                 installed: false,
-                error: "Extension non détectée. Installe-la, recharge l’application puis réessaie."
+                error: "Extension not detected. Install it, reload the app, then try again."
             });
             return false;
         }
@@ -2334,7 +2333,7 @@ export function useTemplateRuntime() {
             dispatchBrowserExtensionCapture({
                 type: BROWSER_EXTENSION_CAPTURE_ACTION.LOCAL_FAILURE,
                 installed: true,
-                error: `Mets l’extension à jour vers la version ${CURRENT_BROWSER_EXTENSION_VERSION}, puis recharge-la.`
+                error: `Update the extension to version ${CURRENT_BROWSER_EXTENSION_VERSION}, then reload it.`
             });
             return false;
         }
@@ -2342,7 +2341,7 @@ export function useTemplateRuntime() {
             dispatchBrowserExtensionCapture({
                 type: BROWSER_EXTENSION_CAPTURE_ACTION.LOCAL_FAILURE,
                 installed: true,
-                error: "Une autre capture est déjà en cours dans l’extension."
+                error: "Another capture is already running in the extension."
             });
             return false;
         }
@@ -2363,7 +2362,7 @@ export function useTemplateRuntime() {
                 type: BROWSER_EXTENSION_CAPTURE_ACTION.LOCAL_FAILURE,
                 requestId,
                 installed: false,
-                error: "L’extension ne répond pas. Recharge l’application puis réessaie."
+                error: "The extension is not responding. Reload the app, then try again."
             });
             return false;
         }

@@ -31,7 +31,7 @@ export function openAlexPage(payload, requestedDelayMs) {
 
     var pageLocation = location;
     if (!/(^|\.)ftthproxy\.ch$/i.test(pageLocation.hostname)) {
-        throw new Error("L’onglet ALEX n’est pas sur ftthproxy.ch.");
+        throw new Error("The ALEX tab is not on ftthproxy.ch.");
     }
     var supportedAction = payload && (
         payload.action === "view-ticket"
@@ -39,7 +39,7 @@ export function openAlexPage(payload, requestedDelayMs) {
         || payload.action === "open-provider"
     );
     if (!payload || payload.source !== "salt-templater-alex-ticket" || !supportedAction) {
-        throw new Error("Les données ALEX sont invalides.");
+        throw new Error("The ALEX data is invalid.");
     }
 
     var alap = text(payload.alap);
@@ -48,16 +48,16 @@ export function openAlexPage(payload, requestedDelayMs) {
     var serviceDomain = Number(payload.serviceDomain);
     var businessDomain = text(payload.businessDomain);
     if (!/^\d+$/.test(alap) || alap === "0") {
-        throw new Error("L’identifiant partenaire ALEX est invalide.");
+        throw new Error("The ALEX partner identifier is invalid.");
     }
     if (payload.action === "view-ticket" && !ticket) {
-        throw new Error("Le numéro du ticket ALEX est absent.");
+        throw new Error("The ALEX ticket number is missing.");
     }
     if (payload.action === "create-ticket" && !/^[A-Z]\.\d{3}\.\d{3}\.\d{3}\.\d+$/.test(otoId)) {
-        throw new Error("L’OTO ID VTI est absent ou invalide.");
+        throw new Error("The VTI OTO ID is missing or invalid.");
     }
     if (!Number.isFinite(serviceDomain) || !businessDomain) {
-        throw new Error("Le contexte partenaire ALEX est incomplet.");
+        throw new Error("The ALEX partner context is incomplete.");
     }
 
     localStorage.setItem("focus", JSON.stringify({

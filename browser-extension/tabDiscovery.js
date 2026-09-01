@@ -6,10 +6,10 @@ export const CAPTURE_TAB_ERROR = Object.freeze({
 });
 
 export const CAPTURE_TAB_ERROR_MESSAGE = Object.freeze({
-    [CAPTURE_TAB_ERROR.VTI_MISSING]: "Aucun onglet VTI n’a été trouvé. Ouvre le bon client VTI puis relance la capture.",
-    [CAPTURE_TAB_ERROR.VTI_AMBIGUOUS]: "Plusieurs onglets VTI ont été trouvés. Garde uniquement l’onglet du client à capturer.",
-    [CAPTURE_TAB_ERROR.SUPER_OFFICE_MISSING]: "Aucun onglet SuperOffice n’a été trouvé. Ouvre le bon ticket puis relance la capture.",
-    [CAPTURE_TAB_ERROR.SUPER_OFFICE_AMBIGUOUS]: "Plusieurs onglets SuperOffice ont été trouvés. Garde uniquement l’onglet du ticket à capturer."
+    [CAPTURE_TAB_ERROR.VTI_MISSING]: "No VTI tab was found. Open the correct VTI customer, then start the capture again.",
+    [CAPTURE_TAB_ERROR.VTI_AMBIGUOUS]: "Multiple VTI tabs were found. Keep only the customer tab you want to capture.",
+    [CAPTURE_TAB_ERROR.SUPER_OFFICE_MISSING]: "No SuperOffice tab was found. Open the correct ticket, then start the capture again.",
+    [CAPTURE_TAB_ERROR.SUPER_OFFICE_AMBIGUOUS]: "Multiple SuperOffice tabs were found. Keep only the ticket tab you want to capture."
 });
 
 function parseTabUrl(rawUrl) {

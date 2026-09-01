@@ -737,7 +737,7 @@ export default function Settings({ embedded = false, onClose = null, initialSect
                             <textarea
                                 value={chatGptPromptSettings.templateInstruction || ""}
                                 onChange={updateChatGptTemplateInstruction}
-                                placeholder="Example: start with Hello {customer_name}, and end with Meilleures salutations {agent_firstName} de votre equipe Salt."
+                                placeholder="Example: start with Hello {customer_name}, and end with Kind regards, {agent_firstName} from your Salt team."
                                 rows={8}
                             />
                         </label>

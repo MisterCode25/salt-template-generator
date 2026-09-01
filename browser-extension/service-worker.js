@@ -63,7 +63,7 @@ function getExtensionVersion() {
 }
 
 function normalizeError(error) {
-    return String(error?.message || error || "Opération impossible.").trim();
+    return String(error?.message || error || "Unable to complete the operation.").trim();
 }
 
 function createVtiResultError(result, fallbackMessage) {
@@ -74,7 +74,7 @@ function createVtiResultError(result, fallbackMessage) {
 
 function isVtiSessionError(error) {
     return error?.code === "VTI_SESSION_REQUIRED"
-        || /session VTI a expiré/i.test(normalizeError(error));
+        || /VTI session has expired/i.test(normalizeError(error));
 }
 
 async function sendToApplication(tabId, message) {
@@ -96,7 +96,7 @@ async function reportProgress(appTabId, requestId, phase, message, details = {})
 function readExecutionResult(results, label) {
     const result = results?.[0]?.result;
     if (!result || typeof result !== "object" || Array.isArray(result)) {
-        throw new Error(`${label} n’a retourné aucune donnée exploitable.`);
+        throw new Error(`${label} returned no usable data.`);
     }
     return result;
 }
@@ -104,14 +104,14 @@ function readExecutionResult(results, label) {
 async function findVtiContractorInTab(tabId, contractorNumber) {
     const searchUrl = buildVtiContractorSearchUrl(contractorNumber);
     await chrome.tabs.update(tabId, { url: searchUrl });
-    await waitForTabLoad(tabId, 30000, "de la recherche contractor VTI");
+    await waitForTabLoad(tabId, 30000, "VTI contractor search");
     const searchResults = await chrome.scripting.executeScript({
         target: { tabId },
         world: "ISOLATED",
         func: findVtiContractorRecord,
         args: [contractorNumber]
     });
-    return readExecutionResult(searchResults, "La recherche VTI");
+    return readExecutionResult(searchResults, "VTI search");
 }
 
 async function captureVtiOfferAndHealth(recordId, pageUrls) {
@@ -119,7 +119,7 @@ async function captureVtiOfferAndHealth(recordId, pageUrls) {
     try {
         const helperTab = await chrome.tabs.create({ url: pageUrls.offers, active: false });
         helperTabId = helperTab.id;
-        await waitForTabLoad(helperTabId, 30000, "d’Offer Management VTI");
+        await waitForTabLoad(helperTabId, 30000, "VTI Offer Management");
 
         const offerResults = await chrome.scripting.executeScript({
             target: { tabId: helperTabId },
@@ -131,7 +131,7 @@ async function captureVtiOfferAndHealth(recordId, pageUrls) {
         if (!offerCapture.ok) {
             throw createVtiResultError(
                 offerCapture,
-                "Offer Management VTI est inaccessible."
+                "VTI Offer Management is unavailable."
             );
         }
 
@@ -152,7 +152,7 @@ async function captureVtiOfferAndHealth(recordId, pageUrls) {
 
         if (!healthText) {
             await chrome.tabs.update(helperTabId, { url: offerCapture.healthUrl });
-            await waitForTabLoad(helperTabId, 30000, "du HealthCheck VTI");
+            await waitForTabLoad(helperTabId, 30000, "VTI HealthCheck");
             const healthResults = await chrome.scripting.executeScript({
                 target: { tabId: helperTabId },
                 world: "ISOLATED",
@@ -164,7 +164,7 @@ async function captureVtiOfferAndHealth(recordId, pageUrls) {
         }
 
         if (!healthText) {
-            throw new Error("Le HealthCheck VTI n’a retourné aucune donnée exploitable.");
+            throw new Error("VTI HealthCheck returned no usable data.");
         }
         return { offerCapture, healthText };
     } finally {
@@ -189,7 +189,7 @@ async function loadVtiContractorInTab(tabId, recordId, contractorNumber) {
         });
     }
     if (!isRequestedRecordAlreadyLoaded || currentVtiTab.status !== "complete") {
-        await waitForTabLoad(tabId, 30000, "de la fiche contractor VTI");
+        await waitForTabLoad(tabId, 30000, "VTI contractor record");
     }
 
     const verificationResults = await chrome.scripting.executeScript({
@@ -200,12 +200,12 @@ async function loadVtiContractorInTab(tabId, recordId, contractorNumber) {
     });
     const verification = readExecutionResult(
         verificationResults,
-        "La validation de la fiche contractor VTI"
+        "VTI contractor record validation"
     );
     if (!verification.ok) {
         throw createVtiResultError(
             verification,
-            "La fiche contractor VTI n’a pas pu être validée."
+            "The VTI contractor record could not be validated."
         );
     }
     return verification;
@@ -220,12 +220,12 @@ async function captureVtiStaticPagesFromTab(tabId, recordId, contractorNumber, p
     });
     const staticCapture = readExecutionResult(
         staticResults,
-        "Les pages VTI en arrière-plan"
+        "The background VTI pages"
     );
     if (!staticCapture.ok) {
         throw createVtiResultError(
             staticCapture,
-            "Les pages VTI n’ont pas pu être capturées."
+            "The VTI pages could not be captured."
         );
     }
     return staticCapture;
@@ -261,14 +261,14 @@ async function runCapture(requestId, appTabId, payload) {
     try {
         const requestedTicketNumber = normalizeSuperOfficeTicketNumber(payload?.ticketNumber);
         if (!requestedTicketNumber) {
-            throw new Error("Le numéro de ticket SuperOffice est invalide.");
+            throw new Error("The SuperOffice ticket number is invalid.");
         }
 
         await reportProgress(
             appTabId,
             requestId,
             BROWSER_EXTENSION_PHASE.LOCATING_TABS,
-            "Recherche de l’onglet SuperOffice et de l’onglet VTI…"
+            "Finding the SuperOffice and VTI tabs..."
         );
 
         const tabs = await chrome.tabs.query({ windowType: "normal" });
@@ -281,7 +281,7 @@ async function runCapture(requestId, appTabId, payload) {
             appTabId,
             requestId,
             BROWSER_EXTENSION_PHASE.LOCATING_TABS,
-            `Chargement du ticket SuperOffice ${requestedTicketNumber}…`,
+            `Loading SuperOffice ticket ${requestedTicketNumber}...`,
             { superOfficeStatus: "active", vtiStatus: "waiting" }
         );
         const isRequestedTicketAlreadyLoaded = getSuperOfficeTicketNumberFromUrl(
@@ -293,14 +293,14 @@ async function runCapture(requestId, appTabId, payload) {
             });
         }
         if (!isRequestedTicketAlreadyLoaded || selection.superOfficeTab.status !== "complete") {
-            await waitForTabLoad(selection.superOfficeTab.id, 30000, "du ticket SuperOffice");
+            await waitForTabLoad(selection.superOfficeTab.id, 30000, "SuperOffice ticket");
         }
 
         await reportProgress(
             appTabId,
             requestId,
             BROWSER_EXTENSION_PHASE.SUPER_OFFICE_CAPTURE,
-            `Capture du ticket SuperOffice ${requestedTicketNumber}…`,
+            `Capturing SuperOffice ticket ${requestedTicketNumber}...`,
             { superOfficeStatus: "active", vtiStatus: "waiting" }
         );
         const superOfficeResults = await chrome.scripting.executeScript({
@@ -311,11 +311,11 @@ async function runCapture(requestId, appTabId, payload) {
         const superOfficePayload = readExecutionResult(superOfficeResults, "SuperOffice");
         const capturedTicketNumber = getCapturedSuperOfficeTicketNumber(superOfficePayload);
         if (!capturedTicketNumber) {
-            throw new Error("Le numéro du ticket chargé n’a pas pu être confirmé dans SuperOffice.");
+            throw new Error("The loaded ticket number could not be confirmed in SuperOffice.");
         }
         if (capturedTicketNumber !== requestedTicketNumber) {
             throw new Error(
-                `Le ticket SuperOffice capturé (${capturedTicketNumber}) ne correspond pas au ticket demandé (${requestedTicketNumber}).`
+                `The captured SuperOffice ticket (${capturedTicketNumber}) does not match the requested ticket (${requestedTicketNumber}).`
             );
         }
 
@@ -331,7 +331,7 @@ async function runCapture(requestId, appTabId, payload) {
                 {
                     phase: BROWSER_EXTENSION_PHASE.AWAITING_CONTRACTOR_INPUT,
                     ticketNumber: requestedTicketNumber,
-                    message: "Aucun contractor n’a été trouvé dans l’External ID ni après MSISDN dans le premier post. Saisis-le manuellement pour continuer. L’onglet VTI n’a pas été modifié."
+                    message: "No contractor was found in the External ID or after MSISDN in the first post. Enter it manually to continue. The VTI tab was not changed."
                 }
             ));
             return;
@@ -343,7 +343,7 @@ async function runCapture(requestId, appTabId, payload) {
                 appTabId,
                 requestId,
                 BROWSER_EXTENSION_PHASE.VTI_SEARCH,
-                `Recherche du contractor ${contractorNumber} dans VTI…`,
+                `Searching for contractor ${contractorNumber} in VTI...`,
                 { superOfficeStatus: "done", vtiStatus: "active" }
             );
             const vtiSearchResult = await findVtiContractorInTab(
@@ -353,7 +353,7 @@ async function runCapture(requestId, appTabId, payload) {
             if (!vtiSearchResult.ok) {
                 throw createVtiResultError(
                     vtiSearchResult,
-                    "Le contractor n’a pas été trouvé dans VTI."
+                    "The contractor was not found in VTI."
                 );
             }
             vtiRecordId = String(vtiSearchResult.recordId || "");
@@ -363,7 +363,7 @@ async function runCapture(requestId, appTabId, payload) {
             appTabId,
             requestId,
             BROWSER_EXTENSION_PHASE.VTI_CAPTURE,
-            `Chargement du contractor ${contractorNumber} dans l’onglet VTI avant les captures parallèles…`,
+            `Loading contractor ${contractorNumber} in the VTI tab before parallel capture...`,
             { superOfficeStatus: "done", vtiStatus: "active", vtiCaptureMode: "parallel" }
         );
         let vtiPayload;
@@ -377,12 +377,12 @@ async function runCapture(requestId, appTabId, payload) {
             if (isVtiSessionError(parallelCaptureError)) {
                 throw parallelCaptureError;
             }
-            console.warn("Capture VTI parallèle indisponible.", parallelCaptureError);
+            console.warn("Parallel VTI capture is unavailable.", parallelCaptureError);
             await reportProgress(
                 appTabId,
                 requestId,
                 BROWSER_EXTENSION_PHASE.VTI_RECORD_LOAD,
-                "Capture parallèle indisponible. Reprise avec la méthode compatible…",
+                "Parallel capture is unavailable. Continuing with the compatible method...",
                 { superOfficeStatus: "done", vtiStatus: "active", vtiCaptureMode: "legacy" }
             );
             vtiPayload = await captureVtiWithLegacyPage(
@@ -394,7 +394,7 @@ async function runCapture(requestId, appTabId, payload) {
         const capturedVtiContractorNumber = getCapturedVtiContractorNumber(vtiPayload);
         if (capturedVtiContractorNumber !== contractorNumber) {
             throw new Error(
-                `Le client VTI capturé (${capturedVtiContractorNumber || "inconnu"}) ne correspond pas au contractor demandé (${contractorNumber}).`
+                `The captured VTI customer (${capturedVtiContractorNumber || "unknown"}) does not match the requested contractor (${contractorNumber}).`
             );
         }
 
@@ -403,7 +403,7 @@ async function runCapture(requestId, appTabId, payload) {
             requestId,
             {
                 phase: BROWSER_EXTENSION_PHASE.COMPLETED,
-                message: "Captures SuperOffice et VTI terminées.",
+                message: "SuperOffice and VTI captures complete.",
                 payload: {
                     superOffice: superOfficePayload,
                     vti: vtiPayload
@@ -424,7 +424,7 @@ async function runCapture(requestId, appTabId, payload) {
     }
 }
 
-function waitForTabLoad(tabId, timeoutMs = 30000, label = "de l’onglet") {
+function waitForTabLoad(tabId, timeoutMs = 30000, label = "tab") {
     return new Promise((resolve, reject) => {
         let timeoutId = null;
         const finish = (callback, value) => {
@@ -440,7 +440,7 @@ function waitForTabLoad(tabId, timeoutMs = 30000, label = "de l’onglet") {
 
         chrome.tabs.onUpdated.addListener(handleUpdated);
         timeoutId = setTimeout(() => {
-            finish(reject, new Error(`Le chargement ${label} a dépassé le délai autorisé.`));
+            finish(reject, new Error(`Loading ${label} timed out.`));
         }, timeoutMs);
 
         chrome.tabs.get(tabId).then((tab) => {
@@ -463,7 +463,7 @@ function validateHealthcheckRequest(message, sender) {
 
 async function captureHealthcheck(message, sender) {
     if (!validateHealthcheckRequest(message, sender)) {
-        return { ok: false, error: "La page Healthcheck demandée n’est pas autorisée." };
+        return { ok: false, error: "The requested Healthcheck page is not allowed." };
     }
 
     let helperTabId = null;
@@ -551,7 +551,7 @@ async function inspectWorkflowTab(tab, workflow) {
     });
     const result = readExecutionResult(results, workflow === "alo" ? "ALO" : "ALEX");
     if (!["ready", "loading", "authentication-required"].includes(result.state)) {
-        throw new Error(`L’état de la page ${workflow === "alo" ? "ALO" : "ALEX"} est inconnu.`);
+        throw new Error(`The ${workflow === "alo" ? "ALO" : "ALEX"} page state is unknown.`);
     }
     return result;
 }
@@ -578,7 +578,7 @@ async function waitForAuthenticatedWorkflowPage({
         try {
             tab = await chrome.tabs.get(tabId);
         } catch {
-            throw new Error(`L’onglet ${workflow === "alo" ? "ALO" : "ALEX"} a été fermé.`);
+            throw new Error(`The ${workflow === "alo" ? "ALO" : "ALEX"} tab was closed.`);
         }
 
         const pageState = await inspectWorkflowTab(tab, workflow);
@@ -595,7 +595,7 @@ async function waitForAuthenticatedWorkflowPage({
                     appTabId,
                     requestId,
                     BROWSER_EXTENSION_PHASE.AWAITING_AUTHENTICATION,
-                    `Connecte-toi à ${label} dans l’onglet ouvert. L’action reprendra automatiquement.`,
+                    `Sign in to ${label} in the open tab. The action will resume automatically.`,
                     { action: workflow }
                 );
             }
@@ -612,7 +612,7 @@ async function waitForAuthenticatedWorkflowPage({
                 await waitForTabLoad(
                     tabId,
                     WORKFLOW_PAGE_READY_TIMEOUT_MS,
-                    workflow === "alo" ? "du formulaire ALO" : "d’ALEX"
+                    workflow === "alo" ? "the ALO form" : "ALEX"
                 );
                 pageReadyStartedAt = Date.now();
                 postLoginLandingStartedAt = null;
@@ -625,15 +625,15 @@ async function waitForAuthenticatedWorkflowPage({
         if (Date.now() - pageReadyStartedAt >= WORKFLOW_PAGE_READY_TIMEOUT_MS) {
             throw new Error(
                 workflow === "alo"
-                    ? "Le formulaire ALO ne s’est pas affiché après la connexion."
-                    : "ALEX ne s’est pas affiché après la connexion."
+                    ? "The ALO form did not appear after sign-in."
+                    : "ALEX did not appear after sign-in."
             );
         }
         await waitForWorkflowPoll();
     }
 
     throw new Error(
-        `La connexion ${workflow === "alo" ? "ALO" : "ALEX"} a dépassé le délai autorisé.`
+        `${workflow === "alo" ? "ALO" : "ALEX"} sign-in timed out.`
     );
 }
 
@@ -656,7 +656,7 @@ async function sendActionFailed(appTabId, requestId, action, error) {
 async function runAloAutofill(requestId, appTabId, payload) {
     try {
         if (!payload || payload.source !== "salt-templater-alo-autofill") {
-            throw new Error("Les données ALO reçues sont invalides.");
+            throw new Error("The received ALO data is invalid.");
         }
         const aloTab = await openOrReuseWorkflowTab("alo", ALO_TICKET_CREATION_URL);
         await waitForAuthenticatedWorkflowPage({
@@ -673,11 +673,11 @@ async function runAloAutofill(requestId, appTabId, payload) {
             args: [payload, ALO_FULFILLMENT_DETAIL_URL]
         });
         const result = readExecutionResult(executionResults, "ALO");
-        if (!result.ok) throw new Error(result.error || "Le formulaire ALO n’a pas pu être rempli.");
+        if (!result.ok) throw new Error(result.error || "The ALO form could not be filled.");
 
         const message = result.externalReferenceStatus === "unavailable"
-            ? "Ticket ALO rempli. L’External Ref est restée vide."
-            : "Ticket ALO ouvert et rempli.";
+            ? "ALO ticket filled. External Ref remains empty."
+            : "ALO ticket opened and filled.";
         await sendActionCompleted(appTabId, requestId, "alo", message, { result });
     } catch (error) {
         await sendActionFailed(appTabId, requestId, "alo", error);
@@ -691,7 +691,7 @@ async function runAlexOpen(requestId, appTabId, payload) {
         const supportedAction = payload
             && ["view-ticket", "create-ticket", "open-provider"].includes(payload.action);
         if (!payload || payload.source !== "salt-templater-alex-ticket" || !supportedAction) {
-            throw new Error("Les données ALEX reçues sont invalides.");
+            throw new Error("The received ALEX data is invalid.");
         }
         const alexTab = await openOrReuseWorkflowTab("alex", ALEX_HOME_URL);
         await waitForAuthenticatedWorkflowPage({
@@ -708,13 +708,13 @@ async function runAlexOpen(requestId, appTabId, payload) {
             args: [payload, ALEX_STORAGE_NAVIGATION_DELAY_MS]
         });
         const result = readExecutionResult(executionResults, "ALEX");
-        if (!result.ok) throw new Error(result.error || "ALEX n’a pas pu être ouvert.");
+        if (!result.ok) throw new Error(result.error || "ALEX could not be opened.");
 
         const message = payload.action === "view-ticket"
-            ? "Contexte partenaire appliqué. Ouverture du ticket ALEX…"
+            ? "Partner context applied. Opening the ALEX ticket..."
             : payload.action === "create-ticket"
-                ? "Provider sélectionné. Recherche SEP ouverte avec l’OTO VTI…"
-                : "Provider sélectionné. Ouverture d’ALEX…";
+                ? "Provider selected. Opening the SEP search with the VTI OTO..."
+                : "Provider selected. Opening ALEX...";
 
         await sendActionCompleted(
             appTabId,
@@ -733,7 +733,7 @@ async function runAlexOpen(requestId, appTabId, payload) {
 function startWorkflow(message, appTabId, sendResponse, runner, action = "") {
     if (activeWorkflow) {
         sendResponse(createExtensionEvent(BROWSER_EXTENSION_MESSAGE.FAILED, message.requestId, {
-            error: "Une opération automatique est déjà en cours."
+            error: "Another automatic operation is already running."
         }));
         return;
     }

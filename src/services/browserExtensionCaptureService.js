@@ -103,7 +103,7 @@ function startBrowserExtensionAction(type, payload) {
             actionTimeoutId = window.setTimeout(() => finish({
                 type: BROWSER_EXTENSION_MESSAGE.FAILED,
                 requestId,
-                error: "L’opération de l’extension a dépassé le délai autorisé."
+                error: "The extension operation timed out."
             }), BROWSER_EXTENSION_ACTION_TIMEOUT_MS);
         };
 

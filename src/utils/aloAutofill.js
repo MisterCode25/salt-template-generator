@@ -552,7 +552,7 @@ function aloAutofillBetaBookmarkletRunner(expectedSource, fulfillmentDetailUrl, 
     }
 
     function fail(detail) {
-        show("ALO beta — impossible de continuer", detail, 100, "error");
+        show("ALO beta — unable to continue", detail, 100, "error");
     }
 
     function fillWithExternalReference(payload, externalReference, detail) {
@@ -564,41 +564,41 @@ function aloAutofillBetaBookmarkletRunner(expectedSource, fulfillmentDetailUrl, 
         fillForm(expectedSource, payload);
     }
 
-    show("ALO beta", "Lecture des données préparées…", 8, "info");
+    show("ALO beta", "Reading prepared data…", 8, "info");
 
     var targetUrl;
     try {
         targetUrl = new URL(fulfillmentDetailUrl);
     } catch {
-        fail("L’adresse Fulfillment configurée est invalide.");
+        fail("The configured Fulfillment URL is invalid.");
         return;
     }
 
     if (location.origin !== targetUrl.origin) {
-        fail("Lance ce bookmarklet depuis le site ALO Wholesale.");
+        fail("Run this bookmarklet from the ALO Wholesale site.");
         return;
     }
 
     if (!navigator.clipboard || !navigator.clipboard.readText) {
-        fail("Le presse-papiers n’est pas accessible sur cette page.");
+        fail("Clipboard access is unavailable on this page.");
         return;
     }
 
     navigator.clipboard.readText().then(function handleClipboard(raw) {
-        if (!text(raw)) throw new Error("Le presse-papiers est vide. Prépare d’abord le ticket depuis Salt BO tools.");
+        if (!text(raw)) throw new Error("The clipboard is empty. Prepare the ticket in Salt BO tools first.");
 
         var payload;
         try {
             payload = JSON.parse(raw);
         } catch {
-            throw new Error("Le presse-papiers ne contient pas de données ALO valides.");
+            throw new Error("The clipboard does not contain valid ALO data.");
         }
 
         if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-            throw new Error("Les données ALO préparées sont invalides.");
+            throw new Error("The prepared ALO data is invalid.");
         }
         if (payload.source && payload.source !== expectedSource) {
-            throw new Error("Le presse-papiers ne contient pas les données ALO préparées par Salt BO tools.");
+            throw new Error("The clipboard does not contain ALO data prepared by Salt BO tools.");
         }
 
         var orderId = first([
@@ -612,12 +612,12 @@ function aloAutofillBetaBookmarkletRunner(expectedSource, fulfillmentDetailUrl, 
             fillWithExternalReference(
                 payload,
                 "",
-                "Order ID indisponible. External Ref laissée vide.\nRemplissage du ticket…"
+                "Order ID unavailable. External Ref left empty.\nFilling the ticket…"
             );
             return;
         }
 
-        show("ALO beta", "Order ID détecté : " + orderId + "\nChargement de la commande Fulfillment…", 38, "info");
+        show("ALO beta", "Order ID detected: " + orderId + "\nLoading the Fulfillment order…", 38, "info");
         targetUrl.searchParams.set("orderId", orderId);
 
         return fetch(targetUrl.href, {
@@ -628,7 +628,7 @@ function aloAutofillBetaBookmarkletRunner(expectedSource, fulfillmentDetailUrl, 
             if (!response.ok) return "";
             return response.text();
         }).then(function handleFulfillmentHtml(html) {
-            show("ALO beta", "Commande chargée.\nRecherche de l’External Ref…", 70, "info");
+            show("ALO beta", "Order loaded.\nSearching for the External Ref…", 70, "info");
             var fulfillmentDocument = html
                 ? new DOMParser().parseFromString(html, "text/html")
                 : null;
@@ -637,14 +637,14 @@ function aloAutofillBetaBookmarkletRunner(expectedSource, fulfillmentDetailUrl, 
                 payload,
                 externalReference,
                 externalReference
-                    ? "External Ref trouvée : " + externalReference + "\nRemplissage du ticket…"
-                    : "External Ref indisponible. Champ laissé vide.\nRemplissage du ticket…"
+                    ? "External Ref found: " + externalReference + "\nFilling the ticket…"
+                    : "External Ref unavailable. Field left empty.\nFilling the ticket…"
             );
         }).catch(function handleExternalReferenceError() {
             fillWithExternalReference(
                 payload,
                 "",
-                "External Ref indisponible. Champ laissé vide.\nRemplissage du ticket…"
+                "External Ref unavailable. Field left empty.\nFilling the ticket…"
             );
         });
     }).catch(function handleError(error) {

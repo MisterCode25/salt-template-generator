@@ -10,7 +10,7 @@ export function normalizeSuperOfficeTicketNumber(value) {
 export function buildSuperOfficeTicketUrl(ticketNumber) {
     const normalizedTicketNumber = normalizeSuperOfficeTicketNumber(ticketNumber);
     if (!normalizedTicketNumber) {
-        throw new Error("Le numéro de ticket SuperOffice est invalide.");
+        throw new Error("The SuperOffice ticket number is invalid.");
     }
 
     const url = new URL(SUPER_OFFICE_TICKET_BASE_URL);

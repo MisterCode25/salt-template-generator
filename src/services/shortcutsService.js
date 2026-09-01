@@ -31,7 +31,7 @@ export const DATA_SHORTCUTS = Object.freeze([
             "Open the ticket in SuperOffice.",
             "Click the saved bookmarklet in the bookmarks bar.",
             "Come back to Salt BO tools with the Capture data popup open.",
-            "Ticket photos, videos and PDFs will appear in the Médias SO tool when compatible attachments are present."
+            "Ticket photos, videos and PDFs will appear in the SO media tool when compatible attachments are present."
         ]
     },
     {

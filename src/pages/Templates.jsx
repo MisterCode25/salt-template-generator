@@ -1489,7 +1489,7 @@ export default function Templates() {
             formatAlexTicketPayload(payload),
             {
                 message: extensionResult
-                    ? "Données ALEX copiées : utilise le bookmarklet de secours"
+                    ? "ALEX data copied: use the fallback bookmarklet"
                     : messages.copied,
                 variant: extensionResult ? "warning" : "success"
             }
@@ -1507,8 +1507,8 @@ export default function Templates() {
         }
 
         await handoffAlexPayload(preparation.payload, {
-            success: "Recherche SEP ALEX ouverte avec l’OTO VTI",
-            copied: "Contexte partenaire et OTO ALEX copiés"
+            success: "ALEX SEP search opened with the VTI OTO",
+            copied: "ALEX partner context and OTO copied"
         });
     }, [handoffAlexPayload]);
 
@@ -1561,7 +1561,7 @@ export default function Templates() {
                 JSON.stringify(payload, null, 2),
                 {
                     message: extensionResult
-                        ? "Données ALO copiées : utilise le bookmarklet de secours"
+                        ? "ALO data copied: use the fallback bookmarklet"
                         : "ALO fill data copied",
                     variant: extensionResult ? "warning" : "success"
                 }

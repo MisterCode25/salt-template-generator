@@ -43,7 +43,7 @@ const saltSuperOfficeTab = {
   assert.equal(url.searchParams.get("idString"), "viewEmail");
   assert.equal(url.searchParams.get("entryId"), "28958607");
   assert.equal(url.searchParams.has("entryID"), false);
-  assert.throws(() => buildSuperOfficeTicketUrl("ticket inconnu"), /numéro de ticket/i);
+  assert.throws(() => buildSuperOfficeTicketUrl("unknown ticket"), /ticket number/i);
 
   assert.equal(getCapturedSuperOfficeTicketNumber({ ticketId: "28958607" }), "28958607");
   assert.equal(getCapturedSuperOfficeTicketNumber({ sourceTicketId: "#28958607" }), "28958607");

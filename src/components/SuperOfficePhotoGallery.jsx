@@ -79,7 +79,7 @@ function getDefaultViewerTransform() {
 }
 
 function getMediaTypeLabel(attachment = {}) {
-    if (attachment.type === "video") return "Vidéo";
+    if (attachment.type === "video") return "Video";
     if (attachment.type === "pdf") return "PDF";
     return "Photo";
 }
@@ -91,9 +91,9 @@ function getMediaIcon(attachment = {}) {
 }
 
 function getOpenMediaLabel(attachment = {}) {
-    if (attachment.type === "video") return "Ouvrir la vidéo";
-    if (attachment.type === "pdf") return "Ouvrir le PDF";
-    return "Ouvrir l’image";
+    if (attachment.type === "video") return "Open video";
+    if (attachment.type === "pdf") return "Open PDF";
+    return "Open image";
 }
 
 function getVideoContentType(attachment = {}) {
@@ -252,7 +252,7 @@ function buildPhotoContextBadges(profile = null) {
     return [
         {
             key: "oto",
-            label: "Prise optique",
+            label: "Optical outlet",
             value: firstValue(profile.otoId, vars.otoId, vars.healthcheckOtoId)
         },
         {
@@ -269,13 +269,13 @@ function buildPhotoContextBadges(profile = null) {
         },
         {
             key: "routerSerial",
-            label: "N° série routeur",
+            label: "Router serial number",
             value: routerSerial,
             routerElectricalImpact: getRouterElectricalImpact(routerSerial)
         },
         {
             key: "routerModel",
-            label: "Modèle routeur",
+            label: "Router model",
             value: routerModel
         }
     ].filter((badge) => badge.value);
@@ -397,7 +397,7 @@ function SuperOfficePhotoThumb({ attachment, onOpen, hasFailed, onMediaError }) 
     );
 }
 
-function SuperOfficeViewerFallback({ attachment, message = "Aperçu indisponible." }) {
+function SuperOfficeViewerFallback({ attachment, message = "Preview unavailable." }) {
     const MediaIcon = getMediaIcon(attachment);
 
     return (
@@ -424,7 +424,7 @@ function SuperOfficeImagePreview({ attachment, viewerTransform, rotation, onMedi
         return (
             <SuperOfficeViewerFallback
                 attachment={attachment}
-                message="Conversion de l’image en cours…"
+                message="Converting image…"
             />
         );
     }
@@ -434,7 +434,7 @@ function SuperOfficeImagePreview({ attachment, viewerTransform, rotation, onMedi
             {isLoading && (
                 <span className="so-photo-viewer__loading" aria-live="polite">
                     <span className="so-photo-loading__spinner" aria-hidden="true" />
-                    Chargement de l’image…
+                    Loading image…
                 </span>
             )}
             <img
@@ -719,9 +719,9 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
             <div className="popup-header so-photo-gallery-header">
                 <div>
                     <p className="eyebrow">SuperOffice</p>
-                    <h2>Médias du ticket{ticket?.ticketId ? ` ${ticket.ticketId}` : ""}</h2>
+                    <h2>Ticket media{ticket?.ticketId ? ` ${ticket.ticketId}` : ""}</h2>
                 </div>
-                <span className="so-photo-gallery-count">{mediaItems.length} média{mediaItems.length > 1 ? "s" : ""}</span>
+                <span className="so-photo-gallery-count">{mediaItems.length} media</span>
             </div>
 
             <div className="so-photo-gallery-body">
@@ -749,15 +749,15 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
                 )) : (
                     <div className="so-photo-gallery-empty">
                         <FileText size={34} strokeWidth={1.7} />
-                        <span>Aucune photo, vidéo ou PDF dans le dernier ticket importé.</span>
+                        <span>No photos, videos or PDFs in the latest imported ticket.</span>
                     </div>
                 )}
                 {hasHiddenMedia && (
                     <div className="so-photo-gallery-more">
                         <button type="button" onClick={showMoreMedia}>
-                            Charger {Math.min(VISIBLE_MEDIA_BATCH_SIZE, mediaItems.length - visibleMediaTotal)} média{mediaItems.length - visibleMediaTotal > 1 ? "s" : ""} de plus
+                            Load {Math.min(VISIBLE_MEDIA_BATCH_SIZE, mediaItems.length - visibleMediaTotal)} more
                         </button>
-                        <span>{visibleMediaTotal} / {mediaItems.length} médias affichés</span>
+                        <span>{visibleMediaTotal} / {mediaItems.length} media shown</span>
                     </div>
                 )}
             </div>
@@ -770,20 +770,20 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
                                 <div className="so-photo-viewer__origin">
                                     <strong>{activeAttachment.name}</strong>
                                     <span>
-                                        <b>{activeGroup?.postLabel || "Post non identifié"}</b>
-                                        <small>{activeGroup?.dateLabel || "Date inconnue"}</small>
+                                        <b>{activeGroup?.postLabel || "Unidentified post"}</b>
+                                        <small>{activeGroup?.dateLabel || "Unknown date"}</small>
                                         {activeGroup?.author && <small>{activeGroup.author}</small>}
                                     </span>
                                 </div>
                                 <div className="so-photo-viewer__meta-actions">
                                     {activeIsImage && (
-                                        <div className="so-photo-viewer__zoom-controls" role="group" aria-label="Zoom et rotation image">
+                                        <div className="so-photo-viewer__zoom-controls" role="group" aria-label="Image zoom and rotation">
                                             <button
                                                 type="button"
                                                 onClick={() => zoomViewerBy(-1)}
                                                 disabled={activeImageFailed || viewerTransform.scale <= VIEWER_MIN_ZOOM}
-                                                title="Zoom arrière"
-                                                aria-label="Zoom arrière"
+                                                title="Zoom out"
+                                                aria-label="Zoom out"
                                             >
                                                 <ZoomOut size={15} aria-hidden="true" />
                                             </button>
@@ -791,8 +791,8 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
                                                 type="button"
                                                 onClick={resetViewerZoom}
                                                 disabled={activeImageFailed || viewerTransform.scale <= VIEWER_MIN_ZOOM}
-                                                title="Réinitialiser le zoom"
-                                                aria-label="Réinitialiser le zoom"
+                                                title="Reset zoom"
+                                                aria-label="Reset zoom"
                                             >
                                                 <RotateCcw size={14} aria-hidden="true" />
                                                 <span>{viewerZoomPercent}%</span>
@@ -801,8 +801,8 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
                                                 type="button"
                                                 onClick={() => zoomViewerBy(1)}
                                                 disabled={activeImageFailed || viewerTransform.scale >= VIEWER_MAX_ZOOM}
-                                                title="Zoom avant"
-                                                aria-label="Zoom avant"
+                                                title="Zoom in"
+                                                aria-label="Zoom in"
                                             >
                                                 <ZoomIn size={15} aria-hidden="true" />
                                             </button>
@@ -810,8 +810,8 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
                                                 type="button"
                                                 onClick={rotateViewerImage}
                                                 disabled={activeImageFailed}
-                                                title="Tourner l’image de 90°"
-                                                aria-label="Tourner l’image de 90 degrés"
+                                                title="Rotate image 90°"
+                                                aria-label="Rotate image 90 degrees"
                                             >
                                                 <RotateCw size={15} aria-hidden="true" />
                                             </button>
@@ -821,11 +821,11 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
                                         <button
                                             type="button"
                                             onClick={() => setAnnotatorOpen(true)}
-                                            title="Annoter"
-                                            aria-label="Annoter l'image"
+                                            title="Annotate"
+                                            aria-label="Annotate image"
                                         >
                                             <Edit3 size={15} aria-hidden="true" />
-                                            <span>Annoter</span>
+                                            <span>Annotate</span>
                                         </button>
                                     )}
                                     <a
@@ -841,7 +841,7 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
                                 </div>
                             </div>
                             {contextBadges.length > 0 && (
-                                <div className="so-photo-viewer__context-badges" aria-label="Contexte technique client">
+                                <div className="so-photo-viewer__context-badges" aria-label="Client technical context">
                                     {contextBadges.map((badge) => (
                                         <span key={badge.key} className="so-photo-viewer__context-badge" title={`${badge.label}: ${badge.value}`}>
                                             <small>{badge.label}</small>
@@ -866,8 +866,8 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
                                 className="so-photo-viewer__nav so-photo-viewer__nav--prev"
                                 onClick={goToPrevious}
                                 disabled={!canGoToPrevious}
-                                aria-label="Média précédent"
-                                title={canGoToPrevious ? "Média précédent" : "Premier média"}
+                                aria-label="Previous media"
+                                title={canGoToPrevious ? "Previous media" : "First media"}
                             >
                                 <ChevronLeft size={26} aria-hidden="true" />
                             </button>
@@ -900,7 +900,7 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
                                         onError={() => handleMediaError(activeAttachment)}
                                     >
                                         <source src={activeAttachment.url} type={getVideoContentType(activeAttachment)} />
-                                        Votre navigateur ne peut pas lire cette vidéo.
+                                        Your browser cannot play this video.
                                     </video>
                                 ) : activeAttachment.type === "pdf" ? (
                                     <object
@@ -911,7 +911,7 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
                                     >
                                         <SuperOfficeViewerFallback
                                             attachment={activeAttachment}
-                                            message="Prévisualisation PDF indisponible."
+                                            message="PDF preview unavailable."
                                         />
                                     </object>
                                 ) : (
@@ -923,8 +923,8 @@ export default function SuperOfficePhotoGallery({ ticket, profile = null, onClos
                                 className="so-photo-viewer__nav so-photo-viewer__nav--next"
                                 onClick={goToNext}
                                 disabled={!canGoToNext}
-                                aria-label="Média suivant"
-                                title={canGoToNext ? "Média suivant" : "Dernier média"}
+                                aria-label="Next media"
+                                title={canGoToNext ? "Next media" : "Last media"}
                             >
                                 <ChevronRight size={26} aria-hidden="true" />
                             </button>

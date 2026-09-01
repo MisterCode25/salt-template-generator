@@ -313,7 +313,7 @@ function CommonToolFields({ draft, onPatch }) {
                     type="text"
                     value={draft.title || ""}
                     onChange={(event) => onPatch({ title: event.target.value })}
-                    placeholder="Ex: Axiros search"
+                    placeholder="Example: Axiros search"
                 />
             </label>
             <label className="tools-field-line">
@@ -721,7 +721,7 @@ function ModuleToolStep({ step, draft, onPatch, tokens, runtimePreviewContext })
                         <textarea
                             value={draft.prompt || ""}
                             onChange={(event) => onPatch({ prompt: event.target.value })}
-                            placeholder="Ex: Build a small refund calculator that copies the final customer message."
+                            placeholder="Example: Build a small refund calculator that copies the final customer message."
                             rows={7}
                         />
                     </label>

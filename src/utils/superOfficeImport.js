@@ -348,7 +348,7 @@ function groupAttachmentsByDate(attachments = []) {
         if (!groups.has(meta.dateKey)) {
             groups.set(meta.dateKey, {
                 ...meta,
-                postLabel: "Post non identifié",
+                postLabel: "Unidentified post",
                 dateLabel: meta.label,
                 author: valueOf(attachment.messageAuthor),
                 attachments: []
@@ -404,7 +404,7 @@ export function groupSuperOfficeImageAttachmentsByPost(attachments = []) {
                 dateKey: groupKey,
                 label: postKey ? buildPostGroupLabel(attachment, fallbackIndex) : dateMeta.label,
                 metaLabel: postKey ? buildPostGroupMetaLabel(attachment) : "",
-                postLabel: postKey ? buildPostGroupLabel(attachment, fallbackIndex) : "Post non identifié",
+                postLabel: postKey ? buildPostGroupLabel(attachment, fallbackIndex) : "Unidentified post",
                 dateLabel: dateMeta.label,
                 author: valueOf(attachment.messageAuthor),
                 sortValue: normalizeOptionalInteger(attachment.messageIndex) ?? index,
@@ -435,7 +435,7 @@ export function groupSuperOfficeMediaAttachmentsByPost(attachments = []) {
                 dateKey: groupKey,
                 label: postKey ? buildPostGroupLabel(attachment, fallbackIndex) : dateMeta.label,
                 metaLabel: postKey ? buildPostGroupMetaLabel(attachment) : "",
-                postLabel: postKey ? buildPostGroupLabel(attachment, fallbackIndex) : "Post non identifié",
+                postLabel: postKey ? buildPostGroupLabel(attachment, fallbackIndex) : "Unidentified post",
                 dateLabel: dateMeta.label,
                 author: valueOf(attachment.messageAuthor),
                 sortValue: normalizeOptionalInteger(attachment.messageIndex) ?? index,

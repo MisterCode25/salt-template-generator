@@ -133,13 +133,13 @@ export async function autofillAloTicketPage(payload, fulfillmentDetailUrl) {
     }
 
     if (!/(^|\.)wholesale\.swisscom\.com$/i.test(location.hostname)) {
-        throw new Error("L’onglet ALO n’est pas sur le site Swisscom Wholesale.");
+        throw new Error("The ALO tab is not on the Swisscom Wholesale site.");
     }
     if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-        throw new Error("Les données ALO sont invalides.");
+        throw new Error("The ALO data is invalid.");
     }
     if (payload.source && payload.source !== "salt-templater-alo-autofill") {
-        throw new Error("Les données ne proviennent pas de Salt BO tools.");
+        throw new Error("The data does not come from Salt BO tools.");
     }
 
     var fields = payload.fields || {};
@@ -195,7 +195,7 @@ export async function autofillAloTicketPage(payload, fulfillmentDetailUrl) {
     apply("ticket.problemCode3", first([fields.problemCode3, "900"]));
 
     if (!filledCount) {
-        throw new Error("Aucun champ du formulaire ALO n’a été trouvé.");
+        throw new Error("No ALO form field was found.");
     }
 
     return {

@@ -298,8 +298,8 @@ assert.equal(
   assert.match(bookmarklet, /new DOMParser\(\)/);
   assert.match(bookmarklet, /payload\.alo && payload\.alo\.orderId/);
   assert.match(bookmarklet, /ticket\.extRef/);
-  assert.match(bookmarklet, /External Ref indisponible\. Champ laissé vide/);
-  assert.doesNotMatch(bookmarklet, /External Ref introuvable\. Vérifie/);
+  assert.match(bookmarklet, /External Ref unavailable\. Field left empty/);
+  assert.doesNotMatch(bookmarklet, /External Ref not found\. Check/);
   assert.match(bookmarklet, new RegExp(ALO_FULFILLMENT_DETAIL_URL.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   assert.doesNotMatch(bookmarklet, /\.submit\(/);
 }

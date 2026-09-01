@@ -11,7 +11,7 @@ export async function findVtiContractorRecord(contractorNumber) {
             return {
                 ok: false,
                 code: "VTI_SESSION_REQUIRED",
-                error: "La session VTI a expiré. Reconnecte-toi dans l’onglet VTI puis réessaie."
+                error: "The VTI session has expired. Sign in again in the VTI tab, then retry."
             };
         }
 
@@ -25,14 +25,14 @@ export async function findVtiContractorRecord(contractorNumber) {
             return {
                 ok: false,
                 code: "VTI_CONTRACTOR_NOT_FOUND",
-                error: `Aucun résultat VTI exact pour le contractor ${requestedContractorNumber}.`
+                error: `No exact VTI result was found for contractor ${requestedContractorNumber}.`
             };
         }
         if (matchingRows.length > 1) {
             return {
                 ok: false,
                 code: "VTI_CONTRACTOR_AMBIGUOUS",
-                error: `Plusieurs résultats VTI correspondent au contractor ${requestedContractorNumber}.`
+                error: `Multiple VTI results match contractor ${requestedContractorNumber}.`
             };
         }
 
@@ -46,7 +46,7 @@ export async function findVtiContractorRecord(contractorNumber) {
             return {
                 ok: false,
                 code: "VTI_RECORD_ID_MISSING",
-                error: `Le résultat VTI du contractor ${requestedContractorNumber} ne contient aucun recordId.`
+                error: `The VTI result for contractor ${requestedContractorNumber} has no recordId.`
             };
         }
 
@@ -61,7 +61,7 @@ export async function findVtiContractorRecord(contractorNumber) {
         return {
             ok: false,
             code: "VTI_CONTRACTOR_INVALID",
-            error: "Le numéro de contractor VTI est invalide."
+            error: "The VTI contractor number is invalid."
         };
     }
 
@@ -80,7 +80,7 @@ export function verifyLoadedVtiContractorPage(expectedRecordId, expectedContract
         return {
             ok: false,
             code: "VTI_SESSION_REQUIRED",
-            error: "La session VTI a expiré. Reconnecte-toi dans l’onglet VTI puis réessaie."
+            error: "The VTI session has expired. Sign in again in the VTI tab, then retry."
         };
     }
 
@@ -100,7 +100,7 @@ export function verifyLoadedVtiContractorPage(expectedRecordId, expectedContract
         return {
             ok: false,
             code: "VTI_RECORD_MISMATCH",
-            error: "La fiche VTI chargée ne correspond pas au contractor demandé."
+            error: "The loaded VTI record does not match the requested contractor."
         };
     }
 

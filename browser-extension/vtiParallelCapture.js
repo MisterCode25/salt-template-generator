@@ -134,21 +134,21 @@ export async function captureVtiBackgroundPages(recordId, expectedContractorNumb
     const fetchDocument = async (rawUrl, label) => {
         const requestedUrl = new URL(rawUrl, location.href);
         if (requestedUrl.origin !== location.origin) {
-            throw new Error(`${label} doit rester sur le domaine VTI courant.`);
+            throw new Error(`${label} must stay on the current VTI domain.`);
         }
         const response = await fetch(requestedUrl.href, {
             credentials: "include",
             cache: "no-store",
             redirect: "follow"
         });
-        if (!response.ok) throw new Error(`${label} a retourné une réponse invalide.`);
+        if (!response.ok) throw new Error(`${label} returned an invalid response.`);
         if (response.url && new URL(response.url, requestedUrl.href).origin !== location.origin) {
-            throw new Error(`${label} a été redirigé hors de VTI.`);
+            throw new Error(`${label} was redirected outside VTI.`);
         }
         const source = await response.text();
         const sourceDocument = new DOMParser().parseFromString(source, "text/html");
         if (hasLoginForm(sourceDocument)) {
-            const sessionError = new Error("La session VTI a expiré. Reconnecte-toi dans l’onglet VTI puis réessaie.");
+            const sessionError = new Error("The VTI session has expired. Sign in again in the VTI tab, then retry.");
             sessionError.code = "VTI_SESSION_REQUIRED";
             throw sessionError;
         }
@@ -171,7 +171,7 @@ export async function captureVtiBackgroundPages(recordId, expectedContractorNumb
         const contactPromise = infoPromise.then(async ({ source, sourceDocument }) => {
             const contactRecordId = getContactRecordId(sourceDocument, source);
             if (!/^\d+$/.test(contactRecordId)) {
-                throw new Error("Le contactRecordId VTI est introuvable.");
+                throw new Error("The VTI contactRecordId was not found.");
             }
             const contactUrl = new URL("index.php", location.origin);
             contactUrl.searchParams.set("module", "Contacts");
@@ -182,7 +182,7 @@ export async function captureVtiBackgroundPages(recordId, expectedContractorNumb
             contactUrl.searchParams.set("tab_label", "Contact Details");
             const contactResult = await fetchDocument(contactUrl.href, "Contact Details");
             if (readRecordId(contactResult.sourceDocument) !== contactRecordId) {
-                throw new Error("La page Contact Details ne correspond pas au contact demandé.");
+                throw new Error("The Contact Details page does not match the requested contact.");
             }
             return {
                 contactRecordId,
@@ -195,15 +195,15 @@ export async function captureVtiBackgroundPages(recordId, expectedContractorNumb
             contactPromise
         ]);
         if (readRecordId(infoResult.sourceDocument) !== String(recordId)) {
-            throw new Error("La page Billing Account Information ne correspond pas au contractor demandé.");
+            throw new Error("The Billing Account Information page does not match the requested contractor.");
         }
         if (readRecordId(billingResult.sourceDocument) !== String(recordId)) {
-            throw new Error("La page Billing Information ne correspond pas au contractor demandé.");
+            throw new Error("The Billing Information page does not match the requested contractor.");
         }
         const billingAccountText = documentText(infoResult.sourceDocument);
         const contractorNumber = contractorNumberFromText(billingAccountText);
         if (contractorNumber !== String(expectedContractorNumber)) {
-            throw new Error("Le contractor chargé en arrière-plan ne correspond pas au contractor demandé.");
+            throw new Error("The contractor loaded in the background does not match the requested contractor.");
         }
         const contactDocument = contactResult.sourceDocument;
 
@@ -245,7 +245,7 @@ export async function captureVtiBackgroundPages(recordId, expectedContractorNumb
         return {
             ok: false,
             code: String(error?.code || ""),
-            error: String(error?.message || error || "Capture VTI en arrière-plan impossible.")
+            error: String(error?.message || error || "Unable to capture VTI data in the background.")
         };
     }
 }
@@ -276,11 +276,11 @@ export async function captureVtiOfferPage(expectedRecordId, timeoutMs = 45000) {
             return {
                 ok: false,
                 code: "VTI_SESSION_REQUIRED",
-                error: "La session VTI a expiré. Reconnecte-toi dans l’onglet VTI puis réessaie."
+                error: "The VTI session has expired. Sign in again in the VTI tab, then retry."
             };
         }
         if (readRecordId() !== String(expectedRecordId)) {
-            throw new Error("Offer Management ne correspond pas au contractor demandé.");
+            throw new Error("Offer Management does not match the requested contractor.");
         }
         const startedAt = Date.now();
         while (Date.now() - startedAt < timeoutMs) {
@@ -295,7 +295,7 @@ export async function captureVtiOfferPage(expectedRecordId, timeoutMs = 45000) {
                 if (healthUrl.origin !== location.origin
                     || healthUrl.searchParams.get("record") !== String(expectedRecordId)
                     || !/^\d+$/.test(serviceId)) {
-                    throw new Error("Le lien HealthCheck VTI est invalide.");
+                    throw new Error("The VTI HealthCheck link is invalid.");
                 }
                 return {
                     ok: true,
@@ -306,7 +306,7 @@ export async function captureVtiOfferPage(expectedRecordId, timeoutMs = 45000) {
             }
             await sleep(200);
         }
-        return { ok: false, error: "HealthCheck introuvable après le chargement des offres." };
+        return { ok: false, error: "HealthCheck was not found after loading the offers." };
     } catch (error) {
         return {
             ok: false,

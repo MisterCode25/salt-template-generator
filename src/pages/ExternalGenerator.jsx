@@ -1067,7 +1067,7 @@ export default function ExternalGenerator({
                                 ref={externalIdFieldRef}
                                 className="external-id-field"
                                 value={externalIdDisplayValue}
-                                placeholder="HCAMP External ID (14 segments, or legacy 15 segments, séparés par //)"
+                                placeholder="HCAMP External ID (14 segments, or legacy 15 segments, separated by //)"
                                 onFocus={() => setExternalIdEditing(true)}
                                 onBlur={() => {
                                     setExternalIdEditing(false);

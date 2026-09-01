@@ -42,13 +42,13 @@ assert.equal(getBrowserExtensionJourneyActiveStep(BROWSER_EXTENSION_PHASE.FAILED
         requestId,
         {
             phase: BROWSER_EXTENSION_PHASE.LOCATING_TABS,
-            message: "Recherche des onglets"
+            message: "Finding tabs"
         }
     ));
 
     assert.equal(locating.isRunning, true);
     assert.equal(locating.phase, BROWSER_EXTENSION_PHASE.LOCATING_TABS);
-    assert.equal(locating.message, "Recherche des onglets");
+    assert.equal(locating.message, "Finding tabs");
 }
 
 {
@@ -61,7 +61,7 @@ assert.equal(getBrowserExtensionJourneyActiveStep(BROWSER_EXTENSION_PHASE.FAILED
         requestId,
         {
             ticketNumber: "28958607",
-            message: "Contractor introuvable"
+            message: "Contractor not found"
         }
     ));
 

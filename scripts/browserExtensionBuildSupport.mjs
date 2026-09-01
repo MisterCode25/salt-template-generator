@@ -72,7 +72,7 @@ export function buildSuperOfficeCaptureModule(bookmarkletSource) {
         "externalTicketId=norm(m?.[1])||null;}const contractorNumber=getExternalIdContractorNumber(externalTicketId)||await waitForSuperOfficeMsisdn();const allowed=",
         "SuperOffice contractor priority"
     );
-    const clipboardTail = "navigator.clipboard.writeText(JSON.stringify(data,null,2)).then(()=>showToast(\"JSON copié dans le presse-papiers\")).catch(()=>showToast(\"Erreur copie clipboard\"));";
+    const clipboardTail = "navigator.clipboard.writeText(JSON.stringify(data,null,2)).then(()=>showToast(\"JSON copied to the clipboard\")).catch(()=>showToast(\"Clipboard copy failed\"));";
     const transformed = replaceRequired(
         source,
         clipboardTail,
@@ -104,7 +104,7 @@ export function buildVtiCaptureModule(bookmarkletSource) {
         source,
         "function fail",
         "function isBilling",
-        "function fail(msg){hide();toast(\"Erreur : \"+msg);throw new Error(msg)}",
+        "function fail(msg){hide();toast(\"Error: \"+msg);throw new Error(msg)}",
         "VTI failure handler"
     );
     source = replaceSection(
@@ -118,12 +118,12 @@ export function buildVtiCaptureModule(bookmarkletSource) {
         source,
         "async function readHealthFast",
         "async function backToBilling",
-        "async function readHealthFast(url){show(\"Analyse Healthcheck\",\"Chargement en arrière-plan…\",60);const response=await chrome.runtime.sendMessage({type:\"salt.capture.healthcheck.v1\",url});if(!response?.ok)throw new Error(response?.error||\"Healthcheck inaccessible.\");return response.text||\"\"}",
+        "async function readHealthFast(url){show(\"Analyzing Healthcheck\",\"Loading in the background…\",60);const response=await chrome.runtime.sendMessage({type:\"salt.capture.healthcheck.v1\",url});if(!response?.ok)throw new Error(response?.error||\"Healthcheck unavailable.\");return response.text||\"\"}",
         "VTI Healthcheck reader"
     );
 
-    const outputTail = "const json=JSON.stringify(parseJson(billingText+\"\\n\\n\"+healthText,contactInfo,offerInfo),null,2);show(\"Finalisation\",\"Copie du JSON dans le presse-papiers…\",88);const ok=await copyTextStrong(json);await backToBilling();hide();toast(ok?\"JSON copié dans le presse-papiers.\":\"Clipboard bloqué : copie manuelle requise.\");if(!ok)prompt(\"Copie le JSON ici :\",json)}catch(e){fail(e.message);console.error(e)}})();";
-    const extensionTail = "const payload=parseJson(billingText+\"\\n\\n\"+healthText,contactInfo,offerInfo);show(\"Finalisation\",\"Transmission des données à l’application…\",88);await backToBilling();hide();toast(\"Données VTI capturées\");return payload}catch(e){hide();toast(\"Erreur : \"+(e?.message||e));console.error(e);throw e}})();";
+    const outputTail = "const json=JSON.stringify(parseJson(billingText+\"\\n\\n\"+healthText,contactInfo,offerInfo),null,2);show(\"Finalizing\",\"Copying JSON to the clipboard…\",88);const ok=await copyTextStrong(json);await backToBilling();hide();toast(ok?\"JSON copied to the clipboard.\":\"Clipboard blocked: manual copy required.\");if(!ok)prompt(\"Copy the JSON here:\",json)}catch(e){fail(e.message);console.error(e)}})();";
+    const extensionTail = "const payload=parseJson(billingText+\"\\n\\n\"+healthText,contactInfo,offerInfo);show(\"Finalizing\",\"Sending data to the app…\",88);await backToBilling();hide();toast(\"VTI data captured\");return payload}catch(e){hide();toast(\"Error: \"+(e?.message||e));console.error(e);throw e}})();";
     source = replaceRequired(source, outputTail, extensionTail, "VTI clipboard output tail");
 
     return wrapBookmarkletExpression("captureVtiPage", source);

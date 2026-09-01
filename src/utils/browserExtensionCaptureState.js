@@ -24,7 +24,7 @@ export function createBrowserExtensionCaptureState() {
         phase: null,
         superOfficeStatus: "waiting",
         vtiStatus: "waiting",
-        message: "Saisis le numéro du ticket SuperOffice à charger.",
+        message: "Enter the SuperOffice ticket number to load.",
         error: ""
     };
 }
@@ -62,7 +62,7 @@ export function reduceBrowserExtensionCaptureState(state, event) {
             return {
                 ...createBrowserExtensionCaptureState(),
                 isChecking: true,
-                message: "Vérification de l’extension…"
+                message: "Checking the extension..."
             };
         case BROWSER_EXTENSION_CAPTURE_ACTION.STARTING:
             return {
@@ -72,7 +72,7 @@ export function reduceBrowserExtensionCaptureState(state, event) {
                 ticketNumber: event.ticketNumber || "",
                 isRunning: true,
                 phase: BROWSER_EXTENSION_PHASE.LOCATING_TABS,
-                message: "Connexion à l’extension…"
+                message: "Connecting to the extension..."
             };
         case BROWSER_EXTENSION_MESSAGE.CONTRACTOR_INPUT_REQUIRED:
             if (!isCurrentRequest(state, event)) return state;
@@ -85,7 +85,7 @@ export function reduceBrowserExtensionCaptureState(state, event) {
                 phase: BROWSER_EXTENSION_PHASE.AWAITING_CONTRACTOR_INPUT,
                 superOfficeStatus: "done",
                 vtiStatus: "waiting",
-                message: event.message || "Aucun contractor n’a été trouvé. Saisis-le pour continuer ; l’onglet VTI n’a pas été modifié.",
+                message: event.message || "No contractor was found. Enter it to continue. The VTI tab was not changed.",
                 error: ""
             };
         case BROWSER_EXTENSION_CAPTURE_ACTION.IMPORTING:
@@ -97,7 +97,7 @@ export function reduceBrowserExtensionCaptureState(state, event) {
                 phase: BROWSER_EXTENSION_PHASE.IMPORTING,
                 superOfficeStatus: "done",
                 vtiStatus: "done",
-                message: "Import des données dans l’application…",
+                message: "Importing data into the app...",
                 error: ""
             };
         case BROWSER_EXTENSION_CAPTURE_ACTION.SUCCEEDED:
@@ -109,7 +109,7 @@ export function reduceBrowserExtensionCaptureState(state, event) {
                 phase: BROWSER_EXTENSION_PHASE.COMPLETED,
                 superOfficeStatus: "done",
                 vtiStatus: "done",
-                message: event.message || "Données SuperOffice et VTI importées.",
+                message: event.message || "SuperOffice and VTI data imported.",
                 error: ""
             };
         case BROWSER_EXTENSION_CAPTURE_ACTION.LOCAL_FAILURE:
@@ -121,8 +121,8 @@ export function reduceBrowserExtensionCaptureState(state, event) {
                 isRunning: false,
                 requiresContractorInput: false,
                 phase: BROWSER_EXTENSION_PHASE.FAILED,
-                message: "Capture automatique interrompue.",
-                error: event.error || "Capture impossible."
+                message: "Automatic capture interrupted.",
+                error: event.error || "Unable to capture data."
             };
         case BROWSER_EXTENSION_MESSAGE.READY:
         case BROWSER_EXTENSION_MESSAGE.STATUS:
@@ -133,7 +133,7 @@ export function reduceBrowserExtensionCaptureState(state, event) {
                 isChecking: false,
                 message: state.isRunning || state.requiresContractorInput
                     ? state.message
-                    : "Extension détectée."
+                    : "Extension detected."
             };
         case BROWSER_EXTENSION_MESSAGE.ACCEPTED:
             if (!isCurrentRequest(state, event)) return state;
@@ -168,7 +168,7 @@ export function reduceBrowserExtensionCaptureState(state, event) {
                 requiresContractorInput: false,
                 superOfficeStatus: "done",
                 vtiStatus: "done",
-                message: event.message || "Captures terminées."
+                message: event.message || "Captures complete."
             };
         case BROWSER_EXTENSION_MESSAGE.FAILED:
             if (!isCurrentRequest(state, event)) return state;
@@ -178,8 +178,8 @@ export function reduceBrowserExtensionCaptureState(state, event) {
                 isRunning: false,
                 requiresContractorInput: false,
                 phase: BROWSER_EXTENSION_PHASE.FAILED,
-                message: "Capture automatique interrompue.",
-                error: event.error || "Capture impossible."
+                message: "Automatic capture interrupted.",
+                error: event.error || "Unable to capture data."
             };
         default:
             return state;

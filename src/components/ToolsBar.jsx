@@ -365,7 +365,7 @@ function ToolsBar({
                                     onClick={onCopyAloAutofillData}
                                     disabled={!hasAloAutofillData}
                                     aria-disabled={!hasAloAutofillData}
-                                    title={hasAloAutofillData ? "Préparer, ouvrir et remplir le ticket ALO" : "Import VTI data before preparing ALO fill data"}
+                                    title={hasAloAutofillData ? "Prepare, open and fill the ALO ticket" : "Import VTI data before preparing ALO fill data"}
                                 >
                                     <ClipboardPaste size={14} strokeWidth={2} aria-hidden="true" />
                                     ALO fill
@@ -379,11 +379,11 @@ function ToolsBar({
                                     disabled={!hasAlexCreateTicketData}
                                     aria-disabled={!hasAlexCreateTicketData}
                                     title={hasAlexCreateTicketData
-                                        ? "Sélectionner le partenaire ALEX et rechercher l’OTO VTI dans SEP"
+                                        ? "Select the ALEX partner and search for the VTI OTO in SEP"
                                         : alexCreateTicketUnavailableMessage}
                                 >
                                     <FilePlus2 size={14} strokeWidth={2} aria-hidden="true" />
-                                    Créer ticket ALEX
+                                    Create ALEX ticket
                                 </button>
                             )}
                             {onOpenAlexTicket && (
@@ -393,7 +393,7 @@ function ToolsBar({
                                     onClick={onOpenAlexTicket}
                                     disabled={!hasAlexTicketData}
                                     aria-disabled={!hasAlexTicketData}
-                                    title={hasAlexTicketData ? "Ouvrir le ticket ALEX avec le contexte partenaire" : alexTicketUnavailableMessage}
+                                    title={hasAlexTicketData ? "Open the ALEX ticket with partner context" : alexTicketUnavailableMessage}
                                 >
                                     <ExternalLink size={14} strokeWidth={2} aria-hidden="true" />
                                     Ticket ALEX
@@ -404,10 +404,10 @@ function ToolsBar({
                                     type="button"
                                     className="tools-bar-btn tools-bar-btn--system tools-bar-btn--photos"
                                     onClick={onOpenSuperOfficePhotos}
-                                    title="Afficher les photos, vidéos et PDF du dernier ticket SuperOffice importé"
+                                    title="Show photos, videos and PDFs from the latest imported SuperOffice ticket"
                                 >
                                     <Files size={14} strokeWidth={2} aria-hidden="true" />
-                                    Médias SO
+                                    SO media
                                     <span className="tools-bar-count">{superOfficeAttachmentCount}</span>
                                 </button>
                             )}

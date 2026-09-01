@@ -35,7 +35,7 @@ import {
 } from "../utils/imageAnnotation.js";
 
 const TOOL_OPTIONS = [
-    { id: "arrow", title: "Flèche", icon: ArrowUpRight },
+    { id: "arrow", title: "Arrow", icon: ArrowUpRight },
     { id: "rect", title: "Rectangle", icon: Square },
     { id: "text", title: "Bulle texte", icon: MessageSquareText },
     { id: "crop", title: "Crop / zoom", icon: Crop }
@@ -76,14 +76,14 @@ function loadImageElement(src) {
     return new Promise((resolve, reject) => {
         const image = new window.Image();
         image.onload = () => resolve(image);
-        image.onerror = () => reject(new Error("Impossible de charger cette image."));
+        image.onerror = () => reject(new Error("Unable to load this image."));
         image.src = src;
     });
 }
 
 async function loadAnnotatableImageSource(src) {
     const source = String(src || "").trim();
-    if (!source) throw new Error("Image manquante.");
+    if (!source) throw new Error("Missing image.");
 
     if (isCanvasSafeInlineUrl(source)) {
         const image = await loadImageElement(source);
@@ -104,7 +104,7 @@ async function loadAnnotatableImageSource(src) {
                 image,
                 objectUrl: "",
                 canExport: false,
-                exportBlockedReason: "Le navigateur bloque l'export PNG de cette image distante. Utilise une image importée en data URL/blob/local object URL pour pouvoir la copier annotée."
+                exportBlockedReason: "The browser blocks PNG export for this remote image. Import it as a data URL, blob or local object URL before copying the annotated image."
             };
         }
     }
@@ -160,7 +160,7 @@ function useAnnotatableImage(src) {
                     width: 0,
                     height: 0,
                     canExport: false,
-                    error: error?.message || "Impossible de charger cette image.",
+                    error: error?.message || "Unable to load this image.",
                     exportBlockedReason: ""
                 });
             });
@@ -481,7 +481,7 @@ function renderArrowEditHandles(annotation, imageRect, options = {}) {
     const { start, end } = getArrowEndpoints(annotation);
     const control = getArrowControlPoint(annotation);
     const handles = [
-        { id: "start", point: start, fill: "#ffffff", stroke: color, radius: ARROW_HANDLE_RADIUS, title: "Départ" },
+        { id: "start", point: start, fill: "#ffffff", stroke: color, radius: ARROW_HANDLE_RADIUS, title: "Start" },
         { id: "control", point: control, fill: color, stroke: "#ffffff", radius: ARROW_HANDLE_RADIUS - 1, title: "Courbure" },
         { id: "end", point: end, fill: "#ffffff", stroke: color, radius: ARROW_HANDLE_RADIUS, title: "Pointe" }
     ];
@@ -639,7 +639,7 @@ function createExportBaseCanvas(image, sourceRect, exportSize) {
     canvas.width = exportSize.width;
     canvas.height = exportSize.height;
     const context = canvas.getContext("2d", { alpha: false });
-    if (!context) throw new Error("Impossible de préparer le canevas d’export.");
+    if (!context) throw new Error("Unable to prepare the export canvas.");
 
     context.imageSmoothingEnabled = true;
     context.imageSmoothingQuality = "high";
@@ -663,7 +663,7 @@ async function buildAnnotatedImageBlob(image, annotations, crop, maxWidth = DEFA
     const sourceRect = getImageSourceRect(crop, naturalWidth, naturalHeight);
     const exportSize = getLimitedExportSize(sourceRect.width, sourceRect.height, maxWidth);
     if (!exportSize.width || !exportSize.height) {
-        throw new Error("Image invalide pour l'export PNG.");
+        throw new Error("Invalid image for PNG export.");
     }
 
     const container = document.createElement("div");
@@ -914,7 +914,7 @@ export default function SuperOfficeImageAnnotator({
         if (!point) return;
 
         if (tool === "text") {
-            const text = window.prompt("Texte de la bulle");
+            const text = window.prompt("Callout text");
             const cleanText = String(text || "").trim();
             if (!cleanText) return;
             addAnnotation({
@@ -1024,53 +1024,53 @@ export default function SuperOfficeImageAnnotator({
 
     const buildFinalImage = useCallback(async () => {
         if (loadedImage.status !== "ready" || !loadedImage.image) {
-            throw new Error("L'image n'est pas encore prête.");
+            throw new Error("The image is not ready yet.");
         }
         if (!loadedImage.canExport) {
-            throw new Error(loadedImage.exportBlockedReason || "Cette image ne peut pas être exportée en PNG depuis le navigateur.");
+            throw new Error(loadedImage.exportBlockedReason || "This image cannot be exported as PNG from the browser.");
         }
         return buildAnnotatedImageBlob(loadedImage.image, annotations, activeCrop);
     }, [activeCrop, annotations, loadedImage]);
 
     const handlePrepareImage = useCallback(async () => {
-        setCopyState({ status: "working", message: "Création de l’image finale..." });
+        setCopyState({ status: "working", message: "Creating final image..." });
         try {
             const blob = await buildFinalImage();
             if (exportObjectUrlRef.current) URL.revokeObjectURL(exportObjectUrlRef.current);
             const objectUrl = URL.createObjectURL(blob);
             exportObjectUrlRef.current = objectUrl;
-            const baseName = String(image?.name || "image-annotee")
+            const baseName = String(image?.name || "annotated-image")
                 .replace(/\.[^.]+$/, "")
                 .replace(/[^\p{L}\p{N}._-]+/gu, "-");
             setExportResult({
                 blob,
                 objectUrl,
-                fileName: `${baseName || "image-annotee"}-annotee.png`
+                fileName: `${baseName || "annotated-image"}-annotated.png`
             });
             setCopyState({ status: "idle", message: "" });
         } catch (error) {
             setCopyState({
                 status: "error",
-                message: error?.message || "Impossible de créer l'image annotée."
+                message: error?.message || "Unable to create the annotated image."
             });
         }
     }, [buildFinalImage, image?.name]);
 
     const handleCopyPreparedImage = useCallback(async () => {
         if (!exportResult?.blob) return;
-        setCopyState({ status: "working", message: "Copie en cours..." });
+        setCopyState({ status: "working", message: "Copying..." });
         try {
             if (!navigator.clipboard?.write || typeof ClipboardItem === "undefined") {
-                throw new Error("Copie automatique bloquée. Fais un clic droit sur l’image puis « Copier l’image ».");
+                throw new Error("Automatic copy blocked. Right-click the image, then choose Copy Image.");
             }
             await navigator.clipboard.write([
                 new ClipboardItem({ "image/png": exportResult.blob })
             ]);
-            setCopyState({ status: "success", message: "Image copiée." });
+            setCopyState({ status: "success", message: "Image copied." });
         } catch (error) {
             setCopyState({
                 status: "error",
-                message: error?.message || "Copie automatique bloquée. Fais un clic droit sur l’image puis « Copier l’image »."
+                message: error?.message || "Automatic copy blocked. Right-click the image, then choose Copy Image."
             });
         }
     }, [exportResult]);
@@ -1122,11 +1122,11 @@ export default function SuperOfficeImageAnnotator({
     }, [handleDeleteSelected, onClose, selectedId]);
 
     return (
-        <div className="so-annotator" role="dialog" aria-modal="true" aria-label={`Annoter ${image?.name || "image"}`} onMouseDown={(event) => event.stopPropagation()}>
+        <div className="so-annotator" role="dialog" aria-modal="true" aria-label={`Annotate ${image?.name || "image"}`} onMouseDown={(event) => event.stopPropagation()}>
             <div className="so-annotator__bar">
                 <div className="so-annotator__title">
                     <strong>{image?.name || "Image"}</strong>
-                    <span>{loadedImage.width && loadedImage.height ? `${loadedImage.width} x ${loadedImage.height}` : "Chargement"}</span>
+                    <span>{loadedImage.width && loadedImage.height ? `${loadedImage.width} x ${loadedImage.height}` : "Loading"}</span>
                 </div>
                 <div className="so-annotator__tools" role="toolbar" aria-label="Annotation tools">
                     <div className="so-annotator__tool-group">
@@ -1162,7 +1162,7 @@ export default function SuperOfficeImageAnnotator({
                             />
                         ))}
                     </div>
-                    <label className="so-annotator__stroke" title="Épaisseur">
+                    <label className="so-annotator__stroke" title="Thickness">
                         <span>Trait</span>
                         <input
                             type="range"
@@ -1171,7 +1171,7 @@ export default function SuperOfficeImageAnnotator({
                             step="1"
                             value={activeStrokeWidth}
                             onChange={handleStrokeWidthChange}
-                            aria-label="Épaisseur du trait"
+                            aria-label="Stroke thickness"
                         />
                         <output>{activeStrokeWidth}</output>
                     </label>
@@ -1179,20 +1179,20 @@ export default function SuperOfficeImageAnnotator({
                         <button type="button" onClick={handleUndo} disabled={annotations.length === 0} title="Undo" aria-label="Undo">
                             <RotateCcw size={18} aria-hidden="true" />
                         </button>
-                        <button type="button" onClick={handleDeleteSelected} disabled={!selectedId} title="Supprimer la sélection" aria-label="Supprimer la sélection">
+                        <button type="button" onClick={handleDeleteSelected} disabled={!selectedId} title="Delete selection" aria-label="Delete selection">
                             <Trash2 size={18} aria-hidden="true" />
                         </button>
-                        <button type="button" onClick={handleResetCrop} disabled={!activeCrop} title="Image complète" aria-label="Image complète">
+                        <button type="button" onClick={handleResetCrop} disabled={!activeCrop} title="Full image" aria-label="Full image">
                             <Maximize2 size={18} aria-hidden="true" />
                         </button>
                         <button type="button" className="so-annotator__text-action" onClick={handleClear} disabled={annotations.length === 0 && !draft} title="Tout effacer" aria-label="Tout effacer">
                             <span>Clear</span>
                         </button>
-                        <button type="button" className="so-annotator__copy" onClick={handlePrepareImage} disabled={copyState.status === "working" || loadedImage.status !== "ready"} title="Créer l’image finale">
+                        <button type="button" className="so-annotator__copy" onClick={handlePrepareImage} disabled={copyState.status === "working" || loadedImage.status !== "ready"} title="Create final image">
                             <ClipboardCopy size={17} aria-hidden="true" />
-                            <span>Image finale</span>
+                            <span>Final image</span>
                         </button>
-                        <button type="button" onClick={onClose} title="Fermer" aria-label="Fermer">
+                        <button type="button" onClick={onClose} title="Close" aria-label="Close">
                             <X size={19} aria-hidden="true" />
                         </button>
                     </div>
@@ -1201,7 +1201,7 @@ export default function SuperOfficeImageAnnotator({
 
             <div className="so-annotator__workspace" ref={workspaceRef}>
                 {loadedImage.status === "loading" && (
-                    <div className="so-annotator__state">Chargement de l’image...</div>
+                    <div className="so-annotator__state">Loading image...</div>
                 )}
                 {loadedImage.status === "error" && (
                     <div className="so-annotator__state is-error">{loadedImage.error}</div>
@@ -1284,31 +1284,31 @@ export default function SuperOfficeImageAnnotator({
             )}
 
             {exportResult && (
-                <div className="so-annotator-result" role="dialog" aria-modal="true" aria-label="Image annotée prête">
+                <div className="so-annotator-result" role="dialog" aria-modal="true" aria-label="Annotated image ready">
                     <div className="so-annotator-result__bar">
                         <div>
-                            <strong>Image annotée prête</strong>
-                            <span>Clic droit sur l’image → Copier l’image si la copie automatique est bloquée.</span>
+                            <strong>Annotated image ready</strong>
+                            <span>Right-click the image and choose Copy Image if automatic copy is blocked.</span>
                         </div>
                         <div className="so-annotator-result__actions">
                             <button type="button" className="secondary-btn" onClick={closeExportResult}>
-                                Retour à l’éditeur
+                                Back to editor
                             </button>
                             <button type="button" className="primary-btn" onClick={handleCopyPreparedImage} disabled={copyState.status === "working"}>
                                 <ClipboardCopy size={16} aria-hidden="true" />
-                                Copier l’image
+                                Copy image
                             </button>
                             <a className="secondary-btn" href={exportResult.objectUrl} download={exportResult.fileName}>
                                 <Download size={16} aria-hidden="true" />
-                                Télécharger PNG
+                                Download PNG
                             </a>
-                            <button type="button" className="so-annotator-result__close" onClick={onClose} title="Fermer" aria-label="Fermer le résultat">
+                            <button type="button" className="so-annotator-result__close" onClick={onClose} title="Close" aria-label="Close result">
                                 <X size={19} aria-hidden="true" />
                             </button>
                         </div>
                     </div>
                     <div className="so-annotator-result__preview">
-                        <img src={exportResult.objectUrl} alt="Image annotée finale à copier" draggable="true" />
+                        <img src={exportResult.objectUrl} alt="Final annotated image to copy" draggable="true" />
                     </div>
                     {copyState.message && (
                         <div className={`so-annotator__status ${copyState.status === "error" ? "is-error" : ""}`}>

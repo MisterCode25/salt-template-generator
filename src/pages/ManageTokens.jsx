@@ -133,7 +133,7 @@ const TokenModal = memo(function TokenModal({ initial, tokens, onClose, onSave }
                             <input
                                 value={key}
                                 onChange={e => setKey(e.target.value)}
-                                placeholder="Ex: LastName, Mobile, Request…"
+                                placeholder="Example: LastName, Mobile, Request…"
                             />
                         </div>
 

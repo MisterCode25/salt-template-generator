@@ -123,7 +123,7 @@ export async function captureVtiHealthcheckPage() {
         if (document.querySelector(
             'input[type="password"], input[name="user_name"], form[action*="Login" i]'
         )) {
-            throw new Error("La session VTI a expiré. Reconnecte-toi dans l’onglet VTI puis réessaie.");
+            throw new Error("The VTI session has expired. Sign in again in the VTI tab, then retry.");
         }
     };
 

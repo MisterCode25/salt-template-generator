@@ -94,19 +94,19 @@ function getVisual(state) {
     if (state.error) {
         return {
             mode: "error",
-            title: state.installed === false ? "Extension non détectée" : "Capture interrompue"
+            title: state.installed === false ? "Extension not detected" : "Capture interrupted"
         };
     }
     if (state.phase === BROWSER_EXTENSION_PHASE.COMPLETED) {
-        return { mode: "done", title: "Import terminé" };
+        return { mode: "done", title: "Import complete" };
     }
     if (state.requiresContractorInput) {
-        return { mode: "warning", title: "Contractor introuvable" };
+        return { mode: "warning", title: "Contractor not found" };
     }
     if (state.isRunning || state.isChecking) {
-        return { mode: "scanning", title: "Capture automatique en cours" };
+        return { mode: "scanning", title: "Automatic capture in progress" };
     }
-    return { mode: "ready", title: "Extension de capture" };
+    return { mode: "ready", title: "Capture extension" };
 }
 
 export default function BrowserExtensionCaptureModal({ state, onStart, onClose }) {
@@ -139,7 +139,7 @@ export default function BrowserExtensionCaptureModal({ state, onStart, onClose }
 
         const normalizedTicketNumber = normalizeSuperOfficeTicketNumber(ticketNumber);
         if (!normalizedTicketNumber) {
-            setTicketInputError("Saisis uniquement le numéro du ticket SuperOffice.");
+            setTicketInputError("Enter only the SuperOffice ticket number.");
             return;
         }
 
@@ -154,7 +154,7 @@ export default function BrowserExtensionCaptureModal({ state, onStart, onClose }
         );
         const normalizedContractorNumber = normalizeContractorNumber(manualContractorNumber);
         if (!normalizedContractorNumber) {
-            setManualContractorError("Saisis uniquement le numéro du contractor.");
+            setManualContractorError("Enter only the contractor number.");
             return;
         }
         if (!requestedTicketNumber || isBusy) return;
@@ -171,7 +171,7 @@ export default function BrowserExtensionCaptureModal({ state, onStart, onClose }
             disableEscapeClose={isBusy}
             showCloseButton={!isBusy && !isCompleted}
             dialogClassName={`popup-box capture-data-modal browser-extension-capture-modal is-${visual.mode}`}
-            ariaLabel="Capture automatique avec l’extension"
+            ariaLabel="Automatic capture with the extension"
         >
             <div className="browser-extension-capture-header">
                 <div className="browser-extension-capture-heading">
@@ -179,8 +179,8 @@ export default function BrowserExtensionCaptureModal({ state, onStart, onClose }
                         <Puzzle size={18} />
                     </div>
                     <div>
-                        <p className="eyebrow">Bêta</p>
-                        <h2>Capture automatique</h2>
+                        <p className="eyebrow">Beta</p>
+                        <h2>Automatic capture</h2>
                     </div>
                 </div>
                 {currentTicketNumber && (
@@ -190,13 +190,13 @@ export default function BrowserExtensionCaptureModal({ state, onStart, onClose }
 
             {!isBusy && !isCompleted && !requiresContractorInput && !state.error && (
                 <p className="browser-extension-capture-intro">
-                    Saisis le ticket SuperOffice. L’extension récupérera ensuite les données SO et VTI.
+                    Enter the SuperOffice ticket. The extension will then capture the SO and VTI data.
                 </p>
             )}
 
             {!isBusy && !isCompleted && !requiresContractorInput && (
                 <form className="browser-extension-ticket-form" onSubmit={submitTicket}>
-                    <label htmlFor="browser-extension-ticket-number">Numéro du ticket SuperOffice</label>
+                    <label htmlFor="browser-extension-ticket-number">SuperOffice ticket number</label>
                     <div className="browser-extension-ticket-row">
                         <input
                             id="browser-extension-ticket-number"
@@ -216,7 +216,7 @@ export default function BrowserExtensionCaptureModal({ state, onStart, onClose }
                         />
                         <button type="submit" className="primary-btn" disabled={isBusy}>
                             {state.error && <RefreshCw size={15} aria-hidden="true" />}
-                            {state.error ? "Réessayer" : "Capturer"}
+                            {state.error ? "Retry" : "Capture"}
                         </button>
                     </div>
                     {ticketInputError && (
@@ -238,19 +238,19 @@ export default function BrowserExtensionCaptureModal({ state, onStart, onClose }
                     />
                     <div className="browser-extension-capture-copy">
                         <strong>{visual.title}</strong>
-                        <span>{state.error || state.message}</span>
+                        {visual.mode !== "scanning" && <span>{state.error || state.message}</span>}
                     </div>
                 </div>
             )}
 
             {requiresContractorInput && (
                 <form className="browser-extension-contractor-input" onSubmit={submitManualContractor}>
-                    <strong>Aucune action n’a été effectuée dans VTI.</strong>
+                    <strong>No action was performed in VTI.</strong>
                     <span>
-                        Indique le contractor à rechercher. L’extension ouvrira sa fiche VTI uniquement après
-                        ta validation.
+                        Enter the contractor to search for. The extension will open its VTI record only after
+                        you confirm it.
                     </span>
-                    <label htmlFor="browser-extension-contractor-number">Numéro du contractor</label>
+                    <label htmlFor="browser-extension-contractor-number">Contractor number</label>
                     <div className="browser-extension-ticket-row">
                         <input
                             id="browser-extension-contractor-number"
@@ -269,7 +269,7 @@ export default function BrowserExtensionCaptureModal({ state, onStart, onClose }
                                 ? "browser-extension-contractor-error"
                                 : undefined}
                         />
-                        <button type="submit" className="primary-btn">Rechercher dans VTI</button>
+                        <button type="submit" className="primary-btn">Search VTI</button>
                     </div>
                     {manualContractorError && (
                         <small id="browser-extension-contractor-error" className="browser-extension-ticket-error">
@@ -282,7 +282,7 @@ export default function BrowserExtensionCaptureModal({ state, onStart, onClose }
             {!isBusy && !isCompleted && !requiresContractorInput && (
                 <div className="browser-extension-capture-note">
                     <Info size={14} aria-hidden="true" />
-                    <span>Garde exactement un onglet SuperOffice et un onglet VTI ouverts.</span>
+                    <span>Keep exactly one SuperOffice tab and one VTI tab open.</span>
                 </div>
             )}
 
@@ -291,12 +291,12 @@ export default function BrowserExtensionCaptureModal({ state, onStart, onClose }
                     {!requiresContractorInput && (
                         <a className="browser-extension-download-link" href={downloadUrl} download>
                             <Download size={14} aria-hidden="true" />
-                            Télécharger l’extension
+                            Download extension
                         </a>
                     )}
                     {requiresContractorInput && (
                         <button type="button" className="secondary-btn" onClick={onClose}>
-                            Annuler la capture
+                            Cancel capture
                         </button>
                     )}
                 </div>

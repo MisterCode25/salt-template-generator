@@ -450,7 +450,7 @@ import { parseExternalId } from "../src/utils/externalGenerator.js";
   const dateGroups = groupSuperOfficeImageAttachmentsByDate(result.attachments);
   assert.equal(dateGroups[0].dateKey, "2026-06-18");
   assert.equal(dateGroups[0].label, "18.06.2026");
-  assert.equal(dateGroups[0].postLabel, "Post non identifié");
+  assert.equal(dateGroups[0].postLabel, "Unidentified post");
   assert.equal(dateGroups[0].dateLabel, "18.06.2026");
 
   const postGroups = groupSuperOfficeImageAttachmentsByPost(result.attachments);

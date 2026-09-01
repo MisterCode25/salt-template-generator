@@ -45,7 +45,7 @@ export function resolveVtiCaptureRoute(superOfficePayload, manualContractorNumbe
 export function buildVtiContractorSearchUrl(contractorNumber) {
     const normalizedContractorNumber = normalizeContractorNumber(contractorNumber);
     if (!normalizedContractorNumber) {
-        throw new Error("Le numéro de contractor VTI est invalide.");
+        throw new Error("The VTI contractor number is invalid.");
     }
 
     const url = new URL(VTI_BASE_URL);
@@ -66,7 +66,7 @@ export function buildVtiContractorSearchUrl(contractorNumber) {
 export function buildVtiContractorDetailUrl(recordId) {
     const normalizedRecordId = String(recordId ?? "").trim();
     if (!/^\d+$/.test(normalizedRecordId)) {
-        throw new Error("Le recordId VTI est invalide.");
+        throw new Error("The VTI recordId is invalid.");
     }
 
     const url = new URL(VTI_BASE_URL);

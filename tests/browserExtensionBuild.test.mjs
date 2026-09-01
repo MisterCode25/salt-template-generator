@@ -59,7 +59,7 @@ async function withGlobalOverrides(overrides, callback) {
         }
       }
     }, () => captureVtiHealthcheckPage()),
-    /session VTI a expiré/i
+    /VTI session has expired/i
   );
 }
 
