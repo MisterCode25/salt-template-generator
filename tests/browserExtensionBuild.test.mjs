@@ -440,7 +440,7 @@ assert.ok(vtiBookmarklet.startsWith("javascript:"));
 assert.ok(superOfficeBookmarklet.startsWith("javascript:"));
 
 assert.equal(manifest.manifest_version, 3);
-assert.equal(manifest.version, "0.1.21");
+assert.equal(manifest.version, "0.1.22");
 assert.equal(CURRENT_BROWSER_EXTENSION_VERSION, manifest.version);
 assert.deepEqual(manifest.permissions.sort(), ["scripting", "tabs"]);
 assert.equal(manifest.host_permissions.includes("<all_urls>"), false);
@@ -453,6 +453,8 @@ assert.ok(manifest.content_scripts[0].matches.includes(
 ));
 assert.match(serviceWorkerSource, /runAloAutofill/);
 assert.match(serviceWorkerSource, /runAlexOpen/);
+assert.match(serviceWorkerSource, /waitForAuthenticatedWorkflowPage/);
+assert.match(serviceWorkerSource, /AWAITING_AUTHENTICATION/);
 assert.match(serviceWorkerSource, /open-provider/);
 assert.match(serviceWorkerSource, /create-ticket/);
 assert.match(serviceWorkerSource, /buildSuperOfficeTicketUrl/);
@@ -468,6 +470,24 @@ assert.match(serviceWorkerSource, /active: false/);
 assert.match(serviceWorkerSource, /fetchVtiHealthcheckSource/);
 assert.match(serviceWorkerSource, /CONTRACTOR_INPUT_REQUIRED/);
 assert.match(serviceWorkerSource, /ALEX_STORAGE_NAVIGATION_DELAY_MS/);
+
+const aloWorkflowSource = serviceWorkerSource.slice(
+  serviceWorkerSource.indexOf("async function runAloAutofill"),
+  serviceWorkerSource.indexOf("async function runAlexOpen")
+);
+assert.ok(
+  aloWorkflowSource.indexOf("waitForAuthenticatedWorkflowPage")
+    < aloWorkflowSource.indexOf("chrome.scripting.executeScript")
+);
+
+const alexWorkflowSource = serviceWorkerSource.slice(
+  serviceWorkerSource.indexOf("async function runAlexOpen"),
+  serviceWorkerSource.indexOf("function startWorkflow")
+);
+assert.ok(
+  alexWorkflowSource.indexOf("waitForAuthenticatedWorkflowPage")
+    < alexWorkflowSource.indexOf("chrome.scripting.executeScript")
+);
 assert.match(appBridgeSource, /salt\.capture\.alo\.start\.v1/);
 assert.match(appBridgeSource, /salt\.capture\.alex\.start\.v1/);
 

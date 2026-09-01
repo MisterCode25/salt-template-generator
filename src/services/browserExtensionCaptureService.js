@@ -6,8 +6,8 @@ import {
 
 const STATUS_TIMEOUT_MS = 1200;
 const START_TIMEOUT_MS = 2200;
-const ACTION_TIMEOUT_MS = 45000;
-export const CURRENT_BROWSER_EXTENSION_VERSION = "0.1.21";
+export const BROWSER_EXTENSION_ACTION_TIMEOUT_MS = 10 * 60 * 1000;
+export const CURRENT_BROWSER_EXTENSION_VERSION = "0.1.22";
 
 export function isBrowserExtensionVersionAtLeast(version, minimumVersion) {
     const parseVersion = (value) => String(value || "")
@@ -98,6 +98,15 @@ function startBrowserExtensionAction(type, payload) {
         let actionTimeoutId = null;
         let isSettled = false;
 
+        const scheduleActionTimeout = () => {
+            if (actionTimeoutId) window.clearTimeout(actionTimeoutId);
+            actionTimeoutId = window.setTimeout(() => finish({
+                type: BROWSER_EXTENSION_MESSAGE.FAILED,
+                requestId,
+                error: "L’opération de l’extension a dépassé le délai autorisé."
+            }), BROWSER_EXTENSION_ACTION_TIMEOUT_MS);
+        };
+
         const finish = (message) => {
             if (isSettled) return;
             isSettled = true;
@@ -111,11 +120,11 @@ function startBrowserExtensionAction(type, payload) {
             if (message.requestId !== requestId) return;
             if (message.type === BROWSER_EXTENSION_MESSAGE.ACCEPTED) {
                 window.clearTimeout(acceptanceTimeoutId);
-                actionTimeoutId = window.setTimeout(() => finish({
-                    type: BROWSER_EXTENSION_MESSAGE.FAILED,
-                    requestId,
-                    error: "L’opération de l’extension a dépassé le délai autorisé."
-                }), ACTION_TIMEOUT_MS);
+                scheduleActionTimeout();
+                return;
+            }
+            if (message.type === BROWSER_EXTENSION_MESSAGE.PROGRESS) {
+                scheduleActionTimeout();
                 return;
             }
             if ([

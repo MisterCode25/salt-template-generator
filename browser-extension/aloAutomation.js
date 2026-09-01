@@ -1,6 +1,39 @@
 export const ALO_FULFILLMENT_DETAIL_URL = "https://wholesale.swisscom.com/wsg/prod/alo/fuf/web/alo-web/fulfillment/detail.do";
 export const ALO_TICKET_CREATION_URL = "https://wholesale.swisscom.com/wsg/prod/alo/ass/web/alo-web/assurance/create.do?clearModel=true";
 
+export function inspectAloWorkflowPage() {
+    function hasAuthenticationMarker() {
+        var selector = [
+            'input[type="password"]',
+            'form[action*="login" i]',
+            '[data-testid*="login" i] input',
+            '.login input'
+        ].join(",");
+        return Boolean(document.querySelector(selector));
+    }
+
+    var isAloHost = /(^|\.)wholesale\.swisscom\.com$/i.test(location.hostname);
+    var route = String(location.pathname || "") + String(location.search || "");
+    var isAuthenticationRoute = /(^|[/?&._=-])(login|sign-in|signin|sso|saml|oauth|authenticate|authentication)(?=$|[/?&._=-])/i
+        .test(route);
+
+    if (!isAloHost || isAuthenticationRoute || hasAuthenticationMarker()) {
+        return { state: "authentication-required" };
+    }
+
+    var ticketFieldIds = [
+        "ticket.socketId",
+        "ticket.extRef",
+        "ticket.problemDescription",
+        "ticket.otoAddress.firstName"
+    ];
+    var hasTicketForm = ticketFieldIds.some(function hasField(fieldId) {
+        return Boolean(document.getElementById(fieldId)
+            || document.querySelector('[name="' + fieldId + '"]'));
+    });
+    return { state: hasTicketForm ? "ready" : "loading" };
+}
+
 export async function autofillAloTicketPage(payload, fulfillmentDetailUrl) {
     function text(value) {
         if (value === null || value === undefined) return "";

@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
 import {
   ALO_FULFILLMENT_DETAIL_URL,
-  autofillAloTicketPage
+  autofillAloTicketPage,
+  inspectAloWorkflowPage
 } from "../browser-extension/aloAutomation.js";
 import {
   ALEX_HOME_URL,
   ALEX_STORAGE_NAVIGATION_DELAY_MS,
+  inspectAlexWorkflowPage,
   openAlexPage
 } from "../browser-extension/alexAutomation.js";
 import {
@@ -13,6 +15,7 @@ import {
   createExtensionEvent
 } from "../shared/browserExtensionProtocol.js";
 import {
+  BROWSER_EXTENSION_ACTION_TIMEOUT_MS,
   CURRENT_BROWSER_EXTENSION_VERSION,
   isBrowserExtensionVersionAtLeast,
   startBrowserExtensionCapture,
@@ -27,7 +30,8 @@ assert.equal(isBrowserExtensionVersionAtLeast("0.1.3", "0.1.3"), true);
 assert.equal(isBrowserExtensionVersionAtLeast("0.2.0", "0.1.3"), true);
 assert.equal(isBrowserExtensionVersionAtLeast("0.1.2", "0.1.3"), false);
 assert.equal(isBrowserExtensionVersionAtLeast("", "0.1.3"), false);
-assert.equal(CURRENT_BROWSER_EXTENSION_VERSION, "0.1.21");
+assert.equal(CURRENT_BROWSER_EXTENSION_VERSION, "0.1.22");
+assert.equal(BROWSER_EXTENSION_ACTION_TIMEOUT_MS, 10 * 60 * 1000);
 
 async function withGlobalOverrides(overrides, callback) {
   const previousDescriptors = new Map();
@@ -49,6 +53,83 @@ async function withGlobalOverrides(overrides, callback) {
       else delete globalThis[name];
     }
   }
+}
+
+{
+  const result = await withGlobalOverrides({
+    document: {
+      querySelector: (selector) => selector.includes('input[type="password"]') ? {} : null
+    },
+    location: {
+      hostname: "www.ftthproxy.ch",
+      pathname: "/login",
+      search: ""
+    }
+  }, () => inspectAlexWorkflowPage());
+
+  assert.equal(result.state, "authentication-required");
+}
+
+{
+  const result = await withGlobalOverrides({
+    document: { querySelector: () => null },
+    location: {
+      hostname: "www.ftthproxy.ch",
+      pathname: "/",
+      search: ""
+    }
+  }, () => inspectAlexWorkflowPage());
+
+  assert.equal(result.state, "ready");
+}
+
+{
+  const fields = new Map([["ticket.socketId", {}]]);
+  const result = await withGlobalOverrides({
+    document: {
+      getElementById: (id) => fields.get(id) || null,
+      querySelector: () => null
+    },
+    location: {
+      hostname: "wholesale.swisscom.com",
+      pathname: "/wsg/prod/alo/ass/web/alo-web/assurance/create.do",
+      search: "?clearModel=true"
+    }
+  }, () => inspectAloWorkflowPage());
+
+  assert.equal(result.state, "ready");
+}
+
+{
+  const result = await withGlobalOverrides({
+    document: {
+      getElementById: () => null,
+      querySelector: (selector) => selector.includes('input[type="password"]') ? {} : null
+    },
+    location: {
+      hostname: "wholesale.swisscom.com",
+      pathname: "/login",
+      search: ""
+    }
+  }, () => inspectAloWorkflowPage());
+
+  assert.equal(result.state, "authentication-required");
+}
+
+{
+  const result = await withGlobalOverrides({
+    document: {
+      getElementById: () => null,
+      querySelector: () => null
+    },
+    location: {
+      hostname: "wholesale.swisscom.com",
+      pathname: "/portal",
+      search: ""
+    }
+  }, () => inspectAloWorkflowPage());
+
+  assert.equal(result.state, "loading");
 }
 
 {
@@ -224,6 +305,7 @@ function createInput(value = "") {
 
 {
   const listeners = new Set();
+  const scheduledDelays = [];
   let nextTimeoutId = 1;
   const fakeWindow = {
     location: { origin: "https://mistercode25.github.io" },
@@ -234,7 +316,8 @@ function createInput(value = "") {
       if (type === "message") listeners.delete(listener);
     },
     clearTimeout() {},
-    setTimeout() {
+    setTimeout(callback, delay) {
+      scheduledDelays.push(delay);
       const timeoutId = nextTimeoutId;
       nextTimeoutId += 1;
       return timeoutId;
@@ -246,6 +329,9 @@ function createInput(value = "") {
         }
       };
       dispatch(createExtensionEvent(BROWSER_EXTENSION_MESSAGE.ACCEPTED, command.requestId));
+      dispatch(createExtensionEvent(BROWSER_EXTENSION_MESSAGE.PROGRESS, command.requestId, {
+        phase: "AWAITING_AUTHENTICATION"
+      }));
       dispatch(createExtensionEvent(BROWSER_EXTENSION_MESSAGE.ACTION_COMPLETED, command.requestId, {
         action: "alo",
         result: { externalReferenceStatus: "unavailable" }
@@ -260,6 +346,10 @@ function createInput(value = "") {
   assert.equal(result.type, BROWSER_EXTENSION_MESSAGE.ACTION_COMPLETED);
   assert.equal(result.action, "alo");
   assert.equal(listeners.size, 0);
+  assert.equal(
+    scheduledDelays.filter((delay) => delay === BROWSER_EXTENSION_ACTION_TIMEOUT_MS).length,
+    2
+  );
 }
 
 console.log("browserExtensionAutomation tests passed");

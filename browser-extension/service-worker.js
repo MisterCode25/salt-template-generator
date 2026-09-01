@@ -26,11 +26,13 @@ import {
 import {
     ALO_FULFILLMENT_DETAIL_URL,
     ALO_TICKET_CREATION_URL,
-    autofillAloTicketPage
+    autofillAloTicketPage,
+    inspectAloWorkflowPage
 } from "./aloAutomation.js";
 import {
     ALEX_HOME_URL,
     ALEX_STORAGE_NAVIGATION_DELAY_MS,
+    inspectAlexWorkflowPage,
     openAlexPage
 } from "./alexAutomation.js";
 import { captureSuperOfficePage } from "./generated/superOfficeCapture.js";
@@ -51,6 +53,10 @@ import {
 } from "./vtiParallelCapture.js";
 
 let activeWorkflow = null;
+const WORKFLOW_AUTHENTICATION_TIMEOUT_MS = 10 * 60 * 1000;
+const WORKFLOW_PAGE_READY_TIMEOUT_MS = 30000;
+const WORKFLOW_POST_LOGIN_GRACE_MS = 1500;
+const WORKFLOW_POLL_INTERVAL_MS = 750;
 
 function getExtensionVersion() {
     return chrome.runtime.getManifest().version;
@@ -512,6 +518,125 @@ async function openOrReuseWorkflowTab(workflow, url) {
     return tab;
 }
 
+function isWorkflowHost(workflow, tabUrl) {
+    try {
+        const hostname = new URL(tabUrl).hostname;
+        return workflow === "alo"
+            ? /(^|\.)wholesale\.swisscom\.com$/i.test(hostname)
+            : /(^|\.)ftthproxy\.ch$/i.test(hostname);
+    } catch {
+        return false;
+    }
+}
+
+function isWorkflowTargetUrl(currentUrl, targetUrl) {
+    try {
+        const current = new URL(currentUrl);
+        const target = new URL(targetUrl);
+        return current.origin === target.origin && current.pathname === target.pathname;
+    } catch {
+        return false;
+    }
+}
+
+async function inspectWorkflowTab(tab, workflow) {
+    if (!isWorkflowHost(workflow, tab.url)) {
+        return { state: "authentication-required" };
+    }
+
+    const results = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        world: "ISOLATED",
+        func: workflow === "alo" ? inspectAloWorkflowPage : inspectAlexWorkflowPage
+    });
+    const result = readExecutionResult(results, workflow === "alo" ? "ALO" : "ALEX");
+    if (!["ready", "loading", "authentication-required"].includes(result.state)) {
+        throw new Error(`L’état de la page ${workflow === "alo" ? "ALO" : "ALEX"} est inconnu.`);
+    }
+    return result;
+}
+
+function waitForWorkflowPoll() {
+    return new Promise((resolve) => setTimeout(resolve, WORKFLOW_POLL_INTERVAL_MS));
+}
+
+async function waitForAuthenticatedWorkflowPage({
+    workflow,
+    tabId,
+    targetUrl,
+    appTabId,
+    requestId
+}) {
+    const authenticationDeadline = Date.now() + WORKFLOW_AUTHENTICATION_TIMEOUT_MS;
+    let pageReadyStartedAt = Date.now();
+    let postLoginLandingStartedAt = null;
+    let hasObservedAuthentication = false;
+    let hasReportedAuthentication = false;
+
+    while (Date.now() < authenticationDeadline) {
+        let tab;
+        try {
+            tab = await chrome.tabs.get(tabId);
+        } catch {
+            throw new Error(`L’onglet ${workflow === "alo" ? "ALO" : "ALEX"} a été fermé.`);
+        }
+
+        const pageState = await inspectWorkflowTab(tab, workflow);
+        if (pageState.state === "ready") return tab;
+
+        if (pageState.state === "authentication-required") {
+            hasObservedAuthentication = true;
+            pageReadyStartedAt = null;
+            postLoginLandingStartedAt = null;
+            if (!hasReportedAuthentication) {
+                hasReportedAuthentication = true;
+                const label = workflow === "alo" ? "ALO" : "ALEX";
+                await reportProgress(
+                    appTabId,
+                    requestId,
+                    BROWSER_EXTENSION_PHASE.AWAITING_AUTHENTICATION,
+                    `Connecte-toi à ${label} dans l’onglet ouvert. L’action reprendra automatiquement.`,
+                    { action: workflow }
+                );
+            }
+            await waitForWorkflowPoll();
+            continue;
+        }
+
+        if (pageReadyStartedAt === null) pageReadyStartedAt = Date.now();
+        const isTargetPage = isWorkflowTargetUrl(tab.url, targetUrl);
+        if (hasObservedAuthentication && !isTargetPage) {
+            if (postLoginLandingStartedAt === null) postLoginLandingStartedAt = Date.now();
+            if (Date.now() - postLoginLandingStartedAt >= WORKFLOW_POST_LOGIN_GRACE_MS) {
+                await chrome.tabs.update(tabId, { active: true, url: targetUrl });
+                await waitForTabLoad(
+                    tabId,
+                    WORKFLOW_PAGE_READY_TIMEOUT_MS,
+                    workflow === "alo" ? "du formulaire ALO" : "d’ALEX"
+                );
+                pageReadyStartedAt = Date.now();
+                postLoginLandingStartedAt = null;
+                continue;
+            }
+        } else {
+            postLoginLandingStartedAt = null;
+        }
+
+        if (Date.now() - pageReadyStartedAt >= WORKFLOW_PAGE_READY_TIMEOUT_MS) {
+            throw new Error(
+                workflow === "alo"
+                    ? "Le formulaire ALO ne s’est pas affiché après la connexion."
+                    : "ALEX ne s’est pas affiché après la connexion."
+            );
+        }
+        await waitForWorkflowPoll();
+    }
+
+    throw new Error(
+        `La connexion ${workflow === "alo" ? "ALO" : "ALEX"} a dépassé le délai autorisé.`
+    );
+}
+
 async function sendActionCompleted(appTabId, requestId, action, message, details = {}) {
     await sendToApplication(appTabId, createExtensionEvent(
         BROWSER_EXTENSION_MESSAGE.ACTION_COMPLETED,
@@ -534,6 +659,13 @@ async function runAloAutofill(requestId, appTabId, payload) {
             throw new Error("Les données ALO reçues sont invalides.");
         }
         const aloTab = await openOrReuseWorkflowTab("alo", ALO_TICKET_CREATION_URL);
+        await waitForAuthenticatedWorkflowPage({
+            workflow: "alo",
+            tabId: aloTab.id,
+            targetUrl: ALO_TICKET_CREATION_URL,
+            appTabId,
+            requestId
+        });
         const executionResults = await chrome.scripting.executeScript({
             target: { tabId: aloTab.id },
             world: "MAIN",
@@ -562,6 +694,13 @@ async function runAlexOpen(requestId, appTabId, payload) {
             throw new Error("Les données ALEX reçues sont invalides.");
         }
         const alexTab = await openOrReuseWorkflowTab("alex", ALEX_HOME_URL);
+        await waitForAuthenticatedWorkflowPage({
+            workflow: "alex",
+            tabId: alexTab.id,
+            targetUrl: ALEX_HOME_URL,
+            appTabId,
+            requestId
+        });
         const executionResults = await chrome.scripting.executeScript({
             target: { tabId: alexTab.id },
             world: "MAIN",
@@ -591,7 +730,7 @@ async function runAlexOpen(requestId, appTabId, payload) {
     }
 }
 
-function startWorkflow(message, appTabId, sendResponse, runner) {
+function startWorkflow(message, appTabId, sendResponse, runner, action = "") {
     if (activeWorkflow) {
         sendResponse(createExtensionEvent(BROWSER_EXTENSION_MESSAGE.FAILED, message.requestId, {
             error: "Une opération automatique est déjà en cours."
@@ -601,7 +740,8 @@ function startWorkflow(message, appTabId, sendResponse, runner) {
 
     activeWorkflow = { requestId: message.requestId, appTabId };
     sendResponse(createExtensionEvent(BROWSER_EXTENSION_MESSAGE.ACCEPTED, message.requestId, {
-        version: getExtensionVersion()
+        version: getExtensionVersion(),
+        ...(action ? { action } : {})
     }));
     runner(message.requestId, appTabId, message.payload);
 }
@@ -629,12 +769,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     if (message.type === BROWSER_EXTENSION_MESSAGE.START_ALO) {
-        startWorkflow(message, sender.tab.id, sendResponse, runAloAutofill);
+        startWorkflow(message, sender.tab.id, sendResponse, runAloAutofill, "alo");
         return false;
     }
 
     if (message.type === BROWSER_EXTENSION_MESSAGE.START_ALEX) {
-        startWorkflow(message, sender.tab.id, sendResponse, runAlexOpen);
+        startWorkflow(message, sender.tab.id, sendResponse, runAlexOpen, "alex");
         return false;
     }
 

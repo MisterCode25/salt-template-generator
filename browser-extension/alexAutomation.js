@@ -1,6 +1,28 @@
 export const ALEX_HOME_URL = "https://www.ftthproxy.ch/";
 export const ALEX_STORAGE_NAVIGATION_DELAY_MS = 500;
 
+export function inspectAlexWorkflowPage() {
+    function hasAuthenticationMarker() {
+        var selector = [
+            'input[type="password"]',
+            'form[action*="login" i]',
+            '[data-testid*="login" i] input',
+            '.login input'
+        ].join(",");
+        return Boolean(document.querySelector(selector));
+    }
+
+    var isAlexHost = /(^|\.)ftthproxy\.ch$/i.test(location.hostname);
+    var route = String(location.pathname || "") + String(location.search || "");
+    var isAuthenticationRoute = /(^|[/?&._=-])(login|sign-in|signin|sso|saml|oauth|authenticate|authentication)(?=$|[/?&._=-])/i
+        .test(route);
+
+    if (!isAlexHost || isAuthenticationRoute || hasAuthenticationMarker()) {
+        return { state: "authentication-required" };
+    }
+    return { state: "ready" };
+}
+
 export function openAlexPage(payload, requestedDelayMs) {
     function text(value) {
         if (value === null || value === undefined) return "";

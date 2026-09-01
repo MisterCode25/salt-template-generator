@@ -44,12 +44,12 @@ import {
 
 {
   const event = createExtensionEvent(BROWSER_EXTENSION_MESSAGE.PROGRESS, "request-2", {
-    phase: BROWSER_EXTENSION_PHASE.SUPER_OFFICE_CAPTURE
+    phase: BROWSER_EXTENSION_PHASE.AWAITING_AUTHENTICATION
   });
 
   assert.equal(isExtensionEvent(event), true);
   assert.equal(isAppCommand(event), false);
-  assert.equal(event.phase, BROWSER_EXTENSION_PHASE.SUPER_OFFICE_CAPTURE);
+  assert.equal(event.phase, "AWAITING_AUTHENTICATION");
 }
 
 {

@@ -48,6 +48,8 @@ function isCurrentRequest(state, event) {
 }
 
 export function reduceBrowserExtensionCaptureState(state, event) {
+    if (["alo", "alex"].includes(event?.action)) return state;
+
     switch (event?.type) {
         case BROWSER_EXTENSION_CAPTURE_ACTION.RESET:
             return createBrowserExtensionCaptureState();

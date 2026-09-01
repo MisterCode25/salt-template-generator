@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Salt BO Capture Beta",
   "description": "Loads SO tickets, finds VTI clients by contractor, and opens ALO or ALEX workflows.",
-  "version": "0.1.21",
+  "version": "0.1.22",
   "permissions": [
     "scripting",
     "tabs"

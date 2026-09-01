@@ -109,4 +109,24 @@ assert.equal(getBrowserExtensionJourneyActiveStep(BROWSER_EXTENSION_PHASE.COMPLE
     assert.equal(failure.phase, BROWSER_EXTENSION_PHASE.FAILED);
 }
 
+{
+    const initial = createBrowserExtensionCaptureState();
+    const accepted = reduceBrowserExtensionCaptureState(initial, createExtensionEvent(
+        BROWSER_EXTENSION_MESSAGE.ACCEPTED,
+        "alo-action-1",
+        { action: "alo" }
+    ));
+    const waitingForLogin = reduceBrowserExtensionCaptureState(accepted, createExtensionEvent(
+        BROWSER_EXTENSION_MESSAGE.PROGRESS,
+        "alo-action-1",
+        {
+            action: "alo",
+            phase: BROWSER_EXTENSION_PHASE.AWAITING_AUTHENTICATION
+        }
+    ));
+
+    assert.deepEqual(accepted, initial);
+    assert.deepEqual(waitingForLogin, initial);
+}
+
 console.log("browserExtensionCaptureState tests passed");
