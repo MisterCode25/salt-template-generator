@@ -1,4 +1,4 @@
-import{k as vh,m as cl,r as Z,o as xs,R as _e,j as $}from"./index-DeoIsrGJ.js";import{c as mi}from"./appConfigService-Fz8Jn0LJ.js";import{R as O0}from"./Templates-CuqNrRIM.js";import{T as I0}from"./trash-2-CnbWwqal.js";import{C as Sh}from"./clipboard-copy-57VECJ_T.js";import{X as xh}from"./x-klAqt4Tp.js";import{D as D0}from"./caseProfile-bY6ybbdE.js";import"./tokenService-C2HRv_ob.js";import"./templateTreeService-BSPaL4iv.js";import"./richTextTokens-jMKVvxvY.js";import"./chatGptPrompt-BpRSsEtY.js";/**
+import{k as vh,m as cl,r as Z,o as xs,R as _e,j as $}from"./index-BN1SY7at.js";import{c as mi}from"./appConfigService-CcXs07DP.js";import{R as O0}from"./Templates-DJaMvnez.js";import{T as I0}from"./trash-2-Ce5mPpxt.js";import{C as Sh}from"./clipboard-copy-BjvqOmDH.js";import{X as xh}from"./x-B2Q308xL.js";import{D as D0}from"./caseProfile-BpdxQHRb.js";import"./tokenService-BJK3ogS3.js";import"./templateTreeService-ClTDa_09.js";import"./richTextTokens-CnHiWKL1.js";import"./chatGptPrompt-C7SB1YaN.js";/**
  * @license lucide-react v1.17.0 - ISC
  *
  * This source code is licensed under the ISC license.
