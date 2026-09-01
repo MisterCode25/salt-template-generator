@@ -22,3 +22,5 @@ Depuis Salt BO tools, l’extension peut aussi ouvrir et préremplir le formulai
 La version 0.1.22 conserve désormais une action ALO ou ALEX en attente lorsqu’une page de connexion s’affiche. Il suffit de se connecter dans l’onglet ouvert : l’extension retrouve ensuite la page cible et poursuit automatiquement le préremplissage ou l’ouverture demandée. L’action expire après dix minutes si la connexion n’est pas terminée.
 
 La version 0.1.23 extrait en priorité le contractor depuis un External ID SuperOffice exploitable. La recherche classique de `MSISDN:` dans les données des posts n’est exécutée que si l’External ID est absent ou ne fournit pas de contractor valide.
+
+Version 0.1.24 normalizes ALO contact phone numbers to the Swiss local format and leaves the second phone field empty when both numbers are identical.

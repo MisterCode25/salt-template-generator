@@ -213,14 +213,14 @@ export function buildAloAutofillFields(clientPayload = {}, agentProfile = {}, su
     const contact = clientPayload?.contact || {};
     const healthcheck = clientPayload?.healthcheck || {};
     const agent = normalizeAgentProfile(agentProfile);
-    const fixedPhone = firstValue([
+    const fixedPhone = formatSwissLocalPhone(firstValue([
         contact.fixedNumber,
         contact.voipNumber,
         contact.voip,
         contact.sip,
         client.fixedNumber,
         client.fixedPhone
-    ]);
+    ]));
     const mobilePhone = formatSwissLocalPhone(firstValue([
         client.mobile,
         client.mobileRaw,
@@ -335,6 +335,21 @@ function aloAutofillBookmarkletRunner(expectedSource, preparedPayload) {
         return "";
     }
 
+    function formatSwissLocalPhone(value) {
+        var raw = text(value);
+        var digits = raw.replace(/\D/g, "");
+        if (digits.indexOf("0041") === 0 && digits.length === 13) return "0" + digits.slice(4);
+        if (digits.indexOf("41") === 0 && digits.length === 11) return "0" + digits.slice(2);
+        if (digits.indexOf("0") === 0 && digits.length === 10) return digits;
+        return raw;
+    }
+
+    function isSamePhone(left, right) {
+        var leftDigits = text(left).replace(/\D/g, "");
+        var rightDigits = text(right).replace(/\D/g, "");
+        return Boolean(leftDigits && rightDigits && leftDigits === rightDigits);
+    }
+
     function escapeHtml(value) {
         return text(value).replace(/[&<>"']/g, function replaceHtmlChar(char) {
             return {
@@ -431,6 +446,20 @@ function aloAutofillBookmarkletRunner(expectedSource, preparedPayload) {
         var technical = payload.technical || payload.healthcheck || {};
         var agent = payload.agent || {};
         var count = 0;
+        var primaryPhone = formatSwissLocalPhone(field(payload, "contactPhone1", [
+            client.contactPhone1,
+            client.fixedNumber,
+            client.mobileRaw,
+            client.mobile,
+            client.phone
+        ]));
+        var secondaryPhoneCandidate = formatSwissLocalPhone(field(payload, "contactPhone2", [client.contactPhone2]));
+        var contactPhone1 = primaryPhone || secondaryPhoneCandidate;
+        var contactPhone2 = primaryPhone
+            && secondaryPhoneCandidate
+            && !isSamePhone(primaryPhone, secondaryPhoneCandidate)
+            ? secondaryPhoneCandidate
+            : "";
 
         function apply(id, value, allowEmpty) {
             if (setVal(id, value, allowEmpty)) count += 1;
@@ -445,8 +474,8 @@ function aloAutofillBookmarkletRunner(expectedSource, preparedPayload) {
         apply("ticket.otoAddress.lastName", field(payload, "lastName", [client.lastName, client.lastname, client.surname, client.familyName]));
         apply("ticket.contactPersonFirstName", field(payload, "firstName", [client.firstName, client.firstname, client.givenName]));
         apply("ticket.contactPersonLastName", field(payload, "lastName", [client.lastName, client.lastname, client.surname, client.familyName]));
-        apply("ticket.contactPersonPhone1", field(payload, "contactPhone1", [client.contactPhone1, client.fixedNumber, client.mobileRaw, client.mobile, client.phone]));
-        apply("ticket.contactPersonPhone2", field(payload, "contactPhone2", [client.contactPhone2]));
+        apply("ticket.contactPersonPhone1", contactPhone1);
+        apply("ticket.contactPersonPhone2", contactPhone2, true);
         apply("ticket.contactPersonMail", field(payload, "contactEmail", [client.email, client.mail]));
         apply("ticket.contactPersonNotificationsType", field(payload, "notificationType", ["Email"]));
         apply("ticket.contactPersonPreferredContactType", field(payload, "preferredContactType", ["Mobile"]));

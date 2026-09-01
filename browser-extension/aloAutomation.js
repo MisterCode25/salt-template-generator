@@ -48,6 +48,21 @@ export async function autofillAloTicketPage(payload, fulfillmentDetailUrl) {
         return "";
     }
 
+    function formatSwissLocalPhone(value) {
+        var raw = text(value);
+        var digits = raw.replace(/\D/g, "");
+        if (digits.indexOf("0041") === 0 && digits.length === 13) return "0" + digits.slice(4);
+        if (digits.indexOf("41") === 0 && digits.length === 11) return "0" + digits.slice(2);
+        if (digits.indexOf("0") === 0 && digits.length === 10) return digits;
+        return raw;
+    }
+
+    function isSamePhone(left, right) {
+        var leftDigits = text(left).replace(/\D/g, "");
+        var rightDigits = text(right).replace(/\D/g, "");
+        return Boolean(leftDigits && rightDigits && leftDigits === rightDigits);
+    }
+
     function byAttribute(name, value) {
         var safeValue = String(value).replace(/["\\]/g, "\\$&");
         return document.querySelector("[" + name + "=\"" + safeValue + "\"]");
@@ -164,6 +179,24 @@ export async function autofillAloTicketPage(payload, fulfillmentDetailUrl) {
             ? "retrieved"
             : "unavailable";
     var filledCount = 0;
+    var primaryPhone = formatSwissLocalPhone(first([
+        fields.contactPhone1,
+        client.contactPhone1,
+        client.fixedNumber,
+        client.mobileRaw,
+        client.mobile,
+        client.phone
+    ]));
+    var secondaryPhoneCandidate = formatSwissLocalPhone(first([
+        fields.contactPhone2,
+        client.contactPhone2
+    ]));
+    var contactPhone1 = primaryPhone || secondaryPhoneCandidate;
+    var contactPhone2 = primaryPhone
+        && secondaryPhoneCandidate
+        && !isSamePhone(primaryPhone, secondaryPhoneCandidate)
+        ? secondaryPhoneCandidate
+        : "";
 
     function apply(id, value, allowEmpty) {
         if (setValue(id, value, allowEmpty)) filledCount += 1;
@@ -178,8 +211,8 @@ export async function autofillAloTicketPage(payload, fulfillmentDetailUrl) {
     apply("ticket.otoAddress.lastName", first([fields.lastName, client.lastName, client.lastname, client.surname, client.familyName]));
     apply("ticket.contactPersonFirstName", first([fields.firstName, client.firstName, client.firstname, client.givenName]));
     apply("ticket.contactPersonLastName", first([fields.lastName, client.lastName, client.lastname, client.surname, client.familyName]));
-    apply("ticket.contactPersonPhone1", first([fields.contactPhone1, client.contactPhone1, client.fixedNumber, client.mobileRaw, client.mobile, client.phone]));
-    apply("ticket.contactPersonPhone2", first([fields.contactPhone2, client.contactPhone2]));
+    apply("ticket.contactPersonPhone1", contactPhone1);
+    apply("ticket.contactPersonPhone2", contactPhone2, true);
     apply("ticket.contactPersonMail", first([fields.contactEmail, client.email, client.mail]));
     apply("ticket.contactPersonNotificationsType", first([fields.notificationType, "Email"]));
     apply("ticket.contactPersonPreferredContactType", first([fields.preferredContactType, "Mobile"]));

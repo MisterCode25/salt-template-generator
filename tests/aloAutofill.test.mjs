@@ -53,7 +53,7 @@ assert.equal(
   assert.equal(payload.fields.breakoutFiber, "8");
   assert.equal(payload.fields.firstName, "Peter manuel");
   assert.equal(payload.fields.lastName, "BILLIG");
-  assert.equal(payload.fields.contactPhone1, "41788451664");
+  assert.equal(payload.fields.contactPhone1, "0788451664");
   assert.equal(payload.fields.contactPhone2, "0789125685");
   assert.equal(payload.fields.contactEmail, "pierremb@gmail.com");
   assert.equal(payload.fields.notificationType, "Email");
@@ -78,6 +78,24 @@ assert.equal(
   }, agentProfile, TEST_SO_IMPORT_PAYLOAD);
 
   assert.equal(payload.fields.contactPhone2, "0789125685");
+}
+
+{
+  const payload = buildAloAutofillPayload({
+    ...TEST_VTI_IMPORT_PAYLOAD,
+    client: {
+      ...TEST_VTI_IMPORT_PAYLOAD.client,
+      mobile: "078 912 56 85",
+      mobileRaw: "41789125685"
+    },
+    contact: {
+      ...TEST_VTI_IMPORT_PAYLOAD.contact,
+      fixedNumber: "+41 78 912 56 85"
+    }
+  }, agentProfile, TEST_SO_IMPORT_PAYLOAD);
+
+  assert.equal(payload.fields.contactPhone1, "0789125685");
+  assert.equal(payload.fields.contactPhone2, "");
 }
 
 {
@@ -279,6 +297,8 @@ assert.equal(
   assert.match(bookmarklet, /ticket\.contactPersonIspMail/);
   assert.match(bookmarklet, /ticket\.contactPersonNotificationsType/);
   assert.match(bookmarklet, /ticket\.contactPersonPreferredContactType/);
+  assert.match(bookmarklet, /function formatSwissLocalPhone/);
+  assert.match(bookmarklet, /contactPersonPhone2", contactPhone2, true/);
   assert.match(bookmarklet, /ticket\.problemDateTime/);
   assert.match(bookmarklet, /ticket\.problemCode3/);
   assert.match(bookmarklet, /tagName === "SELECT"/);
@@ -298,6 +318,7 @@ assert.equal(
   assert.match(bookmarklet, /new DOMParser\(\)/);
   assert.match(bookmarklet, /payload\.alo && payload\.alo\.orderId/);
   assert.match(bookmarklet, /ticket\.extRef/);
+  assert.match(bookmarklet, /function formatSwissLocalPhone/);
   assert.match(bookmarklet, /External Ref unavailable\. Field left empty/);
   assert.doesNotMatch(bookmarklet, /External Ref not found\. Check/);
   assert.match(bookmarklet, new RegExp(ALO_FULFILLMENT_DETAIL_URL.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));

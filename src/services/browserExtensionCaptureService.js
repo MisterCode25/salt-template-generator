@@ -7,7 +7,7 @@ import {
 const STATUS_TIMEOUT_MS = 1200;
 const START_TIMEOUT_MS = 2200;
 export const BROWSER_EXTENSION_ACTION_TIMEOUT_MS = 10 * 60 * 1000;
-export const CURRENT_BROWSER_EXTENSION_VERSION = "0.1.23";
+export const CURRENT_BROWSER_EXTENSION_VERSION = "0.1.24";
 
 export function isBrowserExtensionVersionAtLeast(version, minimumVersion) {
     const parseVersion = (value) => String(value || "")

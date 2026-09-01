@@ -30,7 +30,7 @@ assert.equal(isBrowserExtensionVersionAtLeast("0.1.3", "0.1.3"), true);
 assert.equal(isBrowserExtensionVersionAtLeast("0.2.0", "0.1.3"), true);
 assert.equal(isBrowserExtensionVersionAtLeast("0.1.2", "0.1.3"), false);
 assert.equal(isBrowserExtensionVersionAtLeast("", "0.1.3"), false);
-assert.equal(CURRENT_BROWSER_EXTENSION_VERSION, "0.1.23");
+assert.equal(CURRENT_BROWSER_EXTENSION_VERSION, "0.1.24");
 assert.equal(BROWSER_EXTENSION_ACTION_TIMEOUT_MS, 10 * 60 * 1000);
 
 async function withGlobalOverrides(overrides, callback) {
@@ -225,6 +225,43 @@ function createInput(value = "") {
   assert.deepEqual(externalReferenceInput.dispatchedEvents, ["input", "change"]);
   assert.doesNotMatch(autofillAloTicketPage.toString(), /\.submit\s*\(/);
   assert.doesNotMatch(autofillAloTicketPage.toString(), /position:\s*fixed/);
+}
+
+{
+  const primaryPhoneInput = createInput();
+  const secondaryPhoneInput = createInput("41789125685");
+  const fields = new Map([
+    ["ticket.contactPersonPhone1", primaryPhoneInput],
+    ["ticket.contactPersonPhone2", secondaryPhoneInput]
+  ]);
+
+  const result = await withGlobalOverrides({
+    document: {
+      getElementById: (id) => fields.get(id) || null,
+      querySelector: () => null
+    },
+    Event: class Event {
+      constructor(type) {
+        this.type = type;
+      }
+    },
+    location: {
+      hostname: "wholesale.swisscom.com",
+      origin: "https://wholesale.swisscom.com"
+    }
+  }, () => autofillAloTicketPage({
+    source: "salt-templater-alo-autofill",
+    fields: {
+      externalReference: "61388266",
+      contactPhone1: "41789125685",
+      contactPhone2: "078 912 56 85"
+    }
+  }, ALO_FULFILLMENT_DETAIL_URL));
+
+  assert.equal(result.ok, true);
+  assert.equal(primaryPhoneInput.value, "0789125685");
+  assert.equal(secondaryPhoneInput.value, "");
+  assert.deepEqual(secondaryPhoneInput.dispatchedEvents, ["input", "change"]);
 }
 
 {
