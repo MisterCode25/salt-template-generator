@@ -29,15 +29,20 @@ export function createBrowserExtensionCaptureState() {
     };
 }
 
-export function getBrowserExtensionJourneyActiveStep(phase) {
+export function getBrowserExtensionJourneyActiveStep(phase, statuses = {}) {
     switch (phase) {
         case BROWSER_EXTENSION_PHASE.VTI_SEARCH:
         case BROWSER_EXTENSION_PHASE.VTI_RECORD_LOAD:
         case BROWSER_EXTENSION_PHASE.VTI_CAPTURE:
+        case BROWSER_EXTENSION_PHASE.AWAITING_CONTRACTOR_INPUT:
             return 1;
         case BROWSER_EXTENSION_PHASE.IMPORTING:
         case BROWSER_EXTENSION_PHASE.COMPLETED:
             return 2;
+        case BROWSER_EXTENSION_PHASE.FAILED:
+            if (statuses.vtiStatus === "done") return 2;
+            if (statuses.superOfficeStatus === "done") return 1;
+            return 0;
         default:
             return 0;
     }

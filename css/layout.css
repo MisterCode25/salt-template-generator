@@ -1163,16 +1163,102 @@
     margin-top: 14px;
 }
 
+.popup-box.browser-extension-capture-modal {
+    --popup-padding: 16px;
+    width: min(420px, calc(100vw - 24px));
+    max-width: calc(100vw - 24px);
+    gap: 12px;
+    overflow-x: hidden;
+}
+
+.popup-box.browser-extension-capture-modal:focus {
+    outline: none;
+}
+
+.popup-box.browser-extension-capture-modal.is-scanning,
+.popup-box.browser-extension-capture-modal.is-done {
+    width: min(380px, calc(100vw - 24px));
+}
+
+.browser-extension-capture-modal .modal-close-btn {
+    top: 9px;
+    right: 9px;
+    width: 40px;
+    height: 40px;
+}
+
+.browser-extension-capture-header,
+.browser-extension-capture-heading {
+    display: flex;
+    align-items: center;
+}
+
+.browser-extension-capture-header {
+    min-height: 40px;
+    justify-content: space-between;
+    gap: 12px;
+    padding-right: 40px;
+}
+
+.browser-extension-capture-modal.is-scanning .browser-extension-capture-header,
+.browser-extension-capture-modal.is-done .browser-extension-capture-header {
+    padding-right: 0;
+}
+
+.browser-extension-capture-heading {
+    min-width: 0;
+    gap: 10px;
+}
+
+.browser-extension-capture-heading .eyebrow {
+    margin: 0 0 2px;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+}
+
+.browser-extension-capture-heading h2 {
+    margin: 0;
+    font-size: 17px;
+    line-height: 1.15;
+}
+
 .browser-extension-capture-orb {
-    border-color: rgba(167, 139, 250, 0.34);
+    flex: 0 0 auto;
+    width: 36px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(167, 139, 250, 0.34);
+    border-radius: 10px;
     background: rgba(76, 29, 149, 0.28);
     color: #ddd6fe;
+}
+
+.browser-extension-capture-ticket {
+    flex: 0 0 auto;
+    padding: 4px 8px;
+    border: 1px solid rgba(167, 139, 250, 0.25);
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.7);
+    color: #ddd6fe;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 9px;
+    letter-spacing: 0.03em;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.browser-extension-capture-intro {
+    margin: -2px 0 0;
+    color: var(--text-secondary);
+    font-size: 12px;
+    line-height: 1.45;
 }
 
 .browser-extension-ticket-form {
     display: grid;
     gap: 7px;
-    margin-top: 18px;
 }
 
 .browser-extension-ticket-form label {
@@ -1184,18 +1270,23 @@
 .browser-extension-ticket-row {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
-    gap: 9px;
+    gap: 8px;
 }
 
 .browser-extension-ticket-row input {
     min-width: 0;
-    height: 38px;
-    padding: 0 11px;
+    height: 44px;
+    padding: 0 12px;
     border: 1px solid var(--border-default);
-    border-radius: 7px;
+    border-radius: 9px;
     background: rgba(10, 14, 24, 0.86);
     color: var(--text-primary);
     font: inherit;
+}
+
+.browser-extension-ticket-row .primary-btn {
+    min-height: 44px;
+    padding-inline: 15px;
 }
 
 .browser-extension-ticket-row input:focus {
@@ -1213,215 +1304,232 @@
     font-size: 11px;
 }
 
-@media (max-width: 560px) {
-    .browser-extension-ticket-row {
-        grid-template-columns: 1fr;
-    }
-}
-
-.browser-extension-capture-focus {
-    min-height: 88px;
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    margin: 18px 0 12px;
-    padding: 15px;
-    border-radius: 8px;
-    border: 1px solid rgba(167, 139, 250, 0.24);
-    background: rgba(76, 29, 149, 0.13);
-    color: #ddd6fe;
-}
-
-.browser-extension-capture-focus.is-done {
-    border-color: rgba(34, 197, 94, 0.3);
-    background: rgba(20, 83, 45, 0.16);
-    color: #bbf7d0;
-}
-
-.browser-extension-capture-focus.is-error {
-    border-color: rgba(248, 113, 113, 0.32);
-    background: rgba(127, 29, 29, 0.16);
-    color: #fecaca;
-}
-
-.browser-extension-capture-focus.is-warning {
-    border-color: rgba(250, 204, 21, 0.34);
-    background: rgba(113, 63, 18, 0.17);
-    color: #fde68a;
-}
-
-.browser-extension-capture-focus.has-journey {
-    position: relative;
+.browser-extension-capture-progress {
     display: grid;
-    gap: 8px;
-    overflow: hidden;
-    padding: 16px 18px 14px;
+    justify-items: center;
+    gap: 4px;
+    padding: 5px 10px 10px;
+    border: 1px solid rgba(167, 139, 250, 0.2);
+    border-radius: 12px;
     background:
-        radial-gradient(circle at 50% -55%, rgba(56, 189, 248, 0.24), transparent 58%),
-        rgba(76, 29, 149, 0.13);
+        radial-gradient(circle at 50% 0%, rgba(56, 189, 248, 0.12), transparent 54%),
+        rgba(76, 29, 149, 0.08);
+    overflow: hidden;
+}
+
+.browser-extension-capture-progress.is-done {
+    border-color: rgba(34, 197, 94, 0.28);
+    background: rgba(20, 83, 45, 0.12);
+}
+
+.browser-extension-capture-progress.is-error {
+    border-color: rgba(248, 113, 113, 0.28);
+    background: rgba(127, 29, 29, 0.1);
+}
+
+.browser-extension-capture-progress.is-warning {
+    border-color: rgba(250, 204, 21, 0.3);
+    background: rgba(113, 63, 18, 0.1);
 }
 
 .browser-extension-capture-journey {
-    --ai-accent: #a78bfa;
-    --ai-accent-soft: rgba(167, 139, 250, 0.16);
     display: grid;
     justify-items: center;
-    gap: 7px;
+    gap: 1px;
     width: 100%;
-    min-height: 139px;
 }
 
-.browser-extension-capture-journey.is-stage-1 {
-    --ai-accent: #38bdf8;
-    --ai-accent-soft: rgba(56, 189, 248, 0.16);
-}
-
-.browser-extension-capture-journey.is-stage-2 {
-    --ai-accent: #4ade80;
-    --ai-accent-soft: rgba(74, 222, 128, 0.16);
-}
-
-.browser-extension-ai-core {
+.browser-extension-capture-arc-shell {
     position: relative;
-    width: 104px;
-    height: 104px;
-    display: grid;
-    place-items: center;
+    width: min(224px, 76vw);
+    aspect-ratio: 2 / 1;
 }
 
-.browser-extension-ai-logo {
-    position: relative;
-    z-index: 3;
-    width: 62px;
-    height: 62px;
-    display: grid;
-    place-items: center;
-    overflow: hidden;
-    border: 1px solid rgba(196, 181, 253, 0.5);
-    border-radius: 21px;
-    background:
-        radial-gradient(circle at 35% 25%, rgba(255, 255, 255, 0.2), transparent 35%),
-        linear-gradient(145deg, rgba(91, 33, 182, 0.96), rgba(14, 116, 144, 0.9));
-    color: #f8fafc;
-    box-shadow:
-        0 0 0 7px rgba(139, 92, 246, 0.08),
-        0 13px 30px rgba(14, 116, 144, 0.2),
-        0 0 28px var(--ai-accent-soft);
-    animation: browserExtensionAiFloat 2.6s ease-in-out infinite;
+.browser-extension-capture-arc {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
 }
 
-.browser-extension-ai-logo::after {
-    content: "";
+.browser-extension-arc-track,
+.browser-extension-arc-value,
+.browser-extension-arc-shimmer {
+    fill: none;
+    stroke-linecap: round;
+    stroke-width: 10;
+}
+
+.browser-extension-arc-track {
+    stroke: rgba(148, 163, 184, 0.16);
+}
+
+.browser-extension-arc-value {
+    opacity: 0;
+    transition: stroke 0.24s ease, opacity 0.24s ease;
+}
+
+.browser-extension-arc-step.is-super-office {
+    --arc-color: #a78bfa;
+}
+
+.browser-extension-arc-step.is-vti {
+    --arc-color: #38bdf8;
+}
+
+.browser-extension-arc-step.is-application {
+    --arc-color: #4ade80;
+}
+
+.browser-extension-arc-step.is-active .browser-extension-arc-value,
+.browser-extension-arc-step.is-done .browser-extension-arc-value {
+    stroke: var(--arc-color);
+    opacity: 1;
+}
+
+.browser-extension-arc-step.is-active .browser-extension-arc-value {
+    opacity: 0.42;
+}
+
+.browser-extension-arc-step.is-error .browser-extension-arc-value,
+.browser-extension-arc-step.is-warning .browser-extension-arc-value {
+    opacity: 1;
+}
+
+.browser-extension-arc-step.is-error .browser-extension-arc-value {
+    stroke: #f87171;
+}
+
+.browser-extension-arc-step.is-warning .browser-extension-arc-value {
+    stroke: #facc15;
+}
+
+.browser-extension-arc-shimmer {
+    stroke: #f8fafc;
+    stroke-dasharray: 20 80;
+    filter: drop-shadow(0 0 5px var(--arc-color));
+    animation: browserExtensionArcSweep 1.2s linear infinite;
+}
+
+.browser-extension-capture-arc-icon {
     position: absolute;
-    inset: 7px;
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    border-radius: 15px;
-}
-
-.browser-extension-ai-orbit {
-    position: absolute;
-    border-radius: 50%;
-    pointer-events: none;
-}
-
-.browser-extension-ai-orbit.is-outer {
-    inset: 2px;
-    border: 1px dashed rgba(148, 163, 184, 0.4);
-    animation: browserExtensionAiOrbit 8s linear infinite;
-}
-
-.browser-extension-ai-orbit.is-inner {
-    inset: 11px;
-    border: 2px solid transparent;
-    border-top-color: var(--ai-accent);
-    border-right-color: color-mix(in srgb, var(--ai-accent) 42%, transparent);
-    box-shadow: inset 0 0 17px var(--ai-accent-soft);
-    animation: browserExtensionAiOrbit 2.2s linear infinite reverse;
-}
-
-.browser-extension-ai-satellite {
-    position: absolute;
-    top: 50%;
     left: 50%;
-    z-index: 4;
-    width: 7px;
-    height: 7px;
-    margin: -3.5px;
-    border: 1px solid rgba(255, 255, 255, 0.9);
-    border-radius: 999px;
-    background: var(--ai-accent);
-    box-shadow: 0 0 10px var(--ai-accent);
-    animation: browserExtensionAiSatellite 3s linear infinite;
+    bottom: 14px;
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(196, 181, 253, 0.34);
+    border-radius: 14px;
+    background: rgba(15, 23, 42, 0.92);
+    color: #ddd6fe;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.3), 0 0 18px rgba(167, 139, 250, 0.12);
+    transform: translateX(-50%);
+    transition: border-color 0.24s ease, background 0.24s ease, color 0.24s ease;
 }
 
-.browser-extension-ai-satellite.is-second {
-    width: 5px;
-    height: 5px;
-    margin: -2.5px;
-    opacity: 0.72;
-    animation-duration: 4.4s;
-    animation-delay: -2.2s;
-    animation-direction: reverse;
+.browser-extension-capture-journey.is-stage-1 .browser-extension-capture-arc-icon {
+    border-color: rgba(56, 189, 248, 0.4);
+    color: #bae6fd;
 }
 
-.browser-extension-ai-stages {
-    display: flex;
+.browser-extension-capture-journey.is-stage-2 .browser-extension-capture-arc-icon {
+    border-color: rgba(74, 222, 128, 0.4);
+    color: #bbf7d0;
+}
+
+.browser-extension-capture-journey.is-done .browser-extension-capture-arc-icon {
+    border-color: rgba(74, 222, 128, 0.52);
+    background: rgba(20, 83, 45, 0.86);
+    color: #dcfce7;
+    animation: browserExtensionCaptureSuccess 0.34s cubic-bezier(0.22, 0.9, 0.2, 1);
+}
+
+.browser-extension-capture-journey.is-done .browser-extension-arc-value {
+    stroke: #4ade80;
+}
+
+.browser-extension-capture-journey.is-error .browser-extension-capture-arc-icon {
+    border-color: rgba(248, 113, 113, 0.48);
+    background: rgba(127, 29, 29, 0.78);
+    color: #fecaca;
+}
+
+.browser-extension-capture-journey.is-warning .browser-extension-capture-arc-icon {
+    border-color: rgba(250, 204, 21, 0.48);
+    background: rgba(113, 63, 18, 0.78);
+    color: #fef08a;
+}
+
+.browser-extension-arc-stages {
+    width: min(242px, 82vw);
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-top: -3px;
+}
+
+.browser-extension-arc-stage {
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
-}
-
-.browser-extension-ai-stage {
-    min-width: 34px;
-    padding: 4px 7px;
-    border: 1px solid rgba(148, 163, 184, 0.22);
-    border-radius: 999px;
-    background: rgba(15, 23, 42, 0.48);
+    gap: 5px;
     color: var(--text-muted);
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     font-size: 9px;
     font-weight: 800;
     letter-spacing: 0.09em;
     line-height: 1;
-    text-align: center;
     text-transform: uppercase;
-    transition: border-color 0.25s ease, background 0.25s ease, color 0.25s ease;
+    transition: color 0.24s ease;
 }
 
-.browser-extension-ai-stage.is-active {
-    border-color: var(--ai-accent);
-    background: var(--ai-accent-soft);
-    color: var(--ai-accent);
-    box-shadow: 0 0 12px var(--ai-accent-soft);
-}
-
-.browser-extension-ai-stage.is-done {
-    border-color: rgba(74, 222, 128, 0.42);
-    background: rgba(20, 83, 45, 0.28);
-    color: #86efac;
-}
-
-.browser-extension-ai-stage.is-done::before {
-    content: "✓ ";
-}
-
-.browser-extension-ai-ticket {
-    padding: 3px 7px;
-    border: 1px solid rgba(167, 139, 250, 0.25);
+.browser-extension-arc-stage-dot {
+    width: 6px;
+    height: 6px;
+    border: 1px solid rgba(148, 163, 184, 0.38);
     border-radius: 999px;
-    background: rgba(15, 23, 42, 0.7);
-    color: #ddd6fe;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    font-size: 8px;
-    letter-spacing: 0.04em;
-    line-height: 1;
+    background: transparent;
+}
+
+.browser-extension-arc-stage.is-active,
+.browser-extension-arc-stage.is-done {
+    color: var(--text-primary);
+}
+
+.browser-extension-arc-stage.is-active .browser-extension-arc-stage-dot {
+    border-color: #f8fafc;
+    background: #f8fafc;
+    box-shadow: 0 0 9px rgba(248, 250, 252, 0.72);
+}
+
+.browser-extension-arc-stage.is-done .browser-extension-arc-stage-dot {
+    border-color: #4ade80;
+    background: #4ade80;
+}
+
+.browser-extension-arc-stage.is-error {
+    color: #fca5a5;
+}
+
+.browser-extension-arc-stage.is-error .browser-extension-arc-stage-dot {
+    border-color: #f87171;
+    background: #f87171;
+}
+
+.browser-extension-arc-stage.is-warning {
+    color: #fde68a;
+}
+
+.browser-extension-arc-stage.is-warning .browser-extension-arc-stage-dot {
+    border-color: #facc15;
+    background: #facc15;
 }
 
 .browser-extension-contractor-input {
     display: grid;
     gap: 7px;
-    margin: 0 0 12px;
-    padding: 11px 12px;
+    padding: 10px 11px;
     border: 1px solid rgba(250, 204, 21, 0.28);
     border-radius: 8px;
     background: rgba(113, 63, 18, 0.13);
@@ -1447,7 +1555,7 @@
 
 .browser-extension-contractor-input input {
     min-width: 0;
-    height: 38px;
+    height: 44px;
     padding: 0 11px;
     border: 1px solid var(--border-default);
     border-radius: 7px;
@@ -1468,54 +1576,90 @@
 
 .browser-extension-capture-copy {
     display: grid;
-    gap: 5px;
-}
-
-.browser-extension-capture-focus.has-journey .browser-extension-capture-copy {
     gap: 3px;
     justify-items: center;
     text-align: center;
 }
 
-.browser-extension-capture-focus.has-journey .browser-extension-capture-copy strong {
-    font-size: 12px;
-    letter-spacing: 0.02em;
-}
-
-.browser-extension-capture-focus.has-journey .browser-extension-capture-copy span {
-    font-size: 10px;
-    line-height: 1.35;
-}
-
 .browser-extension-capture-copy strong {
     color: var(--text-primary);
-    font-size: 15px;
+    font-size: 13px;
+    letter-spacing: 0.01em;
 }
 
 .browser-extension-capture-copy span {
-    max-width: 460px;
+    max-width: 320px;
     color: var(--text-secondary);
-    font-size: 12px;
-    line-height: 1.4;
+    font-size: 11px;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
 }
 
 .browser-extension-capture-note {
-    margin-top: 12px;
-    padding: 10px 12px;
+    display: flex;
+    align-items: flex-start;
+    gap: 7px;
+    padding: 8px 9px;
     border-radius: 8px;
     background: rgba(148, 163, 184, 0.08);
     color: var(--text-muted);
     font-size: 11px;
-    line-height: 1.45;
+    line-height: 1.4;
 }
 
-.browser-extension-download-btn,
+.browser-extension-capture-note svg {
+    flex: 0 0 auto;
+    margin-top: 1px;
+}
+
+.browser-extension-capture-footer {
+    min-height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+}
+
+.browser-extension-capture-footer.is-cancel-only {
+    justify-content: flex-end;
+}
+
+.browser-extension-download-link,
 .browser-extension-install-download {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 7px;
+    gap: 6px;
     text-decoration: none;
+}
+
+.browser-extension-download-link {
+    min-height: 32px;
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 700;
+    transition: color 0.18s ease;
+}
+
+.browser-extension-download-link:hover,
+.browser-extension-download-link:focus-visible {
+    color: #c4b5fd;
+    outline: none;
+}
+
+@media (max-width: 560px) {
+    .browser-extension-ticket-row {
+        grid-template-columns: 1fr;
+    }
+
+    .browser-extension-capture-header {
+        align-items: flex-start;
+        flex-direction: column;
+        padding-right: 42px;
+    }
+
+    .browser-extension-capture-ticket {
+        margin-left: 46px;
+    }
 }
 
 @keyframes captureDataSpin {
@@ -1524,45 +1668,35 @@
     }
 }
 
-@keyframes browserExtensionAiOrbit {
-    to {
-        transform: rotate(360deg);
-    }
-}
-
-@keyframes browserExtensionAiFloat {
-    0%, 100% {
-        transform: translateY(1px) scale(0.99);
-    }
-    50% {
-        transform: translateY(-3px) scale(1.02);
-    }
-}
-
-@keyframes browserExtensionAiSatellite {
+@keyframes browserExtensionArcSweep {
     from {
-        transform: rotate(0deg) translateX(49px) rotate(0deg);
+        stroke-dashoffset: 20;
     }
     to {
-        transform: rotate(360deg) translateX(49px) rotate(-360deg);
+        stroke-dashoffset: -80;
+    }
+}
+
+@keyframes browserExtensionCaptureSuccess {
+    0% {
+        transform: translateX(-50%) scale(0.82);
+        opacity: 0.4;
+    }
+    100% {
+        transform: translateX(-50%) scale(1);
+        opacity: 1;
     }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .browser-extension-ai-logo,
-    .browser-extension-ai-orbit.is-outer,
-    .browser-extension-ai-orbit.is-inner,
-    .browser-extension-ai-satellite.is-first,
-    .browser-extension-ai-satellite.is-second {
+    .browser-extension-arc-shimmer,
+    .browser-extension-capture-journey.is-done .browser-extension-capture-arc-icon {
         animation: none;
     }
 
-    .browser-extension-ai-satellite.is-first {
-        transform: translateX(49px);
-    }
-
-    .browser-extension-ai-satellite.is-second {
-        transform: translateX(-49px);
+    .browser-extension-arc-shimmer {
+        stroke-dasharray: none;
+        opacity: 0.68;
     }
 }
 
@@ -2383,95 +2517,73 @@
     color: #b91c1c;
 }
 
-.light-theme .browser-extension-capture-focus {
+.light-theme .browser-extension-capture-progress {
     border-color: #d8b4fe;
-    background: #faf5ff;
-    color: #6d28d9;
+    background:
+        radial-gradient(circle at 50% 0%, rgba(14, 165, 233, 0.1), transparent 54%),
+        #faf5ff;
 }
 
-.light-theme .browser-extension-capture-focus.is-done {
+.light-theme .browser-extension-capture-progress.is-done {
     border-color: #86efac;
+    background: #f0fdf4;
+}
+
+.light-theme .browser-extension-capture-progress.is-error {
+    border-color: #fecaca;
+    background: #fef2f2;
+}
+
+.light-theme .browser-extension-capture-progress.is-warning {
+    border-color: #fde68a;
+    background: #fffbeb;
+}
+
+.light-theme .browser-extension-arc-track {
+    stroke: rgba(100, 116, 139, 0.2);
+}
+
+.light-theme .browser-extension-capture-arc-icon {
+    border-color: #c4b5fd;
+    background: #ffffff;
+    color: #6d28d9;
+    box-shadow: 0 8px 22px rgba(51, 65, 85, 0.14), 0 0 18px rgba(124, 58, 237, 0.08);
+}
+
+.light-theme .browser-extension-capture-journey.is-stage-1 .browser-extension-capture-arc-icon {
+    border-color: #7dd3fc;
+    color: #0369a1;
+}
+
+.light-theme .browser-extension-capture-journey.is-stage-2 .browser-extension-capture-arc-icon {
+    border-color: #86efac;
+    color: #15803d;
+}
+
+.light-theme .browser-extension-capture-journey.is-done .browser-extension-capture-arc-icon {
+    border-color: #4ade80;
     background: #f0fdf4;
     color: #15803d;
 }
 
-.light-theme .browser-extension-capture-focus.is-error {
-    border-color: #fecaca;
+.light-theme .browser-extension-capture-journey.is-error .browser-extension-capture-arc-icon {
+    border-color: #fca5a5;
     background: #fef2f2;
     color: #b91c1c;
 }
 
-.light-theme .browser-extension-capture-focus.is-warning {
-    border-color: #fde68a;
+.light-theme .browser-extension-capture-journey.is-warning .browser-extension-capture-arc-icon {
+    border-color: #fcd34d;
     background: #fffbeb;
     color: #a16207;
 }
 
-.light-theme .browser-extension-capture-focus.has-journey {
-    border-color: #c4b5fd;
-    background:
-        radial-gradient(circle at 50% -35%, rgba(14, 165, 233, 0.16), transparent 56%),
-        linear-gradient(135deg, #faf5ff 0%, #f0f9ff 100%);
+.light-theme .browser-extension-arc-stage.is-active,
+.light-theme .browser-extension-arc-stage.is-done {
+    color: #0f172a;
 }
 
-.light-theme .browser-extension-capture-journey {
-    --ai-accent: #7c3aed;
-    --ai-accent-soft: rgba(124, 58, 237, 0.12);
-}
-
-.light-theme .browser-extension-capture-journey.is-stage-1 {
-    --ai-accent: #0369a1;
-    --ai-accent-soft: rgba(2, 132, 199, 0.12);
-}
-
-.light-theme .browser-extension-capture-journey.is-stage-2 {
-    --ai-accent: #15803d;
-    --ai-accent-soft: rgba(22, 163, 74, 0.12);
-}
-
-.light-theme .browser-extension-ai-logo {
-    border-color: #c4b5fd;
-    background:
-        radial-gradient(circle at 35% 25%, #ffffff 0%, transparent 36%),
-        linear-gradient(145deg, #ffffff 0%, #f5f3ff 55%, #e0f2fe 100%);
-    color: #6d28d9;
-    box-shadow:
-        0 0 0 7px rgba(124, 58, 237, 0.06),
-        0 13px 28px rgba(51, 65, 85, 0.14),
-        0 0 24px var(--ai-accent-soft);
-}
-
-.light-theme .browser-extension-ai-logo::after {
-    border-color: rgba(109, 40, 217, 0.12);
-}
-
-.light-theme .browser-extension-ai-orbit.is-outer {
-    border-color: #a8b8cb;
-}
-
-.light-theme .browser-extension-ai-satellite {
-    border-color: #ffffff;
-}
-
-.light-theme .browser-extension-ai-stage {
-    border-color: #cbd5e1;
-    background: rgba(255, 255, 255, 0.82);
-    color: #64748b;
-}
-
-.light-theme .browser-extension-ai-stage.is-active {
-    border-color: var(--ai-accent);
-    background: var(--ai-accent-soft);
-    color: var(--ai-accent);
-}
-
-.light-theme .browser-extension-ai-stage.is-done {
-    border-color: #86efac;
-    background: #f0fdf4;
-    color: #166534;
-}
-
-.light-theme .browser-extension-ai-ticket {
+.light-theme .browser-extension-capture-ticket {
     border-color: #c4b5fd;
     background: rgba(255, 255, 255, 0.9);
     color: #4c1d95;
@@ -2483,13 +2595,19 @@
 }
 
 .light-theme .browser-extension-capture-copy span,
-.light-theme .browser-extension-capture-note {
+.light-theme .browser-extension-capture-note,
+.light-theme .browser-extension-download-link {
     color: #475569;
 }
 
 .light-theme .browser-extension-capture-note {
     border: 1px solid #e2e8f0;
     background: #f8fafc;
+}
+
+.light-theme .browser-extension-download-link:hover,
+.light-theme .browser-extension-download-link:focus-visible {
+    color: #6d28d9;
 }
 
 .light-theme .browser-extension-contractor-input {

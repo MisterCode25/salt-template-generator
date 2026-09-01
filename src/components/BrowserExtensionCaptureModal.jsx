@@ -3,6 +3,7 @@ import {
     AlertTriangle,
     CheckCircle2,
     Download,
+    Info,
     Puzzle,
     RefreshCw
 } from "lucide-react";
@@ -14,38 +15,77 @@ import Modal from "./Modal.jsx";
 
 const COMPLETED_AUTO_CLOSE_DELAY_MS = 1000;
 const CAPTURE_JOURNEY_STEPS = Object.freeze([
-    { id: "super-office", label: "SO" },
-    { id: "vti", label: "VTI" },
-    { id: "application", label: "APP" }
+    {
+        id: "super-office",
+        label: "SO",
+        path: "M 28 110 A 92 92 0 0 1 68.6 33.7"
+    },
+    {
+        id: "vti",
+        label: "VTI",
+        path: "M 76.8 28.8 A 92 92 0 0 1 163.2 28.8"
+    },
+    {
+        id: "application",
+        label: "APP",
+        path: "M 171.4 33.7 A 92 92 0 0 1 212 110"
+    }
 ]);
 
-function BrowserExtensionCaptureJourney({ phase, ticketNumber }) {
-    const activeStep = getBrowserExtensionJourneyActiveStep(phase);
+function getJourneyStepStatus(index, activeStep, mode) {
+    if (mode === "done" || index < activeStep) return "done";
+    if (index > activeStep) return "waiting";
+    if (["error", "warning"].includes(mode)) return mode;
+    return "active";
+}
+
+function BrowserExtensionCaptureJourney({ state, mode }) {
+    const activeStep = getBrowserExtensionJourneyActiveStep(state.phase, state);
+    const JourneyIcon = mode === "done"
+        ? CheckCircle2
+        : ["error", "warning"].includes(mode)
+            ? AlertTriangle
+            : Puzzle;
 
     return (
-        <div className={`browser-extension-capture-journey is-stage-${activeStep}`} aria-hidden="true">
-            <div className="browser-extension-ai-core">
-                <span className="browser-extension-ai-orbit is-outer" />
-                <span className="browser-extension-ai-orbit is-inner" />
-                <span className="browser-extension-ai-satellite is-first" />
-                <span className="browser-extension-ai-satellite is-second" />
-                <span className="browser-extension-ai-logo">
-                    <Puzzle size={28} strokeWidth={2.1} />
+        <div
+            className={`browser-extension-capture-journey is-stage-${activeStep} is-${mode}`}
+            aria-hidden="true"
+        >
+            <div className="browser-extension-capture-arc-shell">
+                <svg
+                    className="browser-extension-capture-arc"
+                    viewBox="0 0 240 120"
+                    focusable="false"
+                >
+                    {CAPTURE_JOURNEY_STEPS.map((step, index) => {
+                        const status = getJourneyStepStatus(index, activeStep, mode);
+                        return (
+                            <g key={step.id} className={`browser-extension-arc-step is-${step.id} is-${status}`}>
+                                <path className="browser-extension-arc-track" d={step.path} pathLength="100" />
+                                <path className="browser-extension-arc-value" d={step.path} pathLength="100" />
+                                {status === "active" && (
+                                    <path className="browser-extension-arc-shimmer" d={step.path} pathLength="100" />
+                                )}
+                            </g>
+                        );
+                    })}
+                </svg>
+                <span className="browser-extension-capture-arc-icon">
+                    <JourneyIcon size={25} strokeWidth={2.2} />
                 </span>
             </div>
-            <div className="browser-extension-ai-stages">
+            <div className="browser-extension-arc-stages">
                 {CAPTURE_JOURNEY_STEPS.map((step, index) => {
-                    const status = index < activeStep ? "done" : index === activeStep ? "active" : "waiting";
+                    const status = getJourneyStepStatus(index, activeStep, mode);
                     return (
-                        <span key={step.id} className={`browser-extension-ai-stage is-${status}`}>
-                            {step.label}
+                        <span key={step.id} className={`browser-extension-arc-stage is-${status}`}>
+                            <span className="browser-extension-arc-stage-dot" />
+                            <span>{step.label}</span>
                         </span>
                     );
                 })}
             </div>
-            {ticketNumber && (
-                <span className="browser-extension-ai-ticket">Ticket {ticketNumber}</span>
-            )}
         </div>
     );
 }
@@ -54,20 +94,19 @@ function getVisual(state) {
     if (state.error) {
         return {
             mode: "error",
-            Icon: AlertTriangle,
             title: state.installed === false ? "Extension non détectée" : "Capture interrompue"
         };
     }
     if (state.phase === BROWSER_EXTENSION_PHASE.COMPLETED) {
-        return { mode: "done", Icon: CheckCircle2, title: "Import terminé" };
+        return { mode: "done", title: "Import terminé" };
     }
     if (state.requiresContractorInput) {
-        return { mode: "warning", Icon: AlertTriangle, title: "Contractor introuvable" };
+        return { mode: "warning", title: "Contractor introuvable" };
     }
     if (state.isRunning || state.isChecking) {
-        return { mode: "scanning", Icon: Puzzle, title: "Capture automatique en cours" };
+        return { mode: "scanning", title: "Capture automatique en cours" };
     }
-    return { mode: "ready", Icon: Puzzle, title: "Extension de capture" };
+    return { mode: "ready", title: "Extension de capture" };
 }
 
 export default function BrowserExtensionCaptureModal({ state, onStart, onClose }) {
@@ -88,15 +127,11 @@ export default function BrowserExtensionCaptureModal({ state, onStart, onClose }
     }, [state.phase]);
 
     const visual = getVisual(state);
-    const VisualIcon = visual.Icon;
     const isBusy = state.isRunning || state.isChecking;
     const isCompleted = state.phase === BROWSER_EXTENSION_PHASE.COMPLETED;
     const requiresContractorInput = state.requiresContractorInput;
-    const timelineProgressClass = state.vtiStatus === "done"
-        ? "is-complete"
-        : state.superOfficeStatus === "done"
-            ? "is-half"
-            : "is-start";
+    const currentTicketNumber = state.ticketNumber || ticketNumber;
+    const shouldShowProgress = isBusy || isCompleted || requiresContractorInput || Boolean(state.error);
     const downloadUrl = `${import.meta.env.BASE_URL}downloads/salt-bo-capture-beta.zip`;
     const submitTicket = (event) => {
         event.preventDefault();
@@ -134,22 +169,32 @@ export default function BrowserExtensionCaptureModal({ state, onStart, onClose }
             onClose={onClose}
             closeOnOverlay={!isBusy}
             disableEscapeClose={isBusy}
-            showCloseButton={!isBusy}
-            dialogClassName="popup-box capture-data-modal browser-extension-capture-modal"
+            showCloseButton={!isBusy && !isCompleted}
+            dialogClassName={`popup-box capture-data-modal browser-extension-capture-modal is-${visual.mode}`}
             ariaLabel="Capture automatique avec l’extension"
         >
-            <div className="capture-data-header">
-                <div className="capture-data-orb browser-extension-capture-orb" aria-hidden="true">
-                    <Puzzle size={22} />
+            <div className="browser-extension-capture-header">
+                <div className="browser-extension-capture-heading">
+                    <div className="browser-extension-capture-orb" aria-hidden="true">
+                        <Puzzle size={18} />
+                    </div>
+                    <div>
+                        <p className="eyebrow">Bêta</p>
+                        <h2>Capture automatique</h2>
+                    </div>
                 </div>
-                <div>
-                    <p className="eyebrow">Bêta</p>
-                    <h2>Capture par extension</h2>
-                    <p>Charge le ticket demandé dans l’onglet SuperOffice ouvert, puis capture SO et VTI.</p>
-                </div>
+                {currentTicketNumber && (
+                    <span className="browser-extension-capture-ticket">Ticket {currentTicketNumber}</span>
+                )}
             </div>
 
-            {!isCompleted && !requiresContractorInput && (
+            {!isBusy && !isCompleted && !requiresContractorInput && !state.error && (
+                <p className="browser-extension-capture-intro">
+                    Saisis le ticket SuperOffice. L’extension récupérera ensuite les données SO et VTI.
+                </p>
+            )}
+
+            {!isBusy && !isCompleted && !requiresContractorInput && (
                 <form className="browser-extension-ticket-form" onSubmit={submitTicket}>
                     <label htmlFor="browser-extension-ticket-number">Numéro du ticket SuperOffice</label>
                     <div className="browser-extension-ticket-row">
@@ -171,7 +216,7 @@ export default function BrowserExtensionCaptureModal({ state, onStart, onClose }
                         />
                         <button type="submit" className="primary-btn" disabled={isBusy}>
                             {state.error && <RefreshCw size={15} aria-hidden="true" />}
-                            {state.error ? "Réessayer" : "Charger et capturer"}
+                            {state.error ? "Réessayer" : "Capturer"}
                         </button>
                     </div>
                     {ticketInputError && (
@@ -182,23 +227,21 @@ export default function BrowserExtensionCaptureModal({ state, onStart, onClose }
                 </form>
             )}
 
-            <div
-                className={`browser-extension-capture-focus is-${visual.mode}${isBusy ? " has-journey" : ""}`}
-                aria-live="polite"
-            >
-                {isBusy ? (
+            {shouldShowProgress && (
+                <div
+                    className={`browser-extension-capture-progress is-${visual.mode}`}
+                    aria-live="polite"
+                >
                     <BrowserExtensionCaptureJourney
-                        phase={state.phase}
-                        ticketNumber={state.ticketNumber || ticketNumber}
+                        state={state}
+                        mode={visual.mode}
                     />
-                ) : (
-                    <VisualIcon size={30} aria-hidden="true" />
-                )}
-                <div className="browser-extension-capture-copy">
-                    <strong>{visual.title}</strong>
-                    <span>{state.error || state.message}</span>
+                    <div className="browser-extension-capture-copy">
+                        <strong>{visual.title}</strong>
+                        <span>{state.error || state.message}</span>
+                    </div>
                 </div>
-            </div>
+            )}
 
             {requiresContractorInput && (
                 <form className="browser-extension-contractor-input" onSubmit={submitManualContractor}>
@@ -236,41 +279,28 @@ export default function BrowserExtensionCaptureModal({ state, onStart, onClose }
                 </form>
             )}
 
-            {!isBusy && (
-                <div className={`capture-data-timeline ${timelineProgressClass}`} aria-label="Progression de la capture">
-                    <div className="capture-data-timeline-line" aria-hidden="true"><span /></div>
-                    <div className={`capture-data-timeline-step is-${state.superOfficeStatus}`}>
-                        <span className="capture-data-timeline-dot" aria-hidden="true" />
-                        <strong>SuperOffice</strong>
-                        <small>Ticket demandé</small>
-                    </div>
-                    <div className={`capture-data-timeline-step is-${state.vtiStatus}`}>
-                        <span className="capture-data-timeline-dot" aria-hidden="true" />
-                        <strong>VTI</strong>
-                        <small>Recherche et capture</small>
-                    </div>
+            {!isBusy && !isCompleted && !requiresContractorInput && (
+                <div className="browser-extension-capture-note">
+                    <Info size={14} aria-hidden="true" />
+                    <span>Garde exactement un onglet SuperOffice et un onglet VTI ouverts.</span>
                 </div>
             )}
 
-            <div className="browser-extension-capture-note">
-                Exactement un onglet SuperOffice et un onglet VTI doivent être ouverts. Les deux onglets sont
-                réutilisés en arrière-plan ; VTI recherche automatiquement le contractor trouvé dans le ticket.
-            </div>
-
-            <div className="popup-actions capture-data-actions">
-                <a className="secondary-btn browser-extension-download-btn" href={downloadUrl} download>
-                    <Download size={15} aria-hidden="true" />
-                    Télécharger l’extension
-                </a>
-                {requiresContractorInput && (
-                    <button type="button" className="secondary-btn" onClick={onClose}>
-                        Annuler la capture
-                    </button>
-                )}
-                {!isBusy && !requiresContractorInput && (
-                    <button type="button" className="secondary-btn" onClick={onClose}>Fermer</button>
-                )}
-            </div>
+            {!isBusy && !isCompleted && (
+                <div className={`browser-extension-capture-footer${requiresContractorInput ? " is-cancel-only" : ""}`}>
+                    {!requiresContractorInput && (
+                        <a className="browser-extension-download-link" href={downloadUrl} download>
+                            <Download size={14} aria-hidden="true" />
+                            Télécharger l’extension
+                        </a>
+                    )}
+                    {requiresContractorInput && (
+                        <button type="button" className="secondary-btn" onClick={onClose}>
+                            Annuler la capture
+                        </button>
+                    )}
+                </div>
+            )}
         </Modal>
     );
 }

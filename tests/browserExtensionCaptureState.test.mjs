@@ -18,8 +18,18 @@ assert.equal(getBrowserExtensionJourneyActiveStep(BROWSER_EXTENSION_PHASE.SUPER_
 assert.equal(getBrowserExtensionJourneyActiveStep(BROWSER_EXTENSION_PHASE.VTI_SEARCH), 1);
 assert.equal(getBrowserExtensionJourneyActiveStep(BROWSER_EXTENSION_PHASE.VTI_RECORD_LOAD), 1);
 assert.equal(getBrowserExtensionJourneyActiveStep(BROWSER_EXTENSION_PHASE.VTI_CAPTURE), 1);
+assert.equal(getBrowserExtensionJourneyActiveStep(BROWSER_EXTENSION_PHASE.AWAITING_CONTRACTOR_INPUT), 1);
 assert.equal(getBrowserExtensionJourneyActiveStep(BROWSER_EXTENSION_PHASE.IMPORTING), 2);
 assert.equal(getBrowserExtensionJourneyActiveStep(BROWSER_EXTENSION_PHASE.COMPLETED), 2);
+assert.equal(getBrowserExtensionJourneyActiveStep(BROWSER_EXTENSION_PHASE.FAILED), 0);
+assert.equal(getBrowserExtensionJourneyActiveStep(BROWSER_EXTENSION_PHASE.FAILED, {
+    superOfficeStatus: "done",
+    vtiStatus: "waiting"
+}), 1);
+assert.equal(getBrowserExtensionJourneyActiveStep(BROWSER_EXTENSION_PHASE.FAILED, {
+    superOfficeStatus: "done",
+    vtiStatus: "done"
+}), 2);
 
 {
     const initial = createBrowserExtensionCaptureState();
