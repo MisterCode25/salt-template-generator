@@ -10,7 +10,7 @@ import {
     EXTERNAL_DEFAULT_FIELDS,
     EXTERNAL_GENERATOR_PARTNERS,
     EXTERNAL_TREATMENT_STEP_DOWNSTREAM_FIELDS,
-    buildExternalFieldsFromClientPayload,
+    buildExternalClientPrefillFields,
     buildExternalCode,
     buildPartnerTicketPromptTitle,
     buildTreatmentStepChangeFields,
@@ -645,7 +645,16 @@ export default function ExternalGenerator({
                 }
                 if (!value) return false;
                 history.push(before);
-                apply({ [step.key]: step.mapChoice ? step.mapChoice(value) : value });
+                const selectedValue = step.mapChoice ? step.mapChoice(value) : value;
+                if (step.key === "treatmentStep") {
+                    apply(buildTreatmentStepChangeFields(
+                        draft,
+                        selectedValue,
+                        clientPayload || storedClientPayload
+                    ));
+                } else {
+                    apply({ [step.key]: selectedValue });
+                }
                 if (step.markMeta) {
                     meta = { ...meta, [step.markMeta]: true };
                 }
@@ -724,7 +733,7 @@ export default function ExternalGenerator({
 
     const applyActiveClientData = async ({ runFlow = false, notify = false } = {}) => {
         const payload = clientPayload || storedClientPayload || await loadActiveClientPayload();
-        const result = buildExternalFieldsFromClientPayload(payload);
+        const result = buildExternalClientPrefillFields(fieldsRef.current, payload);
 
         if (!result.ok) {
             if (notify) showToast("No active customer data", "error");

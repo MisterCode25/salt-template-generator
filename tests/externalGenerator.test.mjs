@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
     EXTERNAL_SYSTEM_TOKENS,
+    buildExternalClientPrefillFields,
     buildExternalFieldsFromClientPayload,
     buildTreatmentStepChangeFields,
     buildExternalCode,
@@ -66,6 +67,28 @@ import { setTokenInputValues } from "../src/services/tokenInputValueService.js";
     assert.equal(code.split("//")[0], "26.02.2026");
     assert.equal(code.split("//")[2], " ");
     assert.equal(code.split("//")[13], "ok");
+}
+
+{
+    const nonFllCode = buildExternalCode({
+        data: "2026-02-26",
+        treatmentStep: "Other",
+        partner: "SIG",
+        partnerTicketNumber: "PARTNER-42"
+    });
+    const nonFllFields = parseExternalId(nonFllCode).fields;
+    assert.equal(nonFllFields.partner, "");
+    assert.equal(nonFllFields.partnerTicketNumber, "");
+
+    const fllCode = buildExternalCode({
+        data: "2026-02-26",
+        treatmentStep: "FLL Ticket",
+        partner: "SIG",
+        partnerTicketNumber: "PARTNER-42"
+    });
+    const fllFields = parseExternalId(fllCode).fields;
+    assert.equal(fllFields.partner, "SIG");
+    assert.equal(fllFields.partnerTicketNumber, "PARTNER-42");
 }
 
 {
@@ -137,6 +160,31 @@ import { setTokenInputValues } from "../src/services/tokenInputValueService.js";
     assert.equal(parsed.fields.bokBof, "KP100314-C0036|8");
     assert.equal(parsed.fields.partner, "SIG");
     assert.equal(parsed.fields.partnerTicketNumber, undefined);
+}
+
+{
+    const clientPayload = {
+        client: { contractorNumber: "31447756" },
+        contact: { eligibilityOrdering: "35" }
+    };
+    const beforeFlowSelection = buildExternalClientPrefillFields({
+        treatmentStep: "",
+        partner: "EWB",
+        partnerTicketNumber: "OLD-123"
+    }, clientPayload);
+    assert.equal(beforeFlowSelection.ok, true);
+    assert.equal(beforeFlowSelection.fields.customer, "31447756");
+    assert.equal(beforeFlowSelection.fields.partner, "");
+    assert.equal(beforeFlowSelection.fields.partnerTicketNumber, "");
+
+    const fllSelection = buildExternalClientPrefillFields({
+        treatmentStep: "FLL Ticket",
+        partner: "EWB",
+        partnerTicketNumber: "OLD-123"
+    }, clientPayload);
+    assert.equal(fllSelection.ok, true);
+    assert.equal(fllSelection.fields.partner, "SIG");
+    assert.equal(fllSelection.fields.partnerTicketNumber, "");
 }
 
 {

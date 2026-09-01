@@ -96,10 +96,13 @@ export function formatDateForInput(date = new Date()) {
 export function buildExternalCode(fields) {
     const dateValue = fields?.data ? String(fields.data) : "";
     const displayDate = dateValue ? dateValue.split("-").reverse().join(".") : " ";
+    const includesPartnerTicket = String(fields?.treatmentStep ?? "").trim() === "FLL Ticket";
     const valuesByField = {
         ...EXTERNAL_DEFAULT_FIELDS,
         ...fields,
-        data: displayDate
+        data: displayDate,
+        partner: includesPartnerTicket ? fields?.partner : "",
+        partnerTicketNumber: includesPartnerTicket ? fields?.partnerTicketNumber : ""
     };
     return EXTERNAL_GENERATED_FIELD_ORDER
         .map((field) => normalizeSegment(valuesByField[field]))
@@ -355,6 +358,26 @@ export function buildExternalFieldsFromClientPayload(payload) {
     }
 
     return { ok: true, fields };
+}
+
+export function buildExternalClientPrefillFields(currentFields, clientPayload) {
+    const result = buildExternalFieldsFromClientPayload(clientPayload);
+    if (!result.ok) return result;
+
+    const fields = { ...result.fields };
+    const isFllTicket = String(currentFields?.treatmentStep ?? "").trim() === "FLL Ticket";
+    if (!isFllTicket) {
+        fields.partner = "";
+        fields.partnerTicketNumber = "";
+        return { ...result, fields };
+    }
+
+    const currentPartner = String(currentFields?.partner ?? "").trim();
+    const nextPartner = String(fields.partner ?? "").trim();
+    if (nextPartner && nextPartner !== currentPartner) {
+        fields.partnerTicketNumber = "";
+    }
+    return { ...result, fields };
 }
 
 export const EXTERNAL_TREATMENT_STEP_DOWNSTREAM_FIELDS = Object.freeze([
