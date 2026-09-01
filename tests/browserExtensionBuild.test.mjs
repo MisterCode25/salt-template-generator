@@ -77,6 +77,14 @@ async function withGlobalOverrides(overrides, callback) {
   assert.doesNotMatch(moduleSource, /expandAllSuperOfficePosts/);
   assert.doesNotMatch(moduleSource, /HtmlMessages2_buildHtml/);
   assert.match(moduleSource, /waitForSuperOfficeMsisdn/);
+  assert.match(
+    moduleSource,
+    /const contractorNumber=getExternalIdContractorNumber\(externalTicketId\)\|\|await waitForSuperOfficeMsisdn\(\)/
+  );
+  assert.doesNotMatch(
+    moduleSource,
+    /const contractorNumber=await waitForSuperOfficeMsisdn\(\);const text=document\.body\.innerText/
+  );
   assert.doesNotMatch(moduleSource, /prepareSuperOfficePosts/);
   assert.doesNotMatch(moduleSource, /await expandTicketPosts\(\);const text/);
   assert.doesNotMatch(moduleSource, /const message=messageDataList\(\)\[0\]/);
@@ -118,6 +126,91 @@ async function withGlobalOverrides(overrides, callback) {
 
   assert.equal(buildHtmlCallCount, 0);
   assert.equal(captureResult.contractorNumber, "32323232");
+}
+
+{
+  const moduleSource = buildSuperOfficeCaptureModule(superOfficeBookmarklet);
+  const captureSuperOfficePage = Function(
+    `${moduleSource.replace(/^export /, "")}; return captureSuperOfficePage;`
+  )();
+  const externalTicketId = [
+    "27.08.2026",
+    "31486331",
+    "31436062",
+    "signal",
+    "led",
+    "step",
+    "box",
+    "partner",
+    "partner-ticket",
+    "lex",
+    "olt",
+    "board",
+    "bok",
+    "comment"
+  ].join("//");
+  let parsedPostBodyCount = 0;
+
+  const captureResult = await withGlobalOverrides({
+    document: {
+      body: {
+        innerText: `REQUEST 31436062\nExternal ticket ID:\n${externalTicketId}\nPreferred language: French`
+      },
+      querySelectorAll: () => []
+    },
+    DOMParser: class DOMParser {
+      parseFromString(html) {
+        parsedPostBodyCount += 1;
+        return {
+          body: { textContent: String(html).replace(/<[^>]+>/g, " ") },
+          querySelectorAll: () => []
+        };
+      }
+    },
+    location: { origin: "https://cs.salt.ch" },
+    window: {
+      HtmlMessages2_data: {
+        ticket: {
+          messages: [{ body: "MSISDN: 99999999" }]
+        }
+      }
+    }
+  }, () => captureSuperOfficePage());
+
+  assert.equal(captureResult.externalTicketId, externalTicketId);
+  assert.equal(captureResult.contractorNumber, "31486331");
+  assert.equal(parsedPostBodyCount, 0);
+
+  parsedPostBodyCount = 0;
+  const fallbackResult = await withGlobalOverrides({
+    document: {
+      body: {
+        innerText: "REQUEST 31436062\nExternal ticket ID:\ninvalid\nPreferred language: French"
+      },
+      querySelectorAll: () => []
+    },
+    DOMParser: class DOMParser {
+      parseFromString(html) {
+        parsedPostBodyCount += 1;
+        return {
+          body: { textContent: String(html).replace(/<[^>]+>/g, " ") },
+          querySelectorAll: () => []
+        };
+      }
+    },
+    location: { origin: "https://cs.salt.ch" },
+    window: {
+      HtmlMessages2_data: {
+        ticket: {
+          messages: [{ body: "MSISDN: 99999999" }]
+        }
+      }
+    }
+  }, () => captureSuperOfficePage());
+
+  assert.equal(fallbackResult.externalTicketId, "invalid");
+  assert.equal(fallbackResult.contractorNumber, "99999999");
+  assert.equal(parsedPostBodyCount, 1);
 }
 
 {
@@ -440,7 +533,7 @@ assert.ok(vtiBookmarklet.startsWith("javascript:"));
 assert.ok(superOfficeBookmarklet.startsWith("javascript:"));
 
 assert.equal(manifest.manifest_version, 3);
-assert.equal(manifest.version, "0.1.22");
+assert.equal(manifest.version, "0.1.23");
 assert.equal(CURRENT_BROWSER_EXTENSION_VERSION, manifest.version);
 assert.deepEqual(manifest.permissions.sort(), ["scripting", "tabs"]);
 assert.equal(manifest.host_permissions.includes("<all_urls>"), false);

@@ -33,6 +33,7 @@ const superOfficePostTimestamp=value=>{const raw=String(value??"").trim();if(!ra
 const orderedSuperOfficePostEntries=()=>messageDataList().map((message,index)=>{const date=msgDate(message);return{message,index,date,timestamp:superOfficePostTimestamp(date)}}).sort((left,right)=>{if(left.timestamp===null&&right.timestamp===null)return left.index-right.index;if(left.timestamp===null)return 1;if(right.timestamp===null)return-1;return left.timestamp-right.timestamp||left.index-right.index});
 const firstSuperOfficePostEntry=()=>orderedSuperOfficePostEntries()[0]||{message:null,index:0,date:null,timestamp:null};
 const superOfficeMessageValues=message=>[message?.text,message?.plainText,message?.bodyText,message?.body,message?.message,message?.content,message?.html,message?.bodyHtml,message?.messageHtml,message?.htmlBody].filter(value=>typeof value==="string"&&value.trim());
+const getExternalIdContractorNumber=externalTicketId=>{const parts=String(externalTicketId??"").trim().split("//").map(part=>part.trim());const candidate=parts.length===14&&/^\d{2}\.\d{2}\.\d{4}$/.test(parts[0])?parts[1]:parts.length>=15?parts[2]:"";return /^\d+$/.test(candidate)?candidate:""};
 const findSuperOfficeMsisdn=messages=>{for(const message of messages){for(const value of superOfficeMessageValues(message)){const match=readablePostText(value).match(/\bMSISDN\s*:\s*(\d{8})(?!\d)/i);if(match)return match[1]}}return null};
 const isSuperOfficeMessageDataReady=messages=>messages.length>0&&messages.every(message=>message?.bodyNotLoaded!==true&&superOfficeMessageValues(message).length>0);
 const waitForSuperOfficeMsisdn=async()=>{await flipHtmlMessagesPosts();for(let attempt=0;attempt<20;attempt+=1){const messages=messageDataList();const msisdn=findSuperOfficeMsisdn(messages);if(msisdn)return msisdn;if(isSuperOfficeMessageDataReady(messages))return null;if(attempt<19)await sleep(100)}return null};
@@ -62,8 +63,14 @@ export function buildSuperOfficeCaptureModule(bookmarkletSource) {
     source = replaceRequired(
         source,
         "await expandTicketPosts();const text=document.body.innerText;",
-        "const contractorNumber=await waitForSuperOfficeMsisdn();const text=document.body.innerText;",
-        "SuperOffice direct MSISDN lookup"
+        "const text=document.body.innerText;",
+        "SuperOffice deferred MSISDN lookup"
+    );
+    source = replaceRequired(
+        source,
+        "externalTicketId=norm(m?.[1])||null;}const allowed=",
+        "externalTicketId=norm(m?.[1])||null;}const contractorNumber=getExternalIdContractorNumber(externalTicketId)||await waitForSuperOfficeMsisdn();const allowed=",
+        "SuperOffice contractor priority"
     );
     const clipboardTail = "navigator.clipboard.writeText(JSON.stringify(data,null,2)).then(()=>showToast(\"JSON copié dans le presse-papiers\")).catch(()=>showToast(\"Erreur copie clipboard\"));";
     const transformed = replaceRequired(

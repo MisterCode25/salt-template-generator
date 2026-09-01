@@ -20,3 +20,5 @@ La version 0.1.17 n’appelle plus `HtmlMessages2_buildHtml` après le chargemen
 Depuis Salt BO tools, l’extension peut aussi ouvrir et préremplir le formulaire ALO sans jamais le valider. Pour créer un ticket ALEX, elle applique d’abord le contexte partenaire, puis recharge ALEX directement sur la recherche SEP filtrée par l’OTO ID capturé dans VTI. `saltAlexRefresh` est un timestamp renouvelé à chaque ouverture pour forcer ALEX à relire ce contexte. L’ouverture d’un ticket ALEX existant reste inchangée.
 
 La version 0.1.22 conserve désormais une action ALO ou ALEX en attente lorsqu’une page de connexion s’affiche. Il suffit de se connecter dans l’onglet ouvert : l’extension retrouve ensuite la page cible et poursuit automatiquement le préremplissage ou l’ouverture demandée. L’action expire après dix minutes si la connexion n’est pas terminée.
+
+La version 0.1.23 extrait en priorité le contractor depuis un External ID SuperOffice exploitable. La recherche classique de `MSISDN:` dans les données des posts n’est exécutée que si l’External ID est absent ou ne fournit pas de contractor valide.
