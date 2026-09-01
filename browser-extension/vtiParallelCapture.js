@@ -148,7 +148,9 @@ export async function captureVtiBackgroundPages(recordId, expectedContractorNumb
         const source = await response.text();
         const sourceDocument = new DOMParser().parseFromString(source, "text/html");
         if (hasLoginForm(sourceDocument)) {
-            throw new Error("La session VTI a expiré.");
+            const sessionError = new Error("La session VTI a expiré. Reconnecte-toi dans l’onglet VTI puis réessaie.");
+            sessionError.code = "VTI_SESSION_REQUIRED";
+            throw sessionError;
         }
         return { source, sourceDocument };
     };
@@ -242,6 +244,7 @@ export async function captureVtiBackgroundPages(recordId, expectedContractorNumb
     } catch (error) {
         return {
             ok: false,
+            code: String(error?.code || ""),
             error: String(error?.message || error || "Capture VTI en arrière-plan impossible.")
         };
     }
@@ -267,6 +270,15 @@ export async function captureVtiOfferPage(expectedRecordId, timeoutMs = 45000) {
     };
 
     try {
+        if (document.querySelector(
+            'input[type="password"], input[name="user_name"], form[action*="Login" i]'
+        )) {
+            return {
+                ok: false,
+                code: "VTI_SESSION_REQUIRED",
+                error: "La session VTI a expiré. Reconnecte-toi dans l’onglet VTI puis réessaie."
+            };
+        }
         if (readRecordId() !== String(expectedRecordId)) {
             throw new Error("Offer Management ne correspond pas au contractor demandé.");
         }
@@ -298,6 +310,7 @@ export async function captureVtiOfferPage(expectedRecordId, timeoutMs = 45000) {
     } catch (error) {
         return {
             ok: false,
+            code: String(error?.code || ""),
             error: String(error?.message || error || "Offer Management inaccessible.")
         };
     }

@@ -267,9 +267,9 @@ function ToolsBar({
     runtimeContextRef: externalRuntimeContextRef = null,
     onOpenExternalGenerator,
     hasExternalId = false,
-    onOpenAlexProvider,
-    hasAlexProviderData = false,
-    alexProviderUnavailableMessage = "ALEX provider data is unavailable",
+    onCreateAlexTicket,
+    hasAlexCreateTicketData = false,
+    alexCreateTicketUnavailableMessage = "ALEX partner or OTO data is unavailable",
     onOpenAlexTicket,
     hasAlexTicketData = false,
     alexTicketUnavailableMessage = "ALEX ticket data is unavailable",
@@ -371,16 +371,16 @@ function ToolsBar({
                                     ALO fill
                                 </button>
                             )}
-                            {onOpenAlexProvider && (
+                            {onCreateAlexTicket && (
                                 <button
                                     type="button"
-                                    className={`tools-bar-btn tools-bar-btn--system tools-bar-btn--alex${hasAlexProviderData ? "" : " is-disabled"}`}
-                                    onClick={onOpenAlexProvider}
-                                    disabled={!hasAlexProviderData}
-                                    aria-disabled={!hasAlexProviderData}
-                                    title={hasAlexProviderData
-                                        ? "Ouvrir ALEX sur le bon provider pour préparer un nouveau ticket"
-                                        : alexProviderUnavailableMessage}
+                                    className={`tools-bar-btn tools-bar-btn--system tools-bar-btn--alex${hasAlexCreateTicketData ? "" : " is-disabled"}`}
+                                    onClick={onCreateAlexTicket}
+                                    disabled={!hasAlexCreateTicketData}
+                                    aria-disabled={!hasAlexCreateTicketData}
+                                    title={hasAlexCreateTicketData
+                                        ? "Sélectionner le partenaire ALEX et rechercher l’OTO VTI dans SEP"
+                                        : alexCreateTicketUnavailableMessage}
                                 >
                                     <FilePlus2 size={14} strokeWidth={2} aria-hidden="true" />
                                     Créer ticket ALEX
@@ -465,9 +465,9 @@ export default memo(ToolsBar, (prevProps, nextProps) => {
         && prevProps.runtimeContextRef === nextProps.runtimeContextRef
         && prevProps.onOpenExternalGenerator === nextProps.onOpenExternalGenerator
         && prevProps.hasExternalId === nextProps.hasExternalId
-        && prevProps.onOpenAlexProvider === nextProps.onOpenAlexProvider
-        && prevProps.hasAlexProviderData === nextProps.hasAlexProviderData
-        && prevProps.alexProviderUnavailableMessage === nextProps.alexProviderUnavailableMessage
+        && prevProps.onCreateAlexTicket === nextProps.onCreateAlexTicket
+        && prevProps.hasAlexCreateTicketData === nextProps.hasAlexCreateTicketData
+        && prevProps.alexCreateTicketUnavailableMessage === nextProps.alexCreateTicketUnavailableMessage
         && prevProps.onOpenAlexTicket === nextProps.onOpenAlexTicket
         && prevProps.hasAlexTicketData === nextProps.hasAlexTicketData
         && prevProps.alexTicketUnavailableMessage === nextProps.alexTicketUnavailableMessage

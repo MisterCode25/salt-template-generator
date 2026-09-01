@@ -27,7 +27,7 @@ assert.equal(isBrowserExtensionVersionAtLeast("0.1.3", "0.1.3"), true);
 assert.equal(isBrowserExtensionVersionAtLeast("0.2.0", "0.1.3"), true);
 assert.equal(isBrowserExtensionVersionAtLeast("0.1.2", "0.1.3"), false);
 assert.equal(isBrowserExtensionVersionAtLeast("", "0.1.3"), false);
-assert.equal(CURRENT_BROWSER_EXTENSION_VERSION, "0.1.19");
+assert.equal(CURRENT_BROWSER_EXTENSION_VERSION, "0.1.21");
 
 async function withGlobalOverrides(overrides, callback) {
   const previousDescriptors = new Map();
@@ -65,13 +65,15 @@ async function withGlobalOverrides(overrides, callback) {
       origin: "https://www.ftthproxy.ch",
       replace: (url) => replacedUrls.push(url)
     },
-    setTimeout: (callback, delay) => scheduledCallbacks.push({ callback, delay })
+    setTimeout: (callback, delay) => scheduledCallbacks.push({ callback, delay }),
+    Date: { now: () => 1788251403142 }
   }, () => openAlexPage({
     source: "salt-templater-alex-ticket",
-    action: "open-provider",
+    action: "create-ticket",
     alap: "45",
     serviceDomain: 1,
-    businessDomain: "L1"
+    businessDomain: "L1",
+    otoId: "B.123.024.253.8"
   }, ALEX_STORAGE_NAVIGATION_DELAY_MS));
 
   assert.equal(result.ok, true);
@@ -81,9 +83,13 @@ async function withGlobalOverrides(overrides, callback) {
     businessDomain: "L1"
   });
   assert.equal(scheduledCallbacks.length, 1);
+  assert.equal(
+    result.targetUrl,
+    "https://www.ftthproxy.ch/?saltAlexRefresh=1788251403142#/fulfillment/search-sep?obj_fiberconnectionOtoId=B.123.024.253.8"
+  );
 
   scheduledCallbacks[0].callback();
-  assert.match(replacedUrls[0], /^https:\/\/www\.ftthproxy\.ch\/\?saltAlexRefresh=\d+#\/$/);
+  assert.equal(replacedUrls[0], result.targetUrl);
 }
 
 function createInput(value = "") {

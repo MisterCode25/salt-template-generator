@@ -119,6 +119,13 @@ export async function captureVtiHealthcheckPage() {
         || Boolean(getAfter("otoId", source))
         || /No data on the router|CPE found/i.test(source)
     );
+    const assertAuthenticatedSession = () => {
+        if (document.querySelector(
+            'input[type="password"], input[name="user_name"], form[action*="Login" i]'
+        )) {
+            throw new Error("La session VTI a expiré. Reconnecte-toi dans l’onglet VTI puis réessaie.");
+        }
+    };
 
     let lastText = "";
     let bestText = "";
@@ -126,6 +133,7 @@ export async function captureVtiHealthcheckPage() {
     const startedAt = Date.now();
 
     while (Date.now() - startedAt < 45000) {
+        assertAuthenticatedSession();
         const pageText = document.body?.innerText || "";
         if (pageText) {
             lastText = pageText;

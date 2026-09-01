@@ -9,7 +9,10 @@ import {
   normalizeContractorNumber,
   resolveVtiCaptureRoute
 } from "../shared/vtiContractorNavigation.js";
-import { findVtiContractorRecord } from "../browser-extension/vtiContractorSearch.js";
+import {
+  findVtiContractorRecord,
+  verifyLoadedVtiContractorPage
+} from "../browser-extension/vtiContractorSearch.js";
 
 function createResultRow({ contractorNumber, recordId }) {
   return {
@@ -202,41 +205,20 @@ assert.equal(normalizeContractorNumber("contractor 31486331"), "");
 }
 
 {
-  const searchUrl = buildVtiContractorSearchUrl("31486331");
-  const searchDocument = {
-    querySelector: () => null,
-    querySelectorAll: () => [createResultRow({ contractorNumber: "31486331", recordId: "56064498" })]
-  };
-  let requestedUrl = "";
-  let requestedOptions = null;
-
   const result = await withGlobalOverrides({
     document: {
-      querySelector: () => null,
-      querySelectorAll: () => []
-    },
-    location: { href: "https://vti.salt.ch/index.php", origin: "https://vti.salt.ch" },
-    fetch: async (url, options) => {
-      requestedUrl = url;
-      requestedOptions = options;
-      return {
-        ok: true,
-        text: async () => "<html><body>Contractor result</body></html>"
-      };
-    },
-    DOMParser: class DOMParser {
-      parseFromString() {
-        return searchDocument;
+      body: { innerText: "Contractor 31486331" },
+      querySelector(selector) {
+        if (selector.includes("password")) return null;
+        if (selector === "#recordId") return { value: "56064498" };
+        return null;
       }
+    },
+    location: {
+      href: "https://vti.salt.ch/index.php?module=Contractors&view=Detail&record=56064498"
     }
-  }, () => findVtiContractorRecord("31486331", searchUrl));
+  }, () => verifyLoadedVtiContractorPage("56064498", "31486331"));
 
-  assert.equal(requestedUrl, searchUrl);
-  assert.deepEqual(requestedOptions, {
-    credentials: "include",
-    cache: "no-store",
-    redirect: "follow"
-  });
   assert.deepEqual(result, {
     ok: true,
     contractorNumber: "31486331",
@@ -247,20 +229,33 @@ assert.equal(normalizeContractorNumber("contractor 31486331"), "");
 {
   const result = await withGlobalOverrides({
     document: {
-      querySelector: () => null,
-      querySelectorAll: () => []
+      body: { innerText: "Login" },
+      querySelector: (selector) => selector.includes("password") ? {} : null
     },
-    location: { href: "https://vti.salt.ch/index.php", origin: "https://vti.salt.ch" },
-    fetch: async () => {
-      throw new Error("network unavailable");
-    }
-  }, () => findVtiContractorRecord(
-    "31486331",
-    buildVtiContractorSearchUrl("31486331")
-  ));
+    location: { href: "https://vti.salt.ch/index.php" }
+  }, () => verifyLoadedVtiContractorPage("56064498", "31486331"));
 
   assert.equal(result.ok, false);
-  assert.equal(result.code, "VTI_FAST_SEARCH_UNAVAILABLE");
+  assert.equal(result.code, "VTI_SESSION_REQUIRED");
+}
+
+{
+  const result = await withGlobalOverrides({
+    document: {
+      body: { innerText: "Contractor 31486331" },
+      querySelector(selector) {
+        if (selector.includes("password")) return null;
+        if (selector === "#recordId") return { value: "99999999" };
+        return null;
+      }
+    },
+    location: {
+      href: "https://vti.salt.ch/index.php?module=Contractors&view=Detail&record=99999999"
+    }
+  }, () => verifyLoadedVtiContractorPage("56064498", "31486331"));
+
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "VTI_RECORD_MISMATCH");
 }
 
 console.log("vtiContractorNavigation tests passed");

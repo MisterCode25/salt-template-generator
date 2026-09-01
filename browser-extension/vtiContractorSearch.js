@@ -1,4 +1,4 @@
-export async function findVtiContractorRecord(contractorNumber, searchUrl = "") {
+export async function findVtiContractorRecord(contractorNumber) {
     const normalizeNumber = (value) => {
         const normalizedValue = String(value ?? "").trim().replace(/\s+/g, "");
         return /^\d+$/.test(normalizedValue) ? normalizedValue : "";
@@ -65,29 +65,54 @@ export async function findVtiContractorRecord(contractorNumber, searchUrl = "") 
         };
     }
 
-    if (searchUrl) {
-        try {
-            const requestedUrl = new URL(searchUrl, location.href);
-            if (requestedUrl.origin !== location.origin) {
-                throw new Error("La recherche VTI doit rester sur le domaine courant.");
-            }
-            const response = await fetch(requestedUrl.href, {
-                credentials: "include",
-                cache: "no-store",
-                redirect: "follow"
-            });
-            if (!response.ok) throw new Error(`Réponse VTI ${response.status || "invalide"}.`);
-            const source = await response.text();
-            const searchDocument = new DOMParser().parseFromString(source, "text/html");
-            return findRecordInDocument(searchDocument, requestedContractorNumber);
-        } catch {
-            return {
-                ok: false,
-                code: "VTI_FAST_SEARCH_UNAVAILABLE",
-                error: "La recherche VTI en arrière-plan n’est pas disponible."
-            };
-        }
+    return findRecordInDocument(document, requestedContractorNumber);
+}
+
+export function verifyLoadedVtiContractorPage(expectedRecordId, expectedContractorNumber) {
+    const normalizeNumber = (value) => {
+        const normalizedValue = String(value ?? "").trim().replace(/\s+/g, "");
+        return /^\d+$/.test(normalizedValue) ? normalizedValue : "";
+    };
+    const hasLoginForm = Boolean(document.querySelector(
+        'input[type="password"], input[name="user_name"], form[action*="Login" i]'
+    ));
+    if (hasLoginForm) {
+        return {
+            ok: false,
+            code: "VTI_SESSION_REQUIRED",
+            error: "La session VTI a expiré. Reconnecte-toi dans l’onglet VTI puis réessaie."
+        };
     }
 
-    return findRecordInDocument(document, requestedContractorNumber);
+    const requestedRecordId = normalizeNumber(expectedRecordId);
+    const recordIdFromDocument = normalizeNumber(
+        document.querySelector("#recordId")?.value
+            || document.querySelector("#recordId")?.getAttribute?.("value")
+    );
+    let recordIdFromUrl = "";
+    try {
+        recordIdFromUrl = normalizeNumber(new URL(location.href).searchParams.get("record"));
+    } catch {
+        // The hidden VTI record field remains the primary source.
+    }
+    const loadedRecordId = recordIdFromDocument || recordIdFromUrl;
+    if (!requestedRecordId || loadedRecordId !== requestedRecordId) {
+        return {
+            ok: false,
+            code: "VTI_RECORD_MISMATCH",
+            error: "La fiche VTI chargée ne correspond pas au contractor demandé."
+        };
+    }
+
+    const contractorNumber = normalizeNumber(expectedContractorNumber);
+    const pageText = String(document.body?.innerText || document.body?.textContent || "");
+    const escapedContractorNumber = contractorNumber.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const isContractorNumberVisible = contractorNumber
+        && new RegExp(`(^|\\D)${escapedContractorNumber}(?=\\D|$)`).test(pageText);
+
+    return {
+        ok: true,
+        contractorNumber: isContractorNumberVisible ? contractorNumber : "",
+        recordId: loadedRecordId
+    };
 }

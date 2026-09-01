@@ -5,6 +5,7 @@ import {
   buildVtiCaptureModule
 } from "../scripts/browserExtensionBuildSupport.mjs";
 import {
+  captureVtiHealthcheckPage,
   extractUsableVtiHealthcheckText,
   fetchVtiHealthcheckSource,
   normalizeVtiHealthcheckResponseText
@@ -47,6 +48,19 @@ async function withGlobalOverrides(overrides, callback) {
       else delete globalThis[name];
     }
   }
+}
+
+{
+  await assert.rejects(
+    withGlobalOverrides({
+      document: {
+        querySelector(selector) {
+          return selector.includes('input[type="password"]') ? {} : null;
+        }
+      }
+    }, () => captureVtiHealthcheckPage()),
+    /session VTI a expiré/i
+  );
 }
 
 {
@@ -426,7 +440,7 @@ assert.ok(vtiBookmarklet.startsWith("javascript:"));
 assert.ok(superOfficeBookmarklet.startsWith("javascript:"));
 
 assert.equal(manifest.manifest_version, 3);
-assert.equal(manifest.version, "0.1.19");
+assert.equal(manifest.version, "0.1.21");
 assert.equal(CURRENT_BROWSER_EXTENSION_VERSION, manifest.version);
 assert.deepEqual(manifest.permissions.sort(), ["scripting", "tabs"]);
 assert.equal(manifest.host_permissions.includes("<all_urls>"), false);
@@ -440,16 +454,15 @@ assert.ok(manifest.content_scripts[0].matches.includes(
 assert.match(serviceWorkerSource, /runAloAutofill/);
 assert.match(serviceWorkerSource, /runAlexOpen/);
 assert.match(serviceWorkerSource, /open-provider/);
+assert.match(serviceWorkerSource, /create-ticket/);
 assert.match(serviceWorkerSource, /buildSuperOfficeTicketUrl/);
 assert.match(serviceWorkerSource, /chrome\.tabs\.update/);
 assert.match(serviceWorkerSource, /getCapturedSuperOfficeTicketNumber/);
 assert.match(serviceWorkerSource, /findVtiContractorRecord/);
-assert.match(serviceWorkerSource, /VTI_FAST_SEARCH_UNAVAILABLE/);
 assert.match(serviceWorkerSource, /captureVtiInParallel/);
 assert.match(serviceWorkerSource, /captureVtiBackgroundPages/);
 assert.match(serviceWorkerSource, /captureVtiOfferPage/);
 assert.match(serviceWorkerSource, /loadVtiContractorInTab/);
-assert.match(serviceWorkerSource, /const \[, capturedPages\] = await Promise\.all/);
 assert.match(serviceWorkerSource, /captureVtiWithLegacyPage/);
 assert.match(serviceWorkerSource, /active: false/);
 assert.match(serviceWorkerSource, /fetchVtiHealthcheckSource/);
@@ -457,5 +470,23 @@ assert.match(serviceWorkerSource, /CONTRACTOR_INPUT_REQUIRED/);
 assert.match(serviceWorkerSource, /ALEX_STORAGE_NAVIGATION_DELAY_MS/);
 assert.match(appBridgeSource, /salt\.capture\.alo\.start\.v1/);
 assert.match(appBridgeSource, /salt\.capture\.alex\.start\.v1/);
+
+const searchFunctionSource = serviceWorkerSource.slice(
+  serviceWorkerSource.indexOf("async function findVtiContractorInTab"),
+  serviceWorkerSource.indexOf("async function captureVtiOfferAndHealth")
+);
+assert.ok(searchFunctionSource.indexOf("chrome.tabs.update") < searchFunctionSource.indexOf("chrome.scripting.executeScript"));
+assert.doesNotMatch(searchFunctionSource, /VTI_FAST_SEARCH_UNAVAILABLE/);
+
+const captureWorkflowSource = serviceWorkerSource.slice(
+  serviceWorkerSource.indexOf("async function captureVtiInParallel"),
+  serviceWorkerSource.indexOf("async function captureVtiWithLegacyPage")
+);
+assert.match(captureWorkflowSource, /await loadVtiContractorInTab/);
+assert.match(captureWorkflowSource, /await Promise\.all/);
+assert.ok(
+  captureWorkflowSource.indexOf("await loadVtiContractorInTab")
+    < captureWorkflowSource.indexOf("await Promise.all")
+);
 
 console.log("browserExtensionBuild tests passed");

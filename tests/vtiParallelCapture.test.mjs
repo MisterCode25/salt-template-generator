@@ -34,7 +34,7 @@ function textElement(text) {
   return { innerText: text, textContent: text };
 }
 
-function createDocument({ recordId, text, html = "", fields = {} }) {
+function createDocument({ recordId, text, html = "", fields = {}, hasLoginForm = false }) {
   return {
     body: {
       innerHTML: html,
@@ -42,7 +42,7 @@ function createDocument({ recordId, text, html = "", fields = {} }) {
       textContent: text
     },
     querySelector(selector) {
-      if (selector.includes('input[type="password"]')) return null;
+      if (selector.includes('input[type="password"]')) return hasLoginForm ? {} : null;
       if (selector === "#recordId") return { value: recordId };
       return fields[selector] || null;
     },
@@ -50,6 +50,28 @@ function createDocument({ recordId, text, html = "", fields = {} }) {
       return [];
     }
   };
+}
+
+{
+  const pageUrls = buildVtiContractorPageUrls("56064498");
+  const loginDocument = createDocument({
+    recordId: "",
+    text: "Login",
+    hasLoginForm: true
+  });
+
+  const result = await withGlobalOverrides({
+    location: { href: "https://vti.salt.ch/index.php", origin: "https://vti.salt.ch" },
+    fetch: async (url) => ({ ok: true, url, text: async () => "LOGIN" }),
+    DOMParser: class DOMParser {
+      parseFromString() {
+        return loginDocument;
+      }
+    }
+  }, () => injectedBackgroundCapture("56064498", "31486331", pageUrls));
+
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "VTI_SESSION_REQUIRED");
 }
 
 {
@@ -153,6 +175,27 @@ function createDocument({ recordId, text, html = "", fields = {} }) {
   assert.equal(result.ok, true);
   assert.equal(result.serviceId, "56064501");
   assert.equal(result.offerInfo.activationDate, "27.08.2026");
+}
+
+{
+  const result = await withGlobalOverrides({
+    location: {
+      href: "https://vti.salt.ch/index.php",
+      origin: "https://vti.salt.ch"
+    },
+    document: {
+      body: { innerText: "Login", textContent: "Login" },
+      querySelector(selector) {
+        return selector.includes('input[type="password"]') ? {} : null;
+      },
+      querySelectorAll() {
+        return [];
+      }
+    }
+  }, () => injectedOfferCapture("56064498", 10));
+
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "VTI_SESSION_REQUIRED");
 }
 
 {

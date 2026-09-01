@@ -1,5 +1,5 @@
 export const ALEX_CLIPBOARD_SOURCE = "salt-templater-alex-ticket";
-export const ALEX_CLIPBOARD_VERSION = 1;
+export const ALEX_CLIPBOARD_VERSION = 2;
 export const ALEX_HOME_URL = "https://www.ftthproxy.ch/";
 
 const ALEX_SERVICE_DOMAIN = 1;
@@ -13,12 +13,30 @@ function normalizeTicketNumber(value) {
     return String(value ?? "").replace(/[^0-9]+/g, "");
 }
 
+function normalizeOtoId(value) {
+    const normalizedValue = normalizeText(value).toUpperCase();
+    return /^[A-Z]\.\d{3}\.\d{3}\.\d{3}\.\d+$/.test(normalizedValue)
+        ? normalizedValue
+        : "";
+}
+
 function getEligibilityOrdering(clientPayload) {
     return normalizeText(
         clientPayload?.contact?.eligibilityOrdering
         ?? clientPayload?.client?.eligibilityOrdering
         ?? clientPayload?.eligibilityOrdering
     );
+}
+
+function getOtoId(clientPayload) {
+    return [
+        clientPayload?.healthcheck?.otoId,
+        clientPayload?.healthcheck?.oto_id,
+        clientPayload?.healthcheck?.oto,
+        clientPayload?.client?.otoId,
+        clientPayload?.contact?.otoId,
+        clientPayload?.otoId
+    ].map(normalizeOtoId).find(Boolean) || "";
 }
 
 function buildAlexProviderContext(clientPayload, action) {
@@ -40,8 +58,17 @@ function buildAlexProviderContext(clientPayload, action) {
     };
 }
 
-export function buildAlexProviderPayload(clientPayload) {
-    return buildAlexProviderContext(clientPayload, "open-provider");
+export function buildAlexCreateTicketPayload(clientPayload) {
+    const context = buildAlexProviderContext(clientPayload, "create-ticket");
+    if (!context.ok) return context;
+
+    const otoId = getOtoId(clientPayload);
+    if (!otoId) return { ok: false, error: "MISSING_OTO_ID" };
+
+    return {
+        ok: true,
+        payload: { ...context.payload, otoId }
+    };
 }
 
 export function buildAlexTicketPayload(clientPayload, partnerTicketNumber) {
@@ -64,6 +91,7 @@ export function formatAlexTicketPayload(payload) {
 export function getAlexTicketUnavailableMessage(error) {
     if (error === "ALO_PARTNER") return "ALO tickets must be opened with the ALO flow";
     if (error === "MISSING_TICKET") return "Add the partner ticket number to the External ID first";
+    if (error === "MISSING_OTO_ID") return "No valid OTO ID found in the active VTI customer";
     return "No ALEX partner identifier found in the active VTI customer";
 }
 
@@ -95,13 +123,18 @@ function alexTicketBookmarkletRunner(expectedSource) {
             throw new Error("the clipboard does not contain valid JSON.");
         }
 
-        var supportedAction = payload && (payload.action === "view-ticket" || payload.action === "open-provider");
+        var supportedAction = payload && (
+            payload.action === "view-ticket"
+            || payload.action === "create-ticket"
+            || payload.action === "open-provider"
+        );
         if (!payload || payload.source !== expectedSource || !supportedAction) {
             throw new Error("the clipboard does not contain ALEX data from Salt BO tools.");
         }
 
         var alap = String(payload.alap || "").trim();
         var ticket = String(payload.ticket || "").replace(/[^0-9]+/g, "");
+        var otoId = String(payload.otoId || "").trim().toUpperCase();
         var serviceDomain = Number(payload.serviceDomain);
         var businessDomain = String(payload.businessDomain || "").trim();
 
@@ -110,6 +143,9 @@ function alexTicketBookmarkletRunner(expectedSource) {
         }
         if (payload.action === "view-ticket" && !ticket) {
             throw new Error("the ALEX ticket number is missing.");
+        }
+        if (payload.action === "create-ticket" && !/^[A-Z]\.\d{3}\.\d{3}\.\d{3}\.\d+$/.test(otoId)) {
+            throw new Error("the VTI OTO ID is missing or invalid.");
         }
         if (!Number.isFinite(serviceDomain) || !businessDomain) {
             throw new Error("the ALEX partner context is incomplete.");
@@ -123,7 +159,9 @@ function alexTicketBookmarkletRunner(expectedSource) {
 
         var targetHash = payload.action === "view-ticket"
             ? "/assurance/ticket/" + ticket
-            : "/";
+            : payload.action === "create-ticket"
+                ? "/fulfillment/search-sep?obj_fiberconnectionOtoId=" + encodeURIComponent(otoId)
+                : "/";
         var reloadUrl = location.origin
             + "/?saltAlexRefresh=" + Date.now()
             + "#" + targetHash;

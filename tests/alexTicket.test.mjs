@@ -3,7 +3,7 @@ import vm from "node:vm";
 import {
     ALEX_CLIPBOARD_SOURCE,
     ALEX_HOME_URL,
-    buildAlexProviderPayload,
+    buildAlexCreateTicketPayload,
     buildAlexTicketBookmarklet,
     buildAlexTicketPayload,
     formatAlexTicketPayload,
@@ -11,18 +11,20 @@ import {
 } from "../src/utils/alexTicket.js";
 
 {
-    const result = buildAlexProviderPayload({
-        contact: { eligibilityOrdering: "45" }
+    const result = buildAlexCreateTicketPayload({
+        contact: { eligibilityOrdering: "45" },
+        healthcheck: { otoId: "B.123.024.253.8" }
     });
 
     assert.equal(result.ok, true);
     assert.deepEqual(result.payload, {
         source: ALEX_CLIPBOARD_SOURCE,
-        version: 1,
-        action: "open-provider",
+        version: 2,
+        action: "create-ticket",
         alap: "45",
         serviceDomain: 1,
-        businessDomain: "L1"
+        businessDomain: "L1",
+        otoId: "B.123.024.253.8"
     });
 }
 
@@ -34,7 +36,7 @@ import {
     assert.equal(result.ok, true);
     assert.deepEqual(result.payload, {
         source: ALEX_CLIPBOARD_SOURCE,
-        version: 1,
+        version: 2,
         action: "view-ticket",
         alap: "45",
         serviceDomain: 1,
@@ -42,6 +44,25 @@ import {
         ticket: "9861"
     });
     assert.deepEqual(JSON.parse(formatAlexTicketPayload(result.payload)), result.payload);
+}
+
+{
+    const result = buildAlexCreateTicketPayload({
+        contact: { eligibilityOrdering: "45" },
+        healthcheck: {}
+    });
+
+    assert.deepEqual(result, { ok: false, error: "MISSING_OTO_ID" });
+}
+
+{
+    const result = buildAlexCreateTicketPayload({
+        contact: { eligibilityOrdering: "45" },
+        healthcheck: { otoId: "", oto_id: "b.123.024.253.8" }
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.payload.otoId, "B.123.024.253.8");
 }
 
 {
@@ -83,8 +104,10 @@ import {
     assert.match(bookmarklet, /localStorage\.setItem\("focus"/);
     assert.match(bookmarklet, /view-ticket/);
     assert.match(bookmarklet, /open-provider/);
+    assert.match(bookmarklet, /create-ticket/);
     assert.match(bookmarklet, /assurance\/ticket/);
-    assert.doesNotMatch(bookmarklet, /encodeURIComponent/);
+    assert.match(bookmarklet, /fulfillment\/search-sep/);
+    assert.match(bookmarklet, /obj_fiberconnectionOtoId/);
     assert.doesNotMatch(bookmarklet, /auth/i);
 }
 
@@ -164,10 +187,11 @@ import {
             clipboard: {
                 readText: async () => JSON.stringify({
                     source: ALEX_CLIPBOARD_SOURCE,
-                    action: "open-provider",
+                    action: "create-ticket",
                     alap: "45",
                     serviceDomain: 1,
-                    businessDomain: "L1"
+                    businessDomain: "L1",
+                    otoId: "B.123.024.253.8"
                 })
             }
         },
@@ -190,7 +214,7 @@ import {
 
     scheduledCallbacks[0].callback();
     assert.deepEqual(replacedUrls, [
-        "https://www.ftthproxy.ch/?saltAlexRefresh=1234567890#/"
+        "https://www.ftthproxy.ch/?saltAlexRefresh=1234567890#/fulfillment/search-sep?obj_fiberconnectionOtoId=B.123.024.253.8"
     ]);
 }
 

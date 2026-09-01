@@ -80,7 +80,7 @@ import {
     resolveAloTemplateWithProblemDate
 } from "../utils/aloAutofill.js";
 import {
-    buildAlexProviderPayload,
+    buildAlexCreateTicketPayload,
     buildAlexTicketPayload,
     formatAlexTicketPayload,
     getAlexTicketUnavailableMessage,
@@ -1143,8 +1143,8 @@ export default function Templates() {
     );
     const displayClientExternalId = runtime.clientExternalId || caseProfile.externalId || "";
     const alexPartnerTicketNumber = caseProfile.externalPartnerTicketNumber || "";
-    const alexProviderPreparation = useMemo(
-        () => buildAlexProviderPayload(runtime.clientPayload),
+    const alexCreateTicketPreparation = useMemo(
+        () => buildAlexCreateTicketPayload(runtime.clientPayload),
         [runtime.clientPayload]
     );
     const alexTicketPreparation = useMemo(
@@ -1499,16 +1499,16 @@ export default function Templates() {
         if (extensionResult?.error) showToast(extensionResult.error, "warning");
     }, []);
 
-    const openAlexProvider = useCallback(async () => {
-        const preparation = buildAlexProviderPayload(runtimeRef.current.clientPayload);
+    const createAlexTicket = useCallback(async () => {
+        const preparation = buildAlexCreateTicketPayload(runtimeRef.current.clientPayload);
         if (!preparation.ok) {
             showToast(getAlexTicketUnavailableMessage(preparation.error), "error");
             return;
         }
 
         await handoffAlexPayload(preparation.payload, {
-            success: "ALEX ouvert sur le bon provider",
-            copied: "Données du provider ALEX copiées"
+            success: "Recherche SEP ALEX ouverte avec l’OTO VTI",
+            copied: "Contexte partenaire et OTO ALEX copiés"
         });
     }, [handoffAlexPayload]);
 
@@ -1953,11 +1953,11 @@ export default function Templates() {
                 runtimeContextRef={toolRuntimeContextRef}
                 onOpenExternalGenerator={openExternalGenerator}
                 hasExternalId={Boolean(displayClientExternalId)}
-                onOpenAlexProvider={openAlexProvider}
-                hasAlexProviderData={alexProviderPreparation.ok}
-                alexProviderUnavailableMessage={alexProviderPreparation.ok
+                onCreateAlexTicket={createAlexTicket}
+                hasAlexCreateTicketData={alexCreateTicketPreparation.ok}
+                alexCreateTicketUnavailableMessage={alexCreateTicketPreparation.ok
                     ? ""
-                    : getAlexTicketUnavailableMessage(alexProviderPreparation.error)}
+                    : getAlexTicketUnavailableMessage(alexCreateTicketPreparation.error)}
                 onOpenAlexTicket={openAlexTicket}
                 hasAlexTicketData={alexTicketPreparation.ok}
                 alexTicketUnavailableMessage={alexTicketPreparation.ok

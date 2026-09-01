@@ -40,7 +40,10 @@ import {
     extractUsableVtiHealthcheckText,
     fetchVtiHealthcheckSource
 } from "./healthcheckCapture.js";
-import { findVtiContractorRecord } from "./vtiContractorSearch.js";
+import {
+    findVtiContractorRecord,
+    verifyLoadedVtiContractorPage
+} from "./vtiContractorSearch.js";
 import {
     buildVtiCapturePayload,
     captureVtiBackgroundPages,
@@ -55,6 +58,17 @@ function getExtensionVersion() {
 
 function normalizeError(error) {
     return String(error?.message || error || "Opération impossible.").trim();
+}
+
+function createVtiResultError(result, fallbackMessage) {
+    const error = new Error(result?.error || fallbackMessage);
+    if (result?.code) error.code = result.code;
+    return error;
+}
+
+function isVtiSessionError(error) {
+    return error?.code === "VTI_SESSION_REQUIRED"
+        || /session VTI a expiré/i.test(normalizeError(error));
 }
 
 async function sendToApplication(tabId, message) {
@@ -83,67 +97,36 @@ function readExecutionResult(results, label) {
 
 async function findVtiContractorInTab(tabId, contractorNumber) {
     const searchUrl = buildVtiContractorSearchUrl(contractorNumber);
-    let fastSearchResult = {
-        ok: false,
-        code: "VTI_FAST_SEARCH_UNAVAILABLE"
-    };
-    try {
-        const fastSearchResults = await chrome.scripting.executeScript({
-            target: { tabId },
-            world: "MAIN",
-            func: findVtiContractorRecord,
-            args: [contractorNumber, searchUrl]
-        });
-        fastSearchResult = readExecutionResult(fastSearchResults, "La recherche VTI rapide");
-    } catch {
-        // The normal page-navigation path below remains the compatibility fallback.
-    }
-    if (fastSearchResult.ok || fastSearchResult.code !== "VTI_FAST_SEARCH_UNAVAILABLE") {
-        return fastSearchResult;
-    }
-
     await chrome.tabs.update(tabId, { url: searchUrl });
     await waitForTabLoad(tabId, 30000, "de la recherche contractor VTI");
-    const fallbackSearchResults = await chrome.scripting.executeScript({
+    const searchResults = await chrome.scripting.executeScript({
         target: { tabId },
         world: "ISOLATED",
         func: findVtiContractorRecord,
         args: [contractorNumber]
     });
-    return readExecutionResult(fallbackSearchResults, "La recherche VTI");
+    return readExecutionResult(searchResults, "La recherche VTI");
 }
 
-async function captureVtiOfferAndHealth(recordId, contractorNumber, pageUrls) {
+async function captureVtiOfferAndHealth(recordId, pageUrls) {
     let helperTabId = null;
     try {
         const helperTab = await chrome.tabs.create({ url: pageUrls.offers, active: false });
         helperTabId = helperTab.id;
         await waitForTabLoad(helperTabId, 30000, "d’Offer Management VTI");
 
-        const [staticResults, offerResults] = await Promise.all([
-            chrome.scripting.executeScript({
-                target: { tabId: helperTabId },
-                world: "MAIN",
-                func: captureVtiBackgroundPages,
-                args: [recordId, contractorNumber, pageUrls]
-            }),
-            chrome.scripting.executeScript({
-                target: { tabId: helperTabId },
-                world: "MAIN",
-                func: captureVtiOfferPage,
-                args: [recordId]
-            })
-        ]);
-        const staticCapture = readExecutionResult(
-            staticResults,
-            "Les pages VTI en arrière-plan"
-        );
-        if (!staticCapture.ok) {
-            throw new Error(staticCapture.error || "Les pages VTI n’ont pas pu être capturées.");
-        }
+        const offerResults = await chrome.scripting.executeScript({
+            target: { tabId: helperTabId },
+            world: "MAIN",
+            func: captureVtiOfferPage,
+            args: [recordId]
+        });
         const offerCapture = readExecutionResult(offerResults, "Offer Management VTI");
         if (!offerCapture.ok) {
-            throw new Error(offerCapture.error || "Offer Management VTI est inaccessible.");
+            throw createVtiResultError(
+                offerCapture,
+                "Offer Management VTI est inaccessible."
+            );
         }
 
         let healthText = "";
@@ -177,7 +160,7 @@ async function captureVtiOfferAndHealth(recordId, contractorNumber, pageUrls) {
         if (!healthText) {
             throw new Error("Le HealthCheck VTI n’a retourné aucune donnée exploitable.");
         }
-        return { staticCapture, offerCapture, healthText };
+        return { offerCapture, healthText };
     } finally {
         if (helperTabId !== null) {
             try {
@@ -189,7 +172,7 @@ async function captureVtiOfferAndHealth(recordId, contractorNumber, pageUrls) {
     }
 }
 
-async function loadVtiContractorInTab(tabId, recordId) {
+async function loadVtiContractorInTab(tabId, recordId, contractorNumber) {
     const currentVtiTab = await chrome.tabs.get(tabId);
     const isRequestedRecordAlreadyLoaded = getVtiContractorRecordIdFromUrl(
         currentVtiTab.url
@@ -202,24 +185,63 @@ async function loadVtiContractorInTab(tabId, recordId) {
     if (!isRequestedRecordAlreadyLoaded || currentVtiTab.status !== "complete") {
         await waitForTabLoad(tabId, 30000, "de la fiche contractor VTI");
     }
+
+    const verificationResults = await chrome.scripting.executeScript({
+        target: { tabId },
+        world: "ISOLATED",
+        func: verifyLoadedVtiContractorPage,
+        args: [recordId, contractorNumber]
+    });
+    const verification = readExecutionResult(
+        verificationResults,
+        "La validation de la fiche contractor VTI"
+    );
+    if (!verification.ok) {
+        throw createVtiResultError(
+            verification,
+            "La fiche contractor VTI n’a pas pu être validée."
+        );
+    }
+    return verification;
+}
+
+async function captureVtiStaticPagesFromTab(tabId, recordId, contractorNumber, pageUrls) {
+    const staticResults = await chrome.scripting.executeScript({
+        target: { tabId },
+        world: "MAIN",
+        func: captureVtiBackgroundPages,
+        args: [recordId, contractorNumber, pageUrls]
+    });
+    const staticCapture = readExecutionResult(
+        staticResults,
+        "Les pages VTI en arrière-plan"
+    );
+    if (!staticCapture.ok) {
+        throw createVtiResultError(
+            staticCapture,
+            "Les pages VTI n’ont pas pu être capturées."
+        );
+    }
+    return staticCapture;
 }
 
 async function captureVtiInParallel(tabId, recordId, contractorNumber) {
+    await loadVtiContractorInTab(tabId, recordId, contractorNumber);
     const pageUrls = buildVtiContractorPageUrls(recordId);
-    const [, capturedPages] = await Promise.all([
-        loadVtiContractorInTab(tabId, recordId),
-        captureVtiOfferAndHealth(recordId, contractorNumber, pageUrls)
+    const [staticCapture, capturedPages] = await Promise.all([
+        captureVtiStaticPagesFromTab(tabId, recordId, contractorNumber, pageUrls),
+        captureVtiOfferAndHealth(recordId, pageUrls)
     ]);
 
     return buildVtiCapturePayload({
-        staticCapture: capturedPages.staticCapture,
+        staticCapture,
         offerCapture: capturedPages.offerCapture,
         healthText: capturedPages.healthText
     });
 }
 
-async function captureVtiWithLegacyPage(tabId, recordId) {
-    await loadVtiContractorInTab(tabId, recordId);
+async function captureVtiWithLegacyPage(tabId, recordId, contractorNumber) {
+    await loadVtiContractorInTab(tabId, recordId, contractorNumber);
 
     const results = await chrome.scripting.executeScript({
         target: { tabId },
@@ -323,7 +345,10 @@ async function runCapture(requestId, appTabId, payload) {
                 contractorNumber
             );
             if (!vtiSearchResult.ok) {
-                throw new Error(vtiSearchResult.error || "Le contractor n’a pas été trouvé dans VTI.");
+                throw createVtiResultError(
+                    vtiSearchResult,
+                    "Le contractor n’a pas été trouvé dans VTI."
+                );
             }
             vtiRecordId = String(vtiSearchResult.recordId || "");
         }
@@ -332,7 +357,7 @@ async function runCapture(requestId, appTabId, payload) {
             appTabId,
             requestId,
             BROWSER_EXTENSION_PHASE.VTI_CAPTURE,
-            `Contractor trouvé. Capture parallèle des pages VTI…`,
+            `Chargement du contractor ${contractorNumber} dans l’onglet VTI avant les captures parallèles…`,
             { superOfficeStatus: "done", vtiStatus: "active", vtiCaptureMode: "parallel" }
         );
         let vtiPayload;
@@ -343,6 +368,9 @@ async function runCapture(requestId, appTabId, payload) {
                 contractorNumber
             );
         } catch (parallelCaptureError) {
+            if (isVtiSessionError(parallelCaptureError)) {
+                throw parallelCaptureError;
+            }
             console.warn("Capture VTI parallèle indisponible.", parallelCaptureError);
             await reportProgress(
                 appTabId,
@@ -353,7 +381,8 @@ async function runCapture(requestId, appTabId, payload) {
             );
             vtiPayload = await captureVtiWithLegacyPage(
                 selection.vtiTab.id,
-                vtiRecordId
+                vtiRecordId,
+                contractorNumber
             );
         }
         const capturedVtiContractorNumber = getCapturedVtiContractorNumber(vtiPayload);
@@ -528,7 +557,7 @@ async function runAloAutofill(requestId, appTabId, payload) {
 async function runAlexOpen(requestId, appTabId, payload) {
     try {
         const supportedAction = payload
-            && ["view-ticket", "open-provider"].includes(payload.action);
+            && ["view-ticket", "create-ticket", "open-provider"].includes(payload.action);
         if (!payload || payload.source !== "salt-templater-alex-ticket" || !supportedAction) {
             throw new Error("Les données ALEX reçues sont invalides.");
         }
@@ -544,7 +573,9 @@ async function runAlexOpen(requestId, appTabId, payload) {
 
         const message = payload.action === "view-ticket"
             ? "Contexte partenaire appliqué. Ouverture du ticket ALEX…"
-            : "Provider sélectionné. Ouverture d’ALEX…";
+            : payload.action === "create-ticket"
+                ? "Provider sélectionné. Recherche SEP ouverte avec l’OTO VTI…"
+                : "Provider sélectionné. Ouverture d’ALEX…";
 
         await sendActionCompleted(
             appTabId,
