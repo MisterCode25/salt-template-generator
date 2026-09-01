@@ -123,6 +123,10 @@ import {
     CHATGPT_PROMPT_SETTINGS_UPDATED_EVENT,
     loadChatGptPromptSettings
 } from "../services/chatGptPromptSettingsService.js";
+import {
+    CLIENT_BAR_FIELD_LIMIT,
+    limitClientBarFieldKeys
+} from "../utils/clientBarSelection.js";
 import Modal from "./Modal.jsx";
 
 const CLIENT_CLIPBOARD_READ_TIMEOUT_MS = 3500;
@@ -130,7 +134,6 @@ const CAPTURE_DATA_POLL_INTERVAL_MS = 1400;
 const CAPTURE_DATA_COMPLETE_CLOSE_DELAY_MS = 1300;
 const CAPTURE_DATA_STEP_ADVANCE_DELAY_MS = 900;
 const CLIENT_BAR_FIELDS_KEY = "client_bar_fields";
-const CLIENT_BAR_FIELD_LIMIT = 8;
 const RichTextEditor = lazy(() => import("./RichTextEditor.jsx"));
 
 function createCaptureDataState(options = {}) {
@@ -274,9 +277,9 @@ function flattenClientBarFieldGroups(groups = []) {
 }
 
 function getDefaultClientBarFieldKeys(summaryFields = []) {
-    return summaryFields
-        .slice(0, CLIENT_BAR_FIELD_LIMIT)
-        .map((field) => clientBarFieldKey("summary", field.label));
+    return limitClientBarFieldKeys(
+        summaryFields.map((field) => clientBarFieldKey("summary", field.label))
+    );
 }
 
 function resolveClientBarSummaryFields(groups = [], selectedKeys, fallbackSummaryFields = []) {
@@ -1134,7 +1137,7 @@ export function ClientBarCustomizeModal({
         const next = selectedSet.has(key)
             ? activeKeys.filter((item) => item !== key)
             : [...activeKeys, key];
-        onChange(next.slice(0, CLIENT_BAR_FIELD_LIMIT));
+        onChange(limitClientBarFieldKeys(next));
     };
 
     const moveField = (key, direction) => {
@@ -1931,7 +1934,7 @@ export function useTemplateRuntime() {
     const clientExternalId = useMemo(() => getExternalIdFromClientPayload(clientPayload), [clientPayload]);
 
     const saveClientBarSelection = (keys) => {
-        const next = Array.isArray(keys) ? keys.slice(0, CLIENT_BAR_FIELD_LIMIT) : [];
+        const next = limitClientBarFieldKeys(keys);
         setClientBarFieldKeys(next);
         saveClientBarFieldKeys(next);
     };
