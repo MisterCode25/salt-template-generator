@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   APP_FEATURE_FLAGS,
   CAPTURE_FLOW,
@@ -29,6 +30,20 @@ import {
 
 {
   assert.equal(shouldShowCaptureUpdateMenu({ captureUpdateMenu: true }), true);
+}
+
+{
+  const runtimeSource = readFileSync(
+    new URL("../src/components/TemplateRuntime.jsx", import.meta.url),
+    "utf8"
+  );
+  const captureButtonIndex = runtimeSource.indexOf("<small>Extension</small>");
+  const referenceCardIndex = runtimeSource.indexOf("client-capture-reference-card");
+  const clearButtonIndex = runtimeSource.indexOf("className=\"client-import-clear-btn\"");
+
+  assert.ok(captureButtonIndex >= 0);
+  assert.ok(referenceCardIndex > captureButtonIndex);
+  assert.ok(clearButtonIndex > referenceCardIndex);
 }
 
 {

@@ -1321,6 +1321,16 @@ export const ClientInfoPanel = memo(function ClientInfoPanel({
                         <span>Capture data</span>
                         <small>Extension</small>
                     </button>
+                    {caseReferenceFields.length > 0 && (
+                        <dl className="client-capture-reference-card" aria-label="Case references">
+                            {caseReferenceFields.map((field) => (
+                                <div key={field.key} className="client-capture-reference-field">
+                                    <dt>{field.label}</dt>
+                                    <dd title={`${field.label}: ${field.value}`}>{field.value}</dd>
+                                </div>
+                            ))}
+                        </dl>
+                    )}
                     {shouldShowCaptureUpdateMenu() && hasAnyImportedData && (
                         <details className="client-import-update-menu" ref={updateMenuRef}>
                             <summary className="client-import-update-btn">
@@ -1386,16 +1396,6 @@ export const ClientInfoPanel = memo(function ClientInfoPanel({
                         </button>
                     )}
                 </div>
-                {caseReferenceFields.length > 0 && (
-                    <dl className="client-capture-reference-card" aria-label="Case references">
-                        {caseReferenceFields.map((field) => (
-                            <div key={field.key} className="client-capture-reference-field">
-                                <dt>{field.label}</dt>
-                                <dd title={`${field.label}: ${field.value}`}>{field.value}</dd>
-                            </div>
-                        ))}
-                    </dl>
-                )}
             </div>
             <div className="client-info-bar">
                 <div className="client-info-bar-main">
