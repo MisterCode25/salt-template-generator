@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { runInNewContext } from "node:vm";
 import {
   buildSuperOfficeCaptureModule,
   buildVtiCaptureModule
@@ -11,6 +12,10 @@ import {
   normalizeVtiHealthcheckResponseText
 } from "../browser-extension/healthcheckCapture.js";
 import { CURRENT_BROWSER_EXTENSION_VERSION } from "../src/services/browserExtensionCaptureService.js";
+import {
+  BROWSER_EXTENSION_MESSAGE,
+  createAppCommand
+} from "../shared/browserExtensionProtocol.js";
 
 const vtiBookmarklet = readFileSync(
   new URL("../src/data/vtiHealthcheckBookmarklet.txt", import.meta.url),
@@ -533,7 +538,7 @@ assert.ok(vtiBookmarklet.startsWith("javascript:"));
 assert.ok(superOfficeBookmarklet.startsWith("javascript:"));
 
 assert.equal(manifest.manifest_version, 3);
-assert.equal(manifest.version, "0.1.24");
+assert.equal(manifest.version, "0.1.25");
 assert.equal(CURRENT_BROWSER_EXTENSION_VERSION, manifest.version);
 assert.deepEqual(manifest.permissions.sort(), ["scripting", "tabs"]);
 assert.equal(manifest.host_permissions.includes("<all_urls>"), false);
@@ -583,6 +588,46 @@ assert.ok(
 );
 assert.match(appBridgeSource, /salt\.capture\.alo\.start\.v1/);
 assert.match(appBridgeSource, /salt\.capture\.alex\.start\.v1/);
+
+{
+  const applicationEvents = [];
+  let applicationMessageListener = null;
+  const appOrigin = "https://mistercode25.github.io";
+  const fakeWindow = {
+    location: { origin: appOrigin },
+    addEventListener(type, listener) {
+      if (type === "message") applicationMessageListener = listener;
+    },
+    postMessage(message) {
+      applicationEvents.push(message);
+    }
+  };
+
+  runInNewContext(appBridgeSource, {
+    chrome: {
+      runtime: {
+        getManifest: () => ({ version: CURRENT_BROWSER_EXTENSION_VERSION }),
+        onMessage: { addListener() {} },
+        sendMessage() {
+          throw new Error("Extension context invalidated.");
+        }
+      }
+    },
+    Date,
+    window: fakeWindow
+  });
+
+  const request = createAppCommand(BROWSER_EXTENSION_MESSAGE.STATUS_REQUEST, "status-bridge-error");
+  applicationMessageListener({
+    data: request,
+    origin: appOrigin,
+    source: fakeWindow
+  });
+
+  assert.equal(applicationEvents.at(-1).type, BROWSER_EXTENSION_MESSAGE.FAILED);
+  assert.equal(applicationEvents.at(-1).requestId, "status-bridge-error");
+  assert.match(applicationEvents.at(-1).error, /context invalidated/i);
+}
 
 const searchFunctionSource = serviceWorkerSource.slice(
   serviceWorkerSource.indexOf("async function findVtiContractorInTab"),

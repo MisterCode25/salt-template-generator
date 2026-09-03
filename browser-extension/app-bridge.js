@@ -29,21 +29,40 @@
         }, window.location.origin);
     }
 
+    function forwardRuntimeFailure(requestId, error) {
+        forwardToApplication({
+            type: "salt.capture.failed.v1",
+            requestId,
+            error: String(error?.message || error || "Extension unavailable.")
+        });
+    }
+
     window.addEventListener("message", (event) => {
         if (event.source !== window || event.origin !== window.location.origin) return;
         if (!isValidAppCommand(event.data)) return;
 
-        chrome.runtime.sendMessage(event.data, (response) => {
-            if (chrome.runtime.lastError) {
-                forwardToApplication({
-                    type: "salt.capture.failed.v1",
-                    requestId: event.data.requestId,
-                    error: chrome.runtime.lastError.message || "Extension unavailable."
-                });
-                return;
-            }
-            forwardToApplication(response);
-        });
+        try {
+            chrome.runtime.sendMessage(event.data, (response) => {
+                try {
+                    if (chrome.runtime.lastError) {
+                        forwardRuntimeFailure(event.data.requestId, chrome.runtime.lastError);
+                        return;
+                    }
+                    if (!response) {
+                        forwardRuntimeFailure(
+                            event.data.requestId,
+                            "The extension background service returned no response."
+                        );
+                        return;
+                    }
+                    forwardToApplication(response);
+                } catch (error) {
+                    forwardRuntimeFailure(event.data.requestId, error);
+                }
+            });
+        } catch (error) {
+            forwardRuntimeFailure(event.data.requestId, error);
+        }
     });
 
     chrome.runtime.onMessage.addListener((message) => {

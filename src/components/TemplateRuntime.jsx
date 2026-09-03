@@ -2321,11 +2321,22 @@ export function useTemplateRuntime() {
         dispatchBrowserExtensionCapture({ type: BROWSER_EXTENSION_CAPTURE_ACTION.CHECKING });
 
         const status = await requestBrowserExtensionStatus();
-        if (!status || status.type === BROWSER_EXTENSION_MESSAGE.FAILED) {
+        if (!status) {
             dispatchBrowserExtensionCapture({
                 type: BROWSER_EXTENSION_CAPTURE_ACTION.LOCAL_FAILURE,
                 installed: false,
-                error: "Extension not detected. Install it, reload the app, then try again."
+                error: "Extension connection not found. If it is installed or was recently updated, reload the app and try again."
+            });
+            return false;
+        }
+        if (status.type === BROWSER_EXTENSION_MESSAGE.FAILED) {
+            const wasExtensionContextInvalidated = /context invalidated/i.test(status.error || "");
+            dispatchBrowserExtensionCapture({
+                type: BROWSER_EXTENSION_CAPTURE_ACTION.LOCAL_FAILURE,
+                installed: true,
+                error: wasExtensionContextInvalidated
+                    ? "The extension was reloaded after this page opened. Reload the app, then try again."
+                    : "The extension is loaded, but its background service did not respond. Try again."
             });
             return false;
         }

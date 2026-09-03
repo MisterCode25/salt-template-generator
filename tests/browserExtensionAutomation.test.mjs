@@ -18,6 +18,7 @@ import {
   BROWSER_EXTENSION_ACTION_TIMEOUT_MS,
   CURRENT_BROWSER_EXTENSION_VERSION,
   isBrowserExtensionVersionAtLeast,
+  requestBrowserExtensionStatus,
   startBrowserExtensionCapture,
   startBrowserExtensionAloAutofill
 } from "../src/services/browserExtensionCaptureService.js";
@@ -30,7 +31,7 @@ assert.equal(isBrowserExtensionVersionAtLeast("0.1.3", "0.1.3"), true);
 assert.equal(isBrowserExtensionVersionAtLeast("0.2.0", "0.1.3"), true);
 assert.equal(isBrowserExtensionVersionAtLeast("0.1.2", "0.1.3"), false);
 assert.equal(isBrowserExtensionVersionAtLeast("", "0.1.3"), false);
-assert.equal(CURRENT_BROWSER_EXTENSION_VERSION, "0.1.24");
+assert.equal(CURRENT_BROWSER_EXTENSION_VERSION, "0.1.25");
 assert.equal(BROWSER_EXTENSION_ACTION_TIMEOUT_MS, 10 * 60 * 1000);
 
 async function withGlobalOverrides(overrides, callback) {
@@ -53,6 +54,15 @@ async function withGlobalOverrides(overrides, callback) {
       else delete globalThis[name];
     }
   }
+}
+
+{
+  const status = await withGlobalOverrides(
+    { window: undefined },
+    () => requestBrowserExtensionStatus()
+  );
+
+  assert.equal(status, null);
 }
 
 {
@@ -300,6 +310,54 @@ function createInput(value = "") {
 
   scheduledCallbacks[0].callback();
   assert.match(replacedUrls[0], /^https:\/\/www\.ftthproxy\.ch\/\?saltAlexRefresh=\d+#\/assurance\/ticket\/223323$/);
+}
+
+{
+  const commands = [];
+  const listeners = new Set();
+  let nextTimeoutId = 1;
+  const fakeWindow = {
+    location: { origin: "https://mistercode25.github.io" },
+    addEventListener(type, listener) {
+      if (type === "message") listeners.add(listener);
+    },
+    removeEventListener(type, listener) {
+      if (type === "message") listeners.delete(listener);
+    },
+    clearTimeout() {},
+    setTimeout(callback) {
+      const timeoutId = nextTimeoutId;
+      nextTimeoutId += 1;
+      queueMicrotask(callback);
+      return timeoutId;
+    },
+    postMessage(command) {
+      commands.push(command);
+      if (commands.length !== 2) return;
+
+      for (const listener of [...listeners]) {
+        listener({
+          data: createExtensionEvent(BROWSER_EXTENSION_MESSAGE.STATUS, command.requestId, {
+            installed: true,
+            version: CURRENT_BROWSER_EXTENSION_VERSION,
+            busy: false
+          }),
+          origin: fakeWindow.location.origin,
+          source: fakeWindow
+        });
+      }
+    }
+  };
+
+  const status = await withGlobalOverrides(
+    { window: fakeWindow },
+    () => requestBrowserExtensionStatus()
+  );
+
+  assert.equal(commands.length, 2);
+  assert.equal(status.type, BROWSER_EXTENSION_MESSAGE.STATUS);
+  assert.equal(status.installed, true);
+  assert.equal(listeners.size, 0);
 }
 
 {

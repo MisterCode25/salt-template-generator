@@ -5,9 +5,10 @@ import {
 } from "../../shared/browserExtensionProtocol.js";
 
 const STATUS_TIMEOUT_MS = 1200;
+const STATUS_RETRY_DELAYS_MS = Object.freeze([150, 300]);
 const START_TIMEOUT_MS = 2200;
 export const BROWSER_EXTENSION_ACTION_TIMEOUT_MS = 10 * 60 * 1000;
-export const CURRENT_BROWSER_EXTENSION_VERSION = "0.1.24";
+export const CURRENT_BROWSER_EXTENSION_VERSION = "0.1.25";
 
 export function isBrowserExtensionVersionAtLeast(version, minimumVersion) {
     const parseVersion = (value) => String(value || "")
@@ -66,13 +67,29 @@ function sendCommandAndWait(type, requestId, expectedTypes, timeoutMs, details =
 }
 
 export async function requestBrowserExtensionStatus() {
-    const requestId = createBrowserExtensionRequestId();
-    return sendCommandAndWait(
-        BROWSER_EXTENSION_MESSAGE.STATUS_REQUEST,
-        requestId,
-        [BROWSER_EXTENSION_MESSAGE.STATUS, BROWSER_EXTENSION_MESSAGE.FAILED],
-        STATUS_TIMEOUT_MS
-    );
+    if (typeof window === "undefined") return null;
+
+    let lastFailure = null;
+
+    for (let attempt = 0; attempt <= STATUS_RETRY_DELAYS_MS.length; attempt += 1) {
+        const requestId = createBrowserExtensionRequestId();
+        const response = await sendCommandAndWait(
+            BROWSER_EXTENSION_MESSAGE.STATUS_REQUEST,
+            requestId,
+            [BROWSER_EXTENSION_MESSAGE.STATUS, BROWSER_EXTENSION_MESSAGE.FAILED],
+            STATUS_TIMEOUT_MS
+        );
+
+        if (response?.type === BROWSER_EXTENSION_MESSAGE.STATUS) return response;
+        if (response) lastFailure = response;
+
+        const retryDelayMs = STATUS_RETRY_DELAYS_MS[attempt];
+        if (retryDelayMs !== undefined) {
+            await new Promise((resolve) => window.setTimeout(resolve, retryDelayMs));
+        }
+    }
+
+    return lastFailure;
 }
 
 export async function startBrowserExtensionCapture(
