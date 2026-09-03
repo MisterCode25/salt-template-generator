@@ -1,15 +1,11 @@
 export const CAPTURE_TAB_ERROR = Object.freeze({
     VTI_MISSING: "VTI_TAB_MISSING",
-    VTI_AMBIGUOUS: "VTI_TAB_AMBIGUOUS",
-    SUPER_OFFICE_MISSING: "SUPER_OFFICE_TAB_MISSING",
-    SUPER_OFFICE_AMBIGUOUS: "SUPER_OFFICE_TAB_AMBIGUOUS"
+    SUPER_OFFICE_MISSING: "SUPER_OFFICE_TAB_MISSING"
 });
 
 export const CAPTURE_TAB_ERROR_MESSAGE = Object.freeze({
     [CAPTURE_TAB_ERROR.VTI_MISSING]: "No VTI tab was found. Open the correct VTI customer, then start the capture again.",
-    [CAPTURE_TAB_ERROR.VTI_AMBIGUOUS]: "Multiple VTI tabs were found. Keep only the customer tab you want to capture.",
-    [CAPTURE_TAB_ERROR.SUPER_OFFICE_MISSING]: "No SuperOffice tab was found. Open the correct ticket, then start the capture again.",
-    [CAPTURE_TAB_ERROR.SUPER_OFFICE_AMBIGUOUS]: "Multiple SuperOffice tabs were found. Keep only the ticket tab you want to capture."
+    [CAPTURE_TAB_ERROR.SUPER_OFFICE_MISSING]: "No SuperOffice tab was found. Open the correct ticket, then start the capture again."
 });
 
 function parseTabUrl(rawUrl) {
@@ -54,19 +50,27 @@ export function selectReusableWorkflowTab(tabs = [], workflow) {
     return candidates[0] || null;
 }
 
-export function selectUniqueCaptureTabs(tabs = []) {
-    const candidates = Array.isArray(tabs) ? tabs : [];
-    const vtiTabs = candidates.filter((tab) => classifyCaptureTab(tab) === "vti");
-    const superOfficeTabs = candidates.filter((tab) => classifyCaptureTab(tab) === "superOffice");
+export function selectFirstCaptureTabs(tabs = []) {
+    const orderedTabs = (Array.isArray(tabs) ? [...tabs] : [])
+        .sort((left, right) => {
+            const leftIndex = Number.isInteger(left?.index) ? left.index : Number.MAX_SAFE_INTEGER;
+            const rightIndex = Number.isInteger(right?.index) ? right.index : Number.MAX_SAFE_INTEGER;
+            return leftIndex - rightIndex;
+        });
 
-    if (vtiTabs.length === 0) return { ok: false, error: CAPTURE_TAB_ERROR.VTI_MISSING };
-    if (vtiTabs.length > 1) return { ok: false, error: CAPTURE_TAB_ERROR.VTI_AMBIGUOUS };
-    if (superOfficeTabs.length === 0) return { ok: false, error: CAPTURE_TAB_ERROR.SUPER_OFFICE_MISSING };
-    if (superOfficeTabs.length > 1) return { ok: false, error: CAPTURE_TAB_ERROR.SUPER_OFFICE_AMBIGUOUS };
+    const superOfficeTab = orderedTabs.find(
+        (tab) => classifyCaptureTab(tab) === "superOffice"
+    );
+    if (!superOfficeTab) {
+        return { ok: false, error: CAPTURE_TAB_ERROR.SUPER_OFFICE_MISSING };
+    }
+
+    const vtiTab = orderedTabs.find((tab) => classifyCaptureTab(tab) === "vti");
+    if (!vtiTab) return { ok: false, error: CAPTURE_TAB_ERROR.VTI_MISSING };
 
     return {
         ok: true,
-        vtiTab: vtiTabs[0],
-        superOfficeTab: superOfficeTabs[0]
+        vtiTab,
+        superOfficeTab
     };
 }

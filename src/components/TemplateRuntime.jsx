@@ -125,6 +125,7 @@ import {
 } from "../services/chatGptPromptSettingsService.js";
 import {
     CLIENT_BAR_FIELD_LIMIT,
+    excludeCaseReferenceFields,
     limitClientBarFieldKeys
 } from "../utils/clientBarSelection.js";
 import Modal from "./Modal.jsx";
@@ -244,7 +245,7 @@ function saveClientBarFieldKeys(keys) {
 function buildClientBarFieldGroups(summaryFields = [], sections = []) {
     const seen = new Set();
     const groups = [];
-    const summaryOptions = summaryFields.map((field) => ({
+    const summaryOptions = excludeCaseReferenceFields(summaryFields).map((field) => ({
         key: clientBarFieldKey("summary", field.label),
         label: field.label,
         value: field.value
@@ -255,7 +256,7 @@ function buildClientBarFieldGroups(summaryFields = [], sections = []) {
     }
 
     sections.forEach((section) => {
-        const fields = section.fields
+        const fields = excludeCaseReferenceFields(section.fields)
             .map((field) => ({
                 key: clientBarFieldKey(section.id, field.label),
                 label: field.label,
@@ -278,14 +279,16 @@ function flattenClientBarFieldGroups(groups = []) {
 
 function getDefaultClientBarFieldKeys(summaryFields = []) {
     return limitClientBarFieldKeys(
-        summaryFields.map((field) => clientBarFieldKey("summary", field.label))
+        excludeCaseReferenceFields(summaryFields)
+            .map((field) => clientBarFieldKey("summary", field.label))
     );
 }
 
 function resolveClientBarSummaryFields(groups = [], selectedKeys, fallbackSummaryFields = []) {
     const allFields = flattenClientBarFieldGroups(groups);
-    if (allFields.length === 0) return fallbackSummaryFields;
-    const fallbackKeys = getDefaultClientBarFieldKeys(fallbackSummaryFields);
+    const visibleFallbackFields = excludeCaseReferenceFields(fallbackSummaryFields);
+    if (allFields.length === 0) return visibleFallbackFields;
+    const fallbackKeys = getDefaultClientBarFieldKeys(visibleFallbackFields);
     const activeKeys = Array.isArray(selectedKeys) && selectedKeys.length > 0 ? selectedKeys : fallbackKeys;
     const byKey = new Map(allFields.map((field) => [field.key, field]));
     const selected = activeKeys
@@ -293,7 +296,7 @@ function resolveClientBarSummaryFields(groups = [], selectedKeys, fallbackSummar
         .filter(Boolean)
         .slice(0, CLIENT_BAR_FIELD_LIMIT)
         .map(({ label, value }) => ({ label, value }));
-    return selected.length > 0 ? selected : fallbackSummaryFields;
+    return selected.length > 0 ? selected : visibleFallbackFields;
 }
 
 async function withClipboardTimeout(readOperation) {
@@ -1124,9 +1127,12 @@ export function ClientBarCustomizeModal({
     onReset,
     onClose
 }) {
-    const activeKeys = Array.isArray(selectedKeys) && selectedKeys.length > 0 ? selectedKeys : defaultKeys;
-    const selectedSet = useMemo(() => new Set(activeKeys), [activeKeys]);
     const fieldByKey = useMemo(() => new Map(flattenClientBarFieldGroups(groups).map((field) => [field.key, field])), [groups]);
+    const activeKeys = useMemo(() => {
+        const preferredKeys = Array.isArray(selectedKeys) && selectedKeys.length > 0 ? selectedKeys : defaultKeys;
+        return (preferredKeys || []).filter((key) => fieldByKey.has(key));
+    }, [defaultKeys, fieldByKey, selectedKeys]);
+    const selectedSet = useMemo(() => new Set(activeKeys), [activeKeys]);
     const visibleFields = useMemo(
         () => activeKeys.map((key) => fieldByKey.get(key)).filter(Boolean).slice(0, CLIENT_BAR_FIELD_LIMIT),
         [activeKeys, fieldByKey]
@@ -1241,6 +1247,7 @@ export function ClientBarCustomizeModal({
 export const ClientInfoPanel = memo(function ClientInfoPanel({
     sections,
     summaryFields,
+    caseReferenceFields = [],
     externalId,
     status,
     loading,
@@ -1288,94 +1295,106 @@ export const ClientInfoPanel = memo(function ClientInfoPanel({
 
     return (
         <section className="client-info-panel" aria-label="Client information">
-            <div className="client-import-status-row" aria-label="Data imports">
-                {shouldShowLegacyCaptureButton() && (
+            <div className="client-import-toolbar">
+                <div className="client-import-status-row" aria-label="Data imports">
+                    {shouldShowLegacyCaptureButton() && (
+                        <button
+                            type="button"
+                            className={`client-import-status-btn client-import-status-btn--capture${hasVtiData && hasSuperOfficeData ? " is-loaded" : " is-missing"}`}
+                            onClick={onOpenCaptureData}
+                            disabled={loading}
+                            title="Capture SO/BO and VTI data. Alt+Q"
+                        >
+                            <ClipboardList size={14} aria-hidden="true" />
+                            <span>{loading ? "Capturing..." : "Capture data"}</span>
+                            <small>{missingCaptureLabel}</small>
+                        </button>
+                    )}
                     <button
                         type="button"
-                        className={`client-import-status-btn client-import-status-btn--capture${hasVtiData && hasSuperOfficeData ? " is-loaded" : " is-missing"}`}
-                        onClick={onOpenCaptureData}
+                        className="client-import-status-btn client-import-status-btn--extension"
+                        onClick={onOpenBrowserExtensionCapture}
                         disabled={loading}
-                        title="Capture SO/BO and VTI data. Alt+Q"
+                        title="Capture SuperOffice and VTI tabs with the extension"
                     >
-                        <ClipboardList size={14} aria-hidden="true" />
-                        <span>{loading ? "Capturing..." : "Capture data"}</span>
-                        <small>{missingCaptureLabel}</small>
+                        <Puzzle size={14} aria-hidden="true" />
+                        <span>Capture data</span>
+                        <small>Extension</small>
                     </button>
-                )}
-                <button
-                    type="button"
-                    className="client-import-status-btn client-import-status-btn--extension"
-                    onClick={onOpenBrowserExtensionCapture}
-                    disabled={loading}
-                    title="Capture SuperOffice and VTI tabs with the extension"
-                >
-                    <Puzzle size={14} aria-hidden="true" />
-                    <span>Capture data</span>
-                    <small>Extension</small>
-                </button>
-                {shouldShowCaptureUpdateMenu() && hasAnyImportedData && (
-                    <details className="client-import-update-menu" ref={updateMenuRef}>
-                        <summary className="client-import-update-btn">
-                            <RefreshCw size={13} aria-hidden="true" />
-                            Update
-                        </summary>
-                        <div className="client-import-update-popover" role="menu">
-                            <button
-                                type="button"
-                                role="menuitem"
-                                onClick={() => runUpdateAction(onRefreshVti)}
-                                disabled={loading || !hasVtiData}
-                            >
-                                <RefreshCw size={14} aria-hidden="true" />
-                                <span>
-                                    <strong>Refresh VTI</strong>
-                                    <small>Keep the SO ticket</small>
-                                </span>
-                            </button>
-                            <button
-                                type="button"
-                                role="menuitem"
-                                onClick={() => runUpdateAction(onReplaceSuperOffice)}
-                                disabled={loading || !hasVtiData}
-                            >
-                                <ClipboardList size={14} aria-hidden="true" />
-                                <span>
-                                    <strong>Replace the SO ticket</strong>
-                                    <small>Keep VTI data</small>
-                                </span>
-                            </button>
-                            {previousSuperOfficeTicketId && (
+                    {shouldShowCaptureUpdateMenu() && hasAnyImportedData && (
+                        <details className="client-import-update-menu" ref={updateMenuRef}>
+                            <summary className="client-import-update-btn">
+                                <RefreshCw size={13} aria-hidden="true" />
+                                Update
+                            </summary>
+                            <div className="client-import-update-popover" role="menu">
                                 <button
                                     type="button"
                                     role="menuitem"
-                                    onClick={() => runUpdateAction(onRestorePreviousSuperOffice)}
-                                    disabled={loading}
+                                    onClick={() => runUpdateAction(onRefreshVti)}
+                                    disabled={loading || !hasVtiData}
                                 >
-                                    <History size={14} aria-hidden="true" />
+                                    <RefreshCw size={14} aria-hidden="true" />
                                     <span>
-                                        <strong>Restore previous ticket</strong>
-                                        <small>Ticket {previousSuperOfficeTicketId}</small>
+                                        <strong>Refresh VTI</strong>
+                                        <small>Keep the SO ticket</small>
                                     </span>
                                 </button>
-                            )}
-                        </div>
-                    </details>
-                )}
-                <button
-                    type="button"
-                    className="client-import-clear-btn"
-                    onClick={onClearClient}
-                    disabled={loading || !hasAnyImportedData}
-                    aria-label="Clear imported data"
-                    title={hasAnyImportedData ? "Clear VTI and SO data. Alt+E" : "No imported data to clear"}
-                >
-                    <span aria-hidden="true">×</span>
-                    Clear
-                </button>
-                {isError && (
-                    <button type="button" className="client-info-paste-btn" onClick={onOpenPaste}>
-                        Paste manually
+                                <button
+                                    type="button"
+                                    role="menuitem"
+                                    onClick={() => runUpdateAction(onReplaceSuperOffice)}
+                                    disabled={loading || !hasVtiData}
+                                >
+                                    <ClipboardList size={14} aria-hidden="true" />
+                                    <span>
+                                        <strong>Replace the SO ticket</strong>
+                                        <small>Keep VTI data</small>
+                                    </span>
+                                </button>
+                                {previousSuperOfficeTicketId && (
+                                    <button
+                                        type="button"
+                                        role="menuitem"
+                                        onClick={() => runUpdateAction(onRestorePreviousSuperOffice)}
+                                        disabled={loading}
+                                    >
+                                        <History size={14} aria-hidden="true" />
+                                        <span>
+                                            <strong>Restore previous ticket</strong>
+                                            <small>Ticket {previousSuperOfficeTicketId}</small>
+                                        </span>
+                                    </button>
+                                )}
+                            </div>
+                        </details>
+                    )}
+                    <button
+                        type="button"
+                        className="client-import-clear-btn"
+                        onClick={onClearClient}
+                        disabled={loading || !hasAnyImportedData}
+                        aria-label="Clear imported data"
+                        title={hasAnyImportedData ? "Clear VTI and SO data. Alt+E" : "No imported data to clear"}
+                    >
+                        <span aria-hidden="true">×</span>
+                        Clear
                     </button>
+                    {isError && (
+                        <button type="button" className="client-info-paste-btn" onClick={onOpenPaste}>
+                            Paste manually
+                        </button>
+                    )}
+                </div>
+                {caseReferenceFields.length > 0 && (
+                    <dl className="client-capture-reference-card" aria-label="Case references">
+                        {caseReferenceFields.map((field) => (
+                            <div key={field.key} className="client-capture-reference-field">
+                                <dt>{field.label}</dt>
+                                <dd title={`${field.label}: ${field.value}`}>{field.value}</dd>
+                            </div>
+                        ))}
+                    </dl>
                 )}
             </div>
             <div className="client-info-bar">

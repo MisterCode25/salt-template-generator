@@ -4,6 +4,7 @@ import {
   buildCaseProfile,
   CASE_PROFILE_VERSION,
   getCaseProfileInfoSections,
+  getCaseReferenceFields,
   getCaseProfileSummaryFields
 } from "../src/utils/caseProfile.js";
 
@@ -58,6 +59,20 @@ const importedExternalId = "FLAG//26.02.2026//777001//SO-777//Lost//Off//Check O
   assert.equal(profile.photos.length, 1);
   assert.equal(profile.attachments.length, 2);
   assert.ok(profile.availableFields.some((field) => field.key === "healthcheckNewFutureProperty" && field.value === "future-value"));
+  assert.deepEqual(getCaseReferenceFields(profile), [
+    { key: "contractor", label: "Contractor", value: "31447756" },
+    { key: "so-ticket", label: "SO ticket", value: "SO-314" }
+  ]);
+}
+
+{
+  const profile = buildCaseProfile({
+    superOfficePayload: { ticketId: "SO-ONLY" }
+  });
+
+  assert.deepEqual(getCaseReferenceFields(profile), [
+    { key: "so-ticket", label: "SO ticket", value: "SO-ONLY" }
+  ]);
 }
 
 {

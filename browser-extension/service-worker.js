@@ -20,8 +20,8 @@ import {
 } from "./shared/vtiContractorNavigation.js";
 import {
     CAPTURE_TAB_ERROR_MESSAGE,
-    selectReusableWorkflowTab,
-    selectUniqueCaptureTabs
+    selectFirstCaptureTabs,
+    selectReusableWorkflowTab
 } from "./tabDiscovery.js";
 import {
     ALO_FULFILLMENT_DETAIL_URL,
@@ -271,8 +271,9 @@ async function runCapture(requestId, appTabId, payload) {
             "Finding the SuperOffice and VTI tabs..."
         );
 
-        const tabs = await chrome.tabs.query({ windowType: "normal" });
-        const selection = selectUniqueCaptureTabs(tabs);
+        const appTab = await chrome.tabs.get(appTabId);
+        const tabs = await chrome.tabs.query({ windowId: appTab.windowId });
+        const selection = selectFirstCaptureTabs(tabs);
         if (!selection.ok) {
             throw new Error(CAPTURE_TAB_ERROR_MESSAGE[selection.error] || selection.error);
         }

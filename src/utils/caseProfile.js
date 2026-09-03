@@ -626,6 +626,22 @@ export function getCaseProfileSummaryFields(profile = null) {
     ]);
 }
 
+export function getCaseReferenceFields(profile = null) {
+    if (!profile || typeof profile !== "object") return [];
+
+    const contractor = fieldFromValue("Contractor", firstValue(
+        profile.contractorNumber,
+        profile.externalCustomer,
+        profile.customerId
+    ));
+    const superOfficeTicket = fieldFromValue("SO ticket", profile.soTicketNum);
+
+    return [
+        contractor && { key: "contractor", ...contractor },
+        superOfficeTicket && { key: "so-ticket", ...superOfficeTicket }
+    ].filter(Boolean);
+}
+
 export function getCaseProfileInfoSections(profile = null) {
     if (!profile || typeof profile !== "object") return [];
 

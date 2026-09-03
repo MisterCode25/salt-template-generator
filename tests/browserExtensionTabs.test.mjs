@@ -3,8 +3,8 @@ import {
   CAPTURE_TAB_ERROR,
   classifyCaptureTab,
   classifyWorkflowTab,
-  selectReusableWorkflowTab,
-  selectUniqueCaptureTabs
+  selectFirstCaptureTabs,
+  selectReusableWorkflowTab
 } from "../browser-extension/tabDiscovery.js";
 import {
   buildSuperOfficeTicketUrl,
@@ -15,16 +15,19 @@ import {
 
 const vtiTab = {
   id: 11,
+  index: 1,
   url: "https://vti.salt.ch/index.php?module=Accounts&view=Detail",
   title: "VTI"
 };
 const superOfficeTab = {
   id: 12,
+  index: 2,
   url: "https://online.superoffice.com/salt/default.aspx",
   title: "REQUEST 31436062"
 };
 const saltSuperOfficeTab = {
   id: 16,
+  index: 3,
   url: "https://cs.salt.ch/scripts/ticket.fcgi?_sf=0&action=doScreenDefinition&idString=viewEmail&entryId=28958607",
   title: "REQUEST 28958607"
 };
@@ -105,7 +108,7 @@ const saltSuperOfficeTab = {
 }
 
 {
-  const selection = selectUniqueCaptureTabs([vtiTab, superOfficeTab]);
+  const selection = selectFirstCaptureTabs([vtiTab, superOfficeTab]);
 
   assert.equal(selection.ok, true);
   assert.equal(selection.vtiTab.id, 11);
@@ -113,29 +116,28 @@ const saltSuperOfficeTab = {
 }
 
 {
-  const selection = selectUniqueCaptureTabs([superOfficeTab]);
+  const selection = selectFirstCaptureTabs([superOfficeTab]);
   assert.equal(selection.ok, false);
   assert.equal(selection.error, CAPTURE_TAB_ERROR.VTI_MISSING);
 }
 
 {
-  const selection = selectUniqueCaptureTabs([
-    vtiTab,
-    { ...vtiTab, id: 14, url: "https://vti.salt.ch/index.php?record=2" },
-    superOfficeTab
-  ]);
+  const selection = selectFirstCaptureTabs([vtiTab]);
   assert.equal(selection.ok, false);
-  assert.equal(selection.error, CAPTURE_TAB_ERROR.VTI_AMBIGUOUS);
+  assert.equal(selection.error, CAPTURE_TAB_ERROR.SUPER_OFFICE_MISSING);
 }
 
 {
-  const selection = selectUniqueCaptureTabs([
-    vtiTab,
-    superOfficeTab,
-    { ...superOfficeTab, id: 15, url: "https://saltsupport.superoffice.com/ticket/2" }
+  const selection = selectFirstCaptureTabs([
+    { ...vtiTab, id: 21, index: 7, url: "https://vti.salt.ch/index.php?record=late" },
+    { ...superOfficeTab, id: 22, index: 6 },
+    { ...vtiTab, id: 23, index: 1, url: "https://vti.salt.ch/index.php?record=first" },
+    { ...superOfficeTab, id: 24, index: 2, url: "https://saltsupport.superoffice.com/ticket/first" }
   ]);
-  assert.equal(selection.ok, false);
-  assert.equal(selection.error, CAPTURE_TAB_ERROR.SUPER_OFFICE_AMBIGUOUS);
+
+  assert.equal(selection.ok, true);
+  assert.equal(selection.superOfficeTab.id, 24);
+  assert.equal(selection.vtiTab.id, 23);
 }
 
 console.log("browserExtensionTabs tests passed");

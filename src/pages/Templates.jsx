@@ -100,6 +100,7 @@ import { getKeyboardShortcutForEvent } from "../utils/keyboardShortcuts.js";
 import {
     buildCaseProfile,
     getCaseProfileInfoSections,
+    getCaseReferenceFields,
     getCaseProfileSummaryFields
 } from "../utils/caseProfile.js";
 import {
@@ -111,6 +112,7 @@ import { getTopicColorStyle } from "../utils/topicAppearance.js";
 import { getRouterElectricalImpact } from "../utils/routerElectricalImpact.js";
 import { CAPTURE_FLOW, getPrimaryCaptureFlow } from "../config/appFeatureFlags.js";
 import { SETTINGS_SECTION } from "../config/settingsSections.js";
+import { excludeCaseReferenceFields } from "../utils/clientBarSelection.js";
 
 const ExternalGenerator = lazy(() => import("./ExternalGenerator.jsx"));
 const ManageNodes = lazy(() => import("./ManageNodes.jsx"));
@@ -1133,8 +1135,9 @@ export default function Templates() {
     const baseClientSummaryFields = runtime.clientPayload
         ? runtime.clientSummaryFields
         : caseProfileSummaryFields;
+    const caseReferenceFields = useMemo(() => getCaseReferenceFields(caseProfile), [caseProfile]);
     const displayClientSummaryFields = useMemo(
-        () => baseClientSummaryFields.map((field) => (
+        () => excludeCaseReferenceFields(baseClientSummaryFields).map((field) => (
             String(field.label || "").trim().toLowerCase() === "router serial"
                 ? { ...field, routerElectricalImpact: getRouterElectricalImpact(field.value) }
                 : field
@@ -1926,6 +1929,7 @@ export default function Templates() {
             <ClientInfoPanel
                 sections={displayClientInfoSections}
                 summaryFields={displayClientSummaryFields}
+                caseReferenceFields={caseReferenceFields}
                 externalId={displayClientExternalId}
                 status={runtime.clientImportStatus}
                 loading={runtime.clientImportLoading}

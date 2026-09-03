@@ -31,7 +31,7 @@ assert.equal(isBrowserExtensionVersionAtLeast("0.1.3", "0.1.3"), true);
 assert.equal(isBrowserExtensionVersionAtLeast("0.2.0", "0.1.3"), true);
 assert.equal(isBrowserExtensionVersionAtLeast("0.1.2", "0.1.3"), false);
 assert.equal(isBrowserExtensionVersionAtLeast("", "0.1.3"), false);
-assert.equal(CURRENT_BROWSER_EXTENSION_VERSION, "0.1.25");
+assert.equal(CURRENT_BROWSER_EXTENSION_VERSION, "0.1.26");
 assert.equal(BROWSER_EXTENSION_ACTION_TIMEOUT_MS, 10 * 60 * 1000);
 
 async function withGlobalOverrides(overrides, callback) {
