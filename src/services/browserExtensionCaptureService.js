@@ -8,7 +8,7 @@ const STATUS_TIMEOUT_MS = 1200;
 const STATUS_RETRY_DELAYS_MS = Object.freeze([150, 300]);
 const START_TIMEOUT_MS = 2200;
 export const BROWSER_EXTENSION_ACTION_TIMEOUT_MS = 10 * 60 * 1000;
-export const CURRENT_BROWSER_EXTENSION_VERSION = "0.1.27";
+export const CURRENT_BROWSER_EXTENSION_VERSION = "0.1.28";
 
 export function isBrowserExtensionVersionAtLeast(version, minimumVersion) {
     const parseVersion = (value) => String(value || "")

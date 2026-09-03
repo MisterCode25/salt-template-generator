@@ -538,7 +538,7 @@ assert.ok(vtiBookmarklet.startsWith("javascript:"));
 assert.ok(superOfficeBookmarklet.startsWith("javascript:"));
 
 assert.equal(manifest.manifest_version, 3);
-assert.equal(manifest.version, "0.1.27");
+assert.equal(manifest.version, "0.1.28");
 assert.equal(CURRENT_BROWSER_EXTENSION_VERSION, manifest.version);
 assert.deepEqual(manifest.permissions.sort(), ["scripting", "tabs"]);
 assert.equal(manifest.host_permissions.includes("<all_urls>"), false);
@@ -565,6 +565,7 @@ assert.match(serviceWorkerSource, /findVtiContractorRecord/);
 assert.match(serviceWorkerSource, /captureVtiInParallel/);
 assert.match(serviceWorkerSource, /captureVtiBackgroundPages/);
 assert.match(serviceWorkerSource, /captureVtiOfferPage/);
+assert.match(serviceWorkerSource, /withTemporarilyActiveTab/);
 assert.match(serviceWorkerSource, /loadVtiContractorInTab/);
 assert.match(serviceWorkerSource, /captureVtiWithLegacyPage/);
 assert.match(serviceWorkerSource, /active: false/);

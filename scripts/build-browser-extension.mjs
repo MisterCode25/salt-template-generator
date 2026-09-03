@@ -29,6 +29,7 @@ const staticFiles = [
     "healthcheckCapture.js",
     "manifest.json",
     "service-worker.js",
+    "tabActivity.js",
     "tabDiscovery.js",
     "vtiContractorSearch.js",
     "vtiParallelCapture.js"

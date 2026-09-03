@@ -6,6 +6,7 @@ import {
   selectFirstCaptureTabs,
   selectReusableWorkflowTab
 } from "../browser-extension/tabDiscovery.js";
+import { withTemporarilyActiveTab } from "../browser-extension/tabActivity.js";
 import {
   buildSuperOfficeTicketUrl,
   getCapturedSuperOfficeTicketNumber,
@@ -31,6 +32,98 @@ const saltSuperOfficeTab = {
   url: "https://cs.salt.ch/scripts/ticket.fcgi?_sf=0&action=doScreenDefinition&idString=viewEmail&entryId=28958607",
   title: "REQUEST 28958607"
 };
+
+function createTabsApi(initialTabs) {
+  const tabs = new Map(initialTabs.map((tab) => [tab.id, { ...tab }]));
+  const updates = [];
+
+  return {
+    updates,
+    async get(tabId) {
+      const tab = tabs.get(tabId);
+      if (!tab) throw new Error(`Tab ${tabId} was not found.`);
+      return { ...tab };
+    },
+    async query({ active, windowId }) {
+      return [...tabs.values()]
+        .filter((tab) => (active === undefined || tab.active === active)
+          && (windowId === undefined || tab.windowId === windowId))
+        .map((tab) => ({ ...tab }));
+    },
+    async update(tabId, patch) {
+      const tab = tabs.get(tabId);
+      if (!tab) throw new Error(`Tab ${tabId} was not found.`);
+      if (patch.active) {
+        for (const candidate of tabs.values()) {
+          if (candidate.windowId === tab.windowId) candidate.active = false;
+        }
+      }
+      Object.assign(tab, patch);
+      updates.push({ tabId, patch: { ...patch } });
+      return { ...tab };
+    }
+  };
+}
+
+{
+  const tabsApi = createTabsApi([
+    { id: 1, windowId: 7, active: true, autoDiscardable: true },
+    { id: 2, windowId: 7, active: false, autoDiscardable: true }
+  ]);
+
+  const result = await withTemporarilyActiveTab(tabsApi, 2, async () => {
+    assert.equal((await tabsApi.get(2)).active, true);
+    assert.equal((await tabsApi.get(2)).autoDiscardable, false);
+    return "captured";
+  });
+
+  assert.equal(result, "captured");
+  assert.equal((await tabsApi.get(1)).active, true);
+  assert.equal((await tabsApi.get(2)).active, false);
+  assert.equal((await tabsApi.get(2)).autoDiscardable, true);
+  assert.deepEqual(tabsApi.updates, [
+    { tabId: 2, patch: { active: true, autoDiscardable: false } },
+    { tabId: 2, patch: { autoDiscardable: true } },
+    { tabId: 1, patch: { active: true } }
+  ]);
+}
+
+{
+  const tabsApi = createTabsApi([
+    { id: 1, windowId: 7, active: true, autoDiscardable: true },
+    { id: 2, windowId: 7, active: false, autoDiscardable: false }
+  ]);
+
+  await assert.rejects(
+    withTemporarilyActiveTab(tabsApi, 2, async () => {
+      throw new Error("Capture failed.");
+    }),
+    /Capture failed/
+  );
+
+  assert.equal((await tabsApi.get(1)).active, true);
+  assert.equal((await tabsApi.get(2)).autoDiscardable, false);
+}
+
+{
+  const tabsApi = createTabsApi([
+    { id: 1, windowId: 7, active: true, autoDiscardable: true },
+    { id: 2, windowId: 7, active: false, autoDiscardable: true },
+    { id: 3, windowId: 7, active: false, autoDiscardable: true }
+  ]);
+
+  await withTemporarilyActiveTab(tabsApi, 2, async () => {
+    assert.equal((await tabsApi.get(2)).active, true);
+    await withTemporarilyActiveTab(tabsApi, 3, async () => {
+      assert.equal((await tabsApi.get(3)).active, true);
+    });
+    assert.equal((await tabsApi.get(2)).active, true);
+  });
+
+  assert.equal((await tabsApi.get(1)).active, true);
+  assert.equal((await tabsApi.get(2)).autoDiscardable, true);
+  assert.equal((await tabsApi.get(3)).autoDiscardable, true);
+}
 
 {
   assert.equal(normalizeSuperOfficeTicketNumber("28958607"), "28958607");

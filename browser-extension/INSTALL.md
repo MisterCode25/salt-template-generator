@@ -9,7 +9,7 @@
 
 La capture bêta demande le numéro du ticket SuperOffice, charge ce ticket dans l’unique onglet SuperOffice déjà ouvert, puis capture ses données. Lorsqu’un contractor est disponible, elle le recherche dans VTI et récupère son `recordId`.
 
-La version 0.1.20 charge d’abord la recherche puis la fiche du contractor dans l’onglet VTI principal. Elle vérifie que la session est authentifiée et que le bon `recordId` est affiché avant de démarrer les captures parallèles. Billing Account Information, Billing Information et Contact Details sont alors récupérés depuis le contexte authentifié de cet onglet. Offer Management et HealthCheck s’exécutent dans un onglet inactif temporaire, ensuite fermé. Une session réellement expirée arrête immédiatement la capture en laissant VTI ouvert pour la reconnexion ; les autres incompatibilités conservent l’ancienne capture comme fallback.
+Version 0.1.28 temporarily activates VTI during search and capture so Chrome cannot suspend its execution. The Offer Management and HealthCheck helper tab is active only while its dynamic content is loading, then the previously active tab is restored even when capture fails. The authenticated session and expected `recordId` are still validated before capture.
 
 Si aucun contractor n’est trouvé dans SuperOffice, l’extension ne touche pas à VTI. Le popup de l’application demande obligatoirement le contractor avant de lancer la recherche et la capture VTI.
 
