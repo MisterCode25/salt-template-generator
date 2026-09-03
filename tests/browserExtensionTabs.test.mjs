@@ -140,4 +140,29 @@ const saltSuperOfficeTab = {
   assert.equal(selection.vtiTab.id, 23);
 }
 
+{
+  const preferredWindowId = 8;
+  const selection = selectFirstCaptureTabs([
+    { ...superOfficeTab, id: 31, windowId: 3, index: 0 },
+    { ...vtiTab, id: 32, windowId: 3, index: 1 },
+    { ...vtiTab, id: 33, windowId: preferredWindowId, index: 2 },
+    { ...superOfficeTab, id: 34, windowId: preferredWindowId, index: 5 }
+  ], preferredWindowId);
+
+  assert.equal(selection.ok, true);
+  assert.equal(selection.superOfficeTab.id, 34);
+  assert.equal(selection.vtiTab.id, 33);
+}
+
+{
+  const selection = selectFirstCaptureTabs([
+    { ...vtiTab, id: 41, windowId: 8, index: 0 },
+    { ...superOfficeTab, id: 42, windowId: 3, index: 1 }
+  ], 8);
+
+  assert.equal(selection.ok, true);
+  assert.equal(selection.superOfficeTab.id, 42);
+  assert.equal(selection.vtiTab.id, 41);
+}
+
 console.log("browserExtensionTabs tests passed");

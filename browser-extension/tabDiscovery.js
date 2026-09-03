@@ -5,7 +5,7 @@ export const CAPTURE_TAB_ERROR = Object.freeze({
 
 export const CAPTURE_TAB_ERROR_MESSAGE = Object.freeze({
     [CAPTURE_TAB_ERROR.VTI_MISSING]: "No VTI tab was found. Open the correct VTI customer, then start the capture again.",
-    [CAPTURE_TAB_ERROR.SUPER_OFFICE_MISSING]: "No SuperOffice tab was found. Open the correct ticket, then start the capture again."
+    [CAPTURE_TAB_ERROR.SUPER_OFFICE_MISSING]: "No SuperOffice tab was found in any Chrome window. Open the correct ticket, then start the capture again."
 });
 
 function parseTabUrl(rawUrl) {
@@ -50,12 +50,22 @@ export function selectReusableWorkflowTab(tabs = [], workflow) {
     return candidates[0] || null;
 }
 
-export function selectFirstCaptureTabs(tabs = []) {
+export function selectFirstCaptureTabs(tabs = [], preferredWindowId = null) {
     const orderedTabs = (Array.isArray(tabs) ? [...tabs] : [])
         .sort((left, right) => {
+            const leftWindowPriority = left?.windowId === preferredWindowId ? 0 : 1;
+            const rightWindowPriority = right?.windowId === preferredWindowId ? 0 : 1;
+            if (leftWindowPriority !== rightWindowPriority) {
+                return leftWindowPriority - rightWindowPriority;
+            }
+
             const leftIndex = Number.isInteger(left?.index) ? left.index : Number.MAX_SAFE_INTEGER;
             const rightIndex = Number.isInteger(right?.index) ? right.index : Number.MAX_SAFE_INTEGER;
-            return leftIndex - rightIndex;
+            if (leftIndex !== rightIndex) return leftIndex - rightIndex;
+
+            const leftWindowId = Number.isInteger(left?.windowId) ? left.windowId : Number.MAX_SAFE_INTEGER;
+            const rightWindowId = Number.isInteger(right?.windowId) ? right.windowId : Number.MAX_SAFE_INTEGER;
+            return leftWindowId - rightWindowId;
         });
 
     const superOfficeTab = orderedTabs.find(

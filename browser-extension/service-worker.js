@@ -272,8 +272,8 @@ async function runCapture(requestId, appTabId, payload) {
         );
 
         const appTab = await chrome.tabs.get(appTabId);
-        const tabs = await chrome.tabs.query({ windowId: appTab.windowId });
-        const selection = selectFirstCaptureTabs(tabs);
+        const tabs = await chrome.tabs.query({ windowType: "normal" });
+        const selection = selectFirstCaptureTabs(tabs, appTab.windowId);
         if (!selection.ok) {
             throw new Error(CAPTURE_TAB_ERROR_MESSAGE[selection.error] || selection.error);
         }

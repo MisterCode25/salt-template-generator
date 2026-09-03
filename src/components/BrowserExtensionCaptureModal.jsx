@@ -282,7 +282,7 @@ export default function BrowserExtensionCaptureModal({ state, onStart, onClose }
             {!isBusy && !isCompleted && !requiresContractorInput && (
                 <div className="browser-extension-capture-note">
                     <Info size={14} aria-hidden="true" />
-                    <span>Keep exactly one SuperOffice tab and one VTI tab open.</span>
+                    <span>The first matching SuperOffice and VTI tabs will be used.</span>
                 </div>
             )}
 
