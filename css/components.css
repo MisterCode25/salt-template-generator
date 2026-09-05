@@ -10155,7 +10155,7 @@ textarea::placeholder,
 }
 
 .client-info-bar-field-val {
-    font-size: var(--font-md);
+    font-size: var(--font-lg);
     line-height: 1.25;
     font-weight: 750;
 }

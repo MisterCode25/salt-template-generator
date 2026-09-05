@@ -15,6 +15,7 @@ const stylesheets = stylesheetPaths.map((path) => ({
 }));
 const mainCss = stylesheets[0].source;
 const componentsCss = stylesheets.find(({ path }) => path.endsWith("components.css")).source;
+const superOfficeMediaCss = stylesheets.find(({ path }) => path.endsWith("super-office-media.css")).source;
 
 assert.match(mainCss, /family=Atkinson\+Hyperlegible/);
 assert.match(mainCss, /--font-xs:\s*13px/);
@@ -46,24 +47,35 @@ assert.match(
 const layoutCss = stylesheets.find(({ path }) => path.endsWith("layout.css")).source;
 assert.match(
   layoutCss,
-  /\.client-info-bar-field-key\s*\{[^}]*font-size:\s*var\(--font-sm\)/s,
-  "Client banner labels must use the readable small-text size"
+  /\.client-info-bar-field-key\s*\{[^}]*font-size:\s*var\(--font-base\)/s,
+  "Client banner labels must use the readable base-text size"
 );
 assert.match(
   layoutCss,
-  /\.client-info-bar-field-val\s*\{[^}]*font-size:\s*var\(--font-md\)/s,
+  /\.client-info-bar-field-val\s*\{[^}]*font-size:\s*var\(--font-lg\)/s,
   "Client banner values must be visually prominent"
 );
 assert.match(
   layoutCss,
-  /\.client-capture-reference-field dd\s*\{[^}]*font-size:\s*var\(--font-md\)/s,
+  /\.client-capture-reference-field dd\s*\{[^}]*font-size:\s*var\(--font-lg\)/s,
   "VTI and ticket references must be visually prominent"
 );
 
 assert.match(
   componentsCss,
-  /\.client-info-bar-field-val\s*\{[^}]*font-size:\s*var\(--font-md\)/s,
+  /\.client-info-bar-field-val\s*\{[^}]*font-size:\s*var\(--font-lg\)/s,
   "Later component styles must preserve the prominent client banner value size"
+);
+
+assert.match(
+  superOfficeMediaCss,
+  /\.so-photo-viewer__context-badge small\s*\{[^}]*font-size:\s*var\(--font-base\)/s,
+  "Photo viewer technical labels must use the readable base-text size"
+);
+assert.match(
+  superOfficeMediaCss,
+  /\.so-photo-viewer__context-badge strong\s*\{[^}]*font-size:\s*var\(--font-lg\)/s,
+  "Photo viewer OTO, port, and router values must be visually prominent"
 );
 
 console.log("accessibleTypography tests passed");
