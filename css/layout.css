@@ -126,7 +126,7 @@
 
 .client-info-external-id-label {
     color: var(--text-muted);
-    font-size: 10px;
+    font-size: var(--font-xs);
     font-weight: 800;
     letter-spacing: 0.06em;
     text-transform: uppercase;
@@ -137,7 +137,7 @@
     flex: 1 1 auto;
     color: var(--text-primary);
     font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-    font-size: 12px;
+    font-size: var(--font-sm);
     line-height: 1.35;
     overflow-wrap: anywhere;
 }
@@ -159,7 +159,7 @@
     border-radius: 6px;
     background: var(--button-secondary-bg);
     color: var(--button-secondary-text);
-    font-size: 10px;
+    font-size: var(--font-xs);
     font-weight: 800;
     line-height: 1;
     cursor: pointer;
@@ -218,7 +218,7 @@
     overflow: hidden;
     color: currentColor;
     font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-    font-size: 11px;
+    font-size: var(--font-xs);
     font-weight: 760;
     line-height: 1.1;
     text-overflow: ellipsis;
@@ -227,7 +227,7 @@
 .client-info-external-id-separator {
     color: rgba(191, 219, 254, 0.72);
     font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-    font-size: 11px;
+    font-size: var(--font-xs);
     font-weight: 850;
     line-height: 1;
 }
@@ -291,7 +291,7 @@
 
 .client-capture-reference-field dt {
     color: var(--text-muted);
-    font-size: 9px;
+    font-size: var(--font-xs);
     font-weight: 800;
     line-height: 1.1;
     letter-spacing: 0.06em;
@@ -304,7 +304,7 @@
     overflow: hidden;
     color: var(--text-primary);
     font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-    font-size: 13px;
+    font-size: var(--font-sm);
     font-weight: 780;
     line-height: 1.2;
     text-overflow: ellipsis;
@@ -322,7 +322,7 @@
     border: 1px solid rgba(99,102,241,0.42);
     background: rgba(99,102,241,0.16);
     color: var(--text-primary);
-    font-size: 12px;
+    font-size: var(--font-sm);
     font-weight: 760;
     cursor: pointer;
     white-space: nowrap;
@@ -402,7 +402,7 @@
     border-radius: 999px;
     background: rgba(99,102,241,0.22);
     color: #dfe4ff;
-    font-size: 9px;
+    font-size: var(--font-xs);
     font-weight: 850;
     line-height: 1;
     text-transform: uppercase;
@@ -453,7 +453,7 @@
     border: 1px solid rgba(248,113,113,0.26);
     background: rgba(127,29,29,0.18);
     color: rgba(254,202,202,0.9);
-    font-size: 12px;
+    font-size: var(--font-sm);
     font-weight: 720;
     cursor: pointer;
     white-space: nowrap;
@@ -503,7 +503,7 @@
     border-radius: 999px;
     background: rgba(109, 40, 217, 0.14);
     color: var(--text-primary);
-    font-size: 12px;
+    font-size: var(--font-sm);
     font-weight: 760;
     cursor: pointer;
     user-select: none;
@@ -569,12 +569,12 @@
 }
 
 .client-import-update-popover strong {
-    font-size: 12px;
+    font-size: var(--font-sm);
 }
 
 .client-import-update-popover small {
     color: var(--text-muted);
-    font-size: 10px;
+    font-size: var(--font-xs);
 }
 
 .super-office-replacement-summary {
@@ -596,7 +596,7 @@
 
 .super-office-replacement-summary small {
     color: var(--text-muted);
-    font-size: 10px;
+    font-size: var(--font-xs);
     font-weight: 800;
     text-transform: uppercase;
 }
@@ -634,7 +634,7 @@
     border: 1px solid var(--border-default);
     background: var(--button-primary-bg);
     color: var(--button-primary-text);
-    font-size: 12px;
+    font-size: var(--font-sm);
     font-weight: 500;
     cursor: pointer;
     white-space: nowrap;
@@ -692,7 +692,7 @@
     background: rgba(74,222,128,0.15);
     border: 1px solid rgba(74,222,128,0.4);
     color: #4ade80;
-    font-size: 10px;
+    font-size: var(--font-xs);
     font-weight: 700;
     flex-shrink: 0;
 }
@@ -727,7 +727,7 @@
 .client-info-bar-field-key {
     display: block;
     white-space: nowrap;
-    font-size: 10px;
+    font-size: var(--font-xs);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.06em;
@@ -768,7 +768,7 @@
     padding: 2px 7px;
     border: 1px solid currentColor;
     border-radius: 999px;
-    font-size: 10px;
+    font-size: var(--font-xs);
     font-weight: 900;
     line-height: 1;
     letter-spacing: 0.02em;
@@ -857,7 +857,7 @@
     border: 1px solid rgba(180, 60, 60, 0.3);
     background: rgba(60, 15, 15, 0.5);
     color: rgba(255, 140, 140, 0.7);
-    font-size: 13px;
+    font-size: var(--font-sm);
     cursor: pointer;
     transition: var(--transition-base);
     flex-shrink: 0;
@@ -922,7 +922,7 @@
     display: block;
     margin-top: 3px;
     color: var(--text-primary);
-    font-size: 13px;
+    font-size: var(--font-sm);
     line-height: 1.35;
     overflow-wrap: anywhere;
 }
@@ -942,7 +942,7 @@
     background: rgba(10, 14, 24, 0.86);
     color: var(--text-primary);
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-    font-size: 13px;
+    font-size: var(--font-sm);
     line-height: 1.45;
 }
 
@@ -967,7 +967,7 @@
 .capture-data-header p:last-child {
     margin: 7px 0 0;
     color: var(--text-secondary);
-    font-size: 13px;
+    font-size: var(--font-sm);
     line-height: 1.4;
 }
 
@@ -1053,7 +1053,7 @@
 
 .capture-data-focus-label small {
     color: rgba(224, 242, 254, 0.76);
-    font-size: 12px;
+    font-size: var(--font-sm);
     font-weight: 800;
     letter-spacing: 0;
 }
@@ -1083,7 +1083,7 @@
 .capture-data-focus span {
     max-width: 360px;
     color: var(--text-secondary);
-    font-size: 13px;
+    font-size: var(--font-sm);
     line-height: 1.35;
     overflow-wrap: anywhere;
 }
@@ -1159,14 +1159,14 @@
 
 .capture-data-timeline-step strong {
     color: var(--text-primary);
-    font-size: 12px;
+    font-size: var(--font-sm);
     line-height: 1.1;
 }
 
 .capture-data-timeline-step small {
     max-width: 120px;
     color: var(--text-muted);
-    font-size: 11px;
+    font-size: var(--font-xs);
     line-height: 1.25;
     overflow-wrap: anywhere;
 }
@@ -1182,7 +1182,7 @@
     border: 1px solid rgba(56, 189, 248, 0.18);
     background: rgba(8, 47, 73, 0.2);
     color: var(--text-secondary);
-    font-size: 12px;
+    font-size: var(--font-sm);
     line-height: 1.35;
 }
 
@@ -1269,7 +1269,7 @@
 
 .browser-extension-capture-heading .eyebrow {
     margin: 0 0 2px;
-    font-size: 9px;
+    font-size: var(--font-xs);
     letter-spacing: 0.12em;
 }
 
@@ -1300,7 +1300,7 @@
     background: rgba(15, 23, 42, 0.7);
     color: #ddd6fe;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    font-size: 9px;
+    font-size: var(--font-xs);
     letter-spacing: 0.03em;
     line-height: 1;
     white-space: nowrap;
@@ -1309,7 +1309,7 @@
 .browser-extension-capture-intro {
     margin: -2px 0 0;
     color: var(--text-secondary);
-    font-size: 12px;
+    font-size: var(--font-sm);
     line-height: 1.45;
 }
 
@@ -1320,7 +1320,7 @@
 
 .browser-extension-ticket-form label {
     color: var(--text-primary);
-    font-size: 12px;
+    font-size: var(--font-sm);
     font-weight: 700;
 }
 
@@ -1358,7 +1358,7 @@
 
 .browser-extension-ticket-error {
     color: #fca5a5;
-    font-size: 11px;
+    font-size: var(--font-xs);
 }
 
 .browser-extension-capture-progress {
@@ -1533,7 +1533,7 @@
     gap: 5px;
     color: var(--text-muted);
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    font-size: 9px;
+    font-size: var(--font-xs);
     font-weight: 800;
     letter-spacing: 0.09em;
     line-height: 1;
@@ -1594,19 +1594,19 @@
 
 .browser-extension-contractor-input strong {
     color: #fde68a;
-    font-size: 12px;
+    font-size: var(--font-sm);
 }
 
 .browser-extension-contractor-input span {
     color: var(--text-secondary);
-    font-size: 11px;
+    font-size: var(--font-xs);
     line-height: 1.45;
 }
 
 .browser-extension-contractor-input label {
     margin-top: 4px;
     color: var(--text-primary);
-    font-size: 12px;
+    font-size: var(--font-sm);
     font-weight: 700;
 }
 
@@ -1640,14 +1640,14 @@
 
 .browser-extension-capture-copy strong {
     color: var(--text-primary);
-    font-size: 13px;
+    font-size: var(--font-sm);
     letter-spacing: 0.01em;
 }
 
 .browser-extension-capture-copy span {
     max-width: 320px;
     color: var(--text-secondary);
-    font-size: 11px;
+    font-size: var(--font-xs);
     line-height: 1.35;
     overflow-wrap: anywhere;
 }
@@ -1660,7 +1660,7 @@
     border-radius: 8px;
     background: rgba(148, 163, 184, 0.08);
     color: var(--text-muted);
-    font-size: 11px;
+    font-size: var(--font-xs);
     line-height: 1.4;
 }
 
@@ -1692,7 +1692,7 @@
 .browser-extension-download-link {
     min-height: 32px;
     color: var(--text-secondary);
-    font-size: 11px;
+    font-size: var(--font-xs);
     font-weight: 700;
     transition: color 0.18s ease;
 }
@@ -1888,7 +1888,7 @@
     border-radius: 999px;
     background: rgba(148, 163, 184, 0.1);
     color: var(--text-muted);
-    font-size: 11px;
+    font-size: var(--font-xs);
     font-weight: 750;
     white-space: nowrap;
 }
@@ -1910,7 +1910,7 @@
     border: 1px solid currentColor;
     border-radius: 999px;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    font-size: 10px;
+    font-size: var(--font-xs);
     line-height: 1;
     opacity: 0.88;
 }
@@ -1937,7 +1937,7 @@
     padding-top: 12px;
     border-top: 1px solid var(--border-default);
     color: var(--text-muted);
-    font-size: 12px;
+    font-size: var(--font-sm);
 }
 
 .vti-bookmarklet-panel h2 {
@@ -2193,7 +2193,7 @@
 
 .hint {
     color: var(--text-secondary);
-    font-size: 13px;
+    font-size: var(--font-sm);
     margin-top: 6px;
 }
 
@@ -2228,7 +2228,7 @@
 
 .add-template-page .form-field label {
     display: block;
-    font-size: 13px;
+    font-size: var(--font-sm);
     color: #c7d6ff;
 }
 

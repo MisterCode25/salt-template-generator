@@ -176,6 +176,8 @@ globalThis.localStorage = createMemoryStorage();
   assert.match(templatesSource, /<RecentClientsMenu/);
   assert.match(recentClientsMenuSource, /Recent clients/);
   assert.match(recentClientsMenuSource, /No recent clients yet\./);
+  assert.match(recentClientsMenuSource, /VTI \$\{presentation\.contractor \|\| "—"\}/);
+  assert.match(recentClientsMenuSource, /Ticket \$\{presentation\.ticket \|\| "—"\}/);
 }
 
 console.log("recentClientHistory tests passed");

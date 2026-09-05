@@ -49,10 +49,10 @@ export default function RecentClientsMenu({
                 aria-expanded={isOpen}
                 onClick={onToggle}
             >
-                <History size={15} aria-hidden="true" />
+                <History size={17} aria-hidden="true" />
                 <span>Recent clients</span>
                 {entries.length > 0 && <span className="recent-clients-count">{entries.length}</span>}
-                <ChevronDown size={14} aria-hidden="true" />
+                <ChevronDown size={16} aria-hidden="true" />
             </button>
 
             {isOpen && (
@@ -75,26 +75,24 @@ export default function RecentClientsMenu({
                                         role="menuitem"
                                         className="recent-client-entry"
                                         disabled={Boolean(restoringId)}
+                                        aria-label={`Restore ${presentation.clientName}. VTI ${presentation.contractor || "not available"}. Ticket ${presentation.ticket || "not available"}.`}
                                         onClick={() => onRestore(entry.id)}
                                     >
                                         <span className="recent-client-entry__main">
-                                            <strong>{presentation.clientName}</strong>
+                                            <strong title={presentation.clientName}>{presentation.clientName}</strong>
                                             <small>
-                                                {[
-                                                    presentation.contractor && `Contractor ${presentation.contractor}`,
-                                                    presentation.ticket && `SO ${presentation.ticket}`
-                                                ].filter(Boolean).join(" · ") || "Client data"}
+                                                {`VTI ${presentation.contractor || "—"} · Ticket ${presentation.ticket || "—"}`}
                                             </small>
                                         </span>
                                         <span className="recent-client-entry__side">
                                             {isRestoring ? (
-                                                <Loader2 className="recent-client-entry__spinner" size={15} aria-label="Restoring client" />
+                                                <Loader2 className="recent-client-entry__spinner" size={17} aria-label="Restoring client" />
                                             ) : (
                                                 <>
                                                     <small>{presentation.savedAt}</small>
                                                     {presentation.mediaCount > 0 && (
                                                         <span className="recent-client-entry__media" title={`${presentation.mediaCount} ticket media`}>
-                                                            <ImageIcon size={13} aria-hidden="true" />
+                                                            <ImageIcon size={15} aria-hidden="true" />
                                                             {presentation.mediaCount}
                                                         </span>
                                                     )}

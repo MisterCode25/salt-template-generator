@@ -51,5 +51,5 @@
 .node-editor-search__count {
     margin: 0 14px 6px;
     color: var(--text-muted, #667085);
-    font-size: 0.75rem;
+    font-size: var(--font-xs);
 }
