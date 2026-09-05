@@ -24,6 +24,7 @@ import {
     selectReusableWorkflowTab
 } from "./tabDiscovery.js";
 import { withTemporarilyActiveTab } from "./tabActivity.js";
+import { createAloTicketTracker } from "./aloTicketTracking.js";
 import {
     ALO_FULFILLMENT_DETAIL_URL,
     ALO_TICKET_CREATION_URL,
@@ -54,6 +55,16 @@ import {
 } from "./vtiParallelCapture.js";
 
 let activeWorkflow = null;
+const aloTicketTracker = createAloTicketTracker({
+    storage: chrome.storage.session,
+    sendResult: (record) => sendToApplication(record.appTabId, createExtensionEvent(
+        BROWSER_EXTENSION_MESSAGE.ALO_TICKET_CREATED, record.requestId,
+        { result: record.result, capturedAt: record.capturedAt }
+    ))
+});
+chrome.tabs.onRemoved.addListener((tabId) => {
+    aloTicketTracker.removeTab(tabId).catch(console.error);
+});
 const WORKFLOW_AUTHENTICATION_TIMEOUT_MS = 10 * 60 * 1000;
 const WORKFLOW_PAGE_READY_TIMEOUT_MS = 30000;
 const WORKFLOW_POST_LOGIN_GRACE_MS = 1500;
@@ -673,6 +684,7 @@ async function runAloAutofill(requestId, appTabId, payload) {
             throw new Error("The received ALO data is invalid.");
         }
         const aloTab = await openOrReuseWorkflowTab("alo", ALO_TICKET_CREATION_URL);
+        await aloTicketTracker.removeTab(aloTab.id);
         await waitForAuthenticatedWorkflowPage({
             workflow: "alo",
             tabId: aloTab.id,
@@ -689,10 +701,22 @@ async function runAloAutofill(requestId, appTabId, payload) {
         const result = readExecutionResult(executionResults, "ALO");
         if (!result.ok) throw new Error(result.error || "The ALO form could not be filled.");
 
-        const message = result.externalReferenceStatus === "unavailable"
-            ? "ALO ticket filled. External Ref remains empty."
-            : "ALO ticket opened and filled.";
-        await sendActionCompleted(appTabId, requestId, "alo", message, { result });
+        const watchesTicketResult = Boolean(payload.fields?.socketId?.trim());
+        if (watchesTicketResult) {
+            const appTab = await chrome.tabs.get(appTabId);
+            await aloTicketTracker.start({
+                requestId, appTabId, appOrigin: new URL(appTab.url).origin,
+                aloTabId: aloTab.id, socketId: payload.fields.socketId.trim(),
+                externalReference: result.externalReference
+            });
+        }
+
+        const message = !watchesTicketResult
+            ? "ALO filled. Automatic External ID requires a VTI OTO."
+            : result.externalReferenceStatus === "unavailable"
+                ? "ALO ticket filled. External Ref remains empty."
+                : "ALO ticket opened and filled.";
+        await sendActionCompleted(appTabId, requestId, "alo", message, { result: { ...result, watchesTicketResult } });
     } catch (error) {
         await sendActionFailed(appTabId, requestId, "alo", error);
     } finally {
@@ -761,12 +785,29 @@ function startWorkflow(message, appTabId, sendResponse, runner, action = "") {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (["salt.alo.submitted.v1", "salt.alo.result.v1"].includes(message?.type)) {
+        aloTicketTracker.observe(message, sender).then(sendResponse).catch((error) => {
+            console.error("ALO result capture failed", error);
+            sendResponse({ captured: false });
+        });
+        return true;
+    }
     if (message?.type === BROWSER_EXTENSION_MESSAGE.HEALTHCHECK) {
         captureHealthcheck(message, sender).then(sendResponse);
         return true;
     }
 
     if (!isAppCommand(message) || !sender.tab?.id) return false;
+
+    if ([BROWSER_EXTENSION_MESSAGE.ALO_RESULTS_REQUEST, BROWSER_EXTENSION_MESSAGE.ALO_RESULT_ACK].includes(message.type)) {
+        const origin = new URL(sender.url).origin;
+        const operation = message.type === BROWSER_EXTENSION_MESSAGE.ALO_RESULT_ACK
+            ? aloTicketTracker.acknowledge(message.requestId, origin)
+            : aloTicketTracker.replay(Array.isArray(message.requestIds) ? message.requestIds : [], sender.tab.id, origin);
+        operation.then(() => sendResponse(createExtensionEvent(BROWSER_EXTENSION_MESSAGE.ACCEPTED, message.requestId)))
+            .catch((error) => sendResponse(createExtensionEvent(BROWSER_EXTENSION_MESSAGE.FAILED, message.requestId, { error: normalizeError(error) })));
+        return true;
+    }
 
     if (message.type === BROWSER_EXTENSION_MESSAGE.STATUS_REQUEST) {
         sendResponse(createExtensionEvent(BROWSER_EXTENSION_MESSAGE.STATUS, message.requestId, {

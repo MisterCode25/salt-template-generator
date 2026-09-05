@@ -1,5 +1,11 @@
 # Salt BO Capture Beta
 
+Version 0.1.29 watches the ALO form after autofill. Submit the ticket yourself: the extension reads the resulting Incident Id and Salt BO tools saves a generated External ID with `FLL Ticket`, partner `ALO`, and that incident number. It does not copy the External ID. Existing LED information is preserved; an unknown LED stays empty and can be edited later.
+
+Reload the updated extension and Salt BO tools before starting a new ALO fill. The `storage` permission keeps the pending operation in `chrome.storage.session` across page reloads and background-worker suspension. Tracking expires after 24 hours or a browser/extension restart. Only the prepared ALO tab is accepted, after a manual submission and matching OTO, external reference, and recent creation time. A completed result is retained until the app acknowledges it. If the active client or SO ticket changed, reopen the original case to apply its pending result.
+
+The browser regression page is `tests/browser/aloTicketCompletion.html`, served by Vite on a fresh `http://127.0.0.1:5180` origin. It refuses to run if any IndexedDB database already exists and never clears existing databases. It verifies real DOM extraction, atomic persistence, duplicate delivery, the app listener, and clipboard isolation using synthetic tickets. Live Swisscom submission still requires an authenticated manual check.
+
 1. Décompresse le ZIP téléchargé depuis Salt BO tools.
 2. Ouvre `edge://extensions` ou `chrome://extensions`.
 3. Active le mode développeur.

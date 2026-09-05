@@ -130,6 +130,40 @@ export async function deleteIndexedJSON(key) {
     }
 }
 
+// The synchronous updater reads and writes the selected records in one transaction.
+// This keeps a delayed workflow result from being attached during a customer change.
+export async function updateIndexedRecords(keys, updater) {
+    if (!keys.length) throw new Error("An atomic update requires at least one record key.");
+    if (!hasIndexedDB()) {
+        const snapshot = Object.fromEntries(keys.map((key) => [key, memoryStore.get(key)]));
+        const { updates = {}, result } = updater(structuredClone(snapshot));
+        Object.entries(updates).forEach(([key, value]) => memoryStore.set(key, value));
+        return result;
+    }
+    const outcome = {};
+    await withStore("readwrite", (store) => {
+        const snapshot = {};
+        let remaining = keys.length;
+        for (const key of keys) {
+            const request = store.get(key);
+            request.onsuccess = () => {
+                snapshot[key] = request.result;
+                remaining -= 1;
+                if (remaining) return;
+                try {
+                    const { updates = {}, result } = updater(snapshot);
+                    Object.entries(updates).forEach(([name, value]) => store.put(value, name));
+                    outcome.result = result;
+                } catch (error) {
+                    outcome.error = error;
+                    store.transaction.abort();
+                }
+            };
+        }
+    }).catch((error) => { throw outcome.error || error; });
+    return outcome.result;
+}
+
 export async function clearAppIndexedDB() {
     if (!hasIndexedDB()) {
         memoryStore.clear();

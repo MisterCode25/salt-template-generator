@@ -2,9 +2,10 @@
   "manifest_version": 3,
   "name": "Salt BO Capture Beta",
   "description": "Loads SO tickets, finds VTI clients by contractor, and opens ALO or ALEX workflows.",
-  "version": "0.1.28",
+  "version": "0.1.29",
   "permissions": [
     "scripting",
+    "storage",
     "tabs"
   ],
   "host_permissions": [
@@ -32,6 +33,11 @@
         "app-bridge.js"
       ],
       "run_at": "document_start"
+    },
+    {
+      "matches": ["https://wholesale.swisscom.com/wsg/prod/alo/ass/web/alo-web/assurance/*"],
+      "js": ["alo-ticket-observer.js"],
+      "run_at": "document_idle"
     }
   ]
 }

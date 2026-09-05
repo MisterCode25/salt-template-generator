@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect } from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import PageHeader from "./components/PageHeader.jsx";
+import { useAloTicketCompletion } from "./components/useAloTicketCompletion.js";
 import { SETTINGS_SECTION } from "./config/settingsSections.js";
 import { applyTheme, loadThemePreference, watchSystemThemePreference } from "./utils/theme.js";
 
@@ -72,6 +73,7 @@ function AppErrorFallback({ error, reset }) {
 
 export default function App() {
     const location = useLocation();
+    useAloTicketCompletion();
 
     useEffect(() => {
         let cancelled = false;

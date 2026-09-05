@@ -6,6 +6,8 @@
         "salt.capture.status.request.v1",
         "salt.capture.start.v1",
         "salt.capture.alo.start.v1",
+        "salt.capture.alo.results.request.v1",
+        "salt.capture.alo.result.ack.v1",
         "salt.capture.alex.start.v1"
     ]);
 

@@ -14,6 +14,7 @@ import {
     buildSuperOfficeCaptureModule,
     buildVtiCaptureModule
 } from "./browserExtensionBuildSupport.mjs";
+import { extractAloTicketResult } from "../src/utils/aloTicketResult.js";
 
 const projectRoot = fileURLToPath(new URL("../", import.meta.url));
 const extensionRoot = join(projectRoot, "browser-extension");
@@ -24,6 +25,7 @@ const zipRootName = "salt-bo-capture-beta";
 const staticFiles = [
     "alexAutomation.js",
     "aloAutomation.js",
+    "aloTicketTracking.js",
     "INSTALL.md",
     "app-bridge.js",
     "healthcheckCapture.js",
@@ -131,6 +133,8 @@ async function buildExtensionDirectory() {
     await Promise.all(staticFiles.map((fileName) => (
         copyFile(join(extensionRoot, fileName), join(extensionDist, fileName))
     )));
+    await writeFile(join(extensionDist, "alo-ticket-observer.js"),
+        `${extractAloTicketResult.toString()}\n${await readFile(join(extensionRoot, "alo-ticket-observer.js"), "utf8")}`);
     await copyFile(
         join(projectRoot, "shared/browserExtensionProtocol.js"),
         join(extensionDist, "shared/browserExtensionProtocol.js")

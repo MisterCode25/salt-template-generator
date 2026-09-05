@@ -538,9 +538,9 @@ assert.ok(vtiBookmarklet.startsWith("javascript:"));
 assert.ok(superOfficeBookmarklet.startsWith("javascript:"));
 
 assert.equal(manifest.manifest_version, 3);
-assert.equal(manifest.version, "0.1.28");
+assert.equal(manifest.version, "0.1.29");
 assert.equal(CURRENT_BROWSER_EXTENSION_VERSION, manifest.version);
-assert.deepEqual(manifest.permissions.sort(), ["scripting", "tabs"]);
+assert.deepEqual(manifest.permissions.sort(), ["scripting", "storage", "tabs"]);
 assert.equal(manifest.host_permissions.includes("<all_urls>"), false);
 assert.ok(manifest.host_permissions.includes("https://*.salt.ch/*"));
 assert.ok(manifest.host_permissions.some((permission) => permission.includes("superoffice")));

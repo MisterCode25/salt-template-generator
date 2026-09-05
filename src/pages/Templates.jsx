@@ -89,10 +89,12 @@ import {
 } from "../utils/alexTicket.js";
 import { BROWSER_EXTENSION_MESSAGE } from "../../shared/browserExtensionProtocol.js";
 import {
+    createBrowserExtensionRequestId,
     startBrowserExtensionAlexAction,
     startBrowserExtensionAloAutofill
 } from "../services/browserExtensionCaptureService.js";
 import { buildAloPreparationSteps } from "../utils/aloPreparationFlow.js";
+import { prepareAloTicketCompletion, cancelAloTicketCompletion } from "../services/aloTicketCompletionService.js";
 import {
     formatDateInputValueForToken,
     formatDateTokenValueForInput
@@ -1591,15 +1593,27 @@ export default function Templates() {
             superOfficePayload,
             options
         );
-        const extensionResult = await startBrowserExtensionAloAutofill(payload);
+        const requestId = createBrowserExtensionRequestId();
+        try {
+            await prepareAloTicketCompletion(requestId, clientPayload, superOfficePayload, options);
+        } catch (error) {
+            showToast(error.message, "error");
+            return;
+        }
+        const extensionResult = await startBrowserExtensionAloAutofill(payload, requestId);
 
         if (extensionResult?.type === BROWSER_EXTENSION_MESSAGE.ACTION_COMPLETED) {
             const externalReferenceUnavailable = extensionResult.result?.externalReferenceStatus === "unavailable";
+            const watchesTicketResult = extensionResult.result?.watchesTicketResult === true;
+            if (!watchesTicketResult) await cancelAloTicketCompletion(requestId);
             showToast(
-                extensionResult.message || "Ticket ALO ouvert et rempli",
-                externalReferenceUnavailable ? "warning" : "success"
+                extensionResult.result?.watchesTicketResult === undefined
+                    ? "ALO filled. Update the extension to save the External ID automatically."
+                    : extensionResult.message || "ALO ticket opened and filled",
+                externalReferenceUnavailable || !watchesTicketResult ? "warning" : "success"
             );
         } else {
+            await cancelAloTicketCompletion(requestId);
             const copyPromise = copyText(
                 JSON.stringify(payload, null, 2),
                 {

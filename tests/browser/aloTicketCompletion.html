@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>ALO completion browser checks</title></head>
+<body>
+  <button id="run">Run isolated browser checks</button>
+  <button id="result" disabled>Simulate ALO result</button>
+  <button id="replay" disabled>Replay duplicate result</button>
+  <pre id="report">Checking the disposable browser origin...</pre>
+  <div id="root"></div>
+  <script type="module">
+    import React from "react";
+    import { createRoot } from "react-dom/client";
+    import { MemoryRouter } from "react-router-dom";
+    import App from "../../src/App.jsx";
+    import "../../css/main.css";
+    import "../../css/layout.css";
+    import "../../css/components.css";
+    import { loadIndexedJSON, saveIndexedJSON, updateIndexedRecords } from "../../src/services/indexedDbService.js";
+    import { saveActiveClientPayload, loadActiveClientPayload, ACTIVE_CLIENT_PAYLOAD_UPDATED_EVENT } from "../../src/services/activeClientService.js";
+    import { saveSuperOfficeTicketPayload, loadSuperOfficeTicketPayload } from "../../src/services/superOfficeTicketService.js";
+    import { prepareAloTicketCompletion, completeAloTicket } from "../../src/services/aloTicketCompletionService.js";
+    import { extractAloTicketResult } from "../../src/utils/aloTicketResult.js";
+    import { BROWSER_EXTENSION_MESSAGE, createExtensionEvent } from "../../shared/browserExtensionProtocol.js";
+
+    const report = document.getElementById("report");
+    const existingDatabases = await indexedDB.databases();
+    report.textContent = `Existing browser databases: ${existingDatabases.length}. This check requires a fresh origin with no databases.\n`;
+    const log = (text) => { report.textContent += `${text}\n`; };
+    const check = (condition, text) => { if (!condition) throw new Error(text); log(`PASS: ${text}`); };
+    const client = { client: { contractorNumber: "12345678", firstName: "Browser", lastName: "Test" }, healthcheck: { otoId: "B.110.705.978.X", oltName: "OLT1" } };
+    // Minimal fixture retains the exact result-page selectors from the supplied ALO HTML.
+    const labels = {
+      "global.incidentId": "2336981", "global.incidentState": "PENDING",
+      "global.incidentCreatonDateTime": "05.09.2026 10:55:11", "global.extRef": "57982517",
+      "global.swisscomRef": "INC000014852874", "global.otoId": "B.110.705.978.X"
+    };
+    const html = `<form id="formCommand" action="detail.do?ttId=2336981"><h1><span class="tooltipCode">translationId=alo.assurance.detail.title</span>ALO Incident Detail</h1><table>${Object.entries(labels).map(([key,value]) => `<tr><td><span class="tooltipCode">translationId=${key}</span></td><td>${value}</td></tr>`).join("")}</table></form>`;
+    const url = "https://wholesale.swisscom.com/wsg/prod/alo/ass/web/alo-web/assurance/detail.do?ttId=2336981";
+    const result = extractAloTicketResult(new DOMParser().parseFromString(html, "text/html"), url);
+    let clipboardWrites = 0;
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async () => { clipboardWrites++; } } });
+    const emit = () => window.postMessage(createExtensionEvent(BROWSER_EXTENSION_MESSAGE.ALO_TICKET_CREATED, "browser-ui", { result, capturedAt: Date.now() }), window.location.origin);
+    document.getElementById("result").onclick = emit;
+    document.getElementById("replay").onclick = emit;
+    window.addEventListener("message", (event) => {
+      if (event.data?.type === BROWSER_EXTENSION_MESSAGE.ALO_RESULT_ACK) log(`ACK received; clipboard writes: ${clipboardWrites}`);
+    });
+    window.addEventListener(ACTIVE_CLIENT_PAYLOAD_UPDATED_EVENT, (event) => {
+      if (event.detail?.payload?.__importedExternalId) log(`Saved: ${event.detail.payload.__importedExternalId}`);
+    });
+    document.getElementById("run").onclick = async () => {
+      try {
+        if (!["127.0.0.1", "localhost"].includes(location.hostname) || location.port !== "5180") throw new Error("Run only on a disposable localhost:5180 origin.");
+        if ((await indexedDB.databases()).length) throw new Error("This origin already has a database. Refusing all writes; use a fresh origin.");
+        report.textContent = "";
+        const occupiedKeys = ["active_client_payload", "super_office_ticket_payload", "pending_super_office_ticket_payload", "pending_alo_ticket_completions", "atomic-counter"];
+        for (const key of occupiedKeys) {
+          if (await loadIndexedJSON(key) != null) throw new Error(`Existing ${key}: refusing to overwrite this origin. Use a fresh disposable origin.`);
+        }
+        check(result.incidentId === "2336981" && result.socketId === client.healthcheck.otoId, "Real DOM extraction selects Incident Id and OTO");
+        await saveIndexedJSON("atomic-counter", 0);
+        await Promise.all(Array.from({ length: 5 }, () => updateIndexedRecords(["atomic-counter"], (snapshot) => ({ updates: { "atomic-counter": snapshot["atomic-counter"] + 1 } }))));
+        check(await loadIndexedJSON("atomic-counter") === 5, "Concurrent IndexedDB transactions preserve all updates");
+        let rollbackError = "";
+        try {
+          await updateIndexedRecords(["atomic-counter"], () => { throw new Error("Expected rollback"); });
+        } catch (error) { rollbackError = error.message; }
+        check(rollbackError === "Expected rollback" && await loadIndexedJSON("atomic-counter") === 5, "Rejected transaction rolls back and reports its original error");
+        await saveActiveClientPayload(client);
+        await saveSuperOfficeTicketPayload({ ticketId: "31436062", sourceTicketId: "case1" });
+        const ticket = await loadSuperOfficeTicketPayload();
+        await prepareAloTicketCompletion("browser-check", client, ticket, { signalState: "lost" });
+        await saveActiveClientPayload({ client: { contractorNumber: "other" } });
+        check((await completeAloTicket("browser-check", result)).status === "waiting", "Changed client stays untouched");
+        await saveActiveClientPayload(client);
+        check((await completeAloTicket("browser-check", result)).status === "completed", "Original case can receive its deferred result");
+        const saved = (await loadActiveClientPayload()).__importedExternalId;
+        check((await loadSuperOfficeTicketPayload()).externalTicketId === saved, "Client and SO External ID agree");
+        check((await loadIndexedJSON("token_input_values"))["{external_partner_ticket_number}"] === "2336981", "Canonical ALO ticket token saved");
+        check((await completeAloTicket("browser-check", result)).status === "ignored", "Duplicate result is idempotent");
+        check(clipboardWrites === 0, "Completion never writes the clipboard");
+        await saveActiveClientPayload(client);
+        await saveSuperOfficeTicketPayload({ ticketId: "31436062", sourceTicketId: "case1" });
+        await prepareAloTicketCompletion("browser-ui", client, await loadSuperOfficeTicketPayload(), { signalState: "never" });
+        createRoot(document.getElementById("root")).render(React.createElement(MemoryRouter, null, React.createElement(App)));
+        document.getElementById("result").disabled = false;
+        document.getElementById("replay").disabled = false;
+        document.getElementById("run").disabled = true;
+        log("Ready: simulate a result to verify the actual app listener and rendered External ID.");
+      } catch (error) { log(`FAIL: ${error.stack}`); }
+    };
+  </script>
+</body>
+</html>

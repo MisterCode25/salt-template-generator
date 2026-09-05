@@ -178,7 +178,7 @@ Date display inside an External ID is `DD.MM.YYYY`; stored form for the generato
 
 External ID display rules are strict:
 
-- External ID generation is an explicit user action.
+- External ID generation is an explicit user action. The authorized ALO completion flow is an exception: after app-driven autofill and the user's manual ALO submission, a verified new incident generates and saves an External ID without copying it.
 - Display an External ID in the client info panel only when it came from a valid imported BO/SO External ID or another explicitly valid stored/generated External ID source.
 - Never synthesize an imported External ID from partial token values.
 - A valid imported External ID must pass `parseExternalId`.
@@ -437,6 +437,7 @@ For module changes, manually verify when feasible:
 - Avoid duplicating template tree mutation logic; use `templateTreeOperations.js` and `templateTreeService.js`.
 - Do not write directly to IndexedDB/localStorage from UI code.
 - Do not mutate imported payload objects in place when saving state; clone or build new objects.
+- ALO completion: `alo-ticket-observer.js` watches manual submission and the result DOM; `aloTicketTracking.js` preserves tab/request matching in extension session storage. `aloTicketCompletionService.js` atomically checks the client and SO ticket before saving the generated ID and tokens. `useAloTicketCompletion` listens across app routes and retries deferred results. Never submit ALO or copy its generated External ID automatically.
 - Do not commit `output/playwright/*.png` unless explicitly asked.
 - Do not revert unrelated local changes.
 - If the worktree is dirty, identify which files belong to the current task before staging.

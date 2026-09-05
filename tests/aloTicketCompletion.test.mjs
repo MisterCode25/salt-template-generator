@@ -1,0 +1,48 @@
+import assert from "node:assert/strict";
+import { clearAppIndexedDB, loadIndexedJSON, saveIndexedJSON, updateIndexedRecords } from "../src/services/indexedDbService.js";
+import { prepareAloTicketCompletion, completeAloTicket, loadPendingAloTicketCompletions, cancelAloTicketCompletion } from "../src/services/aloTicketCompletionService.js";
+import { saveActiveClientPayload, loadActiveClientPayload } from "../src/services/activeClientService.js";
+import { saveSuperOfficeTicketPayload, loadSuperOfficeTicketPayload } from "../src/services/superOfficeTicketService.js";
+import { parseExternalId } from "../src/utils/externalGenerator.js";
+
+await clearAppIndexedDB();
+const client = { client: { contractorNumber: "12345678" }, healthcheck: { otoId: "OTO1", oltName: "OLT1" } };
+await saveActiveClientPayload(client);
+await saveSuperOfficeTicketPayload({ ticketId: "31436062", sourceTicketId: "case1", attachments: [] });
+const ticket = await loadSuperOfficeTicketPayload();
+await saveIndexedJSON("token_input_values", { "{agent_name}": "Agent", "{external_led_status}": "Fiber Red" });
+await prepareAloTicketCompletion("request-1", client, ticket, { aloType: "noSignal", signalState: "lost" });
+const result = { incidentId: "2336981", socketId: "OTO1" };
+assert.equal((await completeAloTicket("request-1", { incidentId: "INC000014852874" })).status, "invalid");
+assert.equal((await completeAloTicket("unknown", result)).status, "ignored");
+assert.equal((await loadPendingAloTicketCompletions()).length, 1);
+const completed = await completeAloTicket("request-1", result);
+assert.equal(completed.status, "completed");
+assert.equal(parseExternalId(completed.externalId).fields.partnerTicketNumber, "2336981");
+assert.equal(parseExternalId(completed.externalId).fields.LedStatus, "Fiber Red");
+assert.equal((await loadActiveClientPayload()).__importedExternalId, completed.externalId);
+assert.equal((await loadSuperOfficeTicketPayload()).externalTicketId, completed.externalId);
+assert.equal((await loadIndexedJSON("token_input_values"))["{external_partner_ticket_number}"], "2336981");
+assert.equal((await loadIndexedJSON("token_input_values"))["{agent_name}"], "Agent");
+assert.equal((await loadActiveClientPayload()).__templateInputs.external_partner_ticket_number, "2336981");
+assert.equal((await completeAloTicket("request-1", { ...result, incidentId: "9999999" })).status, "ignored");
+assert.equal((await loadPendingAloTicketCompletions()).length, 0);
+
+await prepareAloTicketCompletion("request-2", client, ticket, { signalState: "never" });
+await saveActiveClientPayload({ client: { contractorNumber: "87654321" } });
+assert.equal((await completeAloTicket("request-2", result)).status, "waiting");
+assert.equal((await loadActiveClientPayload()).__importedExternalId, undefined);
+await saveActiveClientPayload(client);
+await saveSuperOfficeTicketPayload({ ticketId: "99999999", sourceTicketId: "case2" });
+assert.equal((await completeAloTicket("request-2", result)).status, "waiting", "same customer, different SO ticket must stay untouched");
+await saveSuperOfficeTicketPayload({ ticketId: ticket.ticketId, sourceTicketId: ticket.sourceTicketId });
+assert.equal((await completeAloTicket("request-2", result)).status, "completed");
+await assert.rejects(() => prepareAloTicketCompletion("stale", { client: { contractorNumber: "other" } }, ticket, {}), /case changed/);
+await prepareAloTicketCompletion("cancelled", client, ticket, {});
+await cancelAloTicketCompletion("cancelled");
+assert.equal((await completeAloTicket("cancelled", result)).status, "ignored");
+
+await saveIndexedJSON("atomic-first", "before");
+await assert.rejects(() => updateIndexedRecords(["atomic-first"], () => { throw new Error("rollback"); }), /rollback/);
+assert.equal(await loadIndexedJSON("atomic-first"), "before");
+console.log("aloTicketCompletion tests passed");

@@ -8,7 +8,7 @@ const STATUS_TIMEOUT_MS = 1200;
 const STATUS_RETRY_DELAYS_MS = Object.freeze([150, 300]);
 const START_TIMEOUT_MS = 2200;
 export const BROWSER_EXTENSION_ACTION_TIMEOUT_MS = 10 * 60 * 1000;
-export const CURRENT_BROWSER_EXTENSION_VERSION = "0.1.28";
+export const CURRENT_BROWSER_EXTENSION_VERSION = "0.1.29";
 
 export function isBrowserExtensionVersionAtLeast(version, minimumVersion) {
     const parseVersion = (value) => String(value || "")
@@ -106,10 +106,9 @@ export async function startBrowserExtensionCapture(
     );
 }
 
-function startBrowserExtensionAction(type, payload) {
+function startBrowserExtensionAction(type, payload, requestId = createBrowserExtensionRequestId()) {
     if (typeof window === "undefined") return Promise.resolve(null);
 
-    const requestId = createBrowserExtensionRequestId();
     return new Promise((resolve) => {
         let acceptanceTimeoutId = null;
         let actionTimeoutId = null;
@@ -157,8 +156,17 @@ function startBrowserExtensionAction(type, payload) {
     });
 }
 
-export function startBrowserExtensionAloAutofill(payload) {
-    return startBrowserExtensionAction(BROWSER_EXTENSION_MESSAGE.START_ALO, payload);
+export function startBrowserExtensionAloAutofill(payload, requestId) {
+    return startBrowserExtensionAction(BROWSER_EXTENSION_MESSAGE.START_ALO, payload, requestId);
+}
+
+export function requestPendingAloResults(requestIds) {
+    window.postMessage(createAppCommand(BROWSER_EXTENSION_MESSAGE.ALO_RESULTS_REQUEST,
+        createBrowserExtensionRequestId(), { requestIds }), window.location.origin);
+}
+
+export function acknowledgeAloResult(requestId) {
+    window.postMessage(createAppCommand(BROWSER_EXTENSION_MESSAGE.ALO_RESULT_ACK, requestId), window.location.origin);
 }
 
 export function startBrowserExtensionAlexAction(payload) {
