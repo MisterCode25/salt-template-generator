@@ -1,4 +1,4 @@
-import{c as e}from"./appConfigService-JA7k1QR0.js";/**
+import{c as e}from"./appConfigService-BQx3U3yq.js";/**
  * @license lucide-react v1.17.0 - ISC
  *
  * This source code is licensed under the ISC license.
