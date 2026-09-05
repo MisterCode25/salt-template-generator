@@ -37,6 +37,10 @@ import {
 import { copyHtml, copyText, formatClipboardHtmlBody, showToast } from "../services/clipboardService.js";
 import { resolveTemplateImagesInHtml } from "../services/templateImageService.js";
 import { clearSuperOfficeMediaCache } from "../services/superOfficeMediaCache.js";
+import {
+    archiveActiveClientSnapshot,
+    restoreRecentClientSnapshot
+} from "../services/clientHistoryService.js";
 import { stripImagesFromHtml } from "../utils/templateImages.js";
 import { loadTokens } from "../services/tokenService.js";
 import { deleteJSON, loadJSON, saveJSON } from "../services/storageService.js";
@@ -2153,6 +2157,7 @@ export function useTemplateRuntime() {
     }, [clientPayload, clientInternalTokens.length, tokens]);
 
     const clearClientInfo = async () => {
+        await archiveActiveClientSnapshot();
         clearSuperOfficeMediaCache();
         await clearSuperOfficeTicketPayload();
         await clearStoredInputValues();
@@ -2178,13 +2183,14 @@ export function useTemplateRuntime() {
         inputChangeVersion.current++;
     };
 
-    const loadClientFromText = async (text) => {
+    const loadClientFromText = async (text, options = {}) => {
         const payload = parseClientClipboardJSON(text);
         const currentClientPayload = await loadActiveClientPayload();
         const currentClientSignature = getSuperOfficeClientSignature(currentClientPayload);
         const nextClientSignature = getSuperOfficeClientSignature(payload);
         const isSameClient = isSameSuperOfficeClient(currentClientPayload, payload);
         if (currentClientSignature && currentClientSignature !== nextClientSignature && !isSameClient) {
+            if (options.archiveCurrent !== false) await archiveActiveClientSnapshot();
             await clearSuperOfficeTicketPayload();
         }
         const {
@@ -2269,13 +2275,61 @@ export function useTemplateRuntime() {
         return { pendingSuperOfficeConflict };
     };
 
+    const restoreRecentClient = async (entryId) => {
+        clearSuperOfficeMediaCache();
+        const restoredEntry = await restoreRecentClientSnapshot(entryId);
+        if (!restoredEntry) {
+            showToast("This recent client is no longer available.", "warning");
+            return false;
+        }
+
+        const restoredClientPayload = await loadActiveClientPayload();
+        const agentProfile = await loadAgentProfile();
+        await syncAgentProfileInputValues(agentProfile);
+        const restoredValues = await loadTokenInputValues();
+        const agentValues = getAgentProfileTokenValues(agentProfile);
+        const {
+            tokenDefs: internalTokenDefs,
+            matchedTokens: internalMatchedTokens
+        } = getClientInternalTokenData(restoredClientPayload);
+        const availableTokens = [
+            ...tokens,
+            ...internalTokenDefs.filter((internalToken) => (
+                !tokens.some((tokenDef) => tokenDef.token === internalToken.token)
+            ))
+        ];
+        const { matchedTokens } = matchClientDataToTokens(restoredClientPayload, availableTokens);
+        const restoredLanguage = getClientLanguageCode(restoredClientPayload);
+
+        setClientPayload(restoredClientPayload);
+        setClientInternalTokens(internalTokenDefs);
+        setClientMatchedTokens([...internalMatchedTokens, ...matchedTokens]);
+        setValues({ ...restoredValues, ...agentValues });
+        if (restoredLanguage) setLang(restoredLanguage);
+        setClientDetailsExpanded(false);
+        setClientPasteOpen(false);
+        setClientPasteInitialError("");
+        setTokenPrompt(null);
+        setCopyPreview(null);
+        setPromptMissingTokens([]);
+        setVariantPicker(null);
+        setExternalIdConflictPrompt(null);
+        setSuperOfficeReplacementPrompt(null);
+        closeCaptureDataFlow();
+        setClientImportStatus({ type: "success", message: "" });
+        lastSectionClickVersion.current = {};
+        inputChangeVersion.current++;
+        showToast("Recent client restored.", "success");
+        return true;
+    };
+
     const importBrowserExtensionCapture = async (message) => {
         if (browserExtensionImportInFlight.current) return;
         browserExtensionImportInFlight.current = true;
 
         try {
             const vtiText = JSON.stringify(message.payload?.vti ?? null);
-            parseClientClipboardJSON(vtiText);
+            const capturedClientPayload = parseClientClipboardJSON(vtiText);
             const superOfficeResult = parseSuperOfficeInfoPayload(message.payload?.superOffice);
             if (!superOfficeResult.ok) {
                 throw new Error("The extension did not return valid SuperOffice data.");
@@ -2286,9 +2340,13 @@ export function useTemplateRuntime() {
                 requestId: message.requestId
             });
 
+            const currentClientPayload = await loadActiveClientPayload();
+            if (currentClientPayload && !isSameSuperOfficeClient(currentClientPayload, capturedClientPayload)) {
+                await archiveActiveClientSnapshot();
+            }
             clearSuperOfficeMediaCache();
             await clearSuperOfficeTicketPayload();
-            await loadClientFromText(vtiText);
+            await loadClientFromText(vtiText, { archiveCurrent: false });
 
             if (openExternalIdConflictPrompt(superOfficeResult, await loadActiveClientPayload())) {
                 setBrowserExtensionCaptureOpen(false);
@@ -3138,6 +3196,7 @@ export function useTemplateRuntime() {
         readClientClipboard,
         readSuperOfficeClipboard,
         clearClientInfo,
+        restoreRecentClient,
         clientPasteOpen,
         setClientPasteOpen,
         clientPasteInitialError,

@@ -577,7 +577,7 @@ export default function Settings({ embedded = false, onClose = null, initialSect
     const resetStorage = useCallback(async () => {
         setConfirmReset(false);
         const keysToDelete = [];
-        const appScopedLegacyKeys = new Set(["tokens", "models", "theme_pref", "active_client_payload", "agent_profile", "chatgpt_prompt_settings", "config_locked"]);
+        const appScopedLegacyKeys = new Set(["tokens", "models", "theme_pref", "active_client_payload", "recent_client_history", "agent_profile", "chatgpt_prompt_settings", "config_locked"]);
         try {
             const storage = globalThis.localStorage || null;
             if (storage) {

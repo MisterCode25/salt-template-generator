@@ -24,6 +24,7 @@ import EmptyState from "../components/EmptyState.jsx";
 import ErrorBoundary from "../components/ErrorBoundary.jsx";
 import Modal from "../components/Modal.jsx";
 import BrowserExtensionCaptureModal from "../components/BrowserExtensionCaptureModal.jsx";
+import RecentClientsMenu from "../components/RecentClientsMenu.jsx";
 import {
     ClientBarCustomizeModal,
     ClientInfoPanel,
@@ -113,6 +114,10 @@ import { getRouterElectricalImpact } from "../utils/routerElectricalImpact.js";
 import { CAPTURE_FLOW, getPrimaryCaptureFlow } from "../config/appFeatureFlags.js";
 import { SETTINGS_SECTION } from "../config/settingsSections.js";
 import { excludeCaseReferenceFields } from "../utils/clientBarSelection.js";
+import {
+    loadRecentClientHistory,
+    RECENT_CLIENT_HISTORY_UPDATED_EVENT
+} from "../services/clientHistoryService.js";
 
 const ExternalGenerator = lazy(() => import("./ExternalGenerator.jsx"));
 const ManageNodes = lazy(() => import("./ManageNodes.jsx"));
@@ -1106,6 +1111,9 @@ export default function Templates() {
     const [query, setQuery] = useState("");
     const [searchResetSignal, setSearchResetSignal] = useState(0);
     const [dropdownOpen, setDropdownOpen] = useState(false);
+    const [recentClientsOpen, setRecentClientsOpen] = useState(false);
+    const [recentClients, setRecentClients] = useState([]);
+    const [restoringRecentClientId, setRestoringRecentClientId] = useState("");
     const [activeWorkspace, setActiveWorkspace] = useState(null);
     const [settingsInitialSection, setSettingsInitialSection] = useState(SETTINGS_SECTION.AGENT);
     const [externalGeneratorOpen, setExternalGeneratorOpen] = useState(false);
@@ -1228,6 +1236,22 @@ export default function Templates() {
     }, [refreshSuperOfficeState]);
 
     useEffect(() => {
+        let cancelled = false;
+        loadRecentClientHistory().then((entries) => {
+            if (!cancelled) setRecentClients(entries);
+        });
+        const handler = (event) => {
+            const entries = event.detail?.entries;
+            if (Array.isArray(entries)) setRecentClients(entries);
+        };
+        window.addEventListener(RECENT_CLIENT_HISTORY_UPDATED_EVENT, handler);
+        return () => {
+            cancelled = true;
+            window.removeEventListener(RECENT_CLIENT_HISTORY_UPDATED_EVENT, handler);
+        };
+    }, []);
+
+    useEffect(() => {
         const handler = (event) => {
             refreshSuperOfficeState(event.detail?.payload ?? undefined);
         };
@@ -1238,6 +1262,7 @@ export default function Templates() {
     useEffect(() => {
         const handler = (event) => {
             if (!event.target.closest(".options-dropdown")) setDropdownOpen(false);
+            if (!event.target.closest(".recent-clients-dropdown")) setRecentClientsOpen(false);
         };
         document.addEventListener("click", handler);
         return () => document.removeEventListener("click", handler);
@@ -1410,6 +1435,21 @@ export default function Templates() {
         await refreshSuperOfficeState(null);
         resetCaseNavigation();
     }, [refreshSuperOfficeState, resetCaseNavigation]);
+
+    const restoreRecentClient = useCallback(async (entryId) => {
+        if (!entryId || restoringRecentClientId) return;
+        setRestoringRecentClientId(entryId);
+        try {
+            const restored = await runtimeRef.current.restoreRecentClient(entryId);
+            if (!restored) return;
+            setRecentClientsOpen(false);
+            setSuperOfficeGalleryOpen(false);
+            await refreshSuperOfficeState();
+            resetCaseNavigation();
+        } finally {
+            setRestoringRecentClientId("");
+        }
+    }, [refreshSuperOfficeState, resetCaseNavigation, restoringRecentClientId]);
 
     const openCaptureDataFlow = useCallback(async () => {
         const hasSoData = await hasSuperOfficeTicketPayload();
@@ -1909,8 +1949,21 @@ export default function Templates() {
                     )}
                 </div>
                 <nav className="top-menu">
+                    <RecentClientsMenu
+                        entries={recentClients}
+                        isOpen={recentClientsOpen}
+                        restoringId={restoringRecentClientId}
+                        onToggle={() => {
+                            setRecentClientsOpen((open) => !open);
+                            setDropdownOpen(false);
+                        }}
+                        onRestore={restoreRecentClient}
+                    />
                     <div className="dropdown options-dropdown">
-                        <button type="button" className="dropdown-btn" aria-haspopup="menu" aria-expanded={dropdownOpen} onClick={() => setDropdownOpen((open) => !open)}>
+                        <button type="button" className="dropdown-btn" aria-haspopup="menu" aria-expanded={dropdownOpen} onClick={() => {
+                            setDropdownOpen((open) => !open);
+                            setRecentClientsOpen(false);
+                        }}>
                             Options ▾
                         </button>
                         {dropdownOpen && (
