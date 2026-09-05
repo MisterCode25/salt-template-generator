@@ -43,4 +43,27 @@ assert.match(
   "The enlarged home header must grow instead of overlapping the capture controls"
 );
 
+const layoutCss = stylesheets.find(({ path }) => path.endsWith("layout.css")).source;
+assert.match(
+  layoutCss,
+  /\.client-info-bar-field-key\s*\{[^}]*font-size:\s*var\(--font-sm\)/s,
+  "Client banner labels must use the readable small-text size"
+);
+assert.match(
+  layoutCss,
+  /\.client-info-bar-field-val\s*\{[^}]*font-size:\s*var\(--font-md\)/s,
+  "Client banner values must be visually prominent"
+);
+assert.match(
+  layoutCss,
+  /\.client-capture-reference-field dd\s*\{[^}]*font-size:\s*var\(--font-md\)/s,
+  "VTI and ticket references must be visually prominent"
+);
+
+assert.match(
+  componentsCss,
+  /\.client-info-bar-field-val\s*\{[^}]*font-size:\s*var\(--font-md\)/s,
+  "Later component styles must preserve the prominent client banner value size"
+);
+
 console.log("accessibleTypography tests passed");

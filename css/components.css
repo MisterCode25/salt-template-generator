@@ -10154,10 +10154,15 @@ textarea::placeholder,
     color: var(--read-text) !important;
 }
 
-.client-info-bar-field-val,
+.client-info-bar-field-val {
+    font-size: var(--font-md);
+    line-height: 1.25;
+    font-weight: 750;
+}
+
 .client-info-value,
 .client-info-summary-value {
-    font-size: 16px;
+    font-size: var(--font-base);
     line-height: 1.25;
     font-weight: 750;
 }
